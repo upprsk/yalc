@@ -14,6 +14,9 @@ TokenType :: enum u8 {
 	// symbols
 	equal,
 	equal_equal,
+	dot,
+	dot_dot,
+	comma,
 
 	// arithmetic
 	plus,
@@ -28,8 +31,10 @@ TokenType :: enum u8 {
 	slash,
 	slash_equal,
 
-	// special
+	// others
 	comment,
+
+	// special
 	eof,
 	error,
 }
@@ -39,36 +44,39 @@ TokenSpan :: struct {
 	end:   u32,
 }
 
+Token :: struct {
+	ty:   TokenType,
+	span: TokenSpan,
+}
+
 State :: struct {
 	source:  []rune,
 	start:   u32,
 	current: u32,
-	tokens:  [dynamic]TokenType,
-	data:    [dynamic]TokenSpan,
+	tokens:  #soa[dynamic]Token,
 }
 
-tokenize :: proc(source: string) -> ([]TokenType, []TokenSpan) {
+tokenize :: proc(source: string) -> #soa[]Token {
 	s := State {
 		source = utf8.string_to_runes(source),
 	}
 	defer delete(s.source)
 
 	for {
-		tok, data := tokenize_one(&s)
-		append(&s.tokens, tok)
-		append(&s.data, data)
-		if tok == .eof {break}
+		tok := tokenize_one(&s)
+		append_soa(&s.tokens, tok)
+		if tok.ty == .eof {break}
 	}
 
-	return s.tokens[:], s.data[:]
+	return s.tokens[:]
 }
 
-tokenize_one :: proc(s: ^State) -> (TokenType, TokenSpan) {
+tokenize_one :: proc(s: ^State) -> Token {
 	skip_whitespace(s)
 
 	s.start = s.current
 	if is_at_end(s^) {
-		return .eof, TokenSpan{}
+		return mktoken(s^, .eof)
 	}
 
 	c := peek(s^)
@@ -91,6 +99,10 @@ tokenize_one :: proc(s: ^State) -> (TokenType, TokenSpan) {
 	// symbols
 	case '=':
 		return mktoken_any_of(s, peek(s^), []rune{'='}, []TokenType{.equal, .equal_equal})
+	case '.':
+		return mktoken_any_of(s, peek(s^), []rune{'.'}, []TokenType{.dot, .dot_dot})
+	case ',':
+		return mktoken(s^, .comma)
 
 	// arithmetic
 	case '+':
@@ -141,15 +153,7 @@ skip_whitespace :: proc(s: ^State) {
 	}
 }
 
-mktoken_any_of :: proc(
-	s: ^State,
-	c: rune,
-	cases: []rune,
-	tys: []TokenType,
-) -> (
-	TokenType,
-	TokenSpan,
-) {
+mktoken_any_of :: proc(s: ^State, c: rune, cases: []rune, tys: []TokenType) -> Token {
 	assert(len(tys) == len(cases) + 1)
 	for ca, idx in cases {
 		if c == ca {
@@ -161,8 +165,8 @@ mktoken_any_of :: proc(
 	return mktoken(s^, tys[0])
 }
 
-mktoken :: proc(s: State, ty: TokenType) -> (TokenType, TokenSpan) {
-	return ty, TokenSpan{begin = s.start, end = s.current}
+mktoken :: proc(s: State, ty: TokenType) -> Token {
+	return Token{ty = ty, span = TokenSpan{begin = s.start, end = s.current}}
 }
 
 peek :: proc(s: State) -> rune {

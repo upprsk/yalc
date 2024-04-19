@@ -17,12 +17,10 @@ main :: proc() {
 	source_code := transmute(string)data
 	fmt.println(source_code)
 
-	tokens, tokens_data := tokenizer.tokenize(source_code)
+	tokens := tokenizer.tokenize(source_code)
 	defer {
 		delete(tokens)
-		delete(tokens_data)
 	}
 
 	fmt.println(tokens)
-	fmt.println(tokens_data)
 }
