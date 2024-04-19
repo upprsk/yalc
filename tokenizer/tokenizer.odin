@@ -3,6 +3,11 @@ package tokenizer
 import "core:unicode/utf8"
 
 TokenType :: enum u8 {
+	// long
+	ident,
+	integer,
+	floating,
+
 	// parens
 	lparen,
 	rparen,
@@ -17,6 +22,7 @@ TokenType :: enum u8 {
 	dot,
 	dot_dot,
 	comma,
+	colon,
 
 	// arithmetic
 	plus,
@@ -82,6 +88,12 @@ tokenize_one :: proc(s: ^State) -> Token {
 	c := peek(s^)
 	advance(s)
 	switch c {
+	// long
+	case '0' ..= '9':
+		return tokenize_number(s)
+	case 'a' ..= 'z', 'A' ..= 'Z', '_':
+		return tokenize_ident(s)
+
 	// parens
 	case '(':
 		return mktoken(s^, .lparen)
@@ -103,6 +115,8 @@ tokenize_one :: proc(s: ^State) -> Token {
 		return mktoken_any_of(s, peek(s^), []rune{'.'}, []TokenType{.dot, .dot_dot})
 	case ',':
 		return mktoken(s^, .comma)
+	case ':':
+		return mktoken(s^, .colon)
 
 	// arithmetic
 	case '+':
@@ -142,6 +156,67 @@ tokenize_one :: proc(s: ^State) -> Token {
 	}
 }
 
+tokenize_number :: proc(s: ^State) -> Token {
+	if peek(s^) == 'x' {
+		// hexadecimal number
+		advance(s)
+
+		for !is_at_end(s^) && is_hexnumeric(peek(s^)) {
+			advance(s)
+		}
+
+		return mktoken(s^, .integer)
+	}
+
+	if peek(s^) == 'o' {
+		// octal number
+		advance(s)
+
+		// NOTE: Using numeric here anyways
+		for !is_at_end(s^) && is_numeric(peek(s^)) {
+			advance(s)
+		}
+
+		return mktoken(s^, .integer)
+	}
+
+	if peek(s^) == 'b' {
+		// binary number
+		advance(s)
+
+		// NOTE: Using numeric here anyways
+		for !is_at_end(s^) && is_numeric(peek(s^)) {
+			advance(s)
+		}
+
+		return mktoken(s^, .integer)
+	}
+
+	for !is_at_end(s^) && is_numeric(peek(s^)) {
+		advance(s)
+	}
+
+	// floating point
+	if peek(s^) == '.' {
+		advance(s)
+		for !is_at_end(s^) && is_numeric(peek(s^)) {
+			advance(s)
+		}
+
+		return mktoken(s^, .floating)
+	}
+
+	return mktoken(s^, .integer)
+}
+
+tokenize_ident :: proc(s: ^State) -> Token {
+	for !is_at_end(s^) && is_alphanumeric(peek(s^)) {
+		advance(s)
+	}
+
+	return mktoken(s^, .ident)
+}
+
 skip_whitespace :: proc(s: ^State) {
 	for !is_at_end(s^) {
 		switch peek(s^) {
@@ -170,6 +245,8 @@ mktoken :: proc(s: State, ty: TokenType) -> Token {
 }
 
 peek :: proc(s: State) -> rune {
+	if is_at_end(s) {return 0}
+
 	return s.source[s.current]
 }
 
@@ -181,4 +258,35 @@ advance :: proc(s: ^State) {
 
 is_at_end :: proc(s: State) -> bool {
 	return s.current == u32(len(s.source))
+}
+
+is_numeric :: proc(c: rune) -> bool {
+	switch c {
+	case '0' ..= '9':
+		return true
+	case:
+		return false
+	}
+}
+
+is_hexnumeric :: proc(c: rune) -> bool {
+	switch c {
+	case '0' ..= '9', 'a' ..= 'f', 'A' ..= 'F':
+		return true
+	case:
+		return false
+	}
+}
+
+is_alpha :: proc(c: rune) -> bool {
+	switch c {
+	case 'a' ..= 'z', 'A' ..= 'Z', '_':
+		return true
+	case:
+		return false
+	}
+}
+
+is_alphanumeric :: proc(c: rune) -> bool {
+	return is_numeric(c) || is_alpha(c)
 }
