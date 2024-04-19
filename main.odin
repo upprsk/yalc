@@ -4,9 +4,6 @@ import "core:fmt"
 import "core:os"
 import "tokenizer"
 
-// read_entire_file_from_filename :: proc(name: string, allocator := context.allocator, loc := #caller_location) -> (data: []u8, success: bool) {…}
-
-
 main :: proc() {
 	filename :: "test.yal"
 	data, read_ok := os.read_entire_file(filename)
