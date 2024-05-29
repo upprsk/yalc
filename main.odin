@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import "core:os"
 import "tokenizer"
+import "parser"
 
 main :: proc() {
 	filename :: "test.yal"
@@ -18,9 +19,9 @@ main :: proc() {
 	// fmt.println(source_code)
 
 	tokens := tokenizer.tokenize(source_code)
-	defer {
-		delete(tokens)
-	}
-
+	defer delete(tokens)
 	fmt.println(tokens)
+
+	ast := parser.parse(tokens)
+	fmt.println(ast)
 }
