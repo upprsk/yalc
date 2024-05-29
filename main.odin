@@ -15,7 +15,7 @@ main :: proc() {
 	defer delete(data)
 
 	source_code := transmute(string)data
-	fmt.println(source_code)
+	// fmt.println(source_code)
 
 	tokens := tokenizer.tokenize(source_code)
 	defer {
