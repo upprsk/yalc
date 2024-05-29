@@ -1,14 +1,16 @@
-// parens
-// ( ) [ ] { }
+// main :: .(argc: i32, argv: [*][*]u8) :{};
+// main: (argc: i32, argv: [*][*]u8) :{}
 
-// symbols
-// = ==
+write: (f: c.Fd, buf: []u8) :{
+    c.write(f, buf.ptr, buf.len);
+}
 
-// arithmetic
-// + ++ +=
-// - -- -=
-// * ** *=
-// /    /=
-// main: () = {
-// }
-main: ()
+c: record :{
+    Fd :: distinct i32;
+
+    STDIN  :: 0 as Fd;
+    STDOUT :: 1 as Fd;
+    STDERR :: 2 as Fd;
+
+    extern write: (f: Fd, buf: *u8, len: usize) -> i32;
+}
