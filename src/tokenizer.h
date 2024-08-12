@@ -26,9 +26,4 @@ typedef struct token {
 typedef struct token_stream {
 } token_stream_t;
 
-typedef enum tokenizer_result {
-    TRES_OK = 0,
-    TRES_FAIL,
-} tokenizer_result_t;
-
-tokenizer_result_t tokenize(char const* source, uint32_t source_len);
+token_t* tokenize(char const* source);

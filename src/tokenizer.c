@@ -35,10 +35,6 @@ static inline void tokenizer_init(tokenizer_t* t, char const* source,
     };
 }
 
-static inline void tokenizer_deinit(tokenizer_t* t) {
-    da_free(t->tokens, t->alloc);
-}
-
 static inline char peek(tokenizer_t const* t) { return *t->head; }
 static inline void advance(tokenizer_t* t) { t->head++; }
 static inline char next(tokenizer_t* t) {
@@ -82,7 +78,7 @@ static inline bool is_digit(char c) {
     }
 }
 
-static tokenizer_result_t tokenize_int(tokenizer_t* t) {
+static void tokenize_int(tokenizer_t* t) {
     while (is_digit(peek(t))) advance(t);
 
     if (peek(t) == '.' && is_digit(peek_next(t))) {
@@ -90,21 +86,18 @@ static tokenizer_result_t tokenize_int(tokenizer_t* t) {
         while (is_digit(peek(t))) advance(t);
 
         append_token(t, TT_FLOAT);
-
-        return TRES_OK;
+        return;
     }
 
     append_token(t, TT_INT);
-
-    return TRES_OK;
 }
 
-static tokenizer_result_t tokenize_one(tokenizer_t* t) {
+static void tokenize_one(tokenizer_t* t) {
     skip_whitespace(t);
 
     t->start = t->head;
 
-    if (is_at_end(t)) return TRES_OK;
+    if (is_at_end(t)) return;
 
     char c = next(t);
     switch (c) {
@@ -113,39 +106,22 @@ static tokenizer_result_t tokenize_one(tokenizer_t* t) {
         case '*': append_token(t, TT_STAR); break;
         case '/': append_token(t, TT_SLASH); break;
         case '0' ... '9': return tokenize_int(t);
-        default:
-            fprintf(stderr, "error: invalid character: '%c'\n", c);
-            return TRES_FAIL;
+        default: fprintf(stderr, "error: invalid character: '%c'\n", c); return;
     }
-
-    return TRES_OK;
 }
 
-tokenizer_result_t tokenize(char const* source, uint32_t source_len) {
+token_t* tokenize(char const* source) {
     allocator_t alloc = {};
     allocator_init_stdc(&alloc);
 
     tokenizer_t t = {};
     tokenizer_init(&t, source, alloc);
 
-    tokenizer_result_t result = TRES_OK;
-
     while (!is_at_end(&t)) {
-        result = tokenize_one(&t);
-        if (result) goto error;
+        tokenize_one(&t);
     }
 
     append_token(&t, TT_EOF);
 
-    for (size_t i = 0; i < da_get_size(t.tokens); ++i) {
-        printf("token (%d) [%d, %d]\n", t.tokens[i].type,
-               t.tokens[i].span.start, t.tokens[i].span.end);
-    }
-
-    tokenizer_deinit(&t);
-    return result;
-
-error:
-    tokenizer_deinit(&t);
-    return result;
+    return t.tokens;
 }
