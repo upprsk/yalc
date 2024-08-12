@@ -1,11 +1,20 @@
 add_library(yal
-  allocator.h
   allocator.c
-  span.h
-  da.h
+  allocator.h
+  arena/arena.c
+  arena/arena.h
+  ast.c
+  ast.h
   da.c
+  da.h
+  errors.c
+  errors.h
+  parser.c
+  parser.h
+  span.h
+  tokenizer.c
   tokenizer.h
-  tokenizer.c)
+)
 
 target_include_directories(yal PUBLIC .)
 target_link_libraries(yal PUBLIC munit)

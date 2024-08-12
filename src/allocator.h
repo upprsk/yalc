@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+#include "arena/arena.h"
+
 typedef void* (*allocator_alloc_fn)(void* ctx, size_t size, size_t align);
 typedef void (*allocator_free_fn)(void* ctx, void* ptr);
 typedef void* (*allocator_realloc_fn)(void* ctx, void* ptr, size_t new_size);
@@ -17,7 +19,12 @@ typedef struct allocator {
     void*                     ctx;
 } allocator_t;
 
+// ============================================================================
+
 void allocator_init_stdc(allocator_t* a);
+void allocator_init_arena(allocator_t* a, Arena* arena);
+
+// ============================================================================
 
 void* allocator_alloc(allocator_t a, size_t size);
 void* allocator_alloc_opt(allocator_t a, size_t size, size_t align);
