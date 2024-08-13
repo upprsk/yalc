@@ -7,6 +7,8 @@
 #include "errors.h"
 #include "parser.h"
 #include "tokenizer.h"
+#include "typecheck.h"
+#include "typestore.h"
 
 static char* read_entire_file(char const* filename, allocator_t alloc,
                               size_t* len) {
@@ -117,6 +119,19 @@ int main(int argc, char* argv[]) {
 
     dump_node(stdout, ast, 0);
 
+    typestore_t ts = {};
+    typestore_init(&ts, alloc);
+
+    pass_typecheck(&(typecheck_params_t){
+        .ast = ast,
+        .ts = &ts,
+        .filename = filename,
+        .source = source,
+        .source_len = source_len,
+        .er = &er,
+    });
+
+    typestore_deinit(&ts);
     arena_free(&node_arena);
 
     return 0;

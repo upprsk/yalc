@@ -58,5 +58,5 @@ void* da_append_opt(void* arr, allocator_t alloc, void* value);
 #define da_init(T, alloc_) (T*)da_init_default(alloc_, sizeof(T))
 
 // T* da_append(T* ptr, allocator_t alloc, T const* value)
-#define da_append(ptr_, alloc_, value_) \
-    (typeof(ptr_))da_append_opt(ptr_, alloc_, (typeof(ptr_))(value_))
+#define da_append(ptr_, alloc_, ...) \
+    (typeof(ptr_))da_append_opt(ptr_, alloc_, (typeof(ptr_))(__VA_ARGS__))

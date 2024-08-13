@@ -14,6 +14,10 @@ add_library(yal
   span.h
   tokenizer.c
   tokenizer.h
+  typecheck.c
+  typecheck.h
+  typestore.c
+  typestore.h
 )
 
 target_include_directories(yal PUBLIC .)

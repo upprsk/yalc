@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "span.h"
+#include "typestore.h"
 
 typedef struct node node_t;
 
@@ -159,6 +160,7 @@ static inline char const* node_type_to_str(node_type_t type) {
 struct node {
     node_type_t type;
     span_t      span;
+    type_id_t   type_id;
     union {
         node_int_t         int_;
         node_float_t       float_;

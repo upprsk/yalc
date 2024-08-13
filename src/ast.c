@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "da.h"
+#include "typestore.h"
 
 static inline void indent_by_2(FILE* f, int indent) {
     for (int i = 0; i < indent; ++i) fprintf(f, "  ");
@@ -14,6 +15,10 @@ void dump_node(FILE* f, node_t* node, int indent) {
     if (!node) {
         fprintf(f, "<null>\n");
         return;
+    }
+
+    if (type_id_is_valid(node->type_id)) {
+        fprintf(f, "[%d] ", node->type_id.id);
     }
 
     switch (node->type) {
