@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "allocator.h"
 #include "da.h"
@@ -14,6 +15,7 @@ typedef struct tokenizer {
     char const* filename;
     /// Null terminated string of the source code.
     char const* source;
+    uint32_t    source_len;
     /// Tokenizing head, points to the current character.
     char const* head;
     /// Start of the current token.
@@ -31,10 +33,11 @@ typedef struct tokenizer {
 
 static inline void tokenizer_init(tokenizer_t* t, error_reporter_t* er,
                                   char const* filename, char const* source,
-                                  allocator_t alloc) {
+                                  uint32_t source_len, allocator_t alloc) {
     *t = (tokenizer_t){
         .filename = filename,
         .source = source,
+        .source_len = source_len,
         .head = source,
         .start = source,
         .er = er,
@@ -121,10 +124,31 @@ static void tokenize_int(tokenizer_t* t) {
     append_token(t, TT_INT);
 }
 
+#define max(a, b)               \
+    ({                          \
+        __typeof__(a) _a = (a); \
+        __typeof__(b) _b = (b); \
+        _a > _b ? _a : _b;      \
+    })
+
+#define min(a, b)               \
+    ({                          \
+        __typeof__(a) _a = (a); \
+        __typeof__(b) _b = (b); \
+        _a < _b ? _a : _b;      \
+    })
+
 static void tokenize_ident(tokenizer_t* t) {
     while (is_digit(peek(t)) || is_alpha(peek(t))) advance(t);
 
-    append_token(t, TT_IDENT);
+    uint32_t    len;
+    char const* ident =
+        span_str_parts(mkspan(t), t->source, t->source_len, &len);
+    if (strncmp(ident, "return", min(len, (uint32_t)6)) == 0) {
+        append_token(t, TT_RETURN);
+    } else {
+        append_token(t, TT_IDENT);
+    }
 }
 
 static void tokenize_one(tokenizer_t* t) {
@@ -174,12 +198,12 @@ static void tokenize_one(tokenizer_t* t) {
 }
 
 token_t* tokenize(error_reporter_t* er, char const* filename,
-                  char const* source) {
+                  char const* source, uint32_t source_len) {
     allocator_t alloc = {};
     allocator_init_stdc(&alloc);
 
     tokenizer_t t = {};
-    tokenizer_init(&t, er, filename, source, alloc);
+    tokenizer_init(&t, er, filename, source, source_len, alloc);
 
     while (!is_at_end(&t)) {
         tokenize_one(&t);

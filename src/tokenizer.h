@@ -33,6 +33,8 @@ typedef enum token_type : uint8_t {
     TT_DOT_LPAREN,  // .(
     TT_ARROW,       // ->
 
+    TT_RETURN,  // return
+
     TT_EOF = 0xFF,
 } token_type_t;
 
@@ -59,6 +61,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_RBRACE: return "TT_RBRACE";
         case TT_DOT_LPAREN: return "TT_DOT_LPAREN";
         case TT_ARROW: return "TT_ARROW";
+        case TT_RETURN: return "TT_RETURN";
         case TT_EOF: return "TT_EOF";
     }
 
@@ -71,4 +74,4 @@ typedef struct token {
 } token_t;
 
 token_t* tokenize(error_reporter_t* er, char const* filename,
-                  char const* source);
+                  char const* source, uint32_t source_len);

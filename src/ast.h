@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -101,6 +102,15 @@ typedef struct node_proc {
     node_t* body;
 } node_proc_t;
 
+typedef struct node_ptr {
+    node_t* child;
+} node_ptr_t;
+
+typedef struct node_mptr {
+    node_t* child;
+    node_t* term;
+} node_mptr_t;
+
 typedef enum node_type {
     NODE_ERR,
 
@@ -120,6 +130,8 @@ typedef enum node_type {
 
     NODE_ARG,
     NODE_PROC,
+    NODE_PTR,
+    NODE_MPTR,
 } node_type_t;
 
 static inline char const* node_type_to_str(node_type_t type) {
@@ -137,6 +149,8 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_ASSIGN: return "NODE_ASSIGN";
         case NODE_ARG: return "NODE_ARG";
         case NODE_PROC: return "NODE_PROC";
+        case NODE_PTR: return "NODE_PTR";
+        case NODE_MPTR: return "NODE_MPTR";
     }
 
     return "?";
@@ -158,6 +172,8 @@ struct node {
         node_assign_t      assign;
         node_arg_t         arg;
         node_proc_t        proc;
+        node_ptr_t         ptr;
+        node_mptr_t        mptr;
     } as;
 };
 

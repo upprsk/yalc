@@ -75,5 +75,14 @@ void dump_node(FILE* f, node_t* node, int indent) {
             dump_node(f, node->as.proc.return_type, indent + 1);
             dump_node(f, node->as.proc.body, indent + 1);
         } break;
+        case NODE_PTR:
+            fprintf(f, "PTR\n");
+            dump_node(f, node->as.ptr.child, indent + 1);
+            break;
+        case NODE_MPTR:
+            fprintf(f, "MPTR\n");
+            dump_node(f, node->as.mptr.term, indent + 1);
+            dump_node(f, node->as.mptr.child, indent + 1);
+            break;
     }
 }

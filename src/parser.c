@@ -185,7 +185,7 @@ static node_t* parse_block(parser_t* p) {
                   .as.stmt_blk.stmts = da_init(node_t*, p->node_alloc),
                   .span.start = open_tok.span.start};
 
-    while (peek(p).type != TT_RBRACE) {
+    while (peek(p).type != TT_EOF && peek(p).type != TT_RBRACE) {
         node_t* stmt = parse_stmt(p);
         n->as.stmt_blk.stmts =
             da_append(n->as.stmt_blk.stmts, p->node_alloc, &stmt);
@@ -242,10 +242,63 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
     *n = (node_t){
         .type = NODE_PROC,
         .as.proc = {.return_type = return_type, .args = args, .body = body},
-        .span.start = tok.span.start
+        .span.start = tok.span.start,
+        .span.end = body->span.end,
     };
 
     return n;
+}
+
+static node_t* parse_pointer(parser_t* p, token_t tok) {
+    node_t* expr = parse_prefix(p);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_PTR,
+        .as.ptr = {.child = expr},
+        .span.start = tok.span.start,
+        .span.end = expr->span.end,
+    };
+
+    return n;
+}
+
+static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
+    if (match(p, TT_STAR)) {
+        node_t* term = NULL;
+
+        if (match(p, TT_COLON)) {
+            // terminated multi pointer
+            term = parse_expr(p, 0);
+        }
+
+        consume(p, TT_RBRACKET);
+
+        // multi pointer
+        node_t* expr = parse_prefix(p);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_MPTR,
+            .as.mptr = {.child = expr, .term = term},
+            .span.start = tok.span.start,
+            .span.end = expr->span.end,
+        };
+
+        return n;
+    }
+
+    if (match(p, TT_RBRACKET)) {
+        // slice
+        report_error(p->er, p->filename, p->source, tok.span,
+                     "slices not implemented");
+        munit_assert(false);
+    }
+
+    // array
+    report_error(p->er, p->filename, p->source, tok.span,
+                 "arrays not implemented");
+    munit_assert(false);
 }
 
 static node_t* parse_prefix(parser_t* p) {
@@ -256,6 +309,8 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_LPAREN: return parse_grouping(p);
         case TT_IDENT: return parse_ident(p, tok);
         case TT_DOT_LPAREN: return parse_proc(p, tok);
+        case TT_STAR: return parse_pointer(p, tok);
+        case TT_LBRACKET: return parse_mptr_or_slice(p, tok);
         default: break;
     }
 
@@ -292,6 +347,25 @@ static node_t* parse_expr(parser_t* p, int precedence) {
 }
 
 static node_t* parse_stmt(parser_t* p) {
+    token_t stmt_start_tok = peek(p);
+
+    if (match(p, TT_RETURN)) {
+        node_t* expr = parse_expr(p, 0);
+
+        token_t end_tok = peek(p);
+        consume(p, TT_SEMICOLON);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_STMT_RET,
+            .as.stmt_ret = {.child = expr},
+            .span = {.start = stmt_start_tok.span.start,
+                            .end = end_tok.span.end}
+        };
+
+        return n;
+    }
+
     if (peek_next(p).type == TT_COLON) {
         token_t name = next(p);
         consume(p, TT_COLON);
