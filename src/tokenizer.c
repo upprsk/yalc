@@ -1,10 +1,12 @@
 #include "tokenizer.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "allocator.h"
 #include "da.h"
 #include "errors.h"
+#include "span.h"
 
 /// Hold state relative to parsing the source code.
 typedef struct tokenizer {
@@ -57,7 +59,11 @@ static inline char peek_next(tokenizer_t const* t) {
 }
 
 static inline span_t mkspan(tokenizer_t const* t) {
-    return (span_t){.start = t->start - t->source, .end = t->head - t->source};
+    uint32_t start = t->start - t->source;
+    uint32_t end = t->head - t->source;
+
+    munit_assert_uint32(start, <=, end);
+    return (span_t){.start = start, .end = end};
 }
 
 static void append_token(tokenizer_t* t, token_type_t ty) {
