@@ -344,84 +344,6 @@ static node_t* parse_stmt(parser_t* p) {
     return expr;
 }
 
-void dump_node(node_t* node, int indent) {
-    for (int i = 0; i < indent; ++i) printf("  ");
-
-    if (!node) {
-        printf("<null>\n");
-        return;
-    }
-
-    switch (node->type) {
-        case NODE_ERR: printf("ERR\n"); break;
-        case NODE_INT: printf("INT (%lu)\n", node->as.int_.value); break;
-        case NODE_FLOAT: printf("FLOAT (%f)\n", node->as.float_.value); break;
-        case NODE_BINOP:
-            printf("BINOP ");
-            switch (node->as.binop.type) {
-                case BINOP_ADD: printf("ADD"); break;
-                case BINOP_SUB: printf("SUB"); break;
-                case BINOP_MUL: printf("MUl"); break;
-                case BINOP_DIV: printf("DIV"); break;
-            }
-
-            printf("\n");
-
-            dump_node(node->as.binop.left, indent + 1);
-            dump_node(node->as.binop.right, indent + 1);
-            break;
-        case NODE_IDENT: printf("IDENT '%s'\n", node->as.ident.ident); break;
-        case NODE_UNOP:
-            printf("UNOP ");
-            switch (node->as.unop.type) {
-                case UNOP_NEG: printf("NEG"); break;
-            }
-
-            printf("\n");
-            dump_node(node->as.unop.child, indent + 1);
-            break;
-        case NODE_STMT_EXPR:
-            printf("STMT EXPR ");
-            dump_node(node->as.stmt_expr.expr, indent + 1);
-            break;
-        case NODE_STMT_RET:
-            printf("STMT RET ");
-            dump_node(node->as.stmt_ret.child, indent + 1);
-            break;
-        case NODE_STMT_BLK: {
-            printf("STMT BLK\n");
-
-            uint32_t size = da_get_size(node->as.stmt_blk.stmts);
-            for (uint32_t i = 0; i < size; ++i) {
-                dump_node(node->as.stmt_blk.stmts[i], indent + 1);
-            }
-        } break;
-        case NODE_DECL:
-            printf("DECL \"%s\"\n", node->as.decl.name);
-            dump_node(node->as.decl.type, indent + 1);
-            dump_node(node->as.decl.init, indent + 1);
-            break;
-        case NODE_ASSIGN:
-            printf("ASSIGN\n");
-            dump_node(node->as.assign.lhs, indent + 1);
-            dump_node(node->as.assign.rhs, indent + 1);
-            break;
-        case NODE_ARG:
-            printf("ARG \"%s\"\n", node->as.arg.name);
-            dump_node(node->as.arg.type, indent + 1);
-            break;
-        case NODE_PROC: {
-            printf("PROC\n");
-            uint32_t size = da_get_size(node->as.proc.args);
-            for (uint32_t i = 0; i < size; ++i) {
-                dump_node(node->as.proc.args[i], indent + 1);
-            }
-            dump_node(node->as.proc.return_type, indent + 1);
-            dump_node(node->as.proc.body, indent + 1);
-        } break;
-    }
-}
-
 void parse(error_reporter_t* er, char const* filename, char const* source,
            uint32_t source_len, token_t const* tokens) {
     Arena       arena = {0};
@@ -449,7 +371,7 @@ void parse(error_reporter_t* er, char const* filename, char const* source,
 
     consume(&p, TT_EOF);
 
-    dump_node(n, 0);
+    dump_node(stdout, n, 0);
 
     arena_free(&arena);
 }

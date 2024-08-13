@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdio.h>
 
 #include "span.h"
 
@@ -25,6 +26,17 @@ typedef enum binop_type {
     BINOP_DIV,
 } binop_type_t;
 
+static inline char const* binop_to_str(binop_type_t op) {
+    switch (op) {
+        case BINOP_ADD: return "BINOP_ADD";
+        case BINOP_SUB: return "BINOP_SUB";
+        case BINOP_MUL: return "BINOP_MUL";
+        case BINOP_DIV: return "BINOP_DIV";
+    }
+
+    return "?";
+}
+
 typedef struct node_binop {
     binop_type_t type;
     node_t*      left;
@@ -34,6 +46,14 @@ typedef struct node_binop {
 typedef enum unop_type {
     UNOP_NEG,
 } unop_type_t;
+
+static inline char const* unop_to_str(unop_type_t op) {
+    switch (op) {
+        case UNOP_NEG: return "UNOP_NEG";
+    }
+
+    return "?";
+}
 
 typedef struct node_unop {
     unop_type_t type;
@@ -102,6 +122,26 @@ typedef enum node_type {
     NODE_PROC,
 } node_type_t;
 
+static inline char const* node_type_to_str(node_type_t type) {
+    switch (type) {
+        case NODE_ERR: return "NODE_ERR";
+        case NODE_INT: return "NODE_INT";
+        case NODE_FLOAT: return "NODE_FLOAT";
+        case NODE_IDENT: return "NODE_IDENT";
+        case NODE_BINOP: return "NODE_BINOP";
+        case NODE_UNOP: return "NODE_UNOP";
+        case NODE_STMT_EXPR: return "NODE_STMT_EXPR";
+        case NODE_STMT_RET: return "NODE_STMT_RET";
+        case NODE_STMT_BLK: return "NODE_STMT_BLK";
+        case NODE_DECL: return "NODE_DECL";
+        case NODE_ASSIGN: return "NODE_ASSIGN";
+        case NODE_ARG: return "NODE_ARG";
+        case NODE_PROC: return "NODE_PROC";
+    }
+
+    return "?";
+}
+
 struct node {
     node_type_t type;
     span_t      span;
@@ -120,3 +160,5 @@ struct node {
         node_proc_t        proc;
     } as;
 };
+
+void dump_node(FILE* f, node_t* node, int indent);
