@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "allocator.h"
+#include "ast.h"
 #include "da.h"
 #include "errors.h"
 #include "parser.h"
@@ -99,12 +100,25 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    for (size_t i = 0; i < da_get_size(tokens); ++i) {
-        printf("token (%d) [%d, %d]\n", tokens[i].type, tokens[i].span.start,
-               tokens[i].span.end);
-    }
+    // for (size_t i = 0; i < da_get_size(tokens); ++i) {
+    //     printf("token (%d) [%d, %d]\n", tokens[i].type, tokens[i].span.start,
+    //            tokens[i].span.end);
+    // }
 
-    parse(&er, filename, source, source_len, tokens);
+    Arena node_arena = {};
+
+    node_t* ast = parse(&(parse_params_t){
+        .tokens = tokens,
+        .filename = filename,
+        .source = source,
+        .source_len = source_len,
+        .er = &er,
+        .arena = &node_arena,
+    });
+
+    dump_node(stdout, ast, 0);
+
+    arena_free(&node_arena);
 
     return 0;
 }
