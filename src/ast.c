@@ -35,11 +35,11 @@ void dump_node(FILE* f, node_t* node, int indent) {
             dump_node(f, node->as.unop.child, indent + 1);
             break;
         case NODE_STMT_EXPR:
-            fprintf(f, "STMT EXPR ");
+            fprintf(f, "STMT EXPR\n");
             dump_node(f, node->as.stmt_expr.expr, indent + 1);
             break;
         case NODE_STMT_RET:
-            fprintf(f, "STMT RET ");
+            fprintf(f, "STMT RET\n");
             dump_node(f, node->as.stmt_ret.child, indent + 1);
             break;
         case NODE_STMT_BLK: {
