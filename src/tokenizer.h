@@ -17,11 +17,21 @@ typedef enum token_type : uint8_t {
     TT_STAR,   // *
     TT_SLASH,  // /
 
+    TT_DOT,        // .
+    TT_COMMA,      // ,
     TT_COLON,      // :
     TT_SEMICOLON,  // ;
+    TT_EQUAL,      // =
 
-    TT_LPAREN,  // (
-    TT_RPAREN,  // )
+    TT_LPAREN,    // (
+    TT_RPAREN,    // )
+    TT_LBRACKET,  // [
+    TT_RBRACKET,  // [
+    TT_LBRACE,    // {
+    TT_RBRACE,    // {
+
+    TT_DOT_LPAREN,  // .(
+    TT_ARROW,       // ->
 
     TT_EOF = 0xFF,
 } token_type_t;
@@ -36,10 +46,19 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_MINUS: return "TT_MINUS";
         case TT_STAR: return "TT_STAR";
         case TT_SLASH: return "TT_SLASH";
+        case TT_DOT: return "TT_DOT";
+        case TT_COMMA: return "TT_COMMA";
         case TT_COLON: return "TT_COLON";
         case TT_SEMICOLON: return "TT_SEMICOLON";
+        case TT_EQUAL: return "TT_EQUAL";
         case TT_LPAREN: return "TT_LPAREN";
         case TT_RPAREN: return "TT_RPAREN";
+        case TT_LBRACKET: return "TT_LBRACKET";
+        case TT_RBRACKET: return "TT_RBRACKET";
+        case TT_LBRACE: return "TT_LBRACE";
+        case TT_RBRACE: return "TT_RBRACE";
+        case TT_DOT_LPAREN: return "TT_DOT_LPAREN";
+        case TT_ARROW: return "TT_ARROW";
         case TT_EOF: return "TT_EOF";
     }
 

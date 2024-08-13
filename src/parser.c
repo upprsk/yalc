@@ -7,6 +7,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "da.h"
 #include "errors.h"
 #include "span.h"
 #include "tokenizer.h"
@@ -25,14 +26,27 @@ typedef struct parser {
     allocator_t node_alloc;
 } parser_t;
 
-static token_t peek(parser_t const* p) { return p->tokens[p->current]; }
-static void    advance(parser_t* p) { p->current++; }
+static inline token_t peek(parser_t const* p) { return p->tokens[p->current]; }
+static inline token_t peek_next(parser_t const* p) {
+    return p->tokens[p->current + 1];
+}
 
-static token_t next(parser_t* p) {
+static inline void advance(parser_t* p) {
+    if (peek(p).type != TT_EOF) p->current++;
+}
+
+static inline token_t next(parser_t* p) {
     token_t t = peek(p);
     advance(p);
 
     return t;
+}
+
+static inline bool match(parser_t* p, token_type_t expected) {
+    if (peek(p).type != expected) return false;
+
+    advance(p);
+    return true;
 }
 
 static void consume(parser_t* p, token_type_t expected) {
@@ -70,6 +84,7 @@ static inline int get_precedence(token_type_t tt) {
 
 static node_t* parse_prefix(parser_t* p);
 static node_t* parse_expr(parser_t* p, int precedence);
+static node_t* parse_stmt(parser_t* p);
 
 static node_t* parse_int(parser_t* p, token_t tok) {
     uint32_t    len;
@@ -137,18 +152,98 @@ static node_t* parse_grouping(parser_t* p) {
     return expr;
 }
 
-static node_t* parse_ident(parser_t* p, token_t tok) {
+static char const* span_dupe_str(span_t s, char const* source,
+                                 uint32_t source_len, allocator_t alloc) {
     uint32_t    len;
-    char const* lit = span_str_parts(tok.span, p->source, p->source_len, &len);
+    char const* lit = span_str_parts(s, source, source_len, &len);
 
+    char* str = allocator_alloc(alloc, len + 1);
+    memcpy(str, lit, len);
+    str[len] = 0;
+
+    return str;
+}
+
+static node_t* parse_ident(parser_t* p, token_t tok) {
     // FIXME: allocating the string in the same pool as the nodes
-    char* ident = allocator_alloc(p->node_alloc, len + 1);
-    memcpy(ident, lit, len);
-    ident[len] = 0;
+    char const* ident =
+        span_dupe_str(tok.span, p->source, p->source_len, p->node_alloc);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_IDENT, .as.ident = {.ident = ident}, .span = tok.span};
+
+    return n;
+}
+
+static node_t* parse_block(parser_t* p) {
+    token_t open_tok = peek(p);
+    consume(p, TT_LBRACE);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){.type = NODE_STMT_BLK,
+                  .as.stmt_blk.stmts = da_init(node_t*, p->node_alloc),
+                  .span.start = open_tok.span.start};
+
+    while (peek(p).type != TT_RBRACE) {
+        node_t* stmt = parse_stmt(p);
+        n->as.stmt_blk.stmts =
+            da_append(n->as.stmt_blk.stmts, p->node_alloc, &stmt);
+    }
+
+    token_t end_tok = peek(p);
+    consume(p, TT_RBRACE);
+
+    n->span.end = end_tok.span.end;
+
+    return n;
+}
+
+static node_t* parse_proc(parser_t* p, token_t tok) {
+    node_t** args = da_init(node_t*, p->node_alloc);
+
+    while (peek(p).type != TT_RPAREN) {
+        token_t argname = peek(p);
+        consume(p, TT_IDENT);
+
+        node_t* argtype = NULL;
+        if (match(p, TT_COLON)) {
+            argtype = parse_expr(p, 0);
+        }
+
+        // FIXME: allocating the string in the same pool as the nodes
+        char const* name = span_dupe_str(argname.span, p->source, p->source_len,
+                                         p->node_alloc);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_ARG,
+            .as.arg.name = name,
+            .as.arg.type = argtype,
+            .span = {.start = argname.span.start,
+                     .end = argtype ? argtype->span.end : argname.span.end}
+        };
+
+        args = da_append(args, p->node_alloc, &n);
+
+        if (!match(p, TT_COMMA)) break;
+    }
+
+    consume(p, TT_RPAREN);
+
+    node_t* return_type = NULL;
+    if (match(p, TT_ARROW)) {
+        return_type = parse_expr(p, 0);
+    }
+
+    node_t* body = parse_block(p);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_PROC,
+        .as.proc = {.return_type = return_type, .args = args, .body = body},
+        .span.start = tok.span.start
+    };
 
     return n;
 }
@@ -160,6 +255,7 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_MINUS: return parse_unary(p, tok);
         case TT_LPAREN: return parse_grouping(p);
         case TT_IDENT: return parse_ident(p, tok);
+        case TT_DOT_LPAREN: return parse_proc(p, tok);
         default: break;
     }
 
@@ -195,10 +291,66 @@ static node_t* parse_expr(parser_t* p, int precedence) {
     return left;
 }
 
-void dump_node(node_t* node, int indent) {
-    munit_assert_not_null(node);
+static node_t* parse_stmt(parser_t* p) {
+    if (peek_next(p).type == TT_COLON) {
+        token_t name = next(p);
+        consume(p, TT_COLON);
 
+        node_t* type = NULL;
+        if (peek(p).type != TT_EQUAL) {
+            type = parse_expr(p, 0);
+        }
+
+        consume(p, TT_EQUAL);
+
+        node_t* init = parse_expr(p, 0);
+
+        token_t end_tok = peek(p);
+        consume(p, TT_SEMICOLON);
+
+        char const* name_str =
+            span_dupe_str(name.span, p->source, p->source_len, p->node_alloc);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_DECL,
+            .as.decl = {.name = name_str,
+                        .name_span = name.span,
+                        .type = type,
+                        .init = init},
+            .span = {.start = name.span.start, .end = end_tok.span.end}
+        };
+
+        return n;
+    }
+
+    node_t* expr = parse_expr(p, 0);
+
+    if (match(p, TT_EQUAL)) {
+        node_t* rhs = parse_expr(p, 0);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_ASSIGN,
+            .as.assign = {              .lhs = expr,           .rhs = rhs},
+            .span = {.start = expr->span.start, .end = rhs->span.end}
+        };
+
+        consume(p, TT_SEMICOLON);
+        return n;
+    }
+
+    consume(p, TT_SEMICOLON);
+    return expr;
+}
+
+void dump_node(node_t* node, int indent) {
     for (int i = 0; i < indent; ++i) printf("  ");
+
+    if (!node) {
+        printf("<null>\n");
+        return;
+    }
 
     switch (node->type) {
         case NODE_ERR: printf("ERR\n"); break;
@@ -228,6 +380,45 @@ void dump_node(node_t* node, int indent) {
             printf("\n");
             dump_node(node->as.unop.child, indent + 1);
             break;
+        case NODE_STMT_EXPR:
+            printf("STMT EXPR ");
+            dump_node(node->as.stmt_expr.expr, indent + 1);
+            break;
+        case NODE_STMT_RET:
+            printf("STMT RET ");
+            dump_node(node->as.stmt_ret.child, indent + 1);
+            break;
+        case NODE_STMT_BLK: {
+            printf("STMT BLK\n");
+
+            uint32_t size = da_get_size(node->as.stmt_blk.stmts);
+            for (uint32_t i = 0; i < size; ++i) {
+                dump_node(node->as.stmt_blk.stmts[i], indent + 1);
+            }
+        } break;
+        case NODE_DECL:
+            printf("DECL \"%s\"\n", node->as.decl.name);
+            dump_node(node->as.decl.type, indent + 1);
+            dump_node(node->as.decl.init, indent + 1);
+            break;
+        case NODE_ASSIGN:
+            printf("ASSIGN\n");
+            dump_node(node->as.assign.lhs, indent + 1);
+            dump_node(node->as.assign.rhs, indent + 1);
+            break;
+        case NODE_ARG:
+            printf("ARG \"%s\"\n", node->as.arg.name);
+            dump_node(node->as.arg.type, indent + 1);
+            break;
+        case NODE_PROC: {
+            printf("PROC\n");
+            uint32_t size = da_get_size(node->as.proc.args);
+            for (uint32_t i = 0; i < size; ++i) {
+                dump_node(node->as.proc.args[i], indent + 1);
+            }
+            dump_node(node->as.proc.return_type, indent + 1);
+            dump_node(node->as.proc.body, indent + 1);
+        } break;
     }
 }
 
@@ -244,7 +435,17 @@ void parse(error_reporter_t* er, char const* filename, char const* source,
                   .er = er,
                   .node_alloc = node_alloc};
 
-    node_t* n = parse_expr(&p, 0);
+    node_t* n = allocator_alloc(p.node_alloc, sizeof(*n));
+    *n = (node_t){.type = NODE_STMT_BLK,
+                  .as.stmt_blk.stmts = da_init(node_t*, p.node_alloc),
+                  .span.start = peek(&p).span.start};
+
+    while (peek(&p).type != TT_EOF) {
+        node_t* stmt = parse_stmt(&p);
+        n->span.end = stmt->span.end;
+        n->as.stmt_blk.stmts =
+            da_append(n->as.stmt_blk.stmts, p.node_alloc, &stmt);
+    }
 
     consume(&p, TT_EOF);
 

@@ -57,6 +57,13 @@ static inline char next(tokenizer_t* t) {
     return c;
 }
 
+static inline bool match(tokenizer_t* t, char test) {
+    if (peek(t) != test) return false;
+
+    advance(t);
+    return true;
+}
+
 static inline char peek_next(tokenizer_t const* t) {
     return is_at_end(t) ? 0 : t->head[1];
 }
@@ -130,13 +137,30 @@ static void tokenize_one(tokenizer_t* t) {
     char c = next(t);
     switch (c) {
         case '+': append_token(t, TT_PLUS); break;
-        case '-': append_token(t, TT_MINUS); break;
+        case '-':
+            if (match(t, '>'))
+                append_token(t, TT_ARROW);
+            else
+                append_token(t, TT_MINUS);
+            break;
         case '*': append_token(t, TT_STAR); break;
         case '/': append_token(t, TT_SLASH); break;
+        case '.':
+            if (match(t, '('))
+                append_token(t, TT_DOT_LPAREN);
+            else
+                append_token(t, TT_DOT);
+            break;
+        case ',': append_token(t, TT_COMMA); break;
         case ':': append_token(t, TT_COLON); break;
         case ';': append_token(t, TT_SEMICOLON); break;
+        case '=': append_token(t, TT_EQUAL); break;
         case '(': append_token(t, TT_LPAREN); break;
         case ')': append_token(t, TT_RPAREN); break;
+        case '[': append_token(t, TT_LBRACKET); break;
+        case ']': append_token(t, TT_RBRACKET); break;
+        case '{': append_token(t, TT_LBRACE); break;
+        case '}': append_token(t, TT_RBRACE); break;
         case '0' ... '9': return tokenize_int(t);
         case 'a' ... 'z':
         case 'A' ... 'Z':

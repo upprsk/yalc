@@ -40,6 +40,47 @@ typedef struct node_unop {
     node_t*     child;
 } node_unop_t;
 
+typedef struct node_stmt_expr {
+    node_t* expr;
+} node_stmt_expr_t;
+
+typedef struct node_stmt_return {
+    // may be null in case it is a bare return.
+    node_t* child;
+} node_stmt_return_t;
+
+typedef struct node_stmt_block {
+    node_t** stmts;
+} node_stmt_block_t;
+
+typedef struct node_decl {
+    char const* name;
+    span_t      name_span;
+    // may be null in case of type inference
+    node_t* type;
+    node_t* init;
+} node_decl_t;
+
+typedef struct node_arg {
+    char const* name;
+    // may be null in case of type inference
+    node_t* type;
+} node_arg_t;
+
+typedef struct node_assign {
+    node_t* lhs;
+    node_t* rhs;
+} node_assign_t;
+
+typedef struct node_proc {
+    // array of arguments
+    node_t** args;
+    node_t*  return_type;
+
+    // body
+    node_t* body;
+} node_proc_t;
+
 typedef enum node_type {
     NODE_ERR,
 
@@ -49,16 +90,33 @@ typedef enum node_type {
 
     NODE_BINOP,
     NODE_UNOP,
+
+    NODE_STMT_EXPR,
+    NODE_STMT_RET,
+    NODE_STMT_BLK,
+
+    NODE_DECL,
+    NODE_ASSIGN,
+
+    NODE_ARG,
+    NODE_PROC,
 } node_type_t;
 
 struct node {
     node_type_t type;
     span_t      span;
     union {
-        node_int_t   int_;
-        node_float_t float_;
-        node_ident_t ident;
-        node_binop_t binop;
-        node_unop_t  unop;
+        node_int_t         int_;
+        node_float_t       float_;
+        node_ident_t       ident;
+        node_binop_t       binop;
+        node_unop_t        unop;
+        node_stmt_expr_t   stmt_expr;
+        node_stmt_return_t stmt_ret;
+        node_stmt_block_t  stmt_blk;
+        node_decl_t        decl;
+        node_assign_t      assign;
+        node_arg_t         arg;
+        node_proc_t        proc;
     } as;
 };
