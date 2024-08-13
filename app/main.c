@@ -20,13 +20,14 @@ static char* read_entire_file(char const* filename, allocator_t alloc,
     if (tell_len < 0) goto error;
     fseek(f, 0, SEEK_SET);
 
-    buf = allocator_alloc(alloc, tell_len);
+    buf = allocator_alloc(alloc, tell_len + 1);
     if (!buf) goto error;
 
     long read = fread(buf, sizeof(char), tell_len, f);
     if (read != tell_len) goto error;
 
     *len = tell_len;
+    buf[tell_len] = 0;
 
     return buf;
 
