@@ -44,15 +44,18 @@ static inline void tokenizer_init(tokenizer_t* t, error_reporter_t* er,
 }
 
 static inline char peek(tokenizer_t const* t) { return *t->head; }
-static inline void advance(tokenizer_t* t) { t->head++; }
+static inline bool is_at_end(tokenizer_t const* t) { return peek(t) == 0; }
+
+static inline void advance(tokenizer_t* t) {
+    if (!is_at_end(t)) t->head++;
+}
+
 static inline char next(tokenizer_t* t) {
     char c = peek(t);
     advance(t);
 
     return c;
 }
-
-static inline bool is_at_end(tokenizer_t const* t) { return peek(t) == 0; }
 
 static inline char peek_next(tokenizer_t const* t) {
     return is_at_end(t) ? 0 : t->head[1];
