@@ -1,4 +1,6 @@
+#include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "allocator.h"
 #include "da.h"
@@ -35,8 +37,48 @@ error:
     return NULL;
 }
 
-int main() {
-    char const* filename = "test.yal";
+char const* shift_args(int* argc, char*** argv) {
+    *argc -= 1;
+
+    char const* data = *argv[0];
+    *argv += 1;
+
+    return data;
+}
+
+static inline bool streq(char const* a, char const* b) {
+    return strcmp(a, b) == 0;
+}
+
+int main(int argc, char* argv[]) {
+    char const* filename = NULL;
+
+    char const* self_path = shift_args(&argc, &argv);
+
+    for (;;) {
+        char const* arg = shift_args(&argc, &argv);
+        if (!arg) break;
+
+        if (streq(arg, "-h") || streq(arg, "--help")) {
+            fprintf(stderr, "usage: %s <root filename> [options]\n", self_path);
+            fprintf(stderr, "      -h, --help      show this message\n");
+
+            return EXIT_SUCCESS;
+        }
+
+        if (filename) {
+            fprintf(stderr, "error: root filename already provided: %s\n",
+                    filename);
+            return EXIT_FAILURE;
+        }
+
+        filename = arg;
+    }
+
+    if (!filename) {
+        fprintf(stderr, "error: no input files\n");
+        return EXIT_FAILURE;
+    }
 
     allocator_t alloc;
     allocator_init_stdc(&alloc);
