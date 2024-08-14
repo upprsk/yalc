@@ -197,11 +197,8 @@ static void tokenize_one(tokenizer_t* t) {
     }
 }
 
-token_t* tokenize(error_reporter_t* er, char const* filename,
+token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* filename,
                   char const* source, uint32_t source_len) {
-    allocator_t alloc = {};
-    allocator_init_stdc(&alloc);
-
     tokenizer_t t = {};
     tokenizer_init(&t, er, filename, source, source_len, alloc);
 

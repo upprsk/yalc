@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
 
     error_reporter_t er = {.stream = stderr};
 
-    token_t* tokens = tokenize(&er, filename, source, source_len);
+    token_t* tokens = tokenize(&er, alloc, filename, source, source_len);
     if (!tokens) {
         fprintf(stderr, "failed to tokenize\n");
         return 1;
