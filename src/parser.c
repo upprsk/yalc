@@ -31,7 +31,11 @@ static inline token_t peek_next(parser_t const* p) {
 }
 
 static inline void advance(parser_t* p) {
-    if (peek(p).type != TT_EOF) p->current++;
+    if (peek(p).type != TT_EOF) {
+        do {
+            p->current++;
+        } while (peek(p).type == TT_ERR);
+    }
 }
 
 static inline token_t next(parser_t* p) {
