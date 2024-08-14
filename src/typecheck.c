@@ -53,6 +53,62 @@ typedef struct env {
     bool has_returned;
 } env_t;
 
+typedef struct value {
+    type_id_t type;
+    span_t    where;
+} value_t;
+
+typedef struct scope_entry {
+    char const* name;
+    value_t     value;
+} scope_entry_t;
+
+da_declare(scope_entry_t, scope_entry);
+
+typedef struct scope {
+    struct scope*  parent;
+    scope_entry_t* entries;
+} scope_t;
+
+static void scope_init(scope_t* s, allocator_t alloc, scope_t* parent) {
+    *s = (scope_t){.entries = da_init_scope_entry(alloc), .parent = parent};
+}
+
+static value_t const* scope_find_direct(scope_t* s, char const* name) {
+    size_t size = da_get_size(s->entries);
+    for (size_t i = 0; i < size; ++i) {
+        if (strcmp(s->entries[i].name, name) == 0) return &s->entries[i].value;
+    }
+
+    return NULL;
+}
+
+static value_t const* scope_find(scope_t* s, char const* name) {
+    if (s == NULL) return NULL;
+
+    value_t const* v = scope_find_direct(s, name);
+    if (!v) return scope_find(s->parent, name);
+
+    return v;
+}
+
+static void scope_add_unchecked(scope_t* s, allocator_t alloc, char const* name,
+                                value_t const* value) {
+    munit_assert_not_null(s);
+
+    s->entries = da_append_scope_entry(
+        s->entries, alloc, &(scope_entry_t){.name = name, .value = *value});
+}
+
+static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
+                                value_t const* value) {
+    value_t const* prev = scope_find(s, name);
+    if (prev) return prev;
+
+    scope_add_unchecked(s, alloc, name, value);
+    return NULL;
+}
+
 static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
     if (node->type != NODE_IDENT) {
         report_error(tc->er, tc->filename, tc->source, node->span,
@@ -75,7 +131,8 @@ static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
     return type;
 }
 
-static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
+static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
+                                node_t* node) {
     munit_assert_not_null(node);
 
     type_id_t void_ = tc->ts->primitives.void_;
@@ -93,10 +150,20 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         case NODE_FLOAT: {
         } break;
         case NODE_IDENT: {
+            value_t const* v = scope_find(scope, node->as.ident.ident);
+            if (!v) {
+                report_error(tc->er, tc->filename, tc->source, node->span,
+                             "undeclared identifier %s", node->as.ident.ident);
+                result = tc->ts->primitives.err;
+                break;
+            }
+
+            result = v->type;
         } break;
         case NODE_BINOP: {
-            type_id_t lhs = typecheck_node(tc, env, node->as.binop.left);
-            type_id_t rhs = typecheck_node(tc, env, node->as.binop.right);
+            type_id_t lhs = typecheck_node(tc, env, scope, node->as.binop.left);
+            type_id_t rhs =
+                typecheck_node(tc, env, scope, node->as.binop.right);
 
             if (!type_id_eq(lhs, rhs)) {
                 char const* lhsstr =
@@ -120,7 +187,8 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         case NODE_UNOP: {
         } break;
         case NODE_STMT_EXPR: {
-            type_id_t expr = typecheck_node(tc, env, node->as.stmt_expr.expr);
+            type_id_t expr =
+                typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
             if (!type_id_eq(expr, void_)) {
                 char const* exprstr =
                     typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
@@ -149,7 +217,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
 
             type_id_t expr = void_;
             if (node->as.stmt_ret.child) {
-                expr = typecheck_node(tc, env, node->as.stmt_ret.child);
+                expr = typecheck_node(tc, env, scope, node->as.stmt_ret.child);
             }
 
             if (!type_id_eq(env->expected_return, expr)) {
@@ -170,10 +238,13 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
             result = void_;
         } break;
         case NODE_STMT_BLK: {
+            scope_t blkscope;
+            scope_init(&blkscope, tc->temp_alloc, scope);
+
             uint32_t size = da_get_size(node->as.stmt_blk.stmts);
             for (uint32_t i = 0; i < size; ++i) {
-                type_id_t id =
-                    typecheck_node(tc, env, node->as.stmt_blk.stmts[i]);
+                type_id_t id = typecheck_node(tc, env, &blkscope,
+                                              node->as.stmt_blk.stmts[i]);
                 if (!type_id_eq(id, void_)) {
                     char const* typestr =
                         typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
@@ -197,7 +268,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
                     continue;
                 }
 
-                type_id_t id = typecheck_node(tc, env, it);
+                type_id_t id = typecheck_node(tc, env, scope, it);
                 if (!type_id_eq(id, void_)) {
                     char const* typestr =
                         typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
@@ -216,7 +287,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
             type_id_t type = INVALID_TYPEID;
             if (decl->type) type = eval_to_type(tc, decl->type);
 
-            type_id_t init = typecheck_node(tc, env, decl->init);
+            type_id_t init = typecheck_node(tc, env, scope, decl->init);
             if (type_id_is_valid(type) && !type_id_eq(type, init)) {
                 char const* typestr =
                     typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
@@ -233,7 +304,18 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
                             "this has type %s", initstr);
             }
 
-            // TODO: Add to symbol table
+            type = init;
+
+            // FIXME: Check if using temp_alloc here is what we want
+            value_t const* prev =
+                scope_add(scope, tc->temp_alloc, decl->name,
+                          &(value_t){.type = type, .where = decl->name_span});
+            if (prev) {
+                report_error(tc->er, tc->filename, tc->source, node->span,
+                             "duplicate identifier %s", decl->name);
+                report_note(tc->er, tc->filename, tc->source, prev->where,
+                            "declared here");
+            }
 
             result = void_;
         } break;
@@ -243,18 +325,19 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         } break;
         case NODE_PROC: {
             node_proc_t* proc = &node->as.proc;
-
-            type_id_t* args = NULL;
-
-            type_id_t ret = void_;
-            if (proc->return_type) {
-                ret = eval_to_type(tc, proc->return_type);
-            }
+            type_id_t*   args = NULL;
 
             if (da_get_size(proc->args) > 0) {
                 report_error(
                     tc->er, tc->filename, tc->source, node->span,
                     "no support for procedure arguments was implemented");
+            }
+
+            // NOTE: process args before return type
+
+            type_id_t ret = void_;
+            if (proc->return_type) {
+                ret = eval_to_type(tc, proc->return_type);
             }
 
             result = typestore_add_type(
@@ -268,7 +351,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
                                   .proc_type_span = proc->return_type
                                                         ? proc->return_type->span
                                                         : node->span};
-            type_id_t body = typecheck_node(tc, &body_env, proc->body);
+            type_id_t body = typecheck_node(tc, &body_env, scope, proc->body);
             if (!type_id_eq(body, void_)) {
                 char const* bodystr =
                     typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
@@ -340,7 +423,11 @@ void pass_typecheck(typecheck_params_t const* params) {
 
     env_t root_env = {};
 
-    typecheck_node(&tc, &root_env, params->ast);
+    // FIXME: Check if temp_alloc is what we want for this
+    scope_t root_scope = {};
+    scope_init(&root_scope, tc.temp_alloc, NULL);
+
+    typecheck_node(&tc, &root_env, &root_scope, params->ast);
 
     arena_free(&temp_arena);
 }
