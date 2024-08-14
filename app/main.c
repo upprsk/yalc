@@ -4,6 +4,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "da.h"
 #include "errors.h"
 #include "parser.h"
 #include "tokenizer.h"
@@ -117,6 +118,7 @@ int main(int argc, char* argv[]) {
         .arena = &node_arena,
     });
 
+    fprintf(stdout, "untyped ast:\n");
     dump_node(stdout, ast, 0);
 
     typestore_t ts = {};
@@ -130,6 +132,48 @@ int main(int argc, char* argv[]) {
         .source_len = source_len,
         .er = &er,
     });
+
+    fprintf(stdout, "typed ast:\n");
+    dump_node(stdout, ast, 0);
+
+    fprintf(stdout, "typestore:\n");
+
+    size_t size = da_get_size(ts.entries);
+    for (size_t i = 0; i < size; ++i) {
+        type_t* type = &ts.entries[i].type;
+
+        fprintf(stdout, "[%d] '%s'", ts.entries[i].id.id,
+                type_tag_to_str(type->tag));
+
+        switch (type->tag) {
+            case TYPE_ERR: break;
+            case TYPE_VOID: break;
+            case TYPE_TYPE: break;
+            case TYPE_INT:
+                fprintf(stdout, " %c%d", type->as.int_.signed_ ? 'i' : 'u',
+                        type->as.int_.bits);
+                break;
+            case TYPE_FLOAT:
+                fprintf(stdout, " f%d", type->as.float_.bits);
+                break;
+            case TYPE_PTR:
+                fprintf(stdout, " *%d", type->as.ptr.inner.id);
+                break;
+            case TYPE_MPTR:
+                fprintf(stdout, " [*]%d", type->as.mptr.inner.id);
+                break;
+            case TYPE_PROC:
+                fprintf(stdout, " (");
+                for (size_t i = 0; i < da_get_size(type->as.proc.args); ++i) {
+                    fprintf(stdout, "%d,", type->as.proc.args[i].id);
+                }
+
+                fprintf(stdout, ") -> %d", type->as.proc.return_type.id);
+                break;
+        }
+
+        fprintf(stdout, "\n");
+    }
 
     typestore_deinit(&ts);
     arena_free(&node_arena);

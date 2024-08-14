@@ -12,6 +12,7 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
     typestore_entry_t inval_entry = {.id = {0}, .type = {.tag = TYPE_ERR}};
     ts->entries = da_append(ts->entries, alloc, &inval_entry);
 
+    ts->primitives.err = typestore_add_type(ts, &(type_t){.tag = TYPE_ERR});
     ts->primitives.void_ = typestore_add_type(ts, &(type_t){.tag = TYPE_VOID});
     ts->primitives.type = typestore_add_type(ts, &(type_t){.tag = TYPE_TYPE});
     ts->primitives.i32 = typestore_add_type(

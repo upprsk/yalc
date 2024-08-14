@@ -20,6 +20,21 @@ typedef enum type_tag {
     TYPE_PROC,
 } type_tag_t;
 
+static inline char const* type_tag_to_str(type_tag_t tag) {
+    switch (tag) {
+        case TYPE_ERR: return "TYPE_ERR";
+        case TYPE_VOID: return "TYPE_VOID";
+        case TYPE_TYPE: return "TYPE_TYPE";
+        case TYPE_INT: return "TYPE_INT";
+        case TYPE_FLOAT: return "TYPE_FLOAT";
+        case TYPE_PTR: return "TYPE_PTR";
+        case TYPE_MPTR: return "TYPE_MPTR";
+        case TYPE_PROC: return "TYPE_PROC";
+    }
+
+    return "?";
+}
+
 typedef struct type_int {
     uint16_t bits;
     bool     signed_;
@@ -52,7 +67,7 @@ typedef struct type {
         type_float_t float_;
         type_ptr_t   ptr;
         type_mptr_t  mptr;
-        type_proc_t  rett;
+        type_proc_t  proc;
     } as;
 } type_t;
 
@@ -62,6 +77,7 @@ typedef struct typestore_entry {
 } typestore_entry_t;
 
 typedef struct typestore_primitives {
+    type_id_t err;
     type_id_t void_;
     type_id_t type;
     type_id_t i32;
@@ -79,6 +95,10 @@ typedef struct typestore {
     (type_id_t) { 0 }
 
 static inline bool type_id_is_valid(type_id_t id) { return id.id != 0; }
+
+static inline bool type_id_eq(type_id_t lhs, type_id_t rhs) {
+    return lhs.id == rhs.id;
+}
 
 void typestore_init(typestore_t* ts, allocator_t alloc);
 void typestore_deinit(typestore_t* ts);
