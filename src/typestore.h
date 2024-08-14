@@ -61,11 +61,18 @@ typedef struct typestore_entry {
     type_t    type;
 } typestore_entry_t;
 
+typedef struct typestore_primitives {
+    type_id_t void_;
+    type_id_t type;
+    type_id_t i32;
+} typestore_primitives_t;
+
 typedef struct typestore {
     // array of all types
     typestore_entry_t* entries;
 
-    allocator_t alloc;
+    allocator_t            alloc;
+    typestore_primitives_t primitives;
 } typestore_t;
 
 #define INVALID_TYPEID \

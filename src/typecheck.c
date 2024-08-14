@@ -11,9 +11,9 @@ typedef struct typechecker {
     char const*       filename;
     char const*       source;
     uint32_t          source_len;
-} typechecker_t;
 
-static void typechecker_init(typechecker_t* tc) { *tc = (typechecker_t){}; }
+    typestore_t* ts;
+} typechecker_t;
 
 static type_id_t typecheck_node(typechecker_t* tc, node_t* node) {
     munit_assert_not_null(node);
@@ -23,7 +23,7 @@ static type_id_t typecheck_node(typechecker_t* tc, node_t* node) {
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "found error node in typecheck");
             return INVALID_TYPEID;
-        case NODE_INT:
+        case NODE_INT: node->type_id = tc->ts->primitives.i32; break;
         case NODE_FLOAT:
         case NODE_IDENT:
         case NODE_BINOP:
@@ -39,6 +39,8 @@ static type_id_t typecheck_node(typechecker_t* tc, node_t* node) {
         case NODE_MPTR: break;
     }
 
+    report_error(tc->er, tc->filename, tc->source, node->span, "got thing");
+
     munit_assert(false);
 }
 
@@ -48,8 +50,8 @@ void pass_typecheck(typecheck_params_t const* params) {
         .source = params->source,
         .source_len = params->source_len,
         .er = params->er,
+        .ts = params->ts,
     };
-    typechecker_init(&tc);
 
     typecheck_node(&tc, params->ast);
 }
