@@ -413,8 +413,17 @@ static node_t* parse_stmt(parser_t* p) {
         return n;
     }
 
+    token_t semi = peek(p);
     consume(p, TT_SEMICOLON);
-    return expr;
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_STMT_EXPR,
+        .as.stmt_expr = {.expr = expr},
+        .span = {.start = expr->span.start, .end = semi.span.end}
+    };
+
+    return n;
 }
 
 node_t* parse(parse_params_t* params) {
