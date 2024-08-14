@@ -19,8 +19,10 @@ static void stdc_free(void* ctx, void const* ptr) {
     free((void*)ptr);
 }
 
-static void* stdc_realloc(void* ctx, void* ptr, size_t new_size) {
+static void* stdc_realloc(void* ctx, void* ptr, size_t old_size,
+                          size_t new_size) {
     (void)ctx;
+    (void)old_size;
 
     return realloc(ptr, new_size);
 }
@@ -53,11 +55,12 @@ void allocator_free(allocator_t a, void const* ptr) {
     return a.vtable->free(a.ctx, ptr);
 }
 
-void* allocator_realloc(allocator_t a, void* ptr, size_t new_size) {
+void* allocator_realloc(allocator_t a, void* ptr, size_t old_size,
+                        size_t new_size) {
     munit_assert_not_null(a.vtable);
     munit_assert_not_null(a.vtable->realloc);
 
-    return a.vtable->realloc(a.ctx, ptr, new_size);
+    return a.vtable->realloc(a.ctx, ptr, old_size, new_size);
 }
 
 static void* my_arena_alloc(void* ctx, size_t size, size_t align) {
@@ -67,12 +70,16 @@ static void* my_arena_alloc(void* ctx, size_t size, size_t align) {
     return arena_alloc(arena, size);
 }
 
-// static void* my_arena_realloc(void* ctx, void* ptr, size_t new_size) {
-//     return arena_realloc(arena, ptr, size_t oldsz, size_t newsz)
-// }
+static void* my_arena_realloc(void* ctx, void* ptr, size_t old_size,
+                              size_t new_size) {
+    Arena* arena = ctx;
+
+    return arena_realloc(arena, ptr, old_size, new_size);
+}
 
 static allocator_vtable_t const arena_vtable = {
     .alloc = my_arena_alloc,
+    .realloc = my_arena_realloc,
 };
 
 void allocator_init_arena(allocator_t* a, Arena* arena) {

@@ -27,6 +27,7 @@ static da_header_t* reallocate_header_with_capacity(allocator_t  alloc,
     uint32_t     new_capacity = header->capacity * 2;
     da_header_t* h = allocator_realloc(
         alloc, header,
+        sizeof(da_header_t) + header->element_size * header->capacity,
         sizeof(da_header_t) + header->element_size * new_capacity);
     munit_assert_not_null(h);
 
