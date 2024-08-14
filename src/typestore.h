@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "allocator.h"
+#include "da.h"
 
 typedef struct type_id {
     uint32_t id;
@@ -75,6 +76,8 @@ typedef struct typestore_entry {
     type_id_t id;
     type_t    type;
 } typestore_entry_t;
+
+da_declare(typestore_entry_t, typestore_entry);
 
 typedef struct typestore_primitives {
     type_id_t err;

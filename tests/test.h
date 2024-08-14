@@ -9,8 +9,10 @@ typedef struct ctx {
     allocator_t alloc;
 } ctx_t;
 
+da_declare(MunitTest, test);
+
 static inline void ctx_add_test(ctx_t* ctx, MunitTest const* test) {
-    ctx->tests = da_append(ctx->tests, ctx->alloc, test);
+    ctx->tests = da_append_test(ctx->tests, ctx->alloc, test);
 }
 
 // ============================================================================

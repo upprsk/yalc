@@ -52,7 +52,27 @@ static inline void* da_free(void* arr, allocator_t alloc) {
 }
 
 /// Append to a dynamic array.
-void* da_append_opt(void* arr, allocator_t alloc, void* value);
+void* da_append_opt(void* arr, allocator_t alloc, void const* value);
+
+void* da_extend_opt(void* arr, allocator_t alloc, void const* value,
+                    size_t count);
+
+#define da_declare(T, name)                                                \
+    static inline T* da_init_##name(allocator_t alloc) {                   \
+        return da_init_default(alloc, sizeof(T));                          \
+    }                                                                      \
+    static inline T* da_append_##name(T* arr, allocator_t alloc,           \
+                                      T const* elem) {                     \
+        return da_append_opt(arr, alloc, elem);                            \
+    }                                                                      \
+    static inline T* da_extend_##name(T* arr, allocator_t alloc,           \
+                                      T const* elems, size_t elem_count) { \
+        return da_extend_opt(arr, alloc, elems, elem_count);               \
+    }
+
+da_declare(char, char);
+
+#if 0
 
 // T* da_init(T* ptr, allocator_t alloc)
 #define da_init(T, alloc_) (T*)da_init_default(alloc_, sizeof(T))
@@ -60,3 +80,5 @@ void* da_append_opt(void* arr, allocator_t alloc, void* value);
 // T* da_append(T* ptr, allocator_t alloc, T const* value)
 #define da_append(ptr_, alloc_, ...) \
     (typeof(ptr_))da_append_opt(ptr_, alloc_, (typeof(ptr_))(__VA_ARGS__))
+
+#endif

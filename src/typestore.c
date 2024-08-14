@@ -7,12 +7,12 @@
 
 void typestore_init(typestore_t* ts, allocator_t alloc) {
     *ts = (typestore_t){
-        .entries = da_init(typestore_entry_t, alloc),
+        .entries = da_init_typestore_entry(alloc),
         .alloc = alloc,
     };
 
     typestore_entry_t inval_entry = {.id = {0}, .type = {.tag = TYPE_ERR}};
-    ts->entries = da_append(ts->entries, alloc, &inval_entry);
+    ts->entries = da_append_typestore_entry(ts->entries, alloc, &inval_entry);
 
     ts->primitives.err = typestore_add_type(ts, &(type_t){.tag = TYPE_ERR});
     ts->primitives.void_ = typestore_add_type(ts, &(type_t){.tag = TYPE_VOID});
@@ -32,7 +32,7 @@ type_id_t typestore_add_type(typestore_t* ts, type_t const* t) {
 
     type_id_t         id = {da_get_size(ts->entries)};
     typestore_entry_t entry = {.type = *t, .id = id};
-    ts->entries = da_append(ts->entries, ts->alloc, &entry);
+    ts->entries = da_append_typestore_entry(ts->entries, ts->alloc, &entry);
 
     return id;
 }
@@ -78,41 +78,26 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
             return s;
         }
         case TYPE_PROC: {
-            char* b = da_init(char, alloc);
+            char* b = da_init_char(alloc);
             char  c = '(';
-            b = da_append(b, alloc, &c);
+            b = da_append_char(b, alloc, &c);
 
             size_t size = da_get_size(type->as.proc.args);
             for (size_t i = 0; i < size; ++i) {
                 char const* argtype =
                     typestore_type_id_to_str(ts, alloc, type->as.proc.args[i]);
-                for (; *argtype != 0; ++argtype) {
-                    b = da_append(b, alloc, argtype);
-                }
+                b = da_extend_char(b, alloc, argtype, strlen(argtype));
+                allocator_free(alloc, argtype);
 
-                c = ',';
-                b = da_append(b, alloc, &c);
-                c = ' ';
-                b = da_append(b, alloc, &c);
+                b = da_extend_char(b, alloc, ", ", 2);
             }
 
-            c = ')';
-            b = da_append(b, alloc, &c);
-            c = ' ';
-            b = da_append(b, alloc, &c);
-
-            c = '-';
-            b = da_append(b, alloc, &c);
-            c = '>';
-            b = da_append(b, alloc, &c);
-            c = ' ';
-            b = da_append(b, alloc, &c);
+            b = da_extend_char(b, alloc, ") -> ", 5);
 
             char const* rettype =
                 typestore_type_id_to_str(ts, alloc, type->as.proc.return_type);
-            for (; *rettype != 0; ++rettype) {
-                b = da_append(b, alloc, rettype);
-            }
+            b = da_extend_char(b, alloc, rettype, strlen(rettype));
+            allocator_free(alloc, rettype);
 
             size = da_get_size(b);
             char* buf = allocator_alloc(alloc, size);

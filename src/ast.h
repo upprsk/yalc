@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "da.h"
 #include "span.h"
 #include "typestore.h"
 
@@ -185,5 +186,7 @@ struct node {
         node_mptr_t        mptr;
     } as;
 };
+
+da_declare(node_t*, node);
 
 void dump_node(FILE* f, node_t* node, int indent);

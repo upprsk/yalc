@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include "allocator.h"
-#include "da.h"
 #include "errors.h"
 #include "span.h"
 
@@ -42,7 +41,7 @@ static inline void tokenizer_init(tokenizer_t* t, error_reporter_t* er,
         .start = source,
         .er = er,
         .alloc = alloc,
-        .tokens = da_init(token_t, alloc),
+        .tokens = da_init_token(alloc),
     };
 }
 
@@ -81,7 +80,7 @@ static inline span_t mkspan(tokenizer_t const* t) {
 
 static void append_token(tokenizer_t* t, token_type_t ty) {
     token_t tok = {.type = ty, .span = mkspan(t)};
-    t->tokens = da_append(t->tokens, t->alloc, &tok);
+    t->tokens = da_append_token(t->tokens, t->alloc, &tok);
 }
 
 static void skip_whitespace(tokenizer_t* t) {

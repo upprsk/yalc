@@ -16,14 +16,14 @@ void add_tests_a(ctx_t* ctx) {
         "/my-test", my_test, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL,
     };
 
-    ctx->tests = da_append(ctx->tests, ctx->alloc, &test);
+    ctx->tests = da_append_test(ctx->tests, ctx->alloc, &test);
 }
 
 int main(int argc, char* argv[]) {
     allocator_t alloc;
     allocator_init_stdc(&alloc);
 
-    ctx_t ctx = {.alloc = alloc, .tests = da_init(MunitTest, alloc)};
+    ctx_t ctx = {.alloc = alloc, .tests = da_init_test(alloc)};
 
     test_tokenizer_add_tests(&ctx);
     ctx_add_test(&ctx, &(MunitTest){});

@@ -7,7 +7,6 @@
 
 #include "allocator.h"
 #include "ast.h"
-#include "da.h"
 #include "errors.h"
 #include "span.h"
 #include "tokenizer.h"
@@ -182,13 +181,13 @@ static node_t* parse_block(parser_t* p) {
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){.type = NODE_STMT_BLK,
-                  .as.stmt_blk.stmts = da_init(node_t*, p->node_alloc),
+                  .as.stmt_blk.stmts = da_init_node(p->node_alloc),
                   .span.start = open_tok.span.start};
 
     while (peek(p).type != TT_EOF && peek(p).type != TT_RBRACE) {
         node_t* stmt = parse_stmt(p);
         n->as.stmt_blk.stmts =
-            da_append(n->as.stmt_blk.stmts, p->node_alloc, &stmt);
+            da_append_node(n->as.stmt_blk.stmts, p->node_alloc, &stmt);
     }
 
     token_t end_tok = peek(p);
@@ -200,7 +199,7 @@ static node_t* parse_block(parser_t* p) {
 }
 
 static node_t* parse_proc(parser_t* p, token_t tok) {
-    node_t** args = da_init(node_t*, p->node_alloc);
+    node_t** args = da_init_node(p->node_alloc);
 
     while (peek(p).type != TT_RPAREN) {
         token_t argname = peek(p);
@@ -224,7 +223,7 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
                      .end = argtype ? argtype->span.end : argname.span.end}
         };
 
-        args = da_append(args, p->node_alloc, &n);
+        args = da_append_node(args, p->node_alloc, &n);
 
         if (!match(p, TT_COMMA)) break;
     }
@@ -431,13 +430,13 @@ node_t* parse(parse_params_t* params) {
 
     node_t* n = allocator_alloc(p.node_alloc, sizeof(*n));
     *n = (node_t){.type = NODE_MOD,
-                  .as.mod.decls = da_init(node_t*, p.node_alloc),
+                  .as.mod.decls = da_init_node(p.node_alloc),
                   .span.start = peek(&p).span.start};
 
     while (peek(&p).type != TT_EOF) {
         node_t* stmt = parse_stmt(&p);
         n->span.end = stmt->span.end;
-        n->as.mod.decls = da_append(n->as.mod.decls, p.node_alloc, &stmt);
+        n->as.mod.decls = da_append_node(n->as.mod.decls, p.node_alloc, &stmt);
     }
 
     consume(&p, TT_EOF);

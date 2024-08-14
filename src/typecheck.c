@@ -15,6 +15,8 @@ typedef struct typename_table_entry {
     type_id_t   type;
 } typename_table_entry_t;
 
+da_declare(typename_table_entry_t, typename_table_entry);
+
 typedef struct typename_table {
     typename_table_entry_t* entries;
 } typename_table_t;
@@ -246,17 +248,17 @@ void pass_typecheck(typecheck_params_t const* params) {
     allocator_init_arena(&alloc, &arena);
 
     typename_table_t tnt = {
-        .entries = da_init(typename_table_entry_t, alloc),
+        .entries = da_init_typename_table_entry(alloc),
     };
 
-    tnt.entries =
-        da_append(tnt.entries, alloc,
-                  &(typename_table_entry_t){
-                      .name = "i32", .type = params->ts->primitives.i32});
-    tnt.entries =
-        da_append(tnt.entries, alloc,
-                  &(typename_table_entry_t){
-                      .name = "void", .type = params->ts->primitives.void_});
+    tnt.entries = da_append_typename_table_entry(
+        tnt.entries, alloc,
+        &(typename_table_entry_t){.name = "i32",
+                                  .type = params->ts->primitives.i32});
+    tnt.entries = da_append_typename_table_entry(
+        tnt.entries, alloc,
+        &(typename_table_entry_t){.name = "void",
+                                  .type = params->ts->primitives.void_});
 
     typechecker_t tc = {
         .filename = params->filename,
