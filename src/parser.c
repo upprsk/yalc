@@ -353,7 +353,11 @@ static node_t* parse_stmt(parser_t* p) {
     token_t stmt_start_tok = peek(p);
 
     if (match(p, TT_RETURN)) {
-        node_t* expr = parse_expr(p, 0);
+        node_t* expr = NULL;
+
+        if (peek(p).type != TT_SEMICOLON) {
+            expr = parse_expr(p, 0);
+        }
 
         token_t end_tok = peek(p);
         consume(p, TT_SEMICOLON);
