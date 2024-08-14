@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "allocator.h"
+#include "common.h"
 #include "errors.h"
 #include "span.h"
 
@@ -122,20 +123,6 @@ static void tokenize_int(tokenizer_t* t) {
 
     append_token(t, TT_INT);
 }
-
-#define max(a, b)               \
-    ({                          \
-        __typeof__(a) _a = (a); \
-        __typeof__(b) _b = (b); \
-        _a > _b ? _a : _b;      \
-    })
-
-#define min(a, b)               \
-    ({                          \
-        __typeof__(a) _a = (a); \
-        __typeof__(b) _b = (b); \
-        _a < _b ? _a : _b;      \
-    })
 
 static void tokenize_ident(tokenizer_t* t) {
     while (is_digit(peek(t)) || is_alpha(peek(t))) advance(t);

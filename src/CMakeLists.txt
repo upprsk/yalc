@@ -7,6 +7,7 @@ add_library(yal
   ast.h
   codegen/codegen_wasm.c
   codegen/codegen_wasm.h
+  common.h
   da.c
   da.h
   errors.c
