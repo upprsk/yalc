@@ -17,3 +17,10 @@ void report_error(error_reporter_t* er, char const* filename,
 void vreport_error(error_reporter_t* er, char const* filename,
                    char const* source, span_t span, char const* format,
                    va_list va);
+
+void report_note(error_reporter_t* er, char const* filename, char const* source,
+                 span_t span, char const* format, ...);
+
+void vreport_note(error_reporter_t* er, char const* filename,
+                  char const* source, span_t span, char const* format,
+                  va_list va);
