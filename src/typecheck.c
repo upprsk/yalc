@@ -89,6 +89,17 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         case NODE_IDENT: {
         } break;
         case NODE_BINOP: {
+            type_id_t lhs = typecheck_node(tc, env, node->as.binop.left);
+            type_id_t rhs = typecheck_node(tc, env, node->as.binop.right);
+
+            if (!type_id_eq(lhs, rhs)) {
+                // TODO: Report type name instead of id
+                report_error(tc->er, tc->filename, tc->source, node->span,
+                             "incompatible types %d and %d in %s", lhs, rhs,
+                             binop_to_str(node->as.binop.type));
+            }
+
+            result = lhs;
         } break;
         case NODE_UNOP: {
         } break;

@@ -23,7 +23,19 @@ static void codegen_node(codegen_state_t* cgs, node_t* node) {
             return;
         case NODE_FLOAT: break;
         case NODE_IDENT: break;
-        case NODE_BINOP: break;
+        case NODE_BINOP:
+            codegen_node(cgs, node->as.binop.left);
+            codegen_node(cgs, node->as.binop.right);
+
+            // FIXME: using i32 for all types!
+            switch (node->as.binop.type) {
+                case BINOP_ADD: fprintf(out, "(i32.add)\n"); break;
+                case BINOP_SUB: fprintf(out, "(i32.sub)\n"); break;
+                case BINOP_MUL: fprintf(out, "(i32.mul)\n"); break;
+                // FIXME: Using div_u for everything!
+                case BINOP_DIV: fprintf(out, "(i32.div_u)\n"); break;
+            }
+            return;
         case NODE_UNOP: break;
         case NODE_STMT_EXPR: break;
         case NODE_STMT_RET: break;
