@@ -39,11 +39,15 @@ typedef struct typechecker {
 
     typestore_t*      ts;
     typename_table_t* tnt;
+
+    allocator_t temp_alloc;
 } typechecker_t;
 
 typedef struct env {
     type_id_t expected_return;
     type_id_t curr_proc_type;
+
+    span_t proc_type_span;
 
     // TODO: Allow more than one return per procedure
     bool has_returned;
@@ -95,10 +99,20 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
             type_id_t rhs = typecheck_node(tc, env, node->as.binop.right);
 
             if (!type_id_eq(lhs, rhs)) {
-                // TODO: Report type name instead of id
+                char const* lhsstr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+                char const* rhsstr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+
                 report_error(tc->er, tc->filename, tc->source, node->span,
-                             "incompatible types %d and %d in %s", lhs, rhs,
-                             binop_to_str(node->as.binop.type));
+                             "incompatible types in %s, expected %s but got %s",
+                             binop_to_str(node->as.binop.type), lhsstr, rhsstr);
+                report_note(tc->er, tc->filename, tc->source,
+                            node->as.binop.left->span, "this has type %s",
+                            lhsstr);
+                report_note(tc->er, tc->filename, tc->source,
+                            node->as.binop.right->span, "this has type %s",
+                            rhsstr);
             }
 
             result = lhs;
@@ -106,11 +120,25 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         case NODE_UNOP: {
         } break;
         case NODE_STMT_EXPR: {
+            type_id_t expr = typecheck_node(tc, env, node->as.stmt_expr.expr);
+            if (!type_id_eq(expr, void_)) {
+                char const* exprstr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+
+                report_error(tc->er, tc->filename, tc->source, node->span,
+                             "expression result unused");
+                report_note(tc->er, tc->filename, tc->source,
+                            node->as.stmt_expr.expr->span,
+                            "this expression has type %s", exprstr);
+            }
+
+            result = void_;
         } break;
         case NODE_STMT_RET: {
             if (!type_id_is_valid(env->curr_proc_type)) {
                 report_error(tc->er, tc->filename, tc->source, node->span,
                              "can't return outside of procedure body");
+                break;
             }
 
             if (env->has_returned) {
@@ -119,12 +147,23 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
                              "each function can only return once");
             }
 
-            type_id_t expr = typecheck_node(tc, env, node->as.stmt_ret.child);
+            type_id_t expr = void_;
+            if (node->as.stmt_ret.child) {
+                expr = typecheck_node(tc, env, node->as.stmt_ret.child);
+            }
+
             if (!type_id_eq(env->expected_return, expr)) {
-                // TODO: Report type name instead of id
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "incompatible types %d and %d in return",
-                             env->expected_return.id, expr.id);
+                char const* retstr = typestore_type_id_to_str(
+                    tc->ts, tc->temp_alloc, env->expected_return);
+                char const* exprstr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+
+                report_error(
+                    tc->er, tc->filename, tc->source, node->span,
+                    "incompatible types in return, expected %s but got %s",
+                    retstr, exprstr);
+                report_note(tc->er, tc->filename, tc->source,
+                            env->proc_type_span, "return type declared here");
             }
 
             env->has_returned = true;
@@ -136,9 +175,11 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
                 type_id_t id =
                     typecheck_node(tc, env, node->as.stmt_blk.stmts[i]);
                 if (!type_id_eq(id, void_)) {
-                    // TODO: Report type name instead of id
+                    char const* typestr =
+                        typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
                     report_error(tc->er, tc->filename, tc->source, node->span,
-                                 "value of expression was unused: %d", id.id);
+                                 "invalid type for block scope declaration: %s",
+                                 typestr);
                 }
             }
 
@@ -147,13 +188,23 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         case NODE_MOD: {
             uint32_t size = da_get_size(node->as.mod.decls);
             for (uint32_t i = 0; i < size; ++i) {
-                type_id_t id = typecheck_node(tc, env, node->as.mod.decls[i]);
+                node_t* it = node->as.mod.decls[i];
+                if (it->type != NODE_DECL) {
+                    report_error(tc->er, tc->filename, tc->source, it->span,
+                                 "only declarations are allowed at module "
+                                 "scope, found %s",
+                                 node_type_to_str(it->type));
+                    continue;
+                }
+
+                type_id_t id = typecheck_node(tc, env, it);
                 if (!type_id_eq(id, void_)) {
-                    // TODO: Report type name instead of id
-                    report_error(tc->er, tc->filename, tc->source, node->span,
-                                 "invalid type for top-level declaration, "
-                                 "expected void, got %d",
-                                 id.id);
+                    char const* typestr =
+                        typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
+                    report_error(
+                        tc->er, tc->filename, tc->source, node->span,
+                        "invalid type for module scope declaration: %s",
+                        typestr);
                 }
             }
 
@@ -162,16 +213,24 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
         case NODE_DECL: {
             node_decl_t* decl = &node->as.decl;
 
+            type_id_t type = INVALID_TYPEID;
+            if (decl->type) type = eval_to_type(tc, decl->type);
+
             type_id_t init = typecheck_node(tc, env, decl->init);
-            if (decl->type) {
-                type_id_t type = eval_to_type(tc, decl->type);
-                if (!type_id_eq(type, init)) {
-                    // TODO: Report type name instead of id
-                    report_error(
-                        tc->er, tc->filename, tc->source, node->span,
-                        "incompatible types %d and %d in declaration of %s",
-                        type.id, init.id, decl->name);
-                }
+            if (type_id_is_valid(type) && !type_id_eq(type, init)) {
+                char const* typestr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
+                char const* initstr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, init);
+
+                report_error(tc->er, tc->filename, tc->source, node->span,
+                             "incompatible types in declaration of %s, "
+                             "expected %s but got %s",
+                             decl->name, typestr, initstr);
+                report_note(tc->er, tc->filename, tc->source, decl->type->span,
+                            "this has type %s", typestr);
+                report_note(tc->er, tc->filename, tc->source, decl->init->span,
+                            "this has type %s", initstr);
             }
 
             // TODO: Add to symbol table
@@ -204,23 +263,32 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
                             .as.proc = {.return_type = ret, .args = args}
             });
 
-            env_t body_env = {.expected_return = ret, .curr_proc_type = result};
+            env_t     body_env = {.expected_return = ret,
+                                  .curr_proc_type = result,
+                                  .proc_type_span = proc->return_type
+                                                        ? proc->return_type->span
+                                                        : node->span};
             type_id_t body = typecheck_node(tc, &body_env, proc->body);
             if (!type_id_eq(body, void_)) {
-                // TODO: Report type name instead of id
-                report_error(
-                    tc->er, tc->filename, tc->source, node->span,
-                    "invalid type for procedure body, expected void, got %d",
-                    body.id);
+                char const* bodystr =
+                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
+                report_error(tc->er, tc->filename, tc->source, node->span,
+                             "invalid type for procedure body: %s", bodystr);
             }
 
             if (!body_env.has_returned &&
                 !type_id_eq(body_env.expected_return, void_)) {
-                // TODO: Report type name instead of id
+                char const* retstr = typestore_type_id_to_str(
+                    tc->ts, tc->temp_alloc, body_env.expected_return);
+
                 report_error(tc->er, tc->filename, tc->source, node->span,
                              "procedure with non-void return type returns "
-                             "implicitly. Expected to return type %d",
-                             body_env.expected_return);
+                             "implicitly. Expected to return value of type %s",
+                             retstr);
+
+                report_note(tc->er, tc->filename, tc->source,
+                            body_env.proc_type_span,
+                            "return type declared here");
             }
         }
         case NODE_PTR: {
@@ -243,20 +311,20 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, node_t* node) {
 }
 
 void pass_typecheck(typecheck_params_t const* params) {
-    allocator_t alloc;
-    Arena       arena = {0};
-    allocator_init_arena(&alloc, &arena);
+    allocator_t temp_alloc;
+    Arena       temp_arena = {0};
+    allocator_init_arena(&temp_alloc, &temp_arena);
 
     typename_table_t tnt = {
-        .entries = da_init_typename_table_entry(alloc),
+        .entries = da_init_typename_table_entry(temp_alloc),
     };
 
     tnt.entries = da_append_typename_table_entry(
-        tnt.entries, alloc,
+        tnt.entries, temp_alloc,
         &(typename_table_entry_t){.name = "i32",
                                   .type = params->ts->primitives.i32});
     tnt.entries = da_append_typename_table_entry(
-        tnt.entries, alloc,
+        tnt.entries, temp_alloc,
         &(typename_table_entry_t){.name = "void",
                                   .type = params->ts->primitives.void_});
 
@@ -267,9 +335,12 @@ void pass_typecheck(typecheck_params_t const* params) {
         .er = params->er,
         .ts = params->ts,
         .tnt = &tnt,
+        .temp_alloc = temp_alloc,
     };
 
     env_t root_env = {};
 
     typecheck_node(&tc, &root_env, params->ast);
+
+    arena_free(&temp_arena);
 }
