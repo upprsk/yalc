@@ -13,10 +13,10 @@ static void* stdc_alloc(void* ctx, size_t size, size_t align) {
     return malloc(size);
 }
 
-static void stdc_free(void* ctx, void* ptr) {
+static void stdc_free(void* ctx, void const* ptr) {
     (void)ctx;
 
-    free(ptr);
+    free((void*)ptr);
 }
 
 static void* stdc_realloc(void* ctx, void* ptr, size_t new_size) {
@@ -46,7 +46,7 @@ void* allocator_alloc_opt(allocator_t a, size_t size, size_t align) {
     return a.vtable->alloc(a.ctx, size, align);
 }
 
-void allocator_free(allocator_t a, void* ptr) {
+void allocator_free(allocator_t a, void const* ptr) {
     munit_assert_not_null(a.vtable);
     if (!a.vtable->free) return;
 
