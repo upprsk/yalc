@@ -134,27 +134,27 @@ int main(int argc, char* argv[]) {
         .er = &er,
     });
 
-    fprintf(stdout, "typed ast:\n");
-    dump_node(stdout, ast, 0);
+    // fprintf(stdout, "typed ast:\n");
+    // dump_node(stdout, ast, 0);
 
-    fprintf(stdout, "typestore:\n");
+    // fprintf(stdout, "typestore:\n");
 
-    size_t size = da_get_size(ts.entries);
-    for (size_t i = 0; i < size; ++i) {
-        type_t* type = &ts.entries[i].type;
+    // size_t size = da_get_size(ts.entries);
+    // for (size_t i = 0; i < size; ++i) {
+    //     type_t* type = &ts.entries[i].type;
+    //
+    //     char const* typestr = typestore_type_to_str(&ts, alloc, type);
+    //     fprintf(stdout, "[%d] '%s': %s\n", ts.entries[i].id.id,
+    //             type_tag_to_str(type->tag), typestr);
+    //     allocator_free(alloc, (char*)typestr);
+    // }
 
-        char const* typestr = typestore_type_to_str(&ts, alloc, type);
-        fprintf(stdout, "[%d] '%s': %s\n", ts.entries[i].id.id,
-                type_tag_to_str(type->tag), typestr);
-        allocator_free(alloc, (char*)typestr);
-    }
-
-    fprintf(stdout, "wasm:\n");
-    codegen_wasm(&(codegen_params_t){
-        .ast = ast,
-        .out = stdout,
-        .ts = &ts,
-    });
+    // fprintf(stdout, "wasm:\n");
+    // codegen_wasm(&(codegen_params_t){
+    //     .ast = ast,
+    //     .out = stdout,
+    //     .ts = &ts,
+    // });
 
     typestore_deinit(&ts);
     arena_free(&node_arena);
