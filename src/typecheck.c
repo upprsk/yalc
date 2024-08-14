@@ -329,13 +329,29 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             node_proc_t* proc = &node->as.proc;
             type_id_t*   args = NULL;
 
-            if (da_get_size(proc->args) > 0) {
-                report_error(
-                    tc->er, tc->filename, tc->source, node->span,
-                    "no support for procedure arguments was implemented");
-            }
+            scope_t proc_scope;
+            scope_init(&proc_scope, tc->temp_alloc, scope);
 
-            // NOTE: process args before return type
+            size_t argc = da_get_size(proc->args);
+            for (size_t i = 0; i < argc; ++i) {
+                node_t* arg_node = proc->args[i];
+                munit_assert_uint8(arg_node->type, ==, NODE_ARG);
+
+                arg_node->type_id = void_;
+
+                node_arg_t* arg = &arg_node->as.arg;
+                if (arg->type) {
+                    type_id_t argtype = eval_to_type(tc, arg->type);
+                    scope_add(
+                        &proc_scope, tc->temp_alloc, arg->name,
+                        &(value_t){.type = argtype, .where = arg_node->span});
+                } else {
+                    report_error(tc->er, tc->filename, tc->source,
+                                 arg_node->span,
+                                 "arguments without types (using inference) "
+                                 "are not supported (yet)");
+                }
+            }
 
             type_id_t ret = void_;
             if (proc->return_type) {
@@ -353,7 +369,8 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
                                   .proc_type_span = proc->return_type
                                                         ? proc->return_type->span
                                                         : node->span};
-            type_id_t body = typecheck_node(tc, &body_env, scope, proc->body);
+            type_id_t body =
+                typecheck_node(tc, &body_env, &proc_scope, proc->body);
             if (!type_id_eq(body, void_)) {
                 char const* bodystr =
                     typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
