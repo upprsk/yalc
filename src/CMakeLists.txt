@@ -5,6 +5,8 @@ add_library(yal
   arena/arena.h
   ast.c
   ast.h
+  codegen/codegen_wasm.c
+  codegen/codegen_wasm.h
   da.c
   da.h
   errors.c

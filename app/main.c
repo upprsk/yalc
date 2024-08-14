@@ -4,6 +4,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "codegen/codegen_wasm.h"
 #include "da.h"
 #include "errors.h"
 #include "parser.h"
@@ -174,6 +175,13 @@ int main(int argc, char* argv[]) {
 
         fprintf(stdout, "\n");
     }
+
+    fprintf(stdout, "wasm:\n");
+    codegen_wasm(&(codegen_params_t){
+        .ast = ast,
+        .out = stdout,
+        .ts = &ts,
+    });
 
     typestore_deinit(&ts);
     arena_free(&node_arena);
