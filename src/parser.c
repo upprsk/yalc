@@ -81,6 +81,7 @@ static inline int get_precedence(token_type_t tt) {
         case TT_MINUS: return 10;
         case TT_STAR:
         case TT_SLASH: return 20;
+        case TT_LPAREN: return 30;
         default: return 0;
     }
 }
@@ -304,6 +305,21 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
     munit_assert(false);
 }
 
+static node_t* parse_call(parser_t* p, node_t* lhs) {
+    token_t rparen = peek(p);
+    consume(p, TT_RPAREN);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_CALL,
+        .as.call = {.args = NULL, .callee = lhs},
+        .span.start = lhs->span.start,
+        .span.end = rparen.span.end,
+    };
+
+    return n;
+}
+
 static node_t* parse_prefix(parser_t* p) {
     token_t tok = next(p);
     switch (tok.type) {
@@ -335,6 +351,7 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_MINUS:
         case TT_STAR:
         case TT_SLASH: return parse_binary(p, lhs, tok);
+        case TT_LPAREN: return parse_call(p, lhs);
         default: break;
     }
 
