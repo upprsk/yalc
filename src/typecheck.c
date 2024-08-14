@@ -138,13 +138,14 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
     munit_assert_not_null(node);
 
     type_id_t void_ = tc->ts->primitives.void_;
+    type_id_t err = tc->ts->primitives.err;
     type_id_t result = INVALID_TYPEID;
 
     switch (node->type) {
         case NODE_ERR: {
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "found error node in typecheck");
-            result = tc->ts->primitives.err;
+            result = err;
         } break;
         case NODE_INT: {
             result = tc->ts->primitives.i32;
@@ -156,7 +157,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             if (!v) {
                 report_error(tc->er, tc->filename, tc->source, node->span,
                              "undeclared identifier %s", node->as.ident.ident);
-                result = tc->ts->primitives.err;
+                result = err;
                 break;
             }
 
@@ -191,7 +192,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_STMT_EXPR: {
             type_id_t expr =
                 typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
-            if (!type_id_eq(expr, void_)) {
+            if (!type_id_eq(expr, void_) && !type_id_eq(expr, err)) {
                 char const* exprstr =
                     typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
 
