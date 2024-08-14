@@ -5,6 +5,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "common.h"
 #include "da.h"
 #include "errors.h"
 #include "span.h"
@@ -189,6 +190,54 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         } break;
         case NODE_UNOP: {
         } break;
+        case NODE_CALL: {
+            node_call_t* call = &node->as.call;
+
+            type_id_t     callee = typecheck_node(tc, env, scope, call->callee);
+            type_t const* callee_type = typestore_find_type(tc->ts, callee);
+            munit_assert_not_null(callee_type);
+
+            if (callee_type->tag != TYPE_PROC) {
+                char const* calleestr =
+                    typestore_type_to_str(tc->ts, tc->temp_alloc, callee_type);
+
+                report_error(
+                    tc->er, tc->filename, tc->source, call->callee->span,
+                    "can't call non procedure value of type %s", calleestr);
+
+                result = err;
+                break;
+            }
+
+            size_t proc_argc = da_get_size(callee_type->as.proc.args);
+            size_t argc = da_get_size(call->args);
+            if (argc != proc_argc) {
+                report_error(
+                    tc->er, tc->filename, tc->source, node->span,
+                    "procedure expects %d arguments, but %d were given",
+                    proc_argc, argc);
+            }
+
+            argc = min(argc, proc_argc);
+            for (size_t i = 0; i < argc; ++i) {
+                type_id_t expectedt = callee_type->as.proc.args[i];
+                type_id_t argt = typecheck_node(tc, env, scope, call->args[i]);
+
+                if (!type_id_eq(expectedt, argt)) {
+                    char const* expectedstr = typestore_type_id_to_str(
+                        tc->ts, tc->temp_alloc, expectedt);
+                    char const* argstr =
+                        typestore_type_id_to_str(tc->ts, tc->temp_alloc, argt);
+
+                    report_error(
+                        tc->er, tc->filename, tc->source, call->args[i]->span,
+                        "procedure expects type %s at position %d, got %s",
+                        expectedstr, i + 1, argstr);
+                }
+            }
+
+            result = callee_type->as.proc.return_type;
+        } break;
         case NODE_STMT_EXPR: {
             type_id_t expr =
                 typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
@@ -328,7 +377,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         } break;
         case NODE_PROC: {
             node_proc_t* proc = &node->as.proc;
-            type_id_t*   args = NULL;
+            type_id_t*   args = da_init_type_id(tc->temp_alloc);
 
             scope_t proc_scope;
             scope_init(&proc_scope, tc->temp_alloc, scope);
@@ -346,6 +395,8 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
                     scope_add(
                         &proc_scope, tc->temp_alloc, arg->name,
                         &(value_t){.type = argtype, .where = arg_node->span});
+
+                    args = da_append_type_id(args, tc->temp_alloc, &argtype);
                 } else {
                     report_error(tc->er, tc->filename, tc->source,
                                  arg_node->span,

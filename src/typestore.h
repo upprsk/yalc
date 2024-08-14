@@ -61,6 +61,8 @@ typedef struct type_proc {
     type_id_t* args;
 } type_proc_t;
 
+da_declare(type_id_t, type_id);
+
 typedef struct type {
     type_tag_t tag;
     union {

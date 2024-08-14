@@ -306,13 +306,22 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
 }
 
 static node_t* parse_call(parser_t* p, node_t* lhs) {
+    node_t** args = da_init_node(p->node_alloc);
+
+    while (peek(p).type != TT_RPAREN) {
+        node_t* arg = parse_expr(p, 0);
+        args = da_append_node(args, p->node_alloc, &arg);
+
+        if (!match(p, TT_COMMA)) break;
+    }
+
     token_t rparen = peek(p);
     consume(p, TT_RPAREN);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_CALL,
-        .as.call = {.args = NULL, .callee = lhs},
+        .as.call = {.args = args, .callee = lhs},
         .span.start = lhs->span.start,
         .span.end = rparen.span.end,
     };

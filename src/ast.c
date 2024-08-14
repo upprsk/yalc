@@ -39,6 +39,15 @@ void dump_node(FILE* f, node_t* node, int indent) {
             fprintf(f, "UNOP %s\n", unop_to_str(node->as.unop.type));
             dump_node(f, node->as.unop.child, indent + 1);
             break;
+        case NODE_CALL: {
+            fprintf(f, "CALL\n");
+            dump_node(f, node->as.call.callee, indent + 1);
+
+            uint32_t size = da_get_size(node->as.call.args);
+            for (uint32_t i = 0; i < size; ++i) {
+                dump_node(f, node->as.call.args[i], indent + 1);
+            }
+        } break;
         case NODE_STMT_EXPR:
             fprintf(f, "STMT EXPR\n");
             dump_node(f, node->as.stmt_expr.expr, indent + 1);
