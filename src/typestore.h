@@ -103,5 +103,17 @@ static inline bool type_id_eq(type_id_t lhs, type_id_t rhs) {
 void typestore_init(typestore_t* ts, allocator_t alloc);
 void typestore_deinit(typestore_t* ts);
 
-type_id_t typestore_add_type(typestore_t* ts, type_t const* t);
+type_id_t     typestore_add_type(typestore_t* ts, type_t const* t);
 type_t const* typestore_find_type(typestore_t* ts, type_id_t id);
+
+char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
+                                  type_t const* type);
+
+static inline char const* typestore_type_id_to_str(typestore_t* ts,
+                                                   allocator_t  alloc,
+                                                   type_id_t    id) {
+    type_t const* type = typestore_find_type(ts, id);
+    if (!type) return allocator_sprintf(alloc, "<not found>");
+
+    return typestore_type_to_str(ts, alloc, type);
+}

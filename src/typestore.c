@@ -1,5 +1,7 @@
 #include "typestore.h"
 
+#include <string.h>
+
 #include "allocator.h"
 #include "da.h"
 
@@ -42,4 +44,85 @@ type_t const* typestore_find_type(typestore_t* ts, type_id_t id) {
     }
 
     return NULL;
+}
+
+char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
+                                  type_t const* type) {
+    switch (type->tag) {
+        case TYPE_ERR: return allocator_sprintf(alloc, "ERR");
+        case TYPE_VOID: return allocator_sprintf(alloc, "void");
+        case TYPE_TYPE: return allocator_sprintf(alloc, "type");
+        case TYPE_INT: {
+            int bits = type->as.int_.bits;
+            return allocator_sprintf(alloc, "%c%d",
+                                     type->as.int_.signed_ ? 'i' : 'u', bits);
+        }
+        case TYPE_FLOAT:
+            return allocator_sprintf(alloc, "f%d", type->as.float_.bits);
+        case TYPE_PTR: {
+            char const* inner =
+                typestore_type_id_to_str(ts, alloc, type->as.ptr.inner);
+
+            char const* s = allocator_sprintf(alloc, "*%s", inner);
+            allocator_free(alloc, (char*)inner);
+
+            return s;
+        }
+        case TYPE_MPTR: {
+            char const* inner =
+                typestore_type_id_to_str(ts, alloc, type->as.ptr.inner);
+
+            char const* s = allocator_sprintf(alloc, "[*]%s", inner);
+            allocator_free(alloc, (char*)inner);
+
+            return s;
+        }
+        case TYPE_PROC: {
+            char* b = da_init(char, alloc);
+            char  c = '(';
+            b = da_append(b, alloc, &c);
+
+            size_t size = da_get_size(type->as.proc.args);
+            for (size_t i = 0; i < size; ++i) {
+                char const* argtype =
+                    typestore_type_id_to_str(ts, alloc, type->as.proc.args[i]);
+                for (; *argtype != 0; ++argtype) {
+                    b = da_append(b, alloc, argtype);
+                }
+
+                c = ',';
+                b = da_append(b, alloc, &c);
+                c = ' ';
+                b = da_append(b, alloc, &c);
+            }
+
+            c = ')';
+            b = da_append(b, alloc, &c);
+            c = ' ';
+            b = da_append(b, alloc, &c);
+
+            c = '-';
+            b = da_append(b, alloc, &c);
+            c = '>';
+            b = da_append(b, alloc, &c);
+            c = ' ';
+            b = da_append(b, alloc, &c);
+
+            char const* rettype =
+                typestore_type_id_to_str(ts, alloc, type->as.proc.return_type);
+            for (; *rettype != 0; ++rettype) {
+                b = da_append(b, alloc, rettype);
+            }
+
+            size = da_get_size(b);
+            char* buf = allocator_alloc(alloc, size);
+            memcpy(buf, b, size);
+
+            da_free(b, alloc);
+
+            return buf;
+        }
+    }
+
+    return allocator_sprintf(alloc, "<invalid %d>", type->tag);
 }

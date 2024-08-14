@@ -143,37 +143,10 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < size; ++i) {
         type_t* type = &ts.entries[i].type;
 
-        fprintf(stdout, "[%d] '%s'", ts.entries[i].id.id,
-                type_tag_to_str(type->tag));
-
-        switch (type->tag) {
-            case TYPE_ERR: break;
-            case TYPE_VOID: break;
-            case TYPE_TYPE: break;
-            case TYPE_INT:
-                fprintf(stdout, " %c%d", type->as.int_.signed_ ? 'i' : 'u',
-                        type->as.int_.bits);
-                break;
-            case TYPE_FLOAT:
-                fprintf(stdout, " f%d", type->as.float_.bits);
-                break;
-            case TYPE_PTR:
-                fprintf(stdout, " *%d", type->as.ptr.inner.id);
-                break;
-            case TYPE_MPTR:
-                fprintf(stdout, " [*]%d", type->as.mptr.inner.id);
-                break;
-            case TYPE_PROC:
-                fprintf(stdout, " (");
-                for (size_t i = 0; i < da_get_size(type->as.proc.args); ++i) {
-                    fprintf(stdout, "%d,", type->as.proc.args[i].id);
-                }
-
-                fprintf(stdout, ") -> %d", type->as.proc.return_type.id);
-                break;
-        }
-
-        fprintf(stdout, "\n");
+        char const* typestr = typestore_type_to_str(&ts, alloc, type);
+        fprintf(stdout, "[%d] '%s': %s\n", ts.entries[i].id.id,
+                type_tag_to_str(type->tag), typestr);
+        allocator_free(alloc, (char*)typestr);
     }
 
     fprintf(stdout, "wasm:\n");
