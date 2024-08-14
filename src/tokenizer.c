@@ -206,6 +206,7 @@ token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* filename,
         tokenize_one(&t);
     }
 
+    t.start = t.head;
     append_token(&t, TT_EOF);
 
     return t.tokens;
