@@ -110,6 +110,8 @@ static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
 }
 
 static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
+    munit_assert_not_null(node);
+
     if (node->type != NODE_IDENT) {
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "expression could not be evaluated to a type");
