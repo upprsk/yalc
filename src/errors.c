@@ -61,6 +61,8 @@ void report_error(error_reporter_t* er, char const* filename,
 void vreport_error(error_reporter_t* er, char const* filename,
                    char const* source, span_t span, char const* format,
                    va_list va) {
+    er->error_count++;
+
     uint32_t line = count_lines(source, span);
     uint32_t line_start = find_line_start(source, span);
     uint32_t line_end = find_line_end(source, span);
