@@ -430,15 +430,14 @@ node_t* parse(parse_params_t* params) {
                   .node_alloc = node_alloc};
 
     node_t* n = allocator_alloc(p.node_alloc, sizeof(*n));
-    *n = (node_t){.type = NODE_STMT_BLK,
-                  .as.stmt_blk.stmts = da_init(node_t*, p.node_alloc),
+    *n = (node_t){.type = NODE_MOD,
+                  .as.mod.decls = da_init(node_t*, p.node_alloc),
                   .span.start = peek(&p).span.start};
 
     while (peek(&p).type != TT_EOF) {
         node_t* stmt = parse_stmt(&p);
         n->span.end = stmt->span.end;
-        n->as.stmt_blk.stmts =
-            da_append(n->as.stmt_blk.stmts, p.node_alloc, &stmt);
+        n->as.mod.decls = da_append(n->as.mod.decls, p.node_alloc, &stmt);
     }
 
     consume(&p, TT_EOF);

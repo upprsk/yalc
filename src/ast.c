@@ -55,6 +55,14 @@ void dump_node(FILE* f, node_t* node, int indent) {
                 dump_node(f, node->as.stmt_blk.stmts[i], indent + 1);
             }
         } break;
+        case NODE_MOD: {
+            fprintf(f, "MOD\n");
+
+            uint32_t size = da_get_size(node->as.mod.decls);
+            for (uint32_t i = 0; i < size; ++i) {
+                dump_node(f, node->as.mod.decls[i], indent + 1);
+            }
+        } break;
         case NODE_DECL:
             fprintf(f, "DECL \"%s\"\n", node->as.decl.name);
             dump_node(f, node->as.decl.type, indent + 1);
