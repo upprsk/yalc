@@ -104,3 +104,4 @@ void typestore_init(typestore_t* ts, allocator_t alloc);
 void typestore_deinit(typestore_t* ts);
 
 type_id_t typestore_add_type(typestore_t* ts, type_t const* t);
+type_t const* typestore_find_type(typestore_t* ts, type_id_t id);

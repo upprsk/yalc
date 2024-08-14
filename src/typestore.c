@@ -34,3 +34,12 @@ type_id_t typestore_add_type(typestore_t* ts, type_t const* t) {
 
     return id;
 }
+
+type_t const* typestore_find_type(typestore_t* ts, type_id_t id) {
+    size_t size = da_get_size(ts->entries);
+    for (size_t i = 0; i < size; ++i) {
+        if (type_id_eq(ts->entries[i].id, id)) return &ts->entries[i].type;
+    }
+
+    return NULL;
+}
