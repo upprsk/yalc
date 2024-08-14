@@ -30,3 +30,6 @@ void* allocator_alloc(allocator_t a, size_t size);
 void* allocator_alloc_opt(allocator_t a, size_t size, size_t align);
 void  allocator_free(allocator_t a, void* ptr);
 void* allocator_realloc(allocator_t a, void* ptr, size_t new_size);
+
+char* allocator_vsprintf(allocator_t a, char const* format, va_list va);
+char* allocator_sprintf(allocator_t a, char const* format, ...);

@@ -1,5 +1,7 @@
 #include "allocator.h"
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "span.h"
@@ -75,4 +77,25 @@ static allocator_vtable_t const arena_vtable = {
 
 void allocator_init_arena(allocator_t* a, Arena* arena) {
     *a = (allocator_t){.vtable = &arena_vtable, .ctx = arena};
+}
+
+char* allocator_vsprintf(allocator_t a, char const* format, va_list va) {
+    va_list va2;
+    va_copy(va2, va);
+
+    int   n = vsnprintf(NULL, 0, format, va2);
+    char* buf = allocator_alloc(a, n + 1);
+    vsnprintf(buf, n + 1, format, va);
+
+    return buf;
+}
+
+char* allocator_sprintf(allocator_t a, char const* format, ...) {
+    va_list va;
+    va_start(va, format);
+
+    char* s = allocator_vsprintf(a, format, va);
+
+    va_end(va);
+    return s;
 }
