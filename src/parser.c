@@ -556,6 +556,34 @@ static node_t* parse_decl(parser_t* p, token_t tok, decl_opt_t opt,
     return n;
 }
 
+static node_t* parse_stmt_if(parser_t* p, token_t tok) {
+    node_t* condition = parse_expr(p, 0);
+    node_t* when_true = parse_block(p);
+    node_t* when_false = NULL;
+
+    if (match(p, TT_ELSE)) {
+        token_t if_tok = peek(p);
+        if (match(p, TT_IF)) {
+            when_false = parse_stmt_if(p, if_tok);
+        } else {
+            when_false = parse_block(p);
+        }
+    }
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_STMT_IF,
+        .as.stmt_if = {.condition = condition,
+                       .when_true = when_true,
+                       .when_false = when_false},
+        .span = {
+                       .start = tok.span.start,
+                       .end = when_false ? when_false->span.end : when_true->span.end}
+    };
+
+    return n;
+}
+
 static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
     token_t stmt_start_tok = peek(p);
 
@@ -581,26 +609,7 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
     }
 
     if (match(p, TT_IF)) {
-        node_t* condition = parse_expr(p, 0);
-        node_t* when_true = parse_block(p);
-        node_t* when_false = NULL;
-
-        if (match(p, TT_ELSE)) {
-            when_false = parse_block(p);
-        }
-
-        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
-        *n = (node_t){
-            .type = NODE_STMT_IF,
-            .as.stmt_if = {.condition = condition,
-                           .when_true = when_true,
-                           .when_false = when_false},
-            .span = {.start = stmt_start_tok.span.start,
-                           .end = when_false ? when_false->span.end
-                                       : when_true->span.end}
-        };
-
-        return n;
+        return parse_stmt_if(p, stmt_start_tok);
     }
 
     if (peek(p).type == TT_EXTERN) {
