@@ -86,6 +86,8 @@ typedef struct typestore_primitives {
     type_id_t void_;
     type_id_t type;
     type_id_t i32;
+    type_id_t f32;
+    type_id_t f64;
 } typestore_primitives_t;
 
 typedef struct typestore {

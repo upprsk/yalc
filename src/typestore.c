@@ -21,6 +21,10 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
         ts, &(type_t){
                 .tag = TYPE_INT, .as.int_ = {.bits = 32, .signed_ = true}
     });
+    ts->primitives.f32 = typestore_add_type(
+        ts, &(type_t){.tag = TYPE_FLOAT, .as.float_ = {.bits = 32}});
+    ts->primitives.f64 = typestore_add_type(
+        ts, &(type_t){.tag = TYPE_FLOAT, .as.float_ = {.bits = 64}});
 }
 
 void typestore_deinit(typestore_t* ts) {
