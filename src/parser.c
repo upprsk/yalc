@@ -111,6 +111,7 @@ static char const* span_conv_strlit(span_t s, char const* source,
     }
 
     append(0);
+#undef append
 
     if (out_len) *out_len = i;
 
