@@ -9,5 +9,5 @@ update := .(n: *i32) {
 main := .() {
     a := 12;
     update(&a);
-    update(44);
+    update(&44);
 };

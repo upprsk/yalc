@@ -39,6 +39,10 @@ void dump_node(FILE* f, node_t* node, int indent) {
             fprintf(f, "UNOP %s\n", unop_to_str(node->as.unop.type));
             dump_node(f, node->as.unop.child, indent + 1);
             break;
+        case NODE_REF:
+            fprintf(f, "REF\n");
+            dump_node(f, node->as.ref.child, indent + 1);
+            break;
         case NODE_CALL: {
             fprintf(f, "CALL\n");
             dump_node(f, node->as.call.callee, indent + 1);

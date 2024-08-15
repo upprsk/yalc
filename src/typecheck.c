@@ -260,6 +260,14 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
     return callee_type->as.proc.return_type;
 }
 
+static type_id_t typecheck_node_ref(typechecker_t* tc, env_t* env,
+                                    scope_t* scope, node_t* node) {
+    type_id_t child = typecheck_node(tc, env, scope, node->as.ref.child);
+
+    return typestore_add_type(
+        tc->ts, &(type_t){.tag = TYPE_PTR, .as.ptr = {.inner = child}});
+}
+
 static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
                                       scope_t* scope, node_t* node) {
     type_id_t     inner = typecheck_node(tc, env, scope, node->as.deref.child);
@@ -454,6 +462,7 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
         case NODE_ARG:
         case NODE_PROC:
         case NODE_PTR:
+        case NODE_REF:
         case NODE_MPTR: break;
         case NODE_DEREF:
         case NODE_IDENT: lhs_is_lvalue = true; break;
@@ -586,6 +595,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_CALL:
             result = typecheck_node_call(tc, env, scope, node);
             break;
+        case NODE_REF: result = typecheck_node_ref(tc, env, scope, node); break;
         case NODE_DEREF:
             result = typecheck_node_deref(tc, env, scope, node);
             break;
