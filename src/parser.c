@@ -75,13 +75,15 @@ static inline node_t* node_err(parser_t* p, span_t span) {
     return n;
 }
 
+static int const unary_precedence = 30;
+
 static inline int get_precedence(token_type_t tt) {
     switch (tt) {
         case TT_PLUS:
         case TT_MINUS: return 10;
         case TT_STAR:
         case TT_SLASH: return 20;
-        case TT_LPAREN: return 30;
+        case TT_LPAREN: return 40;
         default: return 0;
     }
 }
@@ -114,7 +116,7 @@ static node_t* parse_unary(parser_t* p, token_t tok) {
         default: munit_assert(false);
     }
 
-    node_t* child = parse_prefix(p);
+    node_t* child = parse_expr(p, unary_precedence);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
