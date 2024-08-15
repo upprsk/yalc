@@ -4,6 +4,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "common.h"
 #include "errors.h"
 #include "parser.h"
 #include "tokenizer.h"
@@ -49,12 +50,12 @@ char const* shift_args(int* argc, char*** argv) {
     return data;
 }
 
-static inline bool streq(char const* a, char const* b) {
-    return strcmp(a, b) == 0;
-}
-
 int main(int argc, char* argv[]) {
     char const* filename = NULL;
+    bool        show_tokens = false;
+    bool        show_ast = false;
+    bool        show_typed_ast = false;
+    bool        show_typestore = false;
 
     char const* self_path = shift_args(&argc, &argv);
 
@@ -63,19 +64,42 @@ int main(int argc, char* argv[]) {
         if (!arg) break;
 
         if (streq(arg, "-h") || streq(arg, "--help")) {
+            // clang-format off
             fprintf(stderr, "usage: %s <root filename> [options]\n", self_path);
-            fprintf(stderr, "      -h, --help      show this message\n");
+            fprintf(stderr, "      -h, --help          show this message\n");
+            fprintf(stderr, "      --show-tokens       show all tokens from file\n");
+            fprintf(stderr, "      --show-ast          show the parse tree\n");
+            fprintf(stderr, "      --show-typed-ast    show the typed AST\n");
+            fprintf(stderr, "      --show-typestore    show all of the types defined in the typestore\n");
+            // clang-format on
 
             return EXIT_SUCCESS;
         }
 
-        if (filename) {
+        if (streq(arg, "--show-tokens")) {
+            show_tokens = true;
+        }
+
+        else if (streq(arg, "--show-typed-ast")) {
+            show_typed_ast = true;
+        }
+
+        else if (streq(arg, "--show-ast")) {
+            show_ast = true;
+        }
+
+        else if (streq(arg, "--show-typestore")) {
+            show_typestore = true;
+        }
+
+        else if (filename) {
             fprintf(stderr, "error: root filename already provided: %s\n",
                     filename);
             return EXIT_FAILURE;
         }
 
-        filename = arg;
+        else
+            filename = arg;
     }
 
     if (!filename) {
@@ -101,10 +125,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // for (size_t i = 0; i < da_get_size(tokens); ++i) {
-    //     printf("token %s (%d) [%d, %d]\n", token_to_str(tokens[i].type),
-    //            tokens[i].type, tokens[i].span.start, tokens[i].span.end);
-    // }
+    if (show_tokens) {
+        for (size_t i = 0; i < da_get_size(tokens); ++i) {
+            printf("token %s (%d) [%d, %d]\n", token_to_str(tokens[i].type),
+                   tokens[i].type, tokens[i].span.start, tokens[i].span.end);
+        }
+    }
 
     Arena node_arena = {};
 
@@ -117,8 +143,12 @@ int main(int argc, char* argv[]) {
         .arena = &node_arena,
     });
 
-    fprintf(stdout, "untyped ast:\n");
-    dump_node(stdout, ast, 0);
+    if (show_ast) {
+        fprintf(stdout, "untyped ast:\n");
+        dump_node(stdout, ast, 0);
+    }
+
+    if (er.error_count > 0) return EXIT_FAILURE;
 
     typestore_t ts = {};
     typestore_init(&ts, alloc);
@@ -132,19 +162,23 @@ int main(int argc, char* argv[]) {
         .er = &er,
     });
 
-    // fprintf(stdout, "typed ast:\n");
-    // dump_node(stdout, ast, 0);
+    if (show_typed_ast) {
+        fprintf(stdout, "typed ast:\n");
+        dump_node(stdout, ast, 0);
+    }
 
-    // fprintf(stdout, "typestore:\n");
-    // size_t size = da_get_size(ts.entries);
-    // for (size_t i = 0; i < size; ++i) {
-    //     type_t* type = &ts.entries[i].type;
-    //
-    //     char const* typestr = typestore_type_to_str(&ts, alloc, type);
-    //     fprintf(stdout, "[%d] '%s': %s\n", ts.entries[i].id.id,
-    //             type_tag_to_str(type->tag), typestr);
-    //     allocator_free(alloc, (char*)typestr);
-    // }
+    if (show_typestore) {
+        fprintf(stdout, "typestore:\n");
+        size_t size = da_get_size(ts.entries);
+        for (size_t i = 0; i < size; ++i) {
+            type_t* type = &ts.entries[i].type;
+
+            char const* typestr = typestore_type_to_str(&ts, alloc, type);
+            fprintf(stdout, "[%d] '%s': %s\n", ts.entries[i].id.id,
+                    type_tag_to_str(type->tag), typestr);
+            allocator_free(alloc, (char*)typestr);
+        }
+    }
 
     // fprintf(stdout, "wasm:\n");
     // codegen_wasm(&(codegen_params_t){
