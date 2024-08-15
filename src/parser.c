@@ -128,6 +128,8 @@ static int const unary_precedence = 30;
 
 static inline int get_precedence(token_type_t tt) {
     switch (tt) {
+        case TT_AND:
+        case TT_OR: return 5;
         case TT_PLUS:
         case TT_MINUS: return 10;
         case TT_STAR:
@@ -215,6 +217,27 @@ static node_t* parse_binary(parser_t* p, node_t* lhs, token_t tok) {
     *n = (node_t){
         .type = NODE_BINOP,
         .as.binop = {.type = op, .left = lhs, .right = rhs},
+        .span = {.start = lhs->span.start, .end = rhs->span.end}
+    };
+
+    return n;
+}
+
+static node_t* parse_comp(parser_t* p, node_t* lhs, token_t tok) {
+    node_comp_type_t op;
+
+    switch (tok.type) {
+        case TT_AND: op = COMP_AND; break;
+        case TT_OR: op = COMP_OR; break;
+        default: munit_assert(false);
+    }
+
+    node_t* rhs = parse_expr(p, get_precedence(tok.type));
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_COMP,
+        .as.comp = {.type = op, .left = lhs, .right = rhs},
         .span = {.start = lhs->span.start, .end = rhs->span.end}
     };
 
@@ -495,6 +518,8 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_SLASH: return parse_binary(p, lhs, tok);
         case TT_LPAREN: return parse_call(p, lhs);
         case TT_DOT_STAR: return parse_deref(p, lhs, tok);
+        case TT_AND:
+        case TT_OR: return parse_comp(p, lhs, tok);
         default: break;
     }
 

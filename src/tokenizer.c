@@ -163,6 +163,10 @@ static void tokenize_ident(tokenizer_t* t) {
         append_token(t, TT_IF);
     } else if (strncmp(ident, "else", min(len, (uint32_t)4)) == 0) {
         append_token(t, TT_ELSE);
+    } else if (strncmp(ident, "and", min(len, (uint32_t)3)) == 0) {
+        append_token(t, TT_AND);
+    } else if (strncmp(ident, "or", min(len, (uint32_t)2)) == 0) {
+        append_token(t, TT_OR);
     } else {
         append_token(t, TT_IDENT);
     }

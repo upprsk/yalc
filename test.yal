@@ -1,5 +1,5 @@
 main := .() {
-    if !true {
+    if false and true or true {
         a := 1;
     } else {
         a := 0;

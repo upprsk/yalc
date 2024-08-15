@@ -254,6 +254,41 @@ static type_id_t typecheck_node_unop(typechecker_t* tc, env_t* env,
     return child;
 }
 
+static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    type_id_t lhs = typecheck_node(tc, env, scope, node->as.comp.left);
+    type_id_t rhs = typecheck_node(tc, env, scope, node->as.comp.right);
+
+    if (!type_id_eq(lhs, rhs)) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+        char const* rhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "incompatible types in %s, expected %s but got %s",
+                     comp_to_str(node->as.comp.type), lhsstr, rhsstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.comp.left->span,
+                    "this has type %s", lhsstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.comp.right->span,
+                    "this has type %s", rhsstr);
+    }
+
+    type_t const* lhs_type = typestore_find_type(tc->ts, lhs);
+    munit_assert_not_null(lhs_type);
+
+    if (lhs_type->tag != TYPE_BOOL && lhs_type->tag != TYPE_BOOL) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "type %s does not support %s", lhsstr,
+                     comp_to_str(node->as.comp.type));
+    }
+
+    return lhs;
+}
+
 static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node) {
     node_call_t* call = &node->as.call;
@@ -529,28 +564,9 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
 
     bool lhs_is_lvalue = false;
     switch (lhs_node->type) {
-        case NODE_ERR:
-        case NODE_INT:
-        case NODE_FLOAT:
-        case NODE_STR:
-        case NODE_BINOP:
-        case NODE_UNOP:
-        case NODE_CALL:
-        case NODE_STMT_EXPR:
-        case NODE_STMT_RET:
-        case NODE_STMT_IF:
-        case NODE_STMT_BLK:
-        case NODE_MOD:
-        case NODE_DECL:
-        case NODE_ASSIGN:
-        case NODE_ARG:
-        case NODE_PROC:
-        case NODE_ARRAY:
-        case NODE_PTR:
-        case NODE_REF:
-        case NODE_MPTR: break;
         case NODE_DEREF:
         case NODE_IDENT: lhs_is_lvalue = true; break;
+        default: break;
     }
 
     if (!lhs_is_lvalue) {
@@ -729,6 +745,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_UNOP:
             result = typecheck_node_unop(tc, env, scope, node);
+            break;
+        case NODE_COMP:
+            result = typecheck_node_comp(tc, env, scope, node);
             break;
         case NODE_CALL:
             result = typecheck_node_call(tc, env, scope, node);
