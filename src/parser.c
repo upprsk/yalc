@@ -677,6 +677,7 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
     }
 
     if (peek(p).type == TT_EXTERN) {
+        consume(p, TT_EXTERN);
         token_t extern_name_tok = peek(p);
         consume(p, TT_STR);
 
