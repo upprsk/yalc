@@ -289,6 +289,41 @@ static type_id_t typecheck_node_logic(typechecker_t* tc, env_t* env,
     return lhs;
 }
 
+static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    type_id_t lhs = typecheck_node(tc, env, scope, node->as.comp.left);
+    type_id_t rhs = typecheck_node(tc, env, scope, node->as.comp.right);
+
+    if (!type_id_eq(lhs, rhs)) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+        char const* rhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "incompatible types in %s, expected %s but got %s",
+                     comp_to_str(node->as.comp.type), lhsstr, rhsstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.comp.left->span,
+                    "this has type %s", lhsstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.comp.right->span,
+                    "this has type %s", rhsstr);
+    }
+
+    type_t const* lhs_type = typestore_find_type(tc->ts, lhs);
+    munit_assert_not_null(lhs_type);
+
+    if (lhs_type->tag != TYPE_INT && lhs_type->tag != TYPE_FLOAT) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "type %s does not support %s", lhsstr,
+                     comp_to_str(node->as.comp.type));
+    }
+
+    return tc->ts->primitives.bool_;
+}
+
 static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node) {
     node_call_t* call = &node->as.call;
@@ -748,6 +783,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_LOGIC:
             result = typecheck_node_logic(tc, env, scope, node);
+            break;
+        case NODE_COMP:
+            result = typecheck_node_comp(tc, env, scope, node);
             break;
         case NODE_CALL:
             result = typecheck_node_call(tc, env, scope, node);

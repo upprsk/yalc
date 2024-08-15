@@ -201,9 +201,31 @@ static void tokenize_one(tokenizer_t* t) {
         case ',': append_token(t, TT_COMMA); break;
         case ':': append_token(t, TT_COLON); break;
         case ';': append_token(t, TT_SEMICOLON); break;
-        case '=': append_token(t, TT_EQUAL); break;
+        case '=':
+            if (match(t, '='))
+                append_token(t, TT_EQUAL_EQUAL);
+            else
+                append_token(t, TT_EQUAL);
+            break;
+        case '<':
+            if (match(t, '='))
+                append_token(t, TT_SMALLER_EQUAL);
+            else
+                append_token(t, TT_SMALLER);
+            break;
+        case '>':
+            if (match(t, '='))
+                append_token(t, TT_LARGER_EQUAL);
+            else
+                append_token(t, TT_LARGER);
+            break;
         case '&': append_token(t, TT_AMPERSAND); break;
-        case '!': append_token(t, TT_BANG); break;
+        case '!':
+            if (match(t, '='))
+                append_token(t, TT_BANG_EQUAL);
+            else
+                append_token(t, TT_BANG);
+            break;
         case '(': append_token(t, TT_LPAREN); break;
         case ')': append_token(t, TT_RPAREN); break;
         case '[': append_token(t, TT_LBRACKET); break;

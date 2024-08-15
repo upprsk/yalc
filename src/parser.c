@@ -124,18 +124,24 @@ static char const* span_conv_strlit(span_t s, char const* source,
     return str;
 }
 
-static int const unary_precedence = 30;
+static int const unary_precedence = 40;
 
 static inline int get_precedence(token_type_t tt) {
     switch (tt) {
         case TT_AND:
         case TT_OR: return 5;
+        case TT_EQUAL_EQUAL:
+        case TT_BANG_EQUAL:
+        case TT_SMALLER:
+        case TT_SMALLER_EQUAL:
+        case TT_LARGER:
+        case TT_LARGER_EQUAL: return 10;
         case TT_PLUS:
-        case TT_MINUS: return 10;
+        case TT_MINUS: return 20;
         case TT_STAR:
-        case TT_SLASH: return 20;
+        case TT_SLASH: return 30;
         case TT_LPAREN:
-        case TT_DOT_STAR: return 40;
+        case TT_DOT_STAR: return 50;
         default: return 0;
     }
 }
@@ -223,7 +229,7 @@ static node_t* parse_binary(parser_t* p, node_t* lhs, token_t tok) {
     return n;
 }
 
-static node_t* parse_comp(parser_t* p, node_t* lhs, token_t tok) {
+static node_t* parse_logic(parser_t* p, node_t* lhs, token_t tok) {
     node_logic_type_t op;
 
     switch (tok.type) {
@@ -238,6 +244,31 @@ static node_t* parse_comp(parser_t* p, node_t* lhs, token_t tok) {
     *n = (node_t){
         .type = NODE_LOGIC,
         .as.logic = {.type = op, .left = lhs, .right = rhs},
+        .span = {.start = lhs->span.start, .end = rhs->span.end}
+    };
+
+    return n;
+}
+
+static node_t* parse_comp(parser_t* p, node_t* lhs, token_t tok) {
+    node_comp_type_t op;
+
+    switch (tok.type) {
+        case TT_EQUAL_EQUAL: op = COMP_EQ; break;
+        case TT_BANG_EQUAL: op = COMP_NEQ; break;
+        case TT_SMALLER: op = COMP_LT; break;
+        case TT_SMALLER_EQUAL: op = COMP_LTE; break;
+        case TT_LARGER: op = COMP_GT; break;
+        case TT_LARGER_EQUAL: op = COMP_GTE; break;
+        default: munit_assert(false);
+    }
+
+    node_t* rhs = parse_expr(p, get_precedence(tok.type));
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_COMP,
+        .as.comp = {.type = op, .left = lhs, .right = rhs},
         .span = {.start = lhs->span.start, .end = rhs->span.end}
     };
 
@@ -519,7 +550,13 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_LPAREN: return parse_call(p, lhs);
         case TT_DOT_STAR: return parse_deref(p, lhs, tok);
         case TT_AND:
-        case TT_OR: return parse_comp(p, lhs, tok);
+        case TT_OR: return parse_logic(p, lhs, tok);
+        case TT_EQUAL_EQUAL:
+        case TT_BANG_EQUAL:
+        case TT_SMALLER:
+        case TT_SMALLER_EQUAL:
+        case TT_LARGER:
+        case TT_LARGER_EQUAL: return parse_comp(p, lhs, tok);
         default: break;
     }
 

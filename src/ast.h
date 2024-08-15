@@ -90,6 +90,34 @@ typedef struct node_logic {
     node_t*           right;
 } node_logic_t;
 
+typedef enum node_comp_type {
+    COMP_EQ,
+    COMP_NEQ,
+    COMP_LT,
+    COMP_LTE,
+    COMP_GT,
+    COMP_GTE,
+} node_comp_type_t;
+
+static inline char const* comp_to_str(node_comp_type_t op) {
+    switch (op) {
+        case COMP_EQ: return "COMP_EQ";
+        case COMP_NEQ: return "COMP_NEQ";
+        case COMP_LT: return "COMP_LT";
+        case COMP_LTE: return "COMP_LTE";
+        case COMP_GT: return "COMP_GT";
+        case COMP_GTE: return "COMP_GTE";
+    }
+
+    return "?";
+}
+
+typedef struct node_comp {
+    node_comp_type_t type;
+    node_t*          left;
+    node_t*          right;
+} node_comp_t;
+
 typedef struct node_call {
     node_t*  callee;
     node_t** args;
@@ -185,6 +213,7 @@ typedef enum node_type {
     NODE_BINOP,
     NODE_UNOP,
     NODE_LOGIC,
+    NODE_COMP,
     NODE_CALL,
     NODE_REF,
     NODE_DEREF,
@@ -215,6 +244,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_BINOP: return "NODE_BINOP";
         case NODE_UNOP: return "NODE_UNOP";
         case NODE_LOGIC: return "NODE_LOGIC";
+        case NODE_COMP: return "NODE_COMP";
         case NODE_CALL: return "NODE_CALL";
         case NODE_REF: return "NODE_REF";
         case NODE_DEREF: return "NODE_DEREF";
@@ -247,6 +277,7 @@ struct node {
         node_binop_t       binop;
         node_unop_t        unop;
         node_logic_t       logic;
+        node_comp_t        comp;
         node_call_t        call;
         node_ref_t         ref;
         node_deref_t       deref;
