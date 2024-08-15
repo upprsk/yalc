@@ -854,6 +854,18 @@ void pass_typecheck(typecheck_params_t const* params) {
         tnt.entries, temp_alloc,
         &(typename_table_entry_t){.name = "void",
                                   .type = params->ts->primitives.void_});
+    tnt.entries = da_append_typename_table_entry(
+        tnt.entries, temp_alloc,
+        &(typename_table_entry_t){.name = "f32",
+                                  .type = params->ts->primitives.f32});
+    tnt.entries = da_append_typename_table_entry(
+        tnt.entries, temp_alloc,
+        &(typename_table_entry_t){.name = "f64",
+                                  .type = params->ts->primitives.f64});
+    tnt.entries = da_append_typename_table_entry(
+        tnt.entries, temp_alloc,
+        &(typename_table_entry_t){.name = "bool",
+                                  .type = params->ts->primitives.bool_});
 
     typechecker_t tc = {
         .filename = params->filename,

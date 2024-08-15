@@ -1,8 +1,10 @@
+eq := .(a: i32, b: i32) -> bool { return a == b; };
+
 main := .() {
     a := 1;
     b := 2;
     c: i32;
  
-    if a > b { c = 1; }
-    else     { c = 0; }
+    if eq(a, b) { c = 1; }
+    else        { c = 0; }
 };
