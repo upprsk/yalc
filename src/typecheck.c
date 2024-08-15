@@ -485,6 +485,7 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
         case NODE_ERR:
         case NODE_INT:
         case NODE_FLOAT:
+        case NODE_STR:
         case NODE_BINOP:
         case NODE_UNOP:
         case NODE_CALL:
@@ -628,6 +629,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_INT: result = tc->ts->primitives.i32; break;
         case NODE_FLOAT: result = tc->ts->primitives.f64; break;
+        case NODE_STR: result = tc->ts->primitives.err; break;
         case NODE_IDENT:
             result = typecheck_node_ident(tc, env, scope, node);
             break;

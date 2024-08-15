@@ -18,6 +18,11 @@ typedef struct node_float {
     double value;
 } node_float_t;
 
+typedef struct node_str {
+    uint32_t    len;
+    char const* str;
+} node_str_t;
+
 typedef struct node_ident {
     char const* ident;
 } node_ident_t;
@@ -139,6 +144,7 @@ typedef enum node_type {
 
     NODE_INT,
     NODE_FLOAT,
+    NODE_STR,
     NODE_IDENT,
 
     NODE_BINOP,
@@ -166,6 +172,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_ERR: return "NODE_ERR";
         case NODE_INT: return "NODE_INT";
         case NODE_FLOAT: return "NODE_FLOAT";
+        case NODE_STR: return "NODE_STR";
         case NODE_IDENT: return "NODE_IDENT";
         case NODE_BINOP: return "NODE_BINOP";
         case NODE_UNOP: return "NODE_UNOP";
@@ -194,6 +201,7 @@ struct node {
     union {
         node_int_t         int_;
         node_float_t       float_;
+        node_str_t         str;
         node_ident_t       ident;
         node_binop_t       binop;
         node_unop_t        unop;

@@ -7,6 +7,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "da.h"
 #include "errors.h"
 #include "span.h"
 #include "tokenizer.h"
@@ -75,6 +76,53 @@ static inline node_t* node_err(parser_t* p, span_t span) {
     return n;
 }
 
+static char const* span_conv_strlit(span_t s, char const* source,
+                                    uint32_t source_len, allocator_t alloc,
+                                    uint32_t* out_len) {
+    uint32_t    len;
+    char const* lit = span_str_parts(s, source, source_len, &len);
+    munit_assert_char(lit[0], ==, '"');
+    munit_assert_char(lit[len - 1], ==, '"');
+
+    ++lit;
+    len -= 2;
+
+    char* str = da_init_char(alloc);
+
+#define append(c)                              \
+    do {                                       \
+        char cc = c;                           \
+        str = da_append_char(str, alloc, &cc); \
+    } while (0)
+
+    size_t i = 0;
+    for (; i < len; ++i) {
+        if (lit[i] == '\\') {
+            switch (lit[++i]) {
+                case 'n': append('\n'); break;
+                case 'r': append('\r'); break;
+                case 't': append('\t'); break;
+                // unrecognized are just copyed over
+                default: append(lit[i]); break;
+            }
+        } else {
+            append(lit[i]);
+        }
+    }
+
+    append(0);
+
+    if (out_len) *out_len = i;
+
+    size_t size = da_get_size(str);
+    char*  buf = allocator_alloc(alloc, size);
+    memcpy(buf, str, size);
+
+    da_free(str, alloc);
+
+    return str;
+}
+
 static int const unary_precedence = 30;
 
 static inline int get_precedence(token_type_t tt) {
@@ -109,6 +157,21 @@ static node_t* parse_int(parser_t* p, token_t tok) {
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_INT, .as.int_ = {.value = value}, .span = tok.span};
+
+    return n;
+}
+
+static node_t* parse_str(parser_t* p, token_t tok) {
+    uint32_t    len;
+    char const* contents = span_conv_strlit(tok.span, p->source, p->source_len,
+                                            p->node_alloc, &len);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_STR,
+        .as.str = {.str = contents, .len = len},
+        .span = tok.span
+    };
 
     return n;
 }
@@ -369,6 +432,7 @@ static node_t* parse_prefix(parser_t* p) {
     token_t tok = next(p);
     switch (tok.type) {
         case TT_INT: return parse_int(p, tok);
+        case TT_STR: return parse_str(p, tok);
         case TT_MINUS: return parse_unary(p, tok);
         case TT_LPAREN: return parse_grouping(p);
         case TT_IDENT: return parse_ident(p, tok);
@@ -489,13 +553,13 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
     if (peek(p).type == TT_EXTERN) {
         token_t extern_tok = next(p);
 
-        // FIXME: Use a string literal instead of an ident here
-        token_t extern_name = peek(p);
-        consume(p, TT_IDENT);
+        token_t extern_name_tok = peek(p);
+        consume(p, TT_STR);
 
-        return parse_decl(p, extern_tok, DECL_OPT_IS_EXTERN,
-                          span_dupe_str(extern_name.span, p->source,
-                                        p->source_len, p->node_alloc));
+        char const* extern_name =
+            span_conv_strlit(extern_name_tok.span, p->source, p->source_len,
+                             p->node_alloc, NULL);
+        return parse_decl(p, extern_tok, DECL_OPT_IS_EXTERN, extern_name);
     }
 
     if (peek_next(p).type == TT_COLON) {
