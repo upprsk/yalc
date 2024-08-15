@@ -224,11 +224,11 @@ static node_t* parse_binary(parser_t* p, node_t* lhs, token_t tok) {
 }
 
 static node_t* parse_comp(parser_t* p, node_t* lhs, token_t tok) {
-    node_comp_type_t op;
+    node_logic_type_t op;
 
     switch (tok.type) {
-        case TT_AND: op = COMP_AND; break;
-        case TT_OR: op = COMP_OR; break;
+        case TT_AND: op = LOGIC_AND; break;
+        case TT_OR: op = LOGIC_OR; break;
         default: munit_assert(false);
     }
 
@@ -236,8 +236,8 @@ static node_t* parse_comp(parser_t* p, node_t* lhs, token_t tok) {
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
-        .type = NODE_COMP,
-        .as.comp = {.type = op, .left = lhs, .right = rhs},
+        .type = NODE_LOGIC,
+        .as.logic = {.type = op, .left = lhs, .right = rhs},
         .span = {.start = lhs->span.start, .end = rhs->span.end}
     };
 
