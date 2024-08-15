@@ -15,6 +15,7 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
     ts->primitives.err = typestore_add_type(ts, &(type_t){.tag = TYPE_ERR});
     ts->primitives.void_ = typestore_add_type(ts, &(type_t){.tag = TYPE_VOID});
     ts->primitives.type = typestore_add_type(ts, &(type_t){.tag = TYPE_TYPE});
+    ts->primitives.bool_ = typestore_add_type(ts, &(type_t){.tag = TYPE_BOOL});
     ts->primitives.i32 = typestore_add_type(
         ts, &(type_t){
                 .tag = TYPE_INT, .as.int_ = {.bits = 32, .signed_ = true}
@@ -65,6 +66,7 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
         }
         case TYPE_FLOAT:
             return allocator_sprintf(alloc, "f%d", type->as.float_.bits);
+        case TYPE_BOOL: return allocator_sprintf(alloc, "bool");
         case TYPE_ARRAY: {
             char const* inner =
                 typestore_type_id_to_str(ts, alloc, type->as.array.inner);

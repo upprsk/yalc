@@ -25,6 +25,7 @@ typedef enum type_tag {
     TYPE_TYPE,
     TYPE_INT,
     TYPE_FLOAT,
+    TYPE_BOOL,
     TYPE_ARRAY,
     TYPE_PTR,
     TYPE_MPTR,
@@ -38,6 +39,7 @@ static inline char const* type_tag_to_str(type_tag_t tag) {
         case TYPE_TYPE: return "TYPE_TYPE";
         case TYPE_INT: return "TYPE_INT";
         case TYPE_FLOAT: return "TYPE_FLOAT";
+        case TYPE_BOOL: return "TYPE_BOOL";
         case TYPE_ARRAY: return "TYPE_ARRAY";
         case TYPE_PTR: return "TYPE_PTR";
         case TYPE_MPTR: return "TYPE_MPTR";
@@ -97,6 +99,7 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
     switch (lhs->tag) {
         case TYPE_ERR:
         case TYPE_VOID:
+        case TYPE_BOOL:
         case TYPE_TYPE: return true;
         case TYPE_INT:
             return lhs->as.int_.bits == rhs->as.int_.bits &&
@@ -140,6 +143,7 @@ typedef struct typestore_primitives {
     type_id_t err;
     type_id_t void_;
     type_id_t type;
+    type_id_t bool_;
     type_id_t i32;
     type_id_t f32;
     type_id_t f64;

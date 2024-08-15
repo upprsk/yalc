@@ -382,10 +382,18 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
 static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
                                         scope_t* scope, node_t* node) {
     type_id_t void_ = tc->ts->primitives.void_;
-    type_id_t err = tc->ts->primitives.err;
+    type_id_t bool_ = tc->ts->primitives.bool_;
 
     type_id_t condition =
         typecheck_node(tc, env, scope, node->as.stmt_if.condition);
+    if (!type_id_eq(condition, bool_)) {
+        char const* conditionstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, condition);
+        report_error(
+            tc->er, tc->filename, tc->source, node->as.stmt_if.condition->span,
+            "incompatible types in comparison, expected bool but got %s",
+            conditionstr);
+    }
 
     typecheck_node(tc, env, scope, node->as.stmt_if.when_true);
     if (node->as.stmt_if.when_false)
@@ -496,9 +504,10 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
                   &(value_t){.type = type, .where = decl->name_span});
     if (prev) {
         report_error(tc->er, tc->filename, tc->source, node->span,
-                     "duplicate identifier %s", decl->name);
-        report_note(tc->er, tc->filename, tc->source, prev->where,
-                    "declared here");
+                     "identifier %s already defined", decl->name);
+        if (prev->where.start != 0 && prev->where.end != 0)
+            report_note(tc->er, tc->filename, tc->source, prev->where,
+                        "declared here");
     }
 
     return void_;
@@ -796,6 +805,10 @@ void pass_typecheck(typecheck_params_t const* params) {
     // FIXME: Check if temp_alloc is what we want for this
     scope_t root_scope = {};
     scope_init(&root_scope, tc.temp_alloc, NULL);
+    scope_add(&root_scope, tc.temp_alloc, "true",
+              &(value_t){.type = tc.ts->primitives.bool_});
+    scope_add(&root_scope, tc.temp_alloc, "false",
+              &(value_t){.type = tc.ts->primitives.bool_});
 
     typecheck_node(&tc, &root_env, &root_scope, params->ast);
 
