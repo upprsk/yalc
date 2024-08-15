@@ -115,6 +115,13 @@ static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
 static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
     munit_assert_not_null(node);
 
+    if (node->type == NODE_PTR) {
+        type_id_t inner = eval_to_type(tc, node->as.ptr.child);
+
+        return typestore_add_type(
+            tc->ts, &(type_t){.tag = TYPE_PTR, .as.ptr = {.inner = inner}});
+    }
+
     if (node->type != NODE_IDENT) {
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "expression could not be evaluated to a type");
@@ -251,6 +258,26 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
     }
 
     return callee_type->as.proc.return_type;
+}
+
+static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node) {
+    type_id_t     inner = typecheck_node(tc, env, scope, node->as.deref.child);
+    type_t const* inner_type = typestore_find_type(tc->ts, inner);
+    munit_assert_not_null(inner_type);
+
+    if (inner_type->tag != TYPE_PTR) {
+        char const* innerstr =
+            typestore_type_to_str(tc->ts, tc->temp_alloc, inner_type);
+
+        report_error(
+            tc->er, tc->filename, tc->source, node->as.deref.child->span,
+            "can't dereference non-pointer value of type %s", innerstr);
+
+        return tc->ts->primitives.err;
+    }
+
+    return inner_type->as.ptr.inner;
 }
 
 static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
@@ -404,6 +431,60 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     return void_;
 }
 
+static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
+                                       scope_t* scope, node_t* node) {
+    node_t*   lhs_node = node->as.assign.lhs;
+    type_id_t lhs = typecheck_node(tc, env, scope, lhs_node);
+    type_id_t rhs = typecheck_node(tc, env, scope, node->as.assign.rhs);
+
+    bool lhs_is_lvalue = false;
+    switch (lhs_node->type) {
+        case NODE_ERR:
+        case NODE_INT:
+        case NODE_FLOAT:
+        case NODE_BINOP:
+        case NODE_UNOP:
+        case NODE_CALL:
+        case NODE_STMT_EXPR:
+        case NODE_STMT_RET:
+        case NODE_STMT_BLK:
+        case NODE_MOD:
+        case NODE_DECL:
+        case NODE_ASSIGN:
+        case NODE_ARG:
+        case NODE_PROC:
+        case NODE_PTR:
+        case NODE_MPTR: break;
+        case NODE_DEREF:
+        case NODE_IDENT: lhs_is_lvalue = true; break;
+    }
+
+    if (!lhs_is_lvalue) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+        report_error(tc->er, tc->filename, tc->source, lhs_node->span,
+                     "can't assign to rvalue of type %s", lhsstr);
+
+        return tc->ts->primitives.void_;
+    }
+
+    if (!type_id_eq(lhs, rhs)) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+        char const* rhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "incompatible types in assignment, expected %s but got %s",
+                     lhsstr, rhsstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.binop.left->span,
+                    "this has type %s", lhsstr);
+        report_note(tc->er, tc->filename, tc->source,
+                    node->as.binop.right->span, "this has type %s", rhsstr);
+    }
+
+    return tc->ts->primitives.void_;
+}
+
 static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node) {
     (void)env;
@@ -505,7 +586,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_CALL:
             result = typecheck_node_call(tc, env, scope, node);
             break;
-        case NODE_DEREF: break;
+        case NODE_DEREF:
+            result = typecheck_node_deref(tc, env, scope, node);
+            break;
         case NODE_STMT_EXPR:
             result = typecheck_node_stmt_expr(tc, env, scope, node);
             break;
@@ -519,7 +602,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_DECL:
             result = typecheck_node_decl(tc, env, scope, node);
             break;
-        case NODE_ASSIGN: break;
+        case NODE_ASSIGN:
+            result = typecheck_node_assign(tc, env, scope, node);
+            break;
         case NODE_ARG: break;
         case NODE_PROC:
             result = typecheck_node_proc(tc, env, scope, node);
