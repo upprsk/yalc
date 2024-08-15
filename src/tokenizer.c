@@ -85,13 +85,20 @@ static void append_token(tokenizer_t* t, token_type_t ty) {
 }
 
 static void skip_whitespace(tokenizer_t* t) {
-    while (true) switch (peek(t)) {
+    while (true) {
+        switch (peek(t)) {
             case ' ':
             case '\t':
             case '\r':
             case '\n': advance(t); break;
+            case '/':
+                if (peek_next(t) == '/') {
+                    while (!is_at_end(t) && peek(t) != '\n') advance(t);
+                    break;
+                }
             default: return;
         }
+    }
 }
 
 static inline bool is_digit(char c) {
