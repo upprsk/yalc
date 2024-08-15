@@ -512,6 +512,7 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
         case NODE_ASSIGN:
         case NODE_ARG:
         case NODE_PROC:
+        case NODE_ARRAY:
         case NODE_PTR:
         case NODE_REF:
         case NODE_MPTR: break;
@@ -629,6 +630,48 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
     return result;
 }
 
+static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node) {
+    type_id_t     err = tc->ts->primitives.err;
+    node_array_t* array = &node->as.array;
+    munit_assert_not_null(array);
+
+    if (array->len->type != NODE_IDENT ||
+        strcmp(array->len->as.ident.ident, "_") != 0) {
+        report_error(tc->er, tc->filename, tc->source, array->len->span,
+                     "arrays with explicit size are not supported (yet)");
+        return err;
+    }
+
+    type_id_t type = eval_to_type(tc, env, scope, array->type);
+    size_t    count = da_get_size(array->initializer_list);
+    for (size_t i = 0; i < count; ++i) {
+        type_id_t expr =
+            typecheck_node(tc, env, scope, array->initializer_list[i]);
+        if (!type_id_eq(type, expr)) {
+            char const* typestr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
+            char const* exprstr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "incompatible types in array, expected %s but got %s",
+                         typestr, exprstr);
+            report_note(tc->er, tc->filename, tc->source, array->type->span,
+                        "array has type %s", typestr);
+            report_note(tc->er, tc->filename, tc->source,
+                        array->initializer_list[i]->span, "this has type %s",
+                        exprstr);
+        }
+    }
+
+    return typestore_add_type(
+        tc->ts,
+        &(type_t){
+            .tag = TYPE_ARRAY, .as.array = {.len = count, .inner = type}
+    });
+}
+
 static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
                                 node_t* node) {
     munit_assert_not_null(node);
@@ -680,6 +723,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_ARG: break;
         case NODE_PROC:
             result = typecheck_node_proc(tc, env, scope, node, 0);
+            break;
+        case NODE_ARRAY:
+            result = typecheck_node_array(tc, env, scope, node);
             break;
         case NODE_PTR: break;
         case NODE_MPTR: break;

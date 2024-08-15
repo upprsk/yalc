@@ -108,6 +108,16 @@ void dump_node(FILE* f, node_t* node, int indent) {
             dump_node(f, node->as.proc.return_type, indent + 1);
             dump_node(f, node->as.proc.body, indent + 1);
         } break;
+        case NODE_ARRAY: {
+            fprintf(f, "ARRAY\n");
+            dump_node(f, node->as.array.len, indent + 1);
+            dump_node(f, node->as.array.type, indent + 1);
+
+            uint32_t size = da_get_size(node->as.array.initializer_list);
+            for (uint32_t i = 0; i < size; ++i) {
+                dump_node(f, node->as.array.initializer_list[i], indent + 1);
+            }
+        } break;
         case NODE_PTR:
             fprintf(f, "PTR\n");
             dump_node(f, node->as.ptr.child, indent + 1);

@@ -130,6 +130,12 @@ typedef struct node_proc {
     node_t* body;
 } node_proc_t;
 
+typedef struct node_array {
+    node_t*  len;
+    node_t*  type;
+    node_t** initializer_list;
+} node_array_t;
+
 typedef struct node_ptr {
     node_t* child;
 } node_ptr_t;
@@ -163,6 +169,7 @@ typedef enum node_type {
 
     NODE_ARG,
     NODE_PROC,
+    NODE_ARRAY,
     NODE_PTR,
     NODE_MPTR,
 } node_type_t;
@@ -187,6 +194,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_ASSIGN: return "NODE_ASSIGN";
         case NODE_ARG: return "NODE_ARG";
         case NODE_PROC: return "NODE_PROC";
+        case NODE_ARRAY: return "NODE_ARRAY";
         case NODE_PTR: return "NODE_PTR";
         case NODE_MPTR: return "NODE_MPTR";
     }
@@ -216,6 +224,7 @@ struct node {
         node_assign_t      assign;
         node_arg_t         arg;
         node_proc_t        proc;
+        node_array_t       array;
         node_ptr_t         ptr;
         node_mptr_t        mptr;
     } as;

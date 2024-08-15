@@ -25,6 +25,7 @@ typedef enum type_tag {
     TYPE_TYPE,
     TYPE_INT,
     TYPE_FLOAT,
+    TYPE_ARRAY,
     TYPE_PTR,
     TYPE_MPTR,
     TYPE_PROC,
@@ -37,6 +38,7 @@ static inline char const* type_tag_to_str(type_tag_t tag) {
         case TYPE_TYPE: return "TYPE_TYPE";
         case TYPE_INT: return "TYPE_INT";
         case TYPE_FLOAT: return "TYPE_FLOAT";
+        case TYPE_ARRAY: return "TYPE_ARRAY";
         case TYPE_PTR: return "TYPE_PTR";
         case TYPE_MPTR: return "TYPE_MPTR";
         case TYPE_PROC: return "TYPE_PROC";
@@ -53,6 +55,11 @@ typedef struct type_int {
 typedef struct type_float {
     uint16_t bits;
 } type_float_t;
+
+typedef struct type_array {
+    type_id_t inner;
+    uint64_t  len;
+} type_array_t;
 
 typedef struct type_ptr {
     type_id_t inner;
@@ -77,6 +84,7 @@ typedef struct type {
     union {
         type_int_t   int_;
         type_float_t float_;
+        type_array_t array;
         type_ptr_t   ptr;
         type_mptr_t  mptr;
         type_proc_t  proc;
@@ -94,6 +102,9 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
             return lhs->as.int_.bits == rhs->as.int_.bits &&
                    lhs->as.int_.signed_ == rhs->as.int_.signed_;
         case TYPE_FLOAT: return lhs->as.float_.bits == rhs->as.float_.bits;
+        case TYPE_ARRAY:
+            return lhs->as.array.len == rhs->as.array.len &&
+                   type_id_eq(lhs->as.array.inner, rhs->as.array.inner);
         case TYPE_PTR: return type_id_eq(lhs->as.ptr.inner, rhs->as.ptr.inner);
         case TYPE_MPTR:
             return type_id_eq(lhs->as.mptr.inner, rhs->as.mptr.inner);

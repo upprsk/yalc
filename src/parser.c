@@ -373,6 +373,35 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
         munit_assert(false);
     }
 
+    node_t* array_len = parse_expr(p, 0);
+    consume(p, TT_RBRACKET);
+
+    node_t* array_type = parse_expr(p, 0);
+    consume(p, TT_LBRACE);
+
+    node_t** initlist = da_init_node(p->node_alloc);
+    while (peek(p).type != TT_RBRACE) {
+        node_t* arg = parse_expr(p, 0);
+        initlist = da_append_node(initlist, p->node_alloc, &arg);
+
+        if (!match(p, TT_COMMA)) break;
+    }
+
+    token_t rbrace = peek(p);
+    consume(p, TT_RBRACE);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_ARRAY,
+        .as.array = {.len = array_len,
+                     .type = array_type,
+                     .initializer_list = initlist},
+        .span.start = tok.span.start,
+        .span.end = rbrace.span.end,
+    };
+
+    return n;
+
     // array
     report_error(p->er, p->filename, p->source, tok.span,
                  "arrays not implemented");

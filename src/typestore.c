@@ -65,6 +65,16 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
         }
         case TYPE_FLOAT:
             return allocator_sprintf(alloc, "f%d", type->as.float_.bits);
+        case TYPE_ARRAY: {
+            char const* inner =
+                typestore_type_id_to_str(ts, alloc, type->as.array.inner);
+
+            char const* s =
+                allocator_sprintf(alloc, "[%u]%s", type->as.array.len, inner);
+            allocator_free(alloc, (char*)inner);
+
+            return s;
+        }
         case TYPE_PTR: {
             char const* inner =
                 typestore_type_id_to_str(ts, alloc, type->as.ptr.inner);
