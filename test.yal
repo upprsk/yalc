@@ -1,11 +1,8 @@
-add := .(a: i32, b: i32) -> i32 {
-    return a + b;
-};
+f := .() -> i32 { return 42; };
+g := .(x: i32) -> i32 { return x * f(); };
 
-say_hi := .() {};
-
-main := .() -> i32 {
-    a := add(1, 2);
-
-    return a;
+main := .() {
+    a := f();
+    b := -g(69);
+    c := a + b / 2;
 };

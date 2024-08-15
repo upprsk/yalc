@@ -16,6 +16,7 @@ typedef struct typename_table_entry {
     type_id_t   type;
 } typename_table_entry_t;
 
+// NOLINTNEXTLINE
 da_declare(typename_table_entry_t, typename_table_entry);
 
 typedef struct typename_table {
@@ -64,6 +65,7 @@ typedef struct scope_entry {
     value_t     value;
 } scope_entry_t;
 
+// NOLINTNEXTLINE
 da_declare(scope_entry_t, scope_entry);
 
 typedef struct scope {
@@ -135,10 +137,351 @@ static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
 }
 
 static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
+                                node_t* node);
+
+static type_id_t typecheck_node_ident(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node) {
+    (void)env;
+
+    value_t const* v = scope_find(scope, node->as.ident.ident);
+    if (!v) {
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "undeclared identifier %s", node->as.ident.ident);
+        return tc->ts->primitives.err;
+    }
+
+    return v->type;
+}
+
+static type_id_t typecheck_node_binop(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node) {
+    type_id_t lhs = typecheck_node(tc, env, scope, node->as.binop.left);
+    type_id_t rhs = typecheck_node(tc, env, scope, node->as.binop.right);
+
+    if (!type_id_eq(lhs, rhs)) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+        char const* rhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "incompatible types in %s, expected %s but got %s",
+                     binop_to_str(node->as.binop.type), lhsstr, rhsstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.binop.left->span,
+                    "this has type %s", lhsstr);
+        report_note(tc->er, tc->filename, tc->source,
+                    node->as.binop.right->span, "this has type %s", rhsstr);
+    }
+
+    type_t const* lhs_type = typestore_find_type(tc->ts, lhs);
+    munit_assert_not_null(lhs_type);
+
+    if (lhs_type->tag != TYPE_INT && lhs_type->tag != TYPE_FLOAT) {
+        char const* lhsstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "type %s does not support %s", lhsstr,
+                     binop_to_str(node->as.binop.type));
+    }
+
+    return lhs;
+}
+
+static type_id_t typecheck_node_unop(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    type_id_t child = typecheck_node(tc, env, scope, node->as.unop.child);
+
+    type_t const* child_type = typestore_find_type(tc->ts, child);
+    munit_assert_not_null(child_type);
+
+    if (child_type->tag != TYPE_INT && child_type->tag != TYPE_FLOAT) {
+        char const* childstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "type %s does not support %s", childstr,
+                     unop_to_str(node->as.unop.type));
+    }
+
+    return child;
+}
+
+static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    node_call_t* call = &node->as.call;
+
+    type_id_t     callee = typecheck_node(tc, env, scope, call->callee);
+    type_t const* callee_type = typestore_find_type(tc->ts, callee);
+    munit_assert_not_null(callee_type);
+
+    if (callee_type->tag != TYPE_PROC) {
+        char const* calleestr =
+            typestore_type_to_str(tc->ts, tc->temp_alloc, callee_type);
+
+        report_error(tc->er, tc->filename, tc->source, call->callee->span,
+                     "can't call non procedure value of type %s", calleestr);
+
+        return tc->ts->primitives.err;
+    }
+
+    size_t proc_argc = da_get_size(callee_type->as.proc.args);
+    size_t argc = da_get_size(call->args);
+    if (argc != proc_argc) {
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "procedure expects %d arguments, but %d were given",
+                     proc_argc, argc);
+    }
+
+    argc = min(argc, proc_argc);
+    for (size_t i = 0; i < argc; ++i) {
+        type_id_t expectedt = callee_type->as.proc.args[i];
+        type_id_t argt = typecheck_node(tc, env, scope, call->args[i]);
+
+        if (!type_id_eq(expectedt, argt)) {
+            char const* expectedstr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, expectedt);
+            char const* argstr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, argt);
+
+            report_error(tc->er, tc->filename, tc->source, call->args[i]->span,
+                         "procedure expects type %s at position %d, got %s",
+                         expectedstr, i + 1, argstr);
+        }
+    }
+
+    return callee_type->as.proc.return_type;
+}
+
+static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
+                                          scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+    type_id_t err = tc->ts->primitives.err;
+
+    type_id_t expr = typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
+    if (!type_id_eq(expr, void_) && !type_id_eq(expr, err)) {
+        char const* exprstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "expression result unused");
+        report_note(tc->er, tc->filename, tc->source,
+                    node->as.stmt_expr.expr->span,
+                    "this expression has type %s", exprstr);
+    }
+
+    return void_;
+}
+
+static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
+                                         scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+    type_id_t err = tc->ts->primitives.err;
+
+    if (!type_id_is_valid(env->curr_proc_type)) {
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "can't return outside of procedure body");
+        return err;
+    }
+
+    if (env->has_returned) {
+        // TODO: Allow for more than one return
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "each function can only return once");
+    }
+
+    type_id_t expr = void_;
+    if (node->as.stmt_ret.child) {
+        expr = typecheck_node(tc, env, scope, node->as.stmt_ret.child);
+    }
+
+    if (!type_id_eq(env->expected_return, expr)) {
+        char const* retstr = typestore_type_id_to_str(tc->ts, tc->temp_alloc,
+                                                      env->expected_return);
+        char const* exprstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "incompatible types in return, expected %s but got %s",
+                     retstr, exprstr);
+        report_note(tc->er, tc->filename, tc->source, env->proc_type_span,
+                    "return type declared here");
+    }
+
+    env->has_returned = true;
+    return void_;
+}
+
+static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
+                                         scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+
+    scope_t blkscope;
+    scope_init(&blkscope, tc->temp_alloc, scope);
+
+    uint32_t size = da_get_size(node->as.stmt_blk.stmts);
+    for (uint32_t i = 0; i < size; ++i) {
+        type_id_t id =
+            typecheck_node(tc, env, &blkscope, node->as.stmt_blk.stmts[i]);
+        if (!type_id_eq(id, void_)) {
+            char const* typestr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "invalid type for block scope declaration: %s",
+                         typestr);
+        }
+    }
+
+    return void_;
+}
+
+static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
+                                    scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+
+    uint32_t size = da_get_size(node->as.mod.decls);
+    for (uint32_t i = 0; i < size; ++i) {
+        node_t* it = node->as.mod.decls[i];
+        if (it->type != NODE_DECL) {
+            report_error(tc->er, tc->filename, tc->source, it->span,
+                         "only declarations are allowed at module "
+                         "scope, found %s",
+                         node_type_to_str(it->type));
+            continue;
+        }
+
+        type_id_t id = typecheck_node(tc, env, scope, it);
+        if (!type_id_eq(id, void_)) {
+            char const* typestr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "invalid type for module scope declaration: %s",
+                         typestr);
+        }
+    }
+
+    return void_;
+}
+
+static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    type_id_t    void_ = tc->ts->primitives.void_;
+    node_decl_t* decl = &node->as.decl;
+
+    type_id_t type = INVALID_TYPEID;
+    if (decl->type) type = eval_to_type(tc, decl->type);
+
+    type_id_t init = typecheck_node(tc, env, scope, decl->init);
+    if (type_id_is_valid(type) && !type_id_eq(type, init)) {
+        char const* typestr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
+        char const* initstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, init);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "incompatible types in declaration of %s, "
+                     "expected %s but got %s",
+                     decl->name, typestr, initstr);
+        report_note(tc->er, tc->filename, tc->source, decl->type->span,
+                    "this has type %s", typestr);
+        report_note(tc->er, tc->filename, tc->source, decl->init->span,
+                    "this has type %s", initstr);
+    }
+
+    type = init;
+
+    // FIXME: Check if using temp_alloc here is what we want
+    value_t const* prev =
+        scope_add(scope, tc->temp_alloc, decl->name,
+                  &(value_t){.type = type, .where = decl->name_span});
+    if (prev) {
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "duplicate identifier %s", decl->name);
+        report_note(tc->er, tc->filename, tc->source, prev->where,
+                    "declared here");
+    }
+
+    return void_;
+}
+
+static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    (void)env;
+
+    type_id_t void_ = tc->ts->primitives.void_;
+
+    node_proc_t* proc = &node->as.proc;
+    type_id_t*   args = da_init_type_id(tc->temp_alloc);
+
+    scope_t proc_scope;
+    scope_init(&proc_scope, tc->temp_alloc, scope);
+
+    size_t argc = da_get_size(proc->args);
+    for (size_t i = 0; i < argc; ++i) {
+        node_t* arg_node = proc->args[i];
+        munit_assert_uint8(arg_node->type, ==, NODE_ARG);
+
+        arg_node->type_id = void_;
+
+        node_arg_t* arg = &arg_node->as.arg;
+        if (arg->type) {
+            type_id_t argtype = eval_to_type(tc, arg->type);
+            scope_add(&proc_scope, tc->temp_alloc, arg->name,
+                      &(value_t){.type = argtype, .where = arg_node->span});
+
+            args = da_append_type_id(args, tc->temp_alloc, &argtype);
+        } else {
+            report_error(tc->er, tc->filename, tc->source, arg_node->span,
+                         "arguments without types (using inference) "
+                         "are not supported (yet)");
+        }
+    }
+
+    type_id_t ret = void_;
+    if (proc->return_type) {
+        ret = eval_to_type(tc, proc->return_type);
+    }
+
+    type_id_t result = typestore_add_type(
+        tc->ts,
+        &(type_t){
+            .tag = TYPE_PROC, .as.proc = {.return_type = ret, .args = args}
+    });
+
+    env_t     body_env = {.expected_return = ret,
+                          .curr_proc_type = result,
+                          .proc_type_span = proc->return_type
+                                                ? proc->return_type->span
+                                                : node->span};
+    type_id_t body = typecheck_node(tc, &body_env, &proc_scope, proc->body);
+    if (!type_id_eq(body, void_)) {
+        char const* bodystr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "invalid type for procedure body: %s", bodystr);
+    }
+
+    if (!body_env.has_returned &&
+        !type_id_eq(body_env.expected_return, void_)) {
+        char const* retstr = typestore_type_id_to_str(tc->ts, tc->temp_alloc,
+                                                      body_env.expected_return);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "procedure with non-void return type returns "
+                     "implicitly. Expected to return value of type %s",
+                     retstr);
+
+        report_note(tc->er, tc->filename, tc->source, body_env.proc_type_span,
+                    "return type declared here");
+    }
+
+    return result;
+}
+
+static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
                                 node_t* node) {
     munit_assert_not_null(node);
 
-    type_id_t void_ = tc->ts->primitives.void_;
     type_id_t err = tc->ts->primitives.err;
     type_id_t result = INVALID_TYPEID;
 
@@ -152,303 +495,40 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             result = tc->ts->primitives.i32;
         } break;
         case NODE_FLOAT: {
+            result = tc->ts->primitives.f64;
         } break;
-        case NODE_IDENT: {
-            value_t const* v = scope_find(scope, node->as.ident.ident);
-            if (!v) {
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "undeclared identifier %s", node->as.ident.ident);
-                result = err;
-                break;
-            }
-
-            result = v->type;
-        } break;
-        case NODE_BINOP: {
-            type_id_t lhs = typecheck_node(tc, env, scope, node->as.binop.left);
-            type_id_t rhs =
-                typecheck_node(tc, env, scope, node->as.binop.right);
-
-            if (!type_id_eq(lhs, rhs)) {
-                char const* lhsstr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
-                char const* rhsstr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
-
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "incompatible types in %s, expected %s but got %s",
-                             binop_to_str(node->as.binop.type), lhsstr, rhsstr);
-                report_note(tc->er, tc->filename, tc->source,
-                            node->as.binop.left->span, "this has type %s",
-                            lhsstr);
-                report_note(tc->er, tc->filename, tc->source,
-                            node->as.binop.right->span, "this has type %s",
-                            rhsstr);
-            }
-
-            result = lhs;
-        } break;
-        case NODE_UNOP: {
-        } break;
-        case NODE_CALL: {
-            node_call_t* call = &node->as.call;
-
-            type_id_t     callee = typecheck_node(tc, env, scope, call->callee);
-            type_t const* callee_type = typestore_find_type(tc->ts, callee);
-            munit_assert_not_null(callee_type);
-
-            if (callee_type->tag != TYPE_PROC) {
-                char const* calleestr =
-                    typestore_type_to_str(tc->ts, tc->temp_alloc, callee_type);
-
-                report_error(
-                    tc->er, tc->filename, tc->source, call->callee->span,
-                    "can't call non procedure value of type %s", calleestr);
-
-                result = err;
-                break;
-            }
-
-            size_t proc_argc = da_get_size(callee_type->as.proc.args);
-            size_t argc = da_get_size(call->args);
-            if (argc != proc_argc) {
-                report_error(
-                    tc->er, tc->filename, tc->source, node->span,
-                    "procedure expects %d arguments, but %d were given",
-                    proc_argc, argc);
-            }
-
-            argc = min(argc, proc_argc);
-            for (size_t i = 0; i < argc; ++i) {
-                type_id_t expectedt = callee_type->as.proc.args[i];
-                type_id_t argt = typecheck_node(tc, env, scope, call->args[i]);
-
-                if (!type_id_eq(expectedt, argt)) {
-                    char const* expectedstr = typestore_type_id_to_str(
-                        tc->ts, tc->temp_alloc, expectedt);
-                    char const* argstr =
-                        typestore_type_id_to_str(tc->ts, tc->temp_alloc, argt);
-
-                    report_error(
-                        tc->er, tc->filename, tc->source, call->args[i]->span,
-                        "procedure expects type %s at position %d, got %s",
-                        expectedstr, i + 1, argstr);
-                }
-            }
-
-            result = callee_type->as.proc.return_type;
-        } break;
-        case NODE_STMT_EXPR: {
-            type_id_t expr =
-                typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
-            if (!type_id_eq(expr, void_) && !type_id_eq(expr, err)) {
-                char const* exprstr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
-
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "expression result unused");
-                report_note(tc->er, tc->filename, tc->source,
-                            node->as.stmt_expr.expr->span,
-                            "this expression has type %s", exprstr);
-            }
-
-            result = void_;
-        } break;
-        case NODE_STMT_RET: {
-            if (!type_id_is_valid(env->curr_proc_type)) {
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "can't return outside of procedure body");
-                break;
-            }
-
-            if (env->has_returned) {
-                // TODO: Allow for more than one return
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "each function can only return once");
-            }
-
-            type_id_t expr = void_;
-            if (node->as.stmt_ret.child) {
-                expr = typecheck_node(tc, env, scope, node->as.stmt_ret.child);
-            }
-
-            if (!type_id_eq(env->expected_return, expr)) {
-                char const* retstr = typestore_type_id_to_str(
-                    tc->ts, tc->temp_alloc, env->expected_return);
-                char const* exprstr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
-
-                report_error(
-                    tc->er, tc->filename, tc->source, node->span,
-                    "incompatible types in return, expected %s but got %s",
-                    retstr, exprstr);
-                report_note(tc->er, tc->filename, tc->source,
-                            env->proc_type_span, "return type declared here");
-            }
-
-            env->has_returned = true;
-            result = void_;
-        } break;
-        case NODE_STMT_BLK: {
-            scope_t blkscope;
-            scope_init(&blkscope, tc->temp_alloc, scope);
-
-            uint32_t size = da_get_size(node->as.stmt_blk.stmts);
-            for (uint32_t i = 0; i < size; ++i) {
-                type_id_t id = typecheck_node(tc, env, &blkscope,
-                                              node->as.stmt_blk.stmts[i]);
-                if (!type_id_eq(id, void_)) {
-                    char const* typestr =
-                        typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
-                    report_error(tc->er, tc->filename, tc->source, node->span,
-                                 "invalid type for block scope declaration: %s",
-                                 typestr);
-                }
-            }
-
-            result = void_;
-        } break;
-        case NODE_MOD: {
-            uint32_t size = da_get_size(node->as.mod.decls);
-            for (uint32_t i = 0; i < size; ++i) {
-                node_t* it = node->as.mod.decls[i];
-                if (it->type != NODE_DECL) {
-                    report_error(tc->er, tc->filename, tc->source, it->span,
-                                 "only declarations are allowed at module "
-                                 "scope, found %s",
-                                 node_type_to_str(it->type));
-                    continue;
-                }
-
-                type_id_t id = typecheck_node(tc, env, scope, it);
-                if (!type_id_eq(id, void_)) {
-                    char const* typestr =
-                        typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
-                    report_error(
-                        tc->er, tc->filename, tc->source, node->span,
-                        "invalid type for module scope declaration: %s",
-                        typestr);
-                }
-            }
-
-            result = void_;
-        } break;
-        case NODE_DECL: {
-            node_decl_t* decl = &node->as.decl;
-
-            type_id_t type = INVALID_TYPEID;
-            if (decl->type) type = eval_to_type(tc, decl->type);
-
-            type_id_t init = typecheck_node(tc, env, scope, decl->init);
-            if (type_id_is_valid(type) && !type_id_eq(type, init)) {
-                char const* typestr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
-                char const* initstr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, init);
-
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "incompatible types in declaration of %s, "
-                             "expected %s but got %s",
-                             decl->name, typestr, initstr);
-                report_note(tc->er, tc->filename, tc->source, decl->type->span,
-                            "this has type %s", typestr);
-                report_note(tc->er, tc->filename, tc->source, decl->init->span,
-                            "this has type %s", initstr);
-            }
-
-            type = init;
-
-            // FIXME: Check if using temp_alloc here is what we want
-            value_t const* prev =
-                scope_add(scope, tc->temp_alloc, decl->name,
-                          &(value_t){.type = type, .where = decl->name_span});
-            if (prev) {
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "duplicate identifier %s", decl->name);
-                report_note(tc->er, tc->filename, tc->source, prev->where,
-                            "declared here");
-            }
-
-            result = void_;
-        } break;
-        case NODE_ASSIGN: {
-        } break;
-        case NODE_ARG: {
-        } break;
-        case NODE_PROC: {
-            node_proc_t* proc = &node->as.proc;
-            type_id_t*   args = da_init_type_id(tc->temp_alloc);
-
-            scope_t proc_scope;
-            scope_init(&proc_scope, tc->temp_alloc, scope);
-
-            size_t argc = da_get_size(proc->args);
-            for (size_t i = 0; i < argc; ++i) {
-                node_t* arg_node = proc->args[i];
-                munit_assert_uint8(arg_node->type, ==, NODE_ARG);
-
-                arg_node->type_id = void_;
-
-                node_arg_t* arg = &arg_node->as.arg;
-                if (arg->type) {
-                    type_id_t argtype = eval_to_type(tc, arg->type);
-                    scope_add(
-                        &proc_scope, tc->temp_alloc, arg->name,
-                        &(value_t){.type = argtype, .where = arg_node->span});
-
-                    args = da_append_type_id(args, tc->temp_alloc, &argtype);
-                } else {
-                    report_error(tc->er, tc->filename, tc->source,
-                                 arg_node->span,
-                                 "arguments without types (using inference) "
-                                 "are not supported (yet)");
-                }
-            }
-
-            type_id_t ret = void_;
-            if (proc->return_type) {
-                ret = eval_to_type(tc, proc->return_type);
-            }
-
-            result = typestore_add_type(
-                tc->ts, &(type_t){
-                            .tag = TYPE_PROC,
-                            .as.proc = {.return_type = ret, .args = args}
-            });
-
-            env_t     body_env = {.expected_return = ret,
-                                  .curr_proc_type = result,
-                                  .proc_type_span = proc->return_type
-                                                        ? proc->return_type->span
-                                                        : node->span};
-            type_id_t body =
-                typecheck_node(tc, &body_env, &proc_scope, proc->body);
-            if (!type_id_eq(body, void_)) {
-                char const* bodystr =
-                    typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "invalid type for procedure body: %s", bodystr);
-            }
-
-            if (!body_env.has_returned &&
-                !type_id_eq(body_env.expected_return, void_)) {
-                char const* retstr = typestore_type_id_to_str(
-                    tc->ts, tc->temp_alloc, body_env.expected_return);
-
-                report_error(tc->er, tc->filename, tc->source, node->span,
-                             "procedure with non-void return type returns "
-                             "implicitly. Expected to return value of type %s",
-                             retstr);
-
-                report_note(tc->er, tc->filename, tc->source,
-                            body_env.proc_type_span,
-                            "return type declared here");
-            }
-        }
-        case NODE_PTR: {
-        } break;
-        case NODE_MPTR: {
-        } break;
+        case NODE_IDENT:
+            result = typecheck_node_ident(tc, env, scope, node);
+            break;
+        case NODE_BINOP:
+            result = typecheck_node_binop(tc, env, scope, node);
+            break;
+        case NODE_UNOP:
+            result = typecheck_node_unop(tc, env, scope, node);
+            break;
+        case NODE_CALL:
+            result = typecheck_node_call(tc, env, scope, node);
+            break;
+        case NODE_STMT_EXPR:
+            result = typecheck_node_stmt_expr(tc, env, scope, node);
+            break;
+        case NODE_STMT_RET:
+            result = typecheck_node_stmt_ret(tc, env, scope, node);
+            break;
+        case NODE_STMT_BLK:
+            result = typecheck_node_stmt_blk(tc, env, scope, node);
+            break;
+        case NODE_MOD: result = typecheck_node_mod(tc, env, scope, node); break;
+        case NODE_DECL:
+            result = typecheck_node_decl(tc, env, scope, node);
+            break;
+        case NODE_ASSIGN: break;
+        case NODE_ARG: break;
+        case NODE_PROC:
+            result = typecheck_node_proc(tc, env, scope, node);
+            break;
+        case NODE_PTR: break;
+        case NODE_MPTR: break;
     }
 
     node->type_id = result;
