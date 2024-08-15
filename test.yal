@@ -1,13 +1,7 @@
-// f := .() -> i32 { return 42; };
-// g := .(x: i32) -> i32 { return x * f(); };
-// h := .() -> i32 { return 69; };
-
-update := .(n: *i32) {
-    n.* = n.* + 1;
-};
+extern putchar putchar: .(c: i32) -> void;
 
 main := .() {
-    a := 12;
-    update(&a);
-    update(&44);
+    putchar(72);
+    putchar(105);
+    putchar(10);
 };

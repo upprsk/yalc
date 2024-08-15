@@ -112,14 +112,34 @@ static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
     return NULL;
 }
 
-static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
+static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
+                                node_t* node);
+
+typedef enum typecheck_node_proc_opt {
+    TC_NODE_PROC_OPT_ALLOW_NO_BODY = 1 << 0,
+} typecheck_node_proc_opt_t;
+
+static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node,
+                                     typecheck_node_proc_opt_t opt);
+
+static type_id_t eval_to_type(typechecker_t* tc, env_t* env, scope_t* scope,
+                              node_t* node) {
     munit_assert_not_null(node);
 
     if (node->type == NODE_PTR) {
-        type_id_t inner = eval_to_type(tc, node->as.ptr.child);
+        type_id_t inner = eval_to_type(tc, env, scope, node->as.ptr.child);
 
-        return typestore_add_type(
+        type_id_t ty = typestore_add_type(
             tc->ts, &(type_t){.tag = TYPE_PTR, .as.ptr = {.inner = inner}});
+        node->type_id = ty;
+
+        return ty;
+    }
+
+    if (node->type == NODE_PROC && !node->as.proc.body) {
+        return typecheck_node_proc(tc, env, scope, node,
+                                   TC_NODE_PROC_OPT_ALLOW_NO_BODY);
     }
 
     if (node->type != NODE_IDENT) {
@@ -127,7 +147,7 @@ static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
                      "expression could not be evaluated to a type");
 
         node->type_id = tc->ts->primitives.err;
-        return INVALID_TYPEID;
+        return node->type_id;
     }
 
     char const* name = node->as.ident.ident;
@@ -136,15 +156,12 @@ static type_id_t eval_to_type(typechecker_t* tc, node_t* node) {
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "undefined type: %s", name);
         node->type_id = tc->ts->primitives.err;
-        return INVALID_TYPEID;
+        return node->type_id;
     }
 
     node->type_id = tc->ts->primitives.type;
     return type;
 }
-
-static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
-                                node_t* node);
 
 static type_id_t typecheck_node_ident(typechecker_t* tc, env_t* env,
                                       scope_t* scope, node_t* node) {
@@ -401,13 +418,24 @@ static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
 static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node) {
     type_id_t    void_ = tc->ts->primitives.void_;
+    type_id_t    err = tc->ts->primitives.err;
     node_decl_t* decl = &node->as.decl;
 
     type_id_t type = INVALID_TYPEID;
-    if (decl->type) type = eval_to_type(tc, decl->type);
+    if (decl->type) type = eval_to_type(tc, env, scope, decl->type);
 
-    type_id_t init = typecheck_node(tc, env, scope, decl->init);
-    if (type_id_is_valid(type) && !type_id_eq(type, init)) {
+    type_id_t init = INVALID_TYPEID;
+    if (decl->init) {
+        init = typecheck_node(tc, env, scope, decl->init);
+        if (decl->is_extern) {
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "extern declarations can't have initializers");
+            init = err;
+        }
+    }
+
+    if (type_id_is_valid(type) && type_id_is_valid(init) &&
+        !type_id_eq(type, init)) {
         char const* typestr =
             typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
         char const* initstr =
@@ -423,7 +451,14 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
                     "this has type %s", initstr);
     }
 
-    type = init;
+    if (type_id_eq(type, INVALID_TYPEID)) {
+        type = init;
+    }
+
+    if (!type_id_is_valid(type)) {
+        // save as void in case we have no type or initializer
+        type = void_;
+    }
 
     // FIXME: Check if using temp_alloc here is what we want
     value_t const* prev =
@@ -495,7 +530,8 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node) {
+                                     scope_t* scope, node_t* node,
+                                     typecheck_node_proc_opt_t opt) {
     (void)env;
 
     type_id_t void_ = tc->ts->primitives.void_;
@@ -515,7 +551,7 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
 
         node_arg_t* arg = &arg_node->as.arg;
         if (arg->type) {
-            type_id_t argtype = eval_to_type(tc, arg->type);
+            type_id_t argtype = eval_to_type(tc, env, &proc_scope, arg->type);
             scope_add(&proc_scope, tc->temp_alloc, arg->name,
                       &(value_t){.type = argtype, .where = arg_node->span});
 
@@ -529,7 +565,7 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
 
     type_id_t ret = void_;
     if (proc->return_type) {
-        ret = eval_to_type(tc, proc->return_type);
+        ret = eval_to_type(tc, env, &proc_scope, proc->return_type);
     }
 
     type_id_t result = typestore_add_type(
@@ -538,31 +574,40 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
             .tag = TYPE_PROC, .as.proc = {.return_type = ret, .args = args}
     });
 
-    env_t     body_env = {.expected_return = ret,
+    type_id_t body = INVALID_TYPEID;
+
+    if (proc->body) {
+        env_t body_env = {.expected_return = ret,
                           .curr_proc_type = result,
                           .proc_type_span = proc->return_type
                                                 ? proc->return_type->span
                                                 : node->span};
-    type_id_t body = typecheck_node(tc, &body_env, &proc_scope, proc->body);
-    if (!type_id_eq(body, void_)) {
-        char const* bodystr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
-        report_error(tc->er, tc->filename, tc->source, node->span,
-                     "invalid type for procedure body: %s", bodystr);
+        body = typecheck_node(tc, &body_env, &proc_scope, proc->body);
+        if (!type_id_eq(body, void_)) {
+            char const* bodystr =
+                typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "invalid type for procedure body: %s", bodystr);
+        }
+
+        if (!body_env.has_returned &&
+            !type_id_eq(body_env.expected_return, void_)) {
+            char const* retstr = typestore_type_id_to_str(
+                tc->ts, tc->temp_alloc, body_env.expected_return);
+
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "procedure with non-void return type returns "
+                         "implicitly. Expected to return value of type %s",
+                         retstr);
+
+            report_note(tc->er, tc->filename, tc->source,
+                        body_env.proc_type_span, "return type declared here");
+        }
     }
 
-    if (!body_env.has_returned &&
-        !type_id_eq(body_env.expected_return, void_)) {
-        char const* retstr = typestore_type_id_to_str(tc->ts, tc->temp_alloc,
-                                                      body_env.expected_return);
-
+    if (!proc->body && (opt & TC_NODE_PROC_OPT_ALLOW_NO_BODY) == 0) {
         report_error(tc->er, tc->filename, tc->source, node->span,
-                     "procedure with non-void return type returns "
-                     "implicitly. Expected to return value of type %s",
-                     retstr);
-
-        report_note(tc->er, tc->filename, tc->source, body_env.proc_type_span,
-                    "return type declared here");
+                     "procedure is missing a body");
     }
 
     return result;
@@ -573,7 +618,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
     munit_assert_not_null(node);
 
     type_id_t err = tc->ts->primitives.err;
-    type_id_t result = INVALID_TYPEID;
+    type_id_t result = {0xFE};
 
     switch (node->type) {
         case NODE_ERR:
@@ -617,7 +662,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_ARG: break;
         case NODE_PROC:
-            result = typecheck_node_proc(tc, env, scope, node);
+            result = typecheck_node_proc(tc, env, scope, node, 0);
             break;
         case NODE_PTR: break;
         case NODE_MPTR: break;
@@ -625,12 +670,12 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
 
     node->type_id = result;
 
-    if (type_id_eq(result, INVALID_TYPEID)) {
+    if (type_id_eq(result, (type_id_t){0xFE})) {
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "unimplemented node type: '%s'",
                      node_type_to_str(node->type));
 
-        munit_assert(false);
+        // munit_assert(false);
     }
 
     return result;

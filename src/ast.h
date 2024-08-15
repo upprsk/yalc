@@ -95,10 +95,14 @@ typedef struct node_mod {
 
 typedef struct node_decl {
     char const* name;
+    char const* extern_name;
     span_t      name_span;
     // may be null in case of type inference
     node_t* type;
+    // may be null in case of zero-initialization
     node_t* init;
+
+    bool is_extern;
 } node_decl_t;
 
 typedef struct node_arg {

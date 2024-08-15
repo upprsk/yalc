@@ -89,9 +89,13 @@ static inline int get_precedence(token_type_t tt) {
     }
 }
 
+typedef enum stmt_opt {
+    STMT_OPT_IS_MODULE = 1 << 0,
+} stmt_opt_t;
+
 static node_t* parse_prefix(parser_t* p);
 static node_t* parse_expr(parser_t* p, int precedence);
-static node_t* parse_stmt(parser_t* p);
+static node_t* parse_stmt(parser_t* p, stmt_opt_t opt);
 
 static node_t* parse_int(parser_t* p, token_t tok) {
     uint32_t    len;
@@ -193,7 +197,7 @@ static node_t* parse_block(parser_t* p) {
                   .span.start = open_tok.span.start};
 
     while (peek(p).type != TT_EOF && peek(p).type != TT_RBRACE) {
-        node_t* stmt = parse_stmt(p);
+        node_t* stmt = parse_stmt(p, 0);
         n->as.stmt_blk.stmts =
             da_append_node(n->as.stmt_blk.stmts, p->node_alloc, &stmt);
     }
@@ -236,21 +240,24 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
         if (!match(p, TT_COMMA)) break;
     }
 
+    token_t rparen = peek(p);
     consume(p, TT_RPAREN);
 
     node_t* return_type = NULL;
     if (match(p, TT_ARROW)) {
         return_type = parse_expr(p, 0);
     }
-
-    node_t* body = parse_block(p);
+    node_t* body = NULL;
+    if (peek(p).type == TT_LBRACE) body = parse_block(p);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_PROC,
         .as.proc = {.return_type = return_type, .args = args, .body = body},
         .span.start = tok.span.start,
-        .span.end = body->span.end,
+        .span.end = body          ? body->span.end
+                    : return_type ? return_type->span.end
+                                  : rparen.span.end,
     };
 
     return n;
@@ -414,7 +421,48 @@ static node_t* parse_expr(parser_t* p, int precedence) {
     return left;
 }
 
-static node_t* parse_stmt(parser_t* p) {
+typedef enum decl_opt {
+    DECL_OPT_IS_EXTERN = 1 << 0,
+} decl_opt_t;
+
+static node_t* parse_decl(parser_t* p, token_t tok, decl_opt_t opt,
+                          char const* extern_name) {
+    node_t* type = NULL;
+    node_t* init = NULL;
+
+    token_t name = next(p);
+    if (match(p, TT_COLON)) {
+        if (peek(p).type != TT_EQUAL) {
+            type = parse_expr(p, 0);
+        }
+    }
+
+    if (match(p, TT_EQUAL)) {
+        init = parse_expr(p, 0);
+    }
+
+    token_t end_tok = peek(p);
+    consume(p, TT_SEMICOLON);
+
+    char const* name_str =
+        span_dupe_str(name.span, p->source, p->source_len, p->node_alloc);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_DECL,
+        .as.decl = {.name = name_str,
+                    .extern_name = extern_name,
+                    .name_span = name.span,
+                    .type = type,
+                    .init = init,
+                    .is_extern = (opt & DECL_OPT_IS_EXTERN) != 0},
+        .span = {.start = tok.span.start, .end = end_tok.span.end}
+    };
+
+    return n;
+}
+
+static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
     token_t stmt_start_tok = peek(p);
 
     if (match(p, TT_RETURN)) {
@@ -438,36 +486,20 @@ static node_t* parse_stmt(parser_t* p) {
         return n;
     }
 
+    if (peek(p).type == TT_EXTERN) {
+        token_t extern_tok = next(p);
+
+        // FIXME: Use a string literal instead of an ident here
+        token_t extern_name = peek(p);
+        consume(p, TT_IDENT);
+
+        return parse_decl(p, extern_tok, DECL_OPT_IS_EXTERN,
+                          span_dupe_str(extern_name.span, p->source,
+                                        p->source_len, p->node_alloc));
+    }
+
     if (peek_next(p).type == TT_COLON) {
-        token_t name = next(p);
-        consume(p, TT_COLON);
-
-        node_t* type = NULL;
-        if (peek(p).type != TT_EQUAL) {
-            type = parse_expr(p, 0);
-        }
-
-        consume(p, TT_EQUAL);
-
-        node_t* init = parse_expr(p, 0);
-
-        token_t end_tok = peek(p);
-        consume(p, TT_SEMICOLON);
-
-        char const* name_str =
-            span_dupe_str(name.span, p->source, p->source_len, p->node_alloc);
-
-        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
-        *n = (node_t){
-            .type = NODE_DECL,
-            .as.decl = {.name = name_str,
-                        .name_span = name.span,
-                        .type = type,
-                        .init = init},
-            .span = {.start = name.span.start, .end = end_tok.span.end}
-        };
-
-        return n;
+        return parse_decl(p, peek(p), 0, NULL);
     }
 
     node_t* expr = parse_expr(p, 0);
@@ -516,7 +548,7 @@ node_t* parse(parse_params_t* params) {
                   .span.start = peek(&p).span.start};
 
     while (peek(&p).type != TT_EOF) {
-        node_t* stmt = parse_stmt(&p);
+        node_t* stmt = parse_stmt(&p, STMT_OPT_IS_MODULE);
         n->span.end = stmt->span.end;
         n->as.mod.decls = da_append_node(n->as.mod.decls, p.node_alloc, &stmt);
     }
