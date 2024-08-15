@@ -1,6 +1,7 @@
 main := .() {
-    // a := "hello \"great\" world!\n";
-
-    b := 3;
-    c := [_]i32{1, 2, b};
+    if 1 {
+        a := 1;
+    } else {
+        a := 0;
+    }
 };

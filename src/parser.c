@@ -580,16 +580,37 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
         return n;
     }
 
-    if (peek(p).type == TT_EXTERN) {
-        token_t extern_tok = next(p);
+    if (match(p, TT_IF)) {
+        node_t* condition = parse_expr(p, 0);
+        node_t* when_true = parse_block(p);
+        node_t* when_false = NULL;
 
+        if (match(p, TT_ELSE)) {
+            when_false = parse_block(p);
+        }
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_STMT_IF,
+            .as.stmt_if = {.condition = condition,
+                           .when_true = when_true,
+                           .when_false = when_false},
+            .span = {.start = stmt_start_tok.span.start,
+                           .end = when_false ? when_false->span.end
+                                       : when_true->span.end}
+        };
+
+        return n;
+    }
+
+    if (peek(p).type == TT_EXTERN) {
         token_t extern_name_tok = peek(p);
         consume(p, TT_STR);
 
         char const* extern_name =
             span_conv_strlit(extern_name_tok.span, p->source, p->source_len,
                              p->node_alloc, NULL);
-        return parse_decl(p, extern_tok, DECL_OPT_IS_EXTERN, extern_name);
+        return parse_decl(p, stmt_start_tok, DECL_OPT_IS_EXTERN, extern_name);
     }
 
     if (peek_next(p).type == TT_COLON) {

@@ -67,6 +67,12 @@ void dump_node(FILE* f, node_t* node, int indent) {
             fprintf(f, "STMT RET\n");
             dump_node(f, node->as.stmt_ret.child, indent + 1);
             break;
+        case NODE_STMT_IF:
+            fprintf(f, "STMT IF\n");
+            dump_node(f, node->as.stmt_if.condition, indent + 1);
+            dump_node(f, node->as.stmt_if.when_true, indent + 1);
+            dump_node(f, node->as.stmt_if.when_false, indent + 1);
+            break;
         case NODE_STMT_BLK: {
             fprintf(f, "STMT BLK\n");
 

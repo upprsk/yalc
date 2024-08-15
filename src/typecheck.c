@@ -379,6 +379,21 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
     return void_;
 }
 
+static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
+                                        scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+    type_id_t err = tc->ts->primitives.err;
+
+    type_id_t condition =
+        typecheck_node(tc, env, scope, node->as.stmt_if.condition);
+
+    typecheck_node(tc, env, scope, node->as.stmt_if.when_true);
+    if (node->as.stmt_if.when_false)
+        typecheck_node(tc, env, scope, node->as.stmt_if.when_false);
+
+    return void_;
+}
+
 static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
                                          scope_t* scope, node_t* node) {
     type_id_t void_ = tc->ts->primitives.void_;
@@ -506,6 +521,7 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
         case NODE_CALL:
         case NODE_STMT_EXPR:
         case NODE_STMT_RET:
+        case NODE_STMT_IF:
         case NODE_STMT_BLK:
         case NODE_MOD:
         case NODE_DECL:
@@ -709,6 +725,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_STMT_RET:
             result = typecheck_node_stmt_ret(tc, env, scope, node);
+            break;
+        case NODE_STMT_IF:
+            result = typecheck_node_stmt_if(tc, env, scope, node);
             break;
         case NODE_STMT_BLK:
             result = typecheck_node_stmt_blk(tc, env, scope, node);

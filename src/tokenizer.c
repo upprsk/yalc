@@ -154,10 +154,15 @@ static void tokenize_ident(tokenizer_t* t) {
     uint32_t    len;
     char const* ident =
         span_str_parts(mkspan(t), t->source, t->source_len, &len);
+
     if (strncmp(ident, "return", min(len, (uint32_t)6)) == 0) {
         append_token(t, TT_RETURN);
     } else if (strncmp(ident, "extern", min(len, (uint32_t)6)) == 0) {
         append_token(t, TT_EXTERN);
+    } else if (strncmp(ident, "if", min(len, (uint32_t)2)) == 0) {
+        append_token(t, TT_IF);
+    } else if (strncmp(ident, "else", min(len, (uint32_t)4)) == 0) {
+        append_token(t, TT_ELSE);
     } else {
         append_token(t, TT_IDENT);
     }
