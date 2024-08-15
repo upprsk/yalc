@@ -182,6 +182,7 @@ static node_t* parse_unary(parser_t* p, token_t tok) {
 
     switch (tok.type) {
         case TT_MINUS: op = UNOP_NEG; break;
+        case TT_BANG: op = UNOP_NOT; break;
         default: munit_assert(false);
     }
 
@@ -463,6 +464,7 @@ static node_t* parse_prefix(parser_t* p) {
     switch (tok.type) {
         case TT_INT: return parse_int(p, tok);
         case TT_STR: return parse_str(p, tok);
+        case TT_BANG:
         case TT_MINUS: return parse_unary(p, tok);
         case TT_LPAREN: return parse_grouping(p);
         case TT_IDENT: return parse_ident(p, tok);

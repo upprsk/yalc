@@ -234,7 +234,15 @@ static type_id_t typecheck_node_unop(typechecker_t* tc, env_t* env,
     type_t const* child_type = typestore_find_type(tc->ts, child);
     munit_assert_not_null(child_type);
 
-    if (child_type->tag != TYPE_INT && child_type->tag != TYPE_FLOAT) {
+    if (node->as.unop.type == UNOP_NEG && child_type->tag != TYPE_INT &&
+        child_type->tag != TYPE_FLOAT) {
+        char const* childstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "type %s does not support %s", childstr,
+                     unop_to_str(node->as.unop.type));
+    } else if (node->as.unop.type == UNOP_NOT && child_type->tag != TYPE_BOOL) {
         char const* childstr =
             typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
 

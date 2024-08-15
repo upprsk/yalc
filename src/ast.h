@@ -53,11 +53,13 @@ typedef struct node_binop {
 
 typedef enum unop_type {
     UNOP_NEG,
+    UNOP_NOT,
 } unop_type_t;
 
 static inline char const* unop_to_str(unop_type_t op) {
     switch (op) {
         case UNOP_NEG: return "UNOP_NEG";
+        case UNOP_NOT: return "UNOP_NOT";
     }
 
     return "?";
