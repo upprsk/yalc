@@ -12,6 +12,7 @@ typedef enum token_type : uint8_t {
 
     TT_INT,
     TT_FLOAT,
+    TT_STR,
     TT_IDENT,
 
     TT_PLUS,   // +
@@ -48,6 +49,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_ERR: return "TT_ERR";
         case TT_INT: return "TT_INT";
         case TT_FLOAT: return "TT_FLOAT";
+        case TT_STR: return "TT_STR";
         case TT_IDENT: return "TT_IDENT";
         case TT_PLUS: return "TT_PLUS";
         case TT_MINUS: return "TT_MINUS";

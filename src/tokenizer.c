@@ -131,6 +131,23 @@ static void tokenize_int(tokenizer_t* t) {
     append_token(t, TT_INT);
 }
 
+static void tokenize_str(tokenizer_t* t) {
+    while (!is_at_end(t) && peek(t) != '"') {
+        if (peek(t) == '\\' && peek_next(t) == '"') advance(t);
+        advance(t);
+    }
+
+    if (is_at_end(t)) {
+        report_error(t->er, t->filename, t->source, mkspan(t),
+                     "unterminated string literal");
+        append_token(t, TT_ERR);
+        return;
+    }
+
+    advance(t);
+    append_token(t, TT_STR);
+}
+
 static void tokenize_ident(tokenizer_t* t) {
     while (is_digit(peek(t)) || is_alpha(peek(t))) advance(t);
 
@@ -183,6 +200,7 @@ static void tokenize_one(tokenizer_t* t) {
         case ']': append_token(t, TT_RBRACKET); break;
         case '{': append_token(t, TT_LBRACE); break;
         case '}': append_token(t, TT_RBRACE); break;
+        case '"': return tokenize_str(t);
         case '0' ... '9': return tokenize_int(t);
         case 'a' ... 'z':
         case 'A' ... 'Z':
