@@ -68,6 +68,10 @@ typedef struct node_call {
     node_t** args;
 } node_call_t;
 
+typedef struct node_deref {
+    node_t* child;
+} node_deref_t;
+
 typedef struct node_stmt_expr {
     node_t* expr;
 } node_stmt_expr_t;
@@ -132,6 +136,7 @@ typedef enum node_type {
     NODE_BINOP,
     NODE_UNOP,
     NODE_CALL,
+    NODE_DEREF,
 
     NODE_STMT_EXPR,
     NODE_STMT_RET,
@@ -156,6 +161,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_BINOP: return "NODE_BINOP";
         case NODE_UNOP: return "NODE_UNOP";
         case NODE_CALL: return "NODE_CALL";
+        case NODE_DEREF: return "NODE_DEREF";
         case NODE_STMT_EXPR: return "NODE_STMT_EXPR";
         case NODE_STMT_RET: return "NODE_STMT_RET";
         case NODE_STMT_BLK: return "NODE_STMT_BLK";
@@ -182,6 +188,7 @@ struct node {
         node_binop_t       binop;
         node_unop_t        unop;
         node_call_t        call;
+        node_deref_t       deref;
         node_stmt_expr_t   stmt_expr;
         node_stmt_return_t stmt_ret;
         node_stmt_block_t  stmt_blk;

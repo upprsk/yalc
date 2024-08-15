@@ -102,8 +102,8 @@ int main(int argc, char* argv[]) {
     }
 
     // for (size_t i = 0; i < da_get_size(tokens); ++i) {
-    //     printf("token (%d) [%d, %d]\n", tokens[i].type, tokens[i].span.start,
-    //            tokens[i].span.end);
+    //     printf("token %s (%d) [%d, %d]\n", token_to_str(tokens[i].type),
+    //            tokens[i].type, tokens[i].span.start, tokens[i].span.end);
     // }
 
     Arena node_arena = {};
@@ -117,8 +117,8 @@ int main(int argc, char* argv[]) {
         .arena = &node_arena,
     });
 
-    // fprintf(stdout, "untyped ast:\n");
-    // dump_node(stdout, ast, 0);
+    fprintf(stdout, "untyped ast:\n");
+    dump_node(stdout, ast, 0);
 
     typestore_t ts = {};
     typestore_init(&ts, alloc);
@@ -132,8 +132,8 @@ int main(int argc, char* argv[]) {
         .er = &er,
     });
 
-    fprintf(stdout, "typed ast:\n");
-    dump_node(stdout, ast, 0);
+    // fprintf(stdout, "typed ast:\n");
+    // dump_node(stdout, ast, 0);
 
     // fprintf(stdout, "typestore:\n");
     // size_t size = da_get_size(ts.entries);

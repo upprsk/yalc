@@ -165,6 +165,8 @@ static void tokenize_one(tokenizer_t* t) {
         case '.':
             if (match(t, '('))
                 append_token(t, TT_DOT_LPAREN);
+            else if (match(t, '*'))
+                append_token(t, TT_DOT_STAR);
             else
                 append_token(t, TT_DOT);
             break;

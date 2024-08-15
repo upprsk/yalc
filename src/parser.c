@@ -83,7 +83,8 @@ static inline int get_precedence(token_type_t tt) {
         case TT_MINUS: return 10;
         case TT_STAR:
         case TT_SLASH: return 20;
-        case TT_LPAREN: return 40;
+        case TT_LPAREN:
+        case TT_DOT_STAR: return 40;
         default: return 0;
     }
 }
@@ -331,6 +332,18 @@ static node_t* parse_call(parser_t* p, node_t* lhs) {
     return n;
 }
 
+static node_t* parse_deref(parser_t* p, node_t* lhs, token_t tok) {
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_DEREF,
+        .as.deref = {.child = lhs},
+        .span.start = lhs->span.start,
+        .span.end = tok.span.end,
+    };
+
+    return n;
+}
+
 static node_t* parse_prefix(parser_t* p) {
     token_t tok = next(p);
     switch (tok.type) {
@@ -363,10 +376,19 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_STAR:
         case TT_SLASH: return parse_binary(p, lhs, tok);
         case TT_LPAREN: return parse_call(p, lhs);
+        case TT_DOT_STAR: return parse_deref(p, lhs, tok);
         default: break;
     }
 
-    munit_assert(false);
+    uint32_t    litlen;
+    char const* lit =
+        span_str_parts(tok.span, p->source, p->source_len, &litlen);
+
+    report_error(p->er, p->filename, p->source, tok.span,
+                 "expected infix expression, found '%.*s' (%s)", litlen, lit,
+                 token_to_str(tok.type));
+
+    return node_err(p, tok.span);
 }
 
 static node_t* parse_expr(parser_t* p, int precedence) {

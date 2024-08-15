@@ -486,17 +486,13 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
     type_id_t result = INVALID_TYPEID;
 
     switch (node->type) {
-        case NODE_ERR: {
+        case NODE_ERR:
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "found error node in typecheck");
             result = err;
-        } break;
-        case NODE_INT: {
-            result = tc->ts->primitives.i32;
-        } break;
-        case NODE_FLOAT: {
-            result = tc->ts->primitives.f64;
-        } break;
+            break;
+        case NODE_INT: result = tc->ts->primitives.i32; break;
+        case NODE_FLOAT: result = tc->ts->primitives.f64; break;
         case NODE_IDENT:
             result = typecheck_node_ident(tc, env, scope, node);
             break;
@@ -509,6 +505,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_CALL:
             result = typecheck_node_call(tc, env, scope, node);
             break;
+        case NODE_DEREF: break;
         case NODE_STMT_EXPR:
             result = typecheck_node_stmt_expr(tc, env, scope, node);
             break;
