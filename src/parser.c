@@ -308,6 +308,20 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
     munit_assert(false);
 }
 
+static node_t* parse_ref(parser_t* p, token_t tok) {
+    node_t* child = parse_expr(p, unary_precedence);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_REF,
+        .as.ref = {.child = child},
+        .span.start = tok.span.start,
+        .span.end = child->span.end,
+    };
+
+    return n;
+}
+
 static node_t* parse_call(parser_t* p, node_t* lhs) {
     node_t** args = da_init_node(p->node_alloc);
 
@@ -354,6 +368,7 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_DOT_LPAREN: return parse_proc(p, tok);
         case TT_STAR: return parse_pointer(p, tok);
         case TT_LBRACKET: return parse_mptr_or_slice(p, tok);
+        case TT_AMPERSAND: return parse_ref(p, tok);
         default: break;
     }
 

@@ -24,6 +24,7 @@ typedef enum token_type : uint8_t {
     TT_COLON,      // :
     TT_SEMICOLON,  // ;
     TT_EQUAL,      // =
+    TT_AMPERSAND,  // &
 
     TT_LPAREN,    // (
     TT_RPAREN,    // )
@@ -56,6 +57,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_COLON: return "TT_COLON";
         case TT_SEMICOLON: return "TT_SEMICOLON";
         case TT_EQUAL: return "TT_EQUAL";
+        case TT_AMPERSAND: return "TT_AMPERSAND";
         case TT_LPAREN: return "TT_LPAREN";
         case TT_RPAREN: return "TT_RPAREN";
         case TT_LBRACKET: return "TT_LBRACKET";
