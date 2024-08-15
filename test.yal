@@ -1,7 +1,6 @@
-extern putchar putchar: .(c: i32) -> void;
-
 main := .() {
-    putchar(72);
-    putchar(105);
-    putchar(10);
+    // a := "hello \"great\" world!\n";
+
+    b := 3;
+    c := [_]i32{1, 2, b};
 };

@@ -137,6 +137,21 @@ static type_id_t eval_to_type(typechecker_t* tc, env_t* env, scope_t* scope,
         return ty;
     }
 
+    if (node->type == NODE_MPTR) {
+        type_id_t inner = eval_to_type(tc, env, scope, node->as.mptr.child);
+
+        if (node->as.mptr.term) {
+            report_error(tc->er, tc->filename, tc->source, node->span,
+                         "terminators have not been implemented");
+        }
+
+        type_id_t ty = typestore_add_type(
+            tc->ts, &(type_t){.tag = TYPE_MPTR, .as.mptr = {.inner = inner}});
+        node->type_id = ty;
+
+        return ty;
+    }
+
     if (node->type == NODE_PROC && !node->as.proc.body) {
         return typecheck_node_proc(tc, env, scope, node,
                                    TC_NODE_PROC_OPT_ALLOW_NO_BODY);
