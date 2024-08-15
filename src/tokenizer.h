@@ -38,6 +38,7 @@ typedef enum token_type : uint8_t {
     TT_ARROW,       // ->
 
     TT_RETURN,  // return
+    TT_EXTERN,  // extern
 
     TT_EOF = 0xFF,
 } token_type_t;
@@ -68,6 +69,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_DOT_STAR: return "TT_DOT_STAR";
         case TT_ARROW: return "TT_ARROW";
         case TT_RETURN: return "TT_RETURN";
+        case TT_EXTERN: return "TT_EXTERN";
         case TT_EOF: return "TT_EOF";
     }
 
