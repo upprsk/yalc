@@ -4,8 +4,6 @@
 
 #include "allocator.h"
 #include "ast.h"
-#include "codegen/codegen_wasm.h"
-#include "da.h"
 #include "errors.h"
 #include "parser.h"
 #include "tokenizer.h"
@@ -119,8 +117,8 @@ int main(int argc, char* argv[]) {
         .arena = &node_arena,
     });
 
-    fprintf(stdout, "untyped ast:\n");
-    dump_node(stdout, ast, 0);
+    // fprintf(stdout, "untyped ast:\n");
+    // dump_node(stdout, ast, 0);
 
     typestore_t ts = {};
     typestore_init(&ts, alloc);
@@ -134,11 +132,10 @@ int main(int argc, char* argv[]) {
         .er = &er,
     });
 
-    // fprintf(stdout, "typed ast:\n");
-    // dump_node(stdout, ast, 0);
+    fprintf(stdout, "typed ast:\n");
+    dump_node(stdout, ast, 0);
 
     // fprintf(stdout, "typestore:\n");
-
     // size_t size = da_get_size(ts.entries);
     // for (size_t i = 0; i < size; ++i) {
     //     type_t* type = &ts.entries[i].type;
