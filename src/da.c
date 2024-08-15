@@ -96,3 +96,16 @@ void* da_extend_opt(void* arr, allocator_t alloc, void const* value,
 
     return header->data;
 }
+
+bool da_pop_opt(void* arr, void* value) {
+    da_header_t* header = da_get_header(arr);
+    munit_assert_not_null(header);
+
+    if (header->size == 0) return false;
+
+    header->size -= 1;
+    size_t off = header->element_size * header->size;
+    memcpy(value, &header->data[off], header->element_size);
+
+    return true;
+}

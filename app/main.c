@@ -4,6 +4,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "codegen/codegen_mips.h"
 #include "common.h"
 #include "errors.h"
 #include "parser.h"
@@ -180,12 +181,17 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // fprintf(stdout, "wasm:\n");
-    // codegen_wasm(&(codegen_params_t){
-    //     .ast = ast,
-    //     .out = stdout,
-    //     .ts = &ts,
-    // });
+    if (er.error_count > 0) return EXIT_FAILURE;
+
+    codegen_mips(&(codegen_mips_params_t){
+        .ast = ast,
+        .ts = &ts,
+        .filename = filename,
+        .source = source,
+        .source_len = source_len,
+        .er = &er,
+        .out = stdout,
+    });
 
     typestore_deinit(&ts);
     arena_free(&node_arena);

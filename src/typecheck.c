@@ -58,6 +58,10 @@ typedef struct env {
 typedef struct value {
     type_id_t type;
     span_t    where;
+
+    // FIXME: This is probably not how we should do this. Stores the extern name
+    // of a procedure when declared
+    char const* extern_name;
 } value_t;
 
 typedef struct scope_entry {
@@ -367,6 +371,14 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
         }
     }
 
+    // FIXME: This is probably not how we want to do this
+    if (call->callee->type == NODE_IDENT) {
+        value_t const* v = scope_find(scope, call->callee->as.ident.ident);
+        munit_assert_not_null(v);
+
+        call->call_extern_name = v->extern_name;
+    }
+
     return callee_type->as.proc.return_type;
 }
 
@@ -537,6 +549,10 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     type_id_t    err = tc->ts->primitives.err;
     node_decl_t* decl = &node->as.decl;
 
+    // FIXME: view other places that talk about extern name as for why this is
+    // wrong
+    char const* extern_name = decl->is_extern ? decl->extern_name : NULL;
+
     type_id_t type = INVALID_TYPEID;
     if (decl->type) type = eval_to_type(tc, env, scope, decl->type);
 
@@ -577,9 +593,10 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     }
 
     // FIXME: Check if using temp_alloc here is what we want
-    value_t const* prev =
-        scope_add(scope, tc->temp_alloc, decl->name,
-                  &(value_t){.type = type, .where = decl->name_span});
+    value_t const* prev = scope_add(scope, tc->temp_alloc, decl->name,
+                                    &(value_t){.type = type,
+                                               .where = decl->name_span,
+                                               .extern_name = extern_name});
     if (prev) {
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "identifier %s already defined", decl->name);
@@ -704,6 +721,8 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
             report_note(tc->er, tc->filename, tc->source,
                         body_env.proc_type_span, "return type declared here");
         }
+
+        proc->uses_implicit_return = !body_env.has_returned;
     }
 
     if (!proc->body && (opt & TC_NODE_PROC_OPT_ALLOW_NO_BODY) == 0) {

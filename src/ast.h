@@ -121,6 +121,9 @@ typedef struct node_comp {
 typedef struct node_call {
     node_t*  callee;
     node_t** args;
+
+    // FIXME: this is not how this should be handled
+    char const* call_extern_name;
 } node_call_t;
 
 typedef struct node_ref {
@@ -185,6 +188,8 @@ typedef struct node_proc {
 
     // body
     node_t* body;
+
+    bool uses_implicit_return;
 } node_proc_t;
 
 typedef struct node_array {

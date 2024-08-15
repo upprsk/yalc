@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -57,6 +58,8 @@ void* da_append_opt(void* arr, allocator_t alloc, void const* value);
 void* da_extend_opt(void* arr, allocator_t alloc, void const* value,
                     size_t count);
 
+bool da_pop_opt(void* arr, void* value);
+
 #define da_declare(T, name)                                                \
     static inline T* da_init_##name(allocator_t alloc) {                   \
         return da_init_default(alloc, sizeof(T));                          \
@@ -68,6 +71,9 @@ void* da_extend_opt(void* arr, allocator_t alloc, void const* value,
     static inline T* da_extend_##name(T* arr, allocator_t alloc,           \
                                       T const* elems, size_t elem_count) { \
         return da_extend_opt(arr, alloc, elems, elem_count);               \
+    }                                                                      \
+    static inline bool da_pop_##name(T* arr, T* elem) {                    \
+        return da_pop_opt(arr, elem);                                      \
     }
 
 da_declare(char, char);
