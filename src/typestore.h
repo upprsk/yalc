@@ -10,6 +10,15 @@ typedef struct type_id {
     uint32_t id;
 } type_id_t;
 
+#define INVALID_TYPEID \
+    (type_id_t) { 0 }
+
+static inline bool type_id_is_valid(type_id_t id) { return id.id != 0; }
+
+static inline bool type_id_eq(type_id_t lhs, type_id_t rhs) {
+    return lhs.id == rhs.id;
+}
+
 typedef enum type_tag {
     TYPE_ERR,
     TYPE_VOID,
@@ -74,6 +83,41 @@ typedef struct type {
     } as;
 } type_t;
 
+static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
+    if (lhs->tag != rhs->tag) return false;
+
+    switch (lhs->tag) {
+        case TYPE_ERR:
+        case TYPE_VOID:
+        case TYPE_TYPE: return true;
+        case TYPE_INT:
+            return lhs->as.int_.bits == rhs->as.int_.bits &&
+                   lhs->as.int_.signed_ == rhs->as.int_.signed_;
+        case TYPE_FLOAT: return lhs->as.float_.bits == rhs->as.float_.bits;
+        case TYPE_PTR: return type_id_eq(lhs->as.ptr.inner, rhs->as.ptr.inner);
+        case TYPE_MPTR:
+            return type_id_eq(lhs->as.mptr.inner, rhs->as.mptr.inner);
+        case TYPE_PROC: {
+            if (!type_id_eq(lhs->as.proc.return_type, rhs->as.proc.return_type))
+                return false;
+
+            if (da_get_size(lhs->as.proc.args) !=
+                da_get_size(rhs->as.proc.args))
+                return false;
+
+            size_t size = da_get_size(lhs->as.proc.args);
+            for (size_t i = 0; i < size; ++i) {
+                if (!type_id_eq(lhs->as.proc.args[i], rhs->as.proc.args[i]))
+                    return false;
+            }
+
+            return true;
+        } break;
+    }
+
+    __builtin_unreachable();
+}
+
 typedef struct typestore_entry {
     type_id_t id;
     type_t    type;
@@ -97,15 +141,6 @@ typedef struct typestore {
     allocator_t            alloc;
     typestore_primitives_t primitives;
 } typestore_t;
-
-#define INVALID_TYPEID \
-    (type_id_t) { 0 }
-
-static inline bool type_id_is_valid(type_id_t id) { return id.id != 0; }
-
-static inline bool type_id_eq(type_id_t lhs, type_id_t rhs) {
-    return lhs.id == rhs.id;
-}
 
 void typestore_init(typestore_t* ts, allocator_t alloc);
 void typestore_deinit(typestore_t* ts);

@@ -33,8 +33,12 @@ void typestore_deinit(typestore_t* ts) {
 
 type_id_t typestore_add_type(typestore_t* ts, type_t const* t) {
     // TODO: De-dupe types
+    size_t size = da_get_size(ts->entries);
+    for (size_t i = 0; i < size; ++i) {
+        if (type_eq(&ts->entries[i].type, t)) return ts->entries[i].id;
+    }
 
-    type_id_t         id = {da_get_size(ts->entries)};
+    type_id_t         id = {size};
     typestore_entry_t entry = {.type = *t, .id = id};
     ts->entries = da_append_typestore_entry(ts->entries, ts->alloc, &entry);
 
