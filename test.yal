@@ -13,5 +13,8 @@ printiln := .(n: i32) {
 };
 
 main := .() {
-    printiln(readi());
+    a := readi();
+
+    printiln(a);
+    printiln(a);
 };

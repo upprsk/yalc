@@ -176,12 +176,33 @@ static void codegen_stmt_ret(codegen_state_t* cs, proc_state_t* ps,
     fprintf(cs->out, "    jr $ra\n");
 }
 
+static void codegen_stmt_decl(codegen_state_t* cs, proc_state_t* ps,
+                              node_t* node) {
+    codegen_expr(cs, ps, node->as.decl.init);
+    value_t v = pop_value(cs);
+
+    uint8_t reg = register_alloc(&ps->locregalloc);
+    register_push_to_stack(cs, reg);
+
+    fprintf(cs->out,
+            "    # local %s\n"
+            "    move $%d, $%d\n",
+            node->as.decl.name, reg, v.reg);
+
+    push_value(cs, &(value_t){.reg = reg, .name = node->as.decl.name});
+}
+
 static void codegen_stmt(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
     size_t size_start = da_get_size(cs->values);
 
     switch (node->type) {
         case NODE_STMT_EXPR: codegen_stmt_expr(cs, ps, node); break;
         case NODE_STMT_RET: codegen_stmt_ret(cs, ps, node); break;
+        case NODE_DECL:
+            codegen_stmt_decl(cs, ps, node);
+            // declared a local, so increment the number of saved values
+            size_start++;
+            break;
         default: munit_assert(false);
     }
 
@@ -251,6 +272,11 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
     fprintf(cs->out, "    # body start\n");
     codegen_blk(cs, &ps, proc->body);
     fprintf(cs->out, "    # body end\n");
+
+    for (size_t i = 0; i < ps.locregalloc.head - argc; ++i) {
+        value_t v = pop_value(cs);
+        register_pop_from_stack(cs, v.reg);
+    }
 
     for (size_t i = 0; i < argc; ++i) {
         value_t v = pop_value(cs);
