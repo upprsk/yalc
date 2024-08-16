@@ -721,15 +721,12 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
 }
 
 node_t* parse(parse_params_t* params) {
-    allocator_t node_alloc = {};
-    allocator_init_arena(&node_alloc, params->arena);
-
     parser_t p = {.filename = params->filename,
                   .source_len = params->source_len,
                   .source = params->source,
                   .tokens = params->tokens,
                   .er = params->er,
-                  .node_alloc = node_alloc};
+                  .node_alloc = params->node_alloc};
 
     node_t* n = allocator_alloc(p.node_alloc, sizeof(*n));
     *n = (node_t){.type = NODE_MOD,

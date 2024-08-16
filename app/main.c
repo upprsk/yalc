@@ -133,15 +133,17 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    Arena node_arena = {};
+    Arena       node_arena = {0};
+    allocator_t node_alloc = {};
+    allocator_init_arena(&node_alloc, &node_arena);
 
     node_t* ast = parse(&(parse_params_t){
         .tokens = tokens,
         .filename = filename,
         .source = source,
         .source_len = source_len,
+        .node_alloc = node_alloc,
         .er = &er,
-        .arena = &node_arena,
     });
 
     if (show_ast) {

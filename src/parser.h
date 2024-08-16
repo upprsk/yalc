@@ -15,7 +15,7 @@ typedef struct parse_params {
 
     token_t const* tokens;
 
-    Arena* arena;
+    allocator_t node_alloc;
 } parse_params_t;
 
 node_t* parse(parse_params_t* params);
