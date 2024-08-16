@@ -492,6 +492,28 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
     return void_;
 }
 
+static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
+                                           scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+    type_id_t bool_ = tc->ts->primitives.bool_;
+
+    type_id_t condition =
+        typecheck_node(tc, env, scope, node->as.stmt_while.condition);
+    if (!type_id_eq(condition, bool_)) {
+        char const* conditionstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, condition);
+        report_error(
+            tc->er, tc->filename, tc->source,
+            node->as.stmt_while.condition->span,
+            "incompatible types in comparison, expected bool but got %s",
+            conditionstr);
+    }
+
+    typecheck_node(tc, env, scope, node->as.stmt_while.body);
+
+    return void_;
+}
+
 static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
                                          scope_t* scope, node_t* node) {
     type_id_t void_ = tc->ts->primitives.void_;
@@ -821,6 +843,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_STMT_IF:
             result = typecheck_node_stmt_if(tc, env, scope, node);
+            break;
+        case NODE_STMT_WHILE:
+            result = typecheck_node_stmt_while(tc, env, scope, node);
             break;
         case NODE_STMT_BLK:
             result = typecheck_node_stmt_blk(tc, env, scope, node);

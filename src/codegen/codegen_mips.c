@@ -223,25 +223,41 @@ static void codegen_stmt_if(codegen_state_t* cs, proc_state_t* ps,
         size_t when_false = gen_label_id(cs);
         size_t after = gen_label_id(cs);
 
-        fprintf(cs->out, "    beq $%d, $zero, label_%zu # when_false\n", v.reg,
-                when_false);
-
+        fprintf(cs->out, "    beq $%d, $zero, label_%zu\n", v.reg, when_false);
         codegen_blk(cs, ps, node->as.stmt_if.when_true);
-        fprintf(cs->out, "    j label_%zu # after\n", after);
 
-        fprintf(cs->out, "label_%zu: # when_false\n", when_false);
-
+        fprintf(cs->out, "    j label_%zu\n", after);
+        fprintf(cs->out, "label_%zu: # if when_false\n", when_false);
         codegen_blk(cs, ps, node->as.stmt_if.when_false);
-        fprintf(cs->out, "label_%zu: # after\n", after);
+
+        fprintf(cs->out, "label_%zu: # if after\n", after);
     } else {
         size_t after = gen_label_id(cs);
 
-        fprintf(cs->out, "    beq $%d, $zero, label_%zu # after\n", v.reg,
-                after);
-
+        fprintf(cs->out, "    beq $%d, $zero, label_%zu\n", v.reg, after);
         codegen_blk(cs, ps, node->as.stmt_if.when_true);
-        fprintf(cs->out, "label_%zu: # after\n", after);
+
+        fprintf(cs->out, "label_%zu: # if after\n", after);
     }
+}
+
+static void codegen_stmt_while(codegen_state_t* cs, proc_state_t* ps,
+                               node_t* node) {
+    size_t body = gen_label_id(cs);
+    size_t after = gen_label_id(cs);
+
+    fprintf(cs->out, "label_%zu: # while body\n", body);
+
+    codegen_expr(cs, ps, node->as.stmt_while.condition);
+    value_t v = pop_value(cs);
+
+    register_free_all(&cs->tmpregalloc);
+
+    fprintf(cs->out, "    beq $%d, $zero, label_%zu\n", v.reg, after);
+    codegen_blk(cs, ps, node->as.stmt_while.body);
+    fprintf(cs->out, "    j label_%zu\n", body);
+
+    fprintf(cs->out, "label_%zu: # while after\n", after);
 }
 
 static void codegen_assign(codegen_state_t* cs, proc_state_t* ps,
@@ -283,6 +299,7 @@ static void codegen_stmt(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
         case NODE_STMT_EXPR: codegen_stmt_expr(cs, ps, node); break;
         case NODE_STMT_RET: codegen_stmt_ret(cs, ps, node); break;
         case NODE_STMT_IF: codegen_stmt_if(cs, ps, node); break;
+        case NODE_STMT_WHILE: codegen_stmt_while(cs, ps, node); break;
         case NODE_ASSIGN: codegen_assign(cs, ps, node); break;
         case NODE_DECL:
             codegen_stmt_decl(cs, ps, node);

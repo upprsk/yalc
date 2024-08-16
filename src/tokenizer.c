@@ -2,7 +2,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "allocator.h"
 #include "common.h"
@@ -167,6 +166,8 @@ static void tokenize_ident(tokenizer_t* t) {
         append_token(t, TT_AND);
     } else if (strnneq(ident, len, "or", 2)) {
         append_token(t, TT_OR);
+    } else if (strnneq(ident, len, "while", 5)) {
+        append_token(t, TT_WHILE);
     } else {
         append_token(t, TT_IDENT);
     }

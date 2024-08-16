@@ -51,6 +51,7 @@ typedef enum token_type : uint8_t {
     TT_ELSE,    // else
     TT_AND,     // and
     TT_OR,      // or
+    TT_WHILE,   // while
 
     TT_EOF = 0xFF,
 } token_type_t;
@@ -94,6 +95,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_ELSE: return "TT_ELSE";
         case TT_AND: return "TT_AND";
         case TT_OR: return "TT_OR";
+        case TT_WHILE: return "TT_WHILE";
         case TT_EOF: return "TT_EOF";
     }
 

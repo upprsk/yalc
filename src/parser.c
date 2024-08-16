@@ -648,6 +648,20 @@ static node_t* parse_stmt_if(parser_t* p, token_t tok) {
     return n;
 }
 
+static node_t* parse_stmt_while(parser_t* p, token_t tok) {
+    node_t* condition = parse_expr(p, 0);
+    node_t* body = parse_block(p);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_STMT_WHILE,
+        .as.stmt_while = { .condition = condition,          .body = body},
+        .span = {.start = tok.span.start, .end = body->span.end}
+    };
+
+    return n;
+}
+
 static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
     token_t stmt_start_tok = peek(p);
 
@@ -674,6 +688,10 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
 
     if (match(p, TT_IF)) {
         return parse_stmt_if(p, stmt_start_tok);
+    }
+
+    if (match(p, TT_WHILE)) {
+        return parse_stmt_while(p, stmt_start_tok);
     }
 
     if (peek(p).type == TT_EXTERN) {

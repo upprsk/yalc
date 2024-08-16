@@ -7,16 +7,16 @@ extern "__builtin_print_char"
 extern "__builtin_read_i32"
     readi: .() -> i32;
 
-printiln := .(n: i32) {
-    printi(n);
-    printc(10);
-};
-
 main := .() {
-    a := readi();
-    if a < 10 {
-        a = a + 10;
+    count := readi();
+
+    i := 0;
+    while i < count {
+        printi(i);
+        printc(10);
+
+        i = i + 1;
     }
 
-    printiln(a);
+    printc(10);
 };

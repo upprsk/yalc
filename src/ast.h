@@ -150,6 +150,11 @@ typedef struct node_stmt_if {
     node_t* when_false;
 } node_stmt_if_t;
 
+typedef struct node_stmt_while {
+    node_t* condition;
+    node_t* body;
+} node_stmt_while_t;
+
 typedef struct node_stmt_block {
     node_t** stmts;
 } node_stmt_block_t;
@@ -226,6 +231,7 @@ typedef enum node_type {
     NODE_STMT_EXPR,
     NODE_STMT_RET,
     NODE_STMT_IF,
+    NODE_STMT_WHILE,
     NODE_STMT_BLK,
 
     NODE_MOD,
@@ -256,6 +262,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_STMT_EXPR: return "NODE_STMT_EXPR";
         case NODE_STMT_RET: return "NODE_STMT_RET";
         case NODE_STMT_IF: return "NODE_STMT_IF";
+        case NODE_STMT_WHILE: return "NODE_STMT_WHILE";
         case NODE_STMT_BLK: return "NODE_STMT_BLK";
         case NODE_MOD: return "NODE_MOD";
         case NODE_DECL: return "NODE_DECL";
@@ -288,6 +295,7 @@ struct node {
         node_deref_t       deref;
         node_stmt_expr_t   stmt_expr;
         node_stmt_if_t     stmt_if;
+        node_stmt_while_t  stmt_while;
         node_stmt_return_t stmt_ret;
         node_stmt_block_t  stmt_blk;
         node_mod_t         mod;
