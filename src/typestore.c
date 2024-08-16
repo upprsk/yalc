@@ -117,6 +117,9 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
             b = da_extend_char(b, alloc, rettype, strlen(rettype));
             allocator_free(alloc, rettype);
 
+            char zero = 0;
+            b = da_append_char(b, alloc, &zero);
+
             size = da_get_size(b);
             char* buf = allocator_alloc(alloc, size);
             memcpy(buf, b, size);
