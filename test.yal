@@ -15,6 +15,8 @@ printiln := .(n: i32) {
 main := .() {
     a := readi();
     if a < 10 {
-        printiln(1);
+        a = a + 10;
     }
+
+    printiln(a);
 };
