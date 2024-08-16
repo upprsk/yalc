@@ -5,6 +5,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "common.h"
 #include "da.h"
 #include "span.h"
 #include "typestore.h"
@@ -22,7 +23,8 @@ static uint8_t register_alloc(register_alloc_t* alloc) {
 static void register_free_all(register_alloc_t* alloc) { alloc->head = 0; }
 
 typedef struct value {
-    uint8_t reg;
+    uint8_t     reg;
+    char const* name;
 } value_t;
 
 da_declare(value_t, value);
@@ -47,14 +49,22 @@ static value_t pop_value(codegen_state_t* cs) {
     return value;
 }
 
+static value_t find_value(codegen_state_t* cs, char const* name) {
+    size_t size = da_get_size(cs->values);
+    for (size_t i = 0; i < size; ++i) {
+        if (streq(cs->values[i].name, name)) return cs->values[i];
+    }
+
+    munit_assert(false);
+}
+
 #define REGISTER_RA 31
 
 static void register_push_to_stack(codegen_state_t* cs, uint8_t reg) {
     // allocate space for register
     fprintf(cs->out,
             "    addiu $sp, $sp, -4\n"
-            "    sw $%d, 0($sp)\n"
-            "\n",
+            "    sw $%d, 0($sp)\n",
             reg);
 }
 
@@ -62,8 +72,7 @@ static void register_pop_from_stack(codegen_state_t* cs, uint8_t reg) {
     // allocate space for register
     fprintf(cs->out,
             "    lw $%d, 0($sp)\n"
-            "    addiu $sp, $sp, 4\n"
-            "\n",
+            "    addiu $sp, $sp, 4\n",
             reg);
 }
 
@@ -73,6 +82,11 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
             uint8_t reg = register_alloc(&cs->regalloc);
             push_value(cs, &(value_t){.reg = reg});
             fprintf(cs->out, "    li $%d, %lu\n", reg, node->as.int_.value);
+        } break;
+        case NODE_IDENT: {
+            value_t v = find_value(cs, node->as.ident.ident);
+            // fprintf(cs->out, "    # got thing %d: %s\n", v.reg, v.name);
+            push_value(cs, &v);
         } break;
         case NODE_BINOP: {
             codegen_expr(cs, node->as.binop.left);
@@ -131,6 +145,8 @@ static void codegen_stmt_expr(codegen_state_t* cs, node_t* node) {
 }
 
 static void codegen_stmt(codegen_state_t* cs, node_t* node) {
+    size_t size_start = da_get_size(cs->values);
+
     switch (node->type) {
         case NODE_STMT_EXPR:
             codegen_stmt_expr(cs, node);
@@ -139,7 +155,7 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
         default: munit_assert(false);
     }
 
-    munit_assert_size(da_get_size(cs->values), ==, 0);
+    munit_assert_size(da_get_size(cs->values), ==, size_start);
 }
 
 static void codegen_blk(codegen_state_t* cs, node_t* node) {
@@ -176,6 +192,7 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
             cs->ts, cs->temp_alloc, proc_type->as.proc.args[i]);
 
         fprintf(cs->out, "# %s: %s\n", arg->name, argtypestr);
+        push_value(cs, &(value_t){.reg = i + 4, .name = arg->name});
     }
 
     fprintf(cs->out, "%s:\n", decl_name);
@@ -189,6 +206,12 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
     if (proc->uses_implicit_return) {
         fprintf(cs->out, "    jr $ra\n");
     }
+
+    for (size_t i = 0; i < argc; ++i) {
+        pop_value(cs);
+    }
+
+    munit_assert_size(da_get_size(cs->values), ==, 0);
 }
 
 static void codegen_mod(codegen_state_t* cs, node_t* node) {
@@ -246,6 +269,13 @@ void codegen_mips(codegen_mips_params_t const* params) {
             "    syscall\n"
             "    jr $ra\n\n");
 
+    // procedure to use syscal to print a single character
+    fprintf(cs.out,
+            "__builtin_print_char:\n"
+            "    li $v0, 11\n"
+            "    syscall\n"
+            "    jr $ra\n\n");
+
     // _start calls main and then exit() (syscall 10)
     fprintf(cs.out,
             ".global _start\n"
@@ -255,4 +285,6 @@ void codegen_mips(codegen_mips_params_t const* params) {
             "    syscall\n\n");
 
     codegen_mod(&cs, params->ast);
+
+    arena_free(&arena);
 }
