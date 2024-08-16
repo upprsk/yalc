@@ -551,7 +551,7 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
 
     // FIXME: view other places that talk about extern name as for why this is
     // wrong
-    char const* extern_name = decl->is_extern ? decl->extern_name : NULL;
+    char const* extern_name = decl->is_extern ? decl->extern_name : decl->name;
 
     type_id_t type = INVALID_TYPEID;
     if (decl->type) type = eval_to_type(tc, env, scope, decl->type);
