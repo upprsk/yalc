@@ -14,6 +14,8 @@ print2 := .(a: i32, b: i32) {
     printiln(b);
 };
 
+add := .(a: i32, b: i32) -> i32 { return a + b; };
+
 main := .() {
-    print2(60 + 9, 400 + 20);
+    print2(60 + 9, add(400, 20));
 };
