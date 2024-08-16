@@ -37,6 +37,7 @@ typedef struct codegen_state {
     FILE*        out;
 
     size_t register_stack_pushes;
+    size_t label_counter;
 
     register_alloc_t tmpregalloc;
     value_t*         values;
@@ -61,6 +62,8 @@ static value_t find_value(codegen_state_t* cs, char const* name) {
 
     munit_assert(false);
 }
+
+static size_t gen_label_id(codegen_state_t* cs) { return cs->label_counter++; }
 
 #define REGISTER_RA 31
 
@@ -127,6 +130,36 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
                 case BINOP_DIV: munit_assert(false); break;
             }
         } break;
+        case NODE_COMP: {
+            codegen_expr(cs, ps, node->as.comp.left);
+            codegen_expr(cs, ps, node->as.comp.right);
+
+            type_t const* ty =
+                typestore_find_type(cs->ts, node->as.comp.left->type_id);
+            munit_assert_not_null(ty);
+            munit_assert_uint8(ty->tag, ==, TYPE_INT);
+
+            bool is_signed = ty->as.int_.signed_;
+            munit_assert(is_signed);
+
+            value_t rhs = pop_value(cs);
+            value_t lhs = pop_value(cs);
+
+            uint8_t reg = register_alloc(&cs->tmpregalloc);
+
+            switch (node->as.comp.type) {
+                case COMP_LT: {
+                    fprintf(cs->out, "    slt $%d, $%d, $%d\n", reg, lhs.reg,
+                            rhs.reg);
+                    push_value(cs, &(value_t){.reg = reg});
+                } break;
+                case COMP_EQ:
+                case COMP_NEQ:
+                case COMP_LTE:
+                case COMP_GT:
+                case COMP_GTE: munit_assert(false); break;
+            }
+        } break;
         case NODE_CALL: {
             size_t count = da_get_size(node->as.call.args);
             munit_assert_size(count, <, 4);
@@ -156,6 +189,8 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
     }
 }
 
+static void codegen_blk(codegen_state_t* cs, proc_state_t* ps, node_t* node);
+
 static void codegen_stmt_expr(codegen_state_t* cs, proc_state_t* ps,
                               node_t* node) {
     codegen_expr(cs, ps, node->as.stmt_expr.expr);
@@ -174,6 +209,39 @@ static void codegen_stmt_ret(codegen_state_t* cs, proc_state_t* ps,
 
     register_pop_from_stack(cs, REGISTER_RA);
     fprintf(cs->out, "    jr $ra\n");
+}
+
+static void codegen_stmt_if(codegen_state_t* cs, proc_state_t* ps,
+                            node_t* node) {
+    codegen_expr(cs, ps, node->as.stmt_if.condition);
+    value_t v = pop_value(cs);
+
+    register_free_all(&cs->tmpregalloc);
+
+    munit_assert_not_null(node->as.stmt_if.when_true);
+    if (node->as.stmt_if.when_false) {
+        size_t when_false = gen_label_id(cs);
+        size_t after = gen_label_id(cs);
+
+        fprintf(cs->out, "    beq $%d, $zero, label_%zu    # when_false\n",
+                v.reg, when_false);
+
+        codegen_blk(cs, ps, node->as.stmt_if.when_true);
+        fprintf(cs->out, "    j label_%zu    # after\n", after);
+
+        fprintf(cs->out, "label_%zu:    # when_false\n", when_false);
+
+        codegen_blk(cs, ps, node->as.stmt_if.when_false);
+        fprintf(cs->out, "label_%zu:    # after\n", after);
+    } else {
+        size_t after = gen_label_id(cs);
+
+        fprintf(cs->out, "    beq $%d, $zero, label_%zu    # after\n", v.reg,
+                after);
+
+        codegen_blk(cs, ps, node->as.stmt_if.when_true);
+        fprintf(cs->out, "label_%zu:    # after\n", after);
+    }
 }
 
 static void codegen_stmt_decl(codegen_state_t* cs, proc_state_t* ps,
@@ -198,6 +266,7 @@ static void codegen_stmt(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
     switch (node->type) {
         case NODE_STMT_EXPR: codegen_stmt_expr(cs, ps, node); break;
         case NODE_STMT_RET: codegen_stmt_ret(cs, ps, node); break;
+        case NODE_STMT_IF: codegen_stmt_if(cs, ps, node); break;
         case NODE_DECL:
             codegen_stmt_decl(cs, ps, node);
             // declared a local, so increment the number of saved values
