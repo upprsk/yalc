@@ -4,18 +4,14 @@ extern "__builtin_print_i32"
 extern "__builtin_print_char"
     printc: .(c: i32) -> void;
 
+extern "__builtin_read_i32"
+    readi: .() -> i32;
+
 printiln := .(n: i32) {
     printi(n);
     printc(10);
 };
 
-print2 := .(a: i32, b: i32) {
-    printiln(a);
-    printiln(b);
-};
-
-add := .(a: i32, b: i32) -> i32 { return a + b; };
-
 main := .() {
-    print2(60 + 9, add(400, 20));
+    printiln(readi());
 };
