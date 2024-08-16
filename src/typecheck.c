@@ -410,6 +410,68 @@ static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
     return inner_type->as.ptr.inner;
 }
 
+static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node) {
+    type_id_t child = typecheck_node(tc, env, scope, node->as.cast.child);
+    type_id_t target = eval_to_type(tc, env, scope, node->as.cast.type);
+
+    if (type_id_eq(child, target)) {
+        char const* childstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
+        char const* targetstr =
+            typestore_type_id_to_str(tc->ts, tc->temp_alloc, target);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "can't cast from %s to itself", childstr);
+
+        report_note(tc->er, tc->filename, tc->source, node->as.cast.child->span,
+                    "this already has type %s", targetstr);
+
+        return target;
+    }
+
+    type_t const* child_type = typestore_find_type(tc->ts, child);
+    munit_assert_not_null(child_type);
+    type_t const* target_type = typestore_find_type(tc->ts, target);
+    munit_assert_not_null(target_type);
+
+    if (child_type->tag != target_type->tag) {
+        char const* childstr =
+            typestore_type_to_str(tc->ts, tc->temp_alloc, child_type);
+        char const* targetstr =
+            typestore_type_to_str(tc->ts, tc->temp_alloc, target_type);
+
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "can't cast from %s to %s", childstr, targetstr);
+
+        report_note(tc->er, tc->filename, tc->source, node->as.cast.child->span,
+                    "this has type %s", childstr);
+        report_note(tc->er, tc->filename, tc->source, node->as.cast.type->span,
+                    "this has type %s", targetstr);
+
+        return target;
+    }
+
+    if (child_type->tag == TYPE_INT) {
+        return target;
+    }
+
+    char const* childstr =
+        typestore_type_to_str(tc->ts, tc->temp_alloc, child_type);
+    char const* targetstr =
+        typestore_type_to_str(tc->ts, tc->temp_alloc, target_type);
+
+    report_error(tc->er, tc->filename, tc->source, node->span,
+                 "can't cast from %s to %s", childstr, targetstr);
+
+    report_note(tc->er, tc->filename, tc->source, node->as.cast.child->span,
+                "this has type %s", childstr);
+    report_note(tc->er, tc->filename, tc->source, node->as.cast.type->span,
+                "this has type %s", targetstr);
+
+    return target;
+}
+
 static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
                                           scope_t* scope, node_t* node) {
     type_id_t void_ = tc->ts->primitives.void_;
@@ -835,6 +897,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_DEREF:
             result = typecheck_node_deref(tc, env, scope, node);
             break;
+        case NODE_CAST:
+            result = typecheck_node_cast(tc, env, scope, node);
+            break;
         case NODE_STMT_EXPR:
             result = typecheck_node_stmt_expr(tc, env, scope, node);
             break;
@@ -890,6 +955,10 @@ void pass_typecheck(typecheck_params_t const* params) {
         .entries = da_init_typename_table_entry(temp_alloc),
     };
 
+    tnt.entries = da_append_typename_table_entry(
+        tnt.entries, temp_alloc,
+        &(typename_table_entry_t){.name = "i8",
+                                  .type = params->ts->primitives.i8});
     tnt.entries = da_append_typename_table_entry(
         tnt.entries, temp_alloc,
         &(typename_table_entry_t){.name = "i32",

@@ -69,6 +69,11 @@ void dump_node(FILE* f, node_t* node, int indent) {
             fprintf(f, "DEREF\n");
             dump_node(f, node->as.deref.child, indent + 1);
             break;
+        case NODE_CAST:
+            fprintf(f, "CAST\n");
+            dump_node(f, node->as.cast.child, indent + 1);
+            dump_node(f, node->as.cast.type, indent + 1);
+            break;
         case NODE_STMT_EXPR:
             fprintf(f, "STMT EXPR\n");
             dump_node(f, node->as.stmt_expr.expr, indent + 1);

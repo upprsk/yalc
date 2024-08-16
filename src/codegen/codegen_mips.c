@@ -177,6 +177,47 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
                 case COMP_GTE: munit_assert(false); break;
             }
         } break;
+        case NODE_CAST: {
+            type_t const* child =
+                typestore_find_type(cs->ts, node->as.cast.child->type_id);
+            munit_assert_not_null(child);
+            munit_assert_uint8(child->tag, ==, TYPE_INT);
+
+            type_t const* target = typestore_find_type(cs->ts, node->type_id);
+            munit_assert_not_null(target);
+            munit_assert_uint8(target->tag, ==, TYPE_INT);
+
+            munit_assert(child->as.int_.signed_);
+            munit_assert(target->as.int_.signed_);
+
+            type_int_t c = child->as.int_;
+            type_int_t t = target->as.int_;
+
+            codegen_expr(cs, ps, node->as.cast.child);
+            value_t v = pop_value(cs);
+            uint8_t reg = register_alloc(&cs->tmpregalloc);
+            push_value(cs, &(value_t){.reg = reg});
+
+            if (t.bits < c.bits) {
+                // less bits in target, truncate
+                size_t mask = 0;
+                if (t.bits == 8) {
+                    mask = 0xFF;
+                } else if (t.bits == 16) {
+                    munit_assert(false);
+                } else {
+                    munit_assert(false);
+                }
+
+                fprintf(cs->out,
+                        "    li $at, 0x%zx\n"
+                        "    and $%d, $%d, $at\n",
+                        mask, reg, v.reg);
+            } else {
+                // more bits in target, sign extend
+                munit_assert(false);
+            }
+        } break;
         case NODE_CALL: {
             size_t count = da_get_size(node->as.call.args);
             munit_assert_size(count, <, 4);

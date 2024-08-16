@@ -4,6 +4,7 @@
 
 #include "allocator.h"
 #include "da.h"
+#include "span.h"
 
 void typestore_init(typestore_t* ts, allocator_t alloc) {
     *ts = (typestore_t){
@@ -16,6 +17,10 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
     ts->primitives.void_ = typestore_add_type(ts, &(type_t){.tag = TYPE_VOID});
     ts->primitives.type = typestore_add_type(ts, &(type_t){.tag = TYPE_TYPE});
     ts->primitives.bool_ = typestore_add_type(ts, &(type_t){.tag = TYPE_BOOL});
+    ts->primitives.i8 = typestore_add_type(
+        ts, &(type_t){
+                .tag = TYPE_INT, .as.int_ = {.bits = 8, .signed_ = true}
+    });
     ts->primitives.i32 = typestore_add_type(
         ts, &(type_t){
                 .tag = TYPE_INT, .as.int_ = {.bits = 32, .signed_ = true}
@@ -55,6 +60,8 @@ type_t const* typestore_find_type(typestore_t* ts, type_id_t id) {
 
 char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
                                   type_t const* type) {
+    munit_assert_not_null(type);
+
     switch (type->tag) {
         case TYPE_ERR: return allocator_sprintf(alloc, "ERR");
         case TYPE_VOID: return allocator_sprintf(alloc, "void");

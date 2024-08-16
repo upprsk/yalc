@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "allocator.h"
@@ -51,12 +52,18 @@ char const* shift_args(int* argc, char*** argv) {
     return data;
 }
 
+typedef enum outopt {
+    OUT_NONE,
+    OUT_MIPS,
+} outopt_t;
+
 int main(int argc, char* argv[]) {
     char const* filename = NULL;
     bool        show_tokens = false;
     bool        show_ast = false;
     bool        show_typed_ast = false;
     bool        show_typestore = false;
+    outopt_t    out = 0;
 
     char const* self_path = shift_args(&argc, &argv);
 
@@ -72,6 +79,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "      --show-ast          show the parse tree\n");
             fprintf(stderr, "      --show-typed-ast    show the typed AST\n");
             fprintf(stderr, "      --show-typestore    show all of the types defined in the typestore\n");
+            fprintf(stderr, "      --output-mips       output MIPS32 assembly\n");
             // clang-format on
 
             return EXIT_SUCCESS;
@@ -91,6 +99,15 @@ int main(int argc, char* argv[]) {
 
         else if (streq(arg, "--show-typestore")) {
             show_typestore = true;
+        }
+
+        else if (streq(arg, "--output-mips")) {
+            if (out) {
+                fprintf(stderr, "output mode already specified\n");
+                return EXIT_FAILURE;
+            }
+
+            out = OUT_MIPS;
         }
 
         else if (filename) {
@@ -123,7 +140,7 @@ int main(int argc, char* argv[]) {
     token_t* tokens = tokenize(&er, alloc, filename, source, source_len);
     if (!tokens) {
         fprintf(stderr, "failed to tokenize\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (show_tokens) {
@@ -171,6 +188,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (show_typestore) {
+        // FIXME: This currently segfaults
         fprintf(stdout, "typestore:\n");
         size_t size = da_get_size(ts.entries);
         for (size_t i = 0; i < size; ++i) {
@@ -185,18 +203,20 @@ int main(int argc, char* argv[]) {
 
     if (er.error_count > 0) return EXIT_FAILURE;
 
-    codegen_mips(&(codegen_mips_params_t){
-        .ast = ast,
-        .ts = &ts,
-        .filename = filename,
-        .source = source,
-        .source_len = source_len,
-        .er = &er,
-        .out = stdout,
-    });
+    if (out == OUT_MIPS) {
+        codegen_mips(&(codegen_mips_params_t){
+            .ast = ast,
+            .ts = &ts,
+            .filename = filename,
+            .source = source,
+            .source_len = source_len,
+            .er = &er,
+            .out = stdout,
+        });
+    }
 
     typestore_deinit(&ts);
     arena_free(&node_arena);
 
-    return 0;
+    return EXIT_SUCCESS;
 }

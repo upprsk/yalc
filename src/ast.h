@@ -134,6 +134,11 @@ typedef struct node_deref {
     node_t* child;
 } node_deref_t;
 
+typedef struct node_cast {
+    node_t* child;
+    node_t* type;
+} node_cast_t;
+
 typedef struct node_stmt_expr {
     node_t* expr;
 } node_stmt_expr_t;
@@ -212,7 +217,7 @@ typedef struct node_mptr {
     node_t* term;
 } node_mptr_t;
 
-typedef enum node_type {
+typedef enum node_type : uint8_t {
     NODE_ERR,
 
     NODE_INT,
@@ -227,6 +232,7 @@ typedef enum node_type {
     NODE_CALL,
     NODE_REF,
     NODE_DEREF,
+    NODE_CAST,
 
     NODE_STMT_EXPR,
     NODE_STMT_RET,
@@ -259,6 +265,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_CALL: return "NODE_CALL";
         case NODE_REF: return "NODE_REF";
         case NODE_DEREF: return "NODE_DEREF";
+        case NODE_CAST: return "NODE_CAST";
         case NODE_STMT_EXPR: return "NODE_STMT_EXPR";
         case NODE_STMT_RET: return "NODE_STMT_RET";
         case NODE_STMT_IF: return "NODE_STMT_IF";
@@ -293,6 +300,7 @@ struct node {
         node_call_t        call;
         node_ref_t         ref;
         node_deref_t       deref;
+        node_cast_t        cast;
         node_stmt_expr_t   stmt_expr;
         node_stmt_if_t     stmt_if;
         node_stmt_while_t  stmt_while;

@@ -8,23 +8,5 @@ extern "__builtin_read_i32"
     readi: .() -> i32;
 
 main := .() {
-    a := 50;
-    b := 25;
-
-    printi(a);
-    printc(32);
-    printi(b);
-    printc(10);
-
-    printi(a + b);
-    printc(10);
-
-    printi(a - b);
-    printc(10);
-
-    printi(a * b);
-    printc(10);
-
-    printi(a / b);
-    printc(10);
+    a: i8 = 65535 as i8;
 };

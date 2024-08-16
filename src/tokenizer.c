@@ -168,6 +168,8 @@ static void tokenize_ident(tokenizer_t* t) {
         append_token(t, TT_OR);
     } else if (strnneq(ident, len, "while", 5)) {
         append_token(t, TT_WHILE);
+    } else if (strnneq(ident, len, "as", 2)) {
+        append_token(t, TT_AS);
     } else {
         append_token(t, TT_IDENT);
     }
