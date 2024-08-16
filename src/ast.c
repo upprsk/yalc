@@ -52,6 +52,11 @@ void dump_node(FILE* f, node_t* node, int indent) {
             dump_node(f, node->as.comp.left, indent + 1);
             dump_node(f, node->as.comp.right, indent + 1);
             break;
+        case NODE_INDEX:
+            fprintf(f, "index\n");
+            dump_node(f, node->as.index.receiver, indent + 1);
+            dump_node(f, node->as.index.index, indent + 1);
+            break;
         case NODE_REF:
             fprintf(f, "REF\n");
             dump_node(f, node->as.ref.child, indent + 1);

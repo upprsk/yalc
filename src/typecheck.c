@@ -472,6 +472,38 @@ static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
     return target;
 }
 
+static type_id_t typecheck_node_index(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node) {
+    type_id_t receiver =
+        typecheck_node(tc, env, scope, node->as.index.receiver);
+    type_id_t index = typecheck_node(tc, env, scope, node->as.index.index);
+
+    type_t const* receiver_type = typestore_find_type(tc->ts, receiver);
+    munit_assert_not_null(receiver_type);
+    type_t const* index_type = typestore_find_type(tc->ts, index);
+    munit_assert_not_null(index_type);
+
+    if (index_type->tag != TYPE_INT) {
+        char const* indexstr =
+            typestore_type_to_str(tc->ts, tc->temp_alloc, index_type);
+        report_error(tc->er, tc->filename, tc->source,
+                     node->as.index.index->span,
+                     "index must be an integer, got %s", indexstr);
+    }
+
+    if (receiver_type->tag != TYPE_ARRAY) {
+        char const* receiverstr =
+            typestore_type_to_str(tc->ts, tc->temp_alloc, receiver_type);
+        report_error(tc->er, tc->filename, tc->source,
+                     node->as.index.receiver->span,
+                     "can't index into non-array %s", receiverstr);
+
+        return tc->ts->primitives.err;
+    }
+
+    return receiver_type->as.array.inner;
+}
+
 static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
                                           scope_t* scope, node_t* node) {
     type_id_t void_ = tc->ts->primitives.void_;
@@ -899,6 +931,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_CAST:
             result = typecheck_node_cast(tc, env, scope, node);
+            break;
+        case NODE_INDEX:
+            result = typecheck_node_index(tc, env, scope, node);
             break;
         case NODE_STMT_EXPR:
             result = typecheck_node_stmt_expr(tc, env, scope, node);

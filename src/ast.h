@@ -118,6 +118,11 @@ typedef struct node_comp {
     node_t*          right;
 } node_comp_t;
 
+typedef struct node_index {
+    node_t* receiver;
+    node_t* index;
+} node_index_t;
+
 typedef struct node_call {
     node_t*  callee;
     node_t** args;
@@ -229,6 +234,7 @@ typedef enum node_type : uint8_t {
     NODE_UNOP,
     NODE_LOGIC,
     NODE_COMP,
+    NODE_INDEX,
     NODE_CALL,
     NODE_REF,
     NODE_DEREF,
@@ -262,6 +268,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_UNOP: return "NODE_UNOP";
         case NODE_LOGIC: return "NODE_LOGIC";
         case NODE_COMP: return "NODE_COMP";
+        case NODE_INDEX: return "NODE_INDEX";
         case NODE_CALL: return "NODE_CALL";
         case NODE_REF: return "NODE_REF";
         case NODE_DEREF: return "NODE_DEREF";
@@ -297,6 +304,7 @@ struct node {
         node_unop_t        unop;
         node_logic_t       logic;
         node_comp_t        comp;
+        node_index_t       index;
         node_call_t        call;
         node_ref_t         ref;
         node_deref_t       deref;

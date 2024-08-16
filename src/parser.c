@@ -143,6 +143,7 @@ static inline int get_precedence(token_type_t tt) {
         case TT_AS: return 45;
         case TT_LPAREN:
         case TT_DOT_STAR: return 50;
+        case TT_LBRACKET: return 60;
         default: return 0;
     }
 }
@@ -284,6 +285,22 @@ static node_t* parse_cast(parser_t* p, node_t* lhs, token_t tok) {
         .type = NODE_CAST,
         .as.cast = {            .child = lhs,          .type = rhs},
         .span = {.start = lhs->span.start, .end = rhs->span.end}
+    };
+
+    return n;
+}
+
+static node_t* parse_index(parser_t* p, node_t* lhs, token_t tok) {
+    node_t* index = parse_expr(p, get_precedence(tok.type));
+
+    token_t rbracket = peek(p);
+    consume(p, TT_RBRACKET);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_INDEX,
+        .as.index = {         .receiver = lhs,           .index = index},
+        .span = {.start = lhs->span.start, .end = rbracket.span.end}
     };
 
     return n;
@@ -572,6 +589,7 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_LARGER:
         case TT_LARGER_EQUAL: return parse_comp(p, lhs, tok);
         case TT_AS: return parse_cast(p, lhs, tok);
+        case TT_LBRACKET: return parse_index(p, lhs, tok);
         default: break;
     }
 
