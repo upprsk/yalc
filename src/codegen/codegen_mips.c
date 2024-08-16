@@ -125,9 +125,26 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
                             rhs.reg);
                     push_value(cs, &(value_t){.reg = reg});
                 } break;
-                case BINOP_SUB:
-                case BINOP_MUL:
-                case BINOP_DIV: munit_assert(false); break;
+                case BINOP_SUB: {
+                    fprintf(cs->out, "    sub $%d, $%d, $%d\n", reg, lhs.reg,
+                            rhs.reg);
+                    push_value(cs, &(value_t){.reg = reg});
+                } break;
+                case BINOP_MUL: {
+                    fprintf(cs->out, "    mul $%d, $%d, $%d\n", reg, lhs.reg,
+                            rhs.reg);
+                    push_value(cs, &(value_t){.reg = reg});
+                } break;
+                case BINOP_DIV: {
+                    // note, without the `$zero` a GNU assembler macro will be
+                    // used with some jumps to protect from division by zero. We
+                    // don't want that.
+                    fprintf(cs->out,
+                            "    div $zero, $%d, $%d\n"
+                            "    mflo $%d\n",
+                            lhs.reg, rhs.reg, reg);
+                    push_value(cs, &(value_t){.reg = reg});
+                } break;
             }
         } break;
         case NODE_COMP: {

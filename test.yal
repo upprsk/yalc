@@ -8,15 +8,23 @@ extern "__builtin_read_i32"
     readi: .() -> i32;
 
 main := .() {
-    count := readi();
+    a := 50;
+    b := 25;
 
-    i := 0;
-    while i < count {
-        printi(i);
-        printc(10);
+    printi(a);
+    printc(32);
+    printi(b);
+    printc(10);
 
-        i = i + 1;
-    }
+    printi(a + b);
+    printc(10);
 
+    printi(a - b);
+    printc(10);
+
+    printi(a * b);
+    printc(10);
+
+    printi(a / b);
     printc(10);
 };
