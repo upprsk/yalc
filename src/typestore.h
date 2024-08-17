@@ -115,11 +115,9 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
             if (!type_id_eq(lhs->as.proc.return_type, rhs->as.proc.return_type))
                 return false;
 
-            if (da_get_size(lhs->as.proc.args) !=
-                da_get_size(rhs->as.proc.args))
-                return false;
-
             size_t size = da_get_size(lhs->as.proc.args);
+            if (size != da_get_size(rhs->as.proc.args)) return false;
+
             for (size_t i = 0; i < size; ++i) {
                 if (!type_id_eq(lhs->as.proc.args[i], rhs->as.proc.args[i]))
                     return false;

@@ -1,5 +1,6 @@
 #include "typestore.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "allocator.h"
@@ -36,15 +37,14 @@ void typestore_deinit(typestore_t* ts) {
 }
 
 type_id_t typestore_add_type(typestore_t* ts, type_t const* t) {
-    // TODO: De-dupe types
     size_t size = da_get_size(ts->entries);
     for (size_t i = 0; i < size; ++i) {
         if (type_eq(&ts->entries[i].type, t)) return ts->entries[i].id;
     }
 
-    type_id_t         id = {size};
-    typestore_entry_t entry = {.type = *t, .id = id};
-    ts->entries = da_append_typestore_entry(ts->entries, ts->alloc, &entry);
+    type_id_t id = {size};
+    ts->entries = da_append_typestore_entry(
+        ts->entries, ts->alloc, &(typestore_entry_t){.type = *t, .id = id});
 
     return id;
 }
@@ -108,6 +108,7 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
             b = da_append_char(b, alloc, &c);
 
             size_t size = da_get_size(type->as.proc.args);
+            munit_assert_size(size, <, 255);  // arbitrary limit
             for (size_t i = 0; i < size; ++i) {
                 char const* argtype =
                     typestore_type_id_to_str(ts, alloc, type->as.proc.args[i]);
@@ -115,6 +116,11 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
                 allocator_free(alloc, argtype);
 
                 b = da_extend_char(b, alloc, ", ", 2);
+                if (i > 10) {
+                    b = da_extend_char(b, alloc, "\n", 1);
+                    printf("\n%s\n", b);
+                    munit_assert(false);
+                }
             }
 
             b = da_extend_char(b, alloc, ") -> ", 5);
