@@ -179,6 +179,7 @@ int main(int argc, char* argv[]) {
         .filename = filename,
         .source = source,
         .source_len = source_len,
+        .alloc = node_alloc,
         .er = &er,
     });
 
@@ -188,17 +189,21 @@ int main(int argc, char* argv[]) {
     }
 
     if (show_typestore) {
-        // FIXME: This currently segfaults
-        fprintf(stdout, "typestore:\n");
+        Arena       arena = {};
+        allocator_t temp = {};
+        allocator_init_arena(&temp, &arena);
+
+        fprintf(stderr, "typestore:\n");
         size_t size = da_get_size(ts.entries);
         for (size_t i = 0; i < size; ++i) {
             type_t* type = &ts.entries[i].type;
 
-            char const* typestr = typestore_type_to_str(&ts, alloc, type);
+            char const* typestr = typestore_type_to_str(&ts, temp, type);
             fprintf(stdout, "[%d] '%s': %s\n", ts.entries[i].id.id,
                     type_tag_to_str(type->tag), typestr);
-            allocator_free(alloc, (char*)typestr);
         }
+
+        arena_free(&arena);
     }
 
     if (er.error_count > 0) return EXIT_FAILURE;
