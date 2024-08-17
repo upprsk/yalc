@@ -125,6 +125,12 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    if (!out &&
+        !(show_tokens || show_ast || show_typed_ast || show_typestore)) {
+        fprintf(stderr, "error: no output selected\n");
+        return EXIT_FAILURE;
+    }
+
     allocator_t alloc;
     allocator_init_stdc(&alloc);
 

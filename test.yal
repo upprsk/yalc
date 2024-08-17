@@ -8,5 +8,14 @@ extern "__builtin_read_i32"
     readi: .() -> i32;
 
 main := .() {
-    a: i8 = 65535 as i8;
+    len := 2;
+    arr := [_]i32{32, 10};
+
+    i := 0;
+    while i < len {
+        printi(arr[0]);
+        printc(10);
+
+        i = i + 1;
+    }
 };
