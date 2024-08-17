@@ -13,6 +13,8 @@ typedef struct typecheck_params {
 
     node_t*      ast;
     typestore_t* ts;
+
+    allocator_t alloc;
 } typecheck_params_t;
 
 void pass_typecheck(typecheck_params_t const* params);

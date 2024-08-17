@@ -42,7 +42,8 @@ typedef struct typechecker {
     typestore_t*      ts;
     typename_table_t* tnt;
 
-    allocator_t temp_alloc;
+    allocator_t tempalloc;
+    allocator_t alloc;
 } typechecker_t;
 
 typedef struct env {
@@ -203,9 +204,9 @@ static type_id_t typecheck_node_binop(typechecker_t* tc, env_t* env,
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
         char const* rhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, rhs);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "incompatible types in %s, expected %s but got %s",
@@ -221,7 +222,7 @@ static type_id_t typecheck_node_binop(typechecker_t* tc, env_t* env,
 
     if (lhs_type->tag != TYPE_INT && lhs_type->tag != TYPE_FLOAT) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "type %s does not support %s", lhsstr,
@@ -241,14 +242,14 @@ static type_id_t typecheck_node_unop(typechecker_t* tc, env_t* env,
     if (node->as.unop.type == UNOP_NEG && child_type->tag != TYPE_INT &&
         child_type->tag != TYPE_FLOAT) {
         char const* childstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, child);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "type %s does not support %s", childstr,
                      unop_to_str(node->as.unop.type));
     } else if (node->as.unop.type == UNOP_NOT && child_type->tag != TYPE_BOOL) {
         char const* childstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, child);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "type %s does not support %s", childstr,
@@ -265,9 +266,9 @@ static type_id_t typecheck_node_logic(typechecker_t* tc, env_t* env,
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
         char const* rhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, rhs);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "incompatible types in %s, expected %s but got %s",
@@ -283,7 +284,7 @@ static type_id_t typecheck_node_logic(typechecker_t* tc, env_t* env,
 
     if (lhs_type->tag != TYPE_BOOL && lhs_type->tag != TYPE_BOOL) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "type %s does not support %s", lhsstr,
@@ -300,9 +301,9 @@ static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
         char const* rhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, rhs);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "incompatible types in %s, expected %s but got %s",
@@ -318,7 +319,7 @@ static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
 
     if (lhs_type->tag != TYPE_INT && lhs_type->tag != TYPE_FLOAT) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "type %s does not support %s", lhsstr,
@@ -338,7 +339,7 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
 
     if (callee_type->tag != TYPE_PROC) {
         char const* calleestr =
-            typestore_type_to_str(tc->ts, tc->temp_alloc, callee_type);
+            typestore_type_to_str(tc->ts, tc->tempalloc, callee_type);
 
         report_error(tc->er, tc->filename, tc->source, call->callee->span,
                      "can't call non procedure value of type %s", calleestr);
@@ -361,9 +362,9 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
 
         if (!type_id_eq(expectedt, argt)) {
             char const* expectedstr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, expectedt);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, expectedt);
             char const* argstr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, argt);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, argt);
 
             report_error(tc->er, tc->filename, tc->source, call->args[i]->span,
                          "procedure expects type %s at position %d, got %s",
@@ -398,7 +399,7 @@ static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
 
     if (inner_type->tag != TYPE_PTR) {
         char const* innerstr =
-            typestore_type_to_str(tc->ts, tc->temp_alloc, inner_type);
+            typestore_type_to_str(tc->ts, tc->tempalloc, inner_type);
 
         report_error(
             tc->er, tc->filename, tc->source, node->as.deref.child->span,
@@ -417,9 +418,9 @@ static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
 
     if (type_id_eq(child, target)) {
         char const* childstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, child);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, child);
         char const* targetstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, target);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, target);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "can't cast from %s to itself", childstr);
@@ -437,9 +438,9 @@ static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
 
     if (child_type->tag != target_type->tag) {
         char const* childstr =
-            typestore_type_to_str(tc->ts, tc->temp_alloc, child_type);
+            typestore_type_to_str(tc->ts, tc->tempalloc, child_type);
         char const* targetstr =
-            typestore_type_to_str(tc->ts, tc->temp_alloc, target_type);
+            typestore_type_to_str(tc->ts, tc->tempalloc, target_type);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "can't cast from %s to %s", childstr, targetstr);
@@ -457,9 +458,9 @@ static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
     }
 
     char const* childstr =
-        typestore_type_to_str(tc->ts, tc->temp_alloc, child_type);
+        typestore_type_to_str(tc->ts, tc->tempalloc, child_type);
     char const* targetstr =
-        typestore_type_to_str(tc->ts, tc->temp_alloc, target_type);
+        typestore_type_to_str(tc->ts, tc->tempalloc, target_type);
 
     report_error(tc->er, tc->filename, tc->source, node->span,
                  "can't cast from %s to %s", childstr, targetstr);
@@ -485,7 +486,7 @@ static type_id_t typecheck_node_index(typechecker_t* tc, env_t* env,
 
     if (index_type->tag != TYPE_INT) {
         char const* indexstr =
-            typestore_type_to_str(tc->ts, tc->temp_alloc, index_type);
+            typestore_type_to_str(tc->ts, tc->tempalloc, index_type);
         report_error(tc->er, tc->filename, tc->source,
                      node->as.index.index->span,
                      "index must be an integer, got %s", indexstr);
@@ -493,7 +494,7 @@ static type_id_t typecheck_node_index(typechecker_t* tc, env_t* env,
 
     if (receiver_type->tag != TYPE_ARRAY) {
         char const* receiverstr =
-            typestore_type_to_str(tc->ts, tc->temp_alloc, receiver_type);
+            typestore_type_to_str(tc->ts, tc->tempalloc, receiver_type);
         report_error(tc->er, tc->filename, tc->source,
                      node->as.index.receiver->span,
                      "can't index into non-array %s", receiverstr);
@@ -512,7 +513,7 @@ static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
     type_id_t expr = typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
     if (!type_id_eq(expr, void_) && !type_id_eq(expr, err)) {
         char const* exprstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, expr);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "expression result unused");
@@ -547,10 +548,10 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
     }
 
     if (!type_id_eq(env->expected_return, expr)) {
-        char const* retstr = typestore_type_id_to_str(tc->ts, tc->temp_alloc,
+        char const* retstr = typestore_type_id_to_str(tc->ts, tc->tempalloc,
                                                       env->expected_return);
         char const* exprstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, expr);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "incompatible types in return, expected %s but got %s",
@@ -572,7 +573,7 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
         typecheck_node(tc, env, scope, node->as.stmt_if.condition);
     if (!type_id_eq(condition, bool_)) {
         char const* conditionstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, condition);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, condition);
         report_error(
             tc->er, tc->filename, tc->source, node->as.stmt_if.condition->span,
             "incompatible types in comparison, expected bool but got %s",
@@ -595,7 +596,7 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
         typecheck_node(tc, env, scope, node->as.stmt_while.condition);
     if (!type_id_eq(condition, bool_)) {
         char const* conditionstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, condition);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, condition);
         report_error(
             tc->er, tc->filename, tc->source,
             node->as.stmt_while.condition->span,
@@ -613,7 +614,7 @@ static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
     type_id_t void_ = tc->ts->primitives.void_;
 
     scope_t blkscope;
-    scope_init(&blkscope, tc->temp_alloc, scope);
+    scope_init(&blkscope, tc->tempalloc, scope);
 
     uint32_t size = da_get_size(node->as.stmt_blk.stmts);
     for (uint32_t i = 0; i < size; ++i) {
@@ -621,7 +622,7 @@ static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
             typecheck_node(tc, env, &blkscope, node->as.stmt_blk.stmts[i]);
         if (!type_id_eq(id, void_)) {
             char const* typestr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, id);
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "invalid type for block scope declaration: %s",
                          typestr);
@@ -649,7 +650,7 @@ static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
         type_id_t id = typecheck_node(tc, env, scope, it);
         if (!type_id_eq(id, void_)) {
             char const* typestr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, id);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, id);
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "invalid type for module scope declaration: %s",
                          typestr);
@@ -685,9 +686,9 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     if (type_id_is_valid(type) && type_id_is_valid(init) &&
         !type_id_eq(type, init)) {
         char const* typestr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, type);
         char const* initstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, init);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, init);
 
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "incompatible types in declaration of %s, "
@@ -709,7 +710,7 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     }
 
     // FIXME: Check if using temp_alloc here is what we want
-    value_t const* prev = scope_add(scope, tc->temp_alloc, decl->name,
+    value_t const* prev = scope_add(scope, tc->tempalloc, decl->name,
                                     &(value_t){.type = type,
                                                .where = decl->name_span,
                                                .extern_name = extern_name});
@@ -739,7 +740,7 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
 
     if (!lhs_is_lvalue) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
         report_error(tc->er, tc->filename, tc->source, lhs_node->span,
                      "can't assign to rvalue of type %s", lhsstr);
 
@@ -748,9 +749,9 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, lhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
         char const* rhsstr =
-            typestore_type_id_to_str(tc->ts, tc->temp_alloc, rhs);
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, rhs);
         report_error(tc->er, tc->filename, tc->source, node->span,
                      "incompatible types in assignment, expected %s but got %s",
                      lhsstr, rhsstr);
@@ -771,10 +772,10 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
     type_id_t void_ = tc->ts->primitives.void_;
 
     node_proc_t* proc = &node->as.proc;
-    type_id_t*   args = da_init_type_id(tc->temp_alloc);
+    type_id_t*   args = da_init_type_id(tc->alloc);
 
     scope_t proc_scope;
-    scope_init(&proc_scope, tc->temp_alloc, scope);
+    scope_init(&proc_scope, tc->tempalloc, scope);
 
     size_t argc = da_get_size(proc->args);
     for (size_t i = 0; i < argc; ++i) {
@@ -786,10 +787,10 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
         node_arg_t* arg = &arg_node->as.arg;
         if (arg->type) {
             type_id_t argtype = eval_to_type(tc, env, &proc_scope, arg->type);
-            scope_add(&proc_scope, tc->temp_alloc, arg->name,
+            scope_add(&proc_scope, tc->tempalloc, arg->name,
                       &(value_t){.type = argtype, .where = arg_node->span});
 
-            args = da_append_type_id(args, tc->temp_alloc, &argtype);
+            args = da_append_type_id(args, tc->alloc, &argtype);
         } else {
             report_error(tc->er, tc->filename, tc->source, arg_node->span,
                          "arguments without types (using inference) "
@@ -819,7 +820,7 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
         body = typecheck_node(tc, &body_env, &proc_scope, proc->body);
         if (!type_id_eq(body, void_)) {
             char const* bodystr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, body);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, body);
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "invalid type for procedure body: %s", bodystr);
         }
@@ -827,7 +828,7 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
         if (!body_env.has_returned &&
             !type_id_eq(body_env.expected_return, void_)) {
             char const* retstr = typestore_type_id_to_str(
-                tc->ts, tc->temp_alloc, body_env.expected_return);
+                tc->ts, tc->tempalloc, body_env.expected_return);
 
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "procedure with non-void return type returns "
@@ -869,9 +870,9 @@ static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
             typecheck_node(tc, env, scope, array->initializer_list[i]);
         if (!type_id_eq(type, expr)) {
             char const* typestr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, type);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, type);
             char const* exprstr =
-                typestore_type_id_to_str(tc->ts, tc->temp_alloc, expr);
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, expr);
 
             report_error(tc->er, tc->filename, tc->source, node->span,
                          "incompatible types in array, expected %s but got %s",
@@ -982,6 +983,8 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
 }
 
 void pass_typecheck(typecheck_params_t const* params) {
+    // FIXME: temp_alloc should not be used for types!!!
+
     allocator_t temp_alloc;
     Arena       temp_arena = {0};
     allocator_init_arena(&temp_alloc, &temp_arena);
@@ -1022,17 +1025,18 @@ void pass_typecheck(typecheck_params_t const* params) {
         .er = params->er,
         .ts = params->ts,
         .tnt = &tnt,
-        .temp_alloc = temp_alloc,
+        .tempalloc = temp_alloc,
+        .alloc = params->alloc,
     };
 
     env_t root_env = {};
 
     // FIXME: Check if temp_alloc is what we want for this
     scope_t root_scope = {};
-    scope_init(&root_scope, tc.temp_alloc, NULL);
-    scope_add(&root_scope, tc.temp_alloc, "true",
+    scope_init(&root_scope, tc.tempalloc, NULL);
+    scope_add(&root_scope, tc.tempalloc, "true",
               &(value_t){.type = tc.ts->primitives.bool_});
-    scope_add(&root_scope, tc.temp_alloc, "false",
+    scope_add(&root_scope, tc.tempalloc, "false",
               &(value_t){.type = tc.ts->primitives.bool_});
 
     typecheck_node(&tc, &root_env, &root_scope, params->ast);
