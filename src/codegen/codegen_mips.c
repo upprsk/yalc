@@ -173,7 +173,13 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
                 case COMP_EQ:
                 case COMP_NEQ:
                 case COMP_LTE:
-                case COMP_GT:
+                case COMP_GT: {
+                    fprintf(cs->out,
+                            "    slt $%d, $%d, $%d\n"
+                            "    nor $%d, $%d, $%d\n",
+                            reg, lhs.reg, rhs.reg, reg, reg, reg);
+                    push_value(cs, &(value_t){.reg = reg});
+                } break;
                 case COMP_GTE: munit_assert(false); break;
             }
         } break;
