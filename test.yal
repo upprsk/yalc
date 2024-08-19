@@ -7,15 +7,14 @@ extern "__builtin_print_char"
 extern "__builtin_read_i32"
     readi: .() -> i32;
 
+f := .(x: i32) -> bool {
+    if x > 200 { return true;  }
+    else       { return false; }
+
+    if x > 120 { return true; }
+    if x > 50 { return false; }
+    // return true;
+};
+
 main := .() {
-    len := 2;
-    arr := [_]i32{32, 10};
-
-    i := 0;
-    while i < len {
-        printi(arr[0]);
-        printc(10);
-
-        i = i + 1;
-    }
 };

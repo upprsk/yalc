@@ -12,6 +12,7 @@
 #include "tokenizer.h"
 #include "typecheck.h"
 #include "typestore.h"
+#include "yair.h"
 
 static char* read_entire_file(char const* filename, allocator_t alloc,
                               size_t* len) {
@@ -211,6 +212,12 @@ int main(int argc, char* argv[]) {
 
         arena_free(&arena);
     }
+
+    if (er.error_count > 0) return EXIT_FAILURE;
+
+    pass_to_ir(&(pass_to_ir_params_t){
+        .ast = ast,
+    });
 
     if (er.error_count > 0) return EXIT_FAILURE;
 

@@ -21,6 +21,8 @@ add_library(yal
   typecheck.h
   typestore.c
   typestore.h
+  yair.c
+  yair.h
 )
 
 target_include_directories(yal PUBLIC .)
