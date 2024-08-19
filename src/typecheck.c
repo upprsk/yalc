@@ -536,11 +536,11 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
         return err;
     }
 
-    if (env->has_returned) {
-        // TODO: Allow for more than one return
-        report_error(tc->er, tc->filename, tc->source, node->span,
-                     "each function can only return once");
-    }
+    // if (env->has_returned) {
+    //     // TODO: Allow for more than one return
+    //     report_error(tc->er, tc->filename, tc->source, node->span,
+    //                  "each function can only return once");
+    // }
 
     type_id_t expr = void_;
     if (node->as.stmt_ret.child) {
@@ -569,6 +569,9 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t bool_ = tc->ts->primitives.bool_;
 
+    bool had_returned = env->has_returned;
+    env->has_returned = false;
+
     type_id_t condition =
         typecheck_node(tc, env, scope, node->as.stmt_if.condition);
     if (!type_id_eq(condition, bool_)) {
@@ -581,8 +584,17 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
     }
 
     typecheck_node(tc, env, scope, node->as.stmt_if.when_true);
-    if (node->as.stmt_if.when_false)
+    bool wt_returned = env->has_returned;
+    bool wf_returned = false;
+
+    env->has_returned = false;
+
+    if (node->as.stmt_if.when_false) {
         typecheck_node(tc, env, scope, node->as.stmt_if.when_false);
+        wf_returned = env->has_returned;
+    }
+
+    env->has_returned = (wt_returned && wf_returned) || had_returned;
 
     return void_;
 }
