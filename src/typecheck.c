@@ -996,8 +996,6 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
 }
 
 void pass_typecheck(typecheck_params_t const* params) {
-    // FIXME: temp_alloc should not be used for types!!!
-
     allocator_t temp_alloc;
     Arena       temp_arena = {0};
     allocator_init_arena(&temp_alloc, &temp_arena);
