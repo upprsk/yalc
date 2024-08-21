@@ -33,10 +33,14 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
 }
 
 void typestore_deinit(typestore_t* ts) {
+    munit_assert_not_null(ts);
+
     ts->entries = da_free(ts->entries, ts->alloc);
 }
 
 type_id_t typestore_add_type(typestore_t* ts, type_t const* t) {
+    munit_assert_not_null(ts);
+
     size_t size = da_get_size(ts->entries);
     for (size_t i = 0; i < size; ++i) {
         if (type_eq(&ts->entries[i].type, t)) return ts->entries[i].id;
@@ -50,6 +54,8 @@ type_id_t typestore_add_type(typestore_t* ts, type_t const* t) {
 }
 
 type_t const* typestore_find_type(typestore_t* ts, type_id_t id) {
+    munit_assert_not_null(ts);
+
     size_t size = da_get_size(ts->entries);
     for (size_t i = 0; i < size; ++i) {
         if (type_id_eq(ts->entries[i].id, id)) return &ts->entries[i].type;
@@ -60,6 +66,7 @@ type_t const* typestore_find_type(typestore_t* ts, type_id_t id) {
 
 char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
                                   type_t const* type) {
+    munit_assert_not_null(ts);
     munit_assert_not_null(type);
 
     switch (type->tag) {
