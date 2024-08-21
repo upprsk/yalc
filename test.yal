@@ -1,3 +1,31 @@
+printiln := .(n: i32) {
+    printi(n);
+    newline();
+};
+
+newline := .() { printc(10); };
+
+main := .() {
+    print_10();
+    sum_and_print(15, 50);
+};
+
+sum_and_print := .(a: i32, b: i32) {
+    s := sum(a, b);
+    printiln(s);
+};
+
+sum := .(a: i32, b: i32) -> i32 { return a + b; };
+sub := .(a: i32, b: i32) -> i32 { return a - b; };
+
+print_10 := .() {
+    VALUE := 10;
+    printiln(VALUE);
+};
+
+extern "__builtin_read_i32"
+    readi: .() -> i32;
+
 extern "__builtin_print_i32"
     printi: .(n: i32) -> void;
 
