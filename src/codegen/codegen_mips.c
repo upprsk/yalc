@@ -72,9 +72,10 @@ static void register_push_to_stack(codegen_state_t* cs, uint8_t reg) {
 
     // allocate space for register
     fprintf(cs->out,
+            "    # save $%d to stack\n"
             "    addiu $sp, $sp, -4\n"
             "    sw $%d, 0($sp)\n",
-            reg);
+            reg, reg);
 }
 
 static void register_pop_from_stack(codegen_state_t* cs, uint8_t reg) {
@@ -82,14 +83,15 @@ static void register_pop_from_stack(codegen_state_t* cs, uint8_t reg) {
 
     // allocate space for register
     fprintf(cs->out,
+            "    # restore $%d from stack\n"
             "    lw $%d, 0($sp)\n"
             "    addiu $sp, $sp, 4\n",
-            reg);
+            reg, reg);
 }
 
 typedef struct proc_state {
     register_alloc_t locregalloc;
-    int              end_label;
+    uint8_t          ret_label;
 } proc_state_t;
 
 static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
@@ -265,7 +267,11 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
             uint8_t reg = register_alloc(&cs->tmpregalloc);
             push_value(cs, &(value_t){.reg = reg});
 
-            if (2 != reg) fprintf(cs->out, "    move $%d, $%d\n", reg, 2);
+            type_t const* type = typestore_find_type(cs->ts, node->type_id);
+            munit_assert_not_null(type);
+
+            if (type->tag != TYPE_VOID)
+                fprintf(cs->out, "    move $%d, $%d\n", reg, 2);
         } break;
         default: munit_assert(false);
     }
@@ -285,11 +291,13 @@ static void codegen_stmt_ret(codegen_state_t* cs, proc_state_t* ps,
                              node_t* node) {
     codegen_expr(cs, ps, node->as.stmt_ret.child);
     value_t v = pop_value(cs);
-    if (2 != v.reg) fprintf(cs->out, "    move $%d, $%d\n", 2, v.reg);
+    if (2 != v.reg)
+        fprintf(cs->out,
+                "    move $%d, $%d\n"
+                "    j label_%d\n",
+                2, v.reg, ps->ret_label);
 
     register_free_all(&cs->tmpregalloc);
-
-    fprintf(cs->out, "    j label_%d\n", ps->end_label);
 }
 
 static void codegen_stmt_if(codegen_state_t* cs, proc_state_t* ps,
@@ -359,11 +367,12 @@ static void codegen_assign(codegen_state_t* cs, proc_state_t* ps,
 
 static void codegen_stmt_decl(codegen_state_t* cs, proc_state_t* ps,
                               node_t* node) {
+    uint8_t reg = register_alloc(&ps->locregalloc);
+
+    register_push_to_stack(cs, reg);
+
     codegen_expr(cs, ps, node->as.decl.init);
     value_t v = pop_value(cs);
-
-    uint8_t reg = register_alloc(&ps->locregalloc);
-    register_push_to_stack(cs, reg);
 
     fprintf(cs->out,
             "    # local %s\n"
@@ -412,7 +421,7 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
 
     proc_state_t ps = {
         .locregalloc = {.cap = 8, .off = 16},
-        .end_label = gen_label_id(cs),
+        .ret_label = gen_label_id(cs),
     };
 
     node_proc_t*  proc = &node->as.proc;
@@ -458,7 +467,9 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
     codegen_blk(cs, &ps, proc->body);
     fprintf(cs->out, "    # body end\n");
 
-    fprintf(cs->out, "label_%d: # end\n", ps.end_label);
+    if (!proc->uses_implicit_return) {
+        fprintf(cs->out, "label_%d:\n", ps.ret_label);
+    }
 
     for (size_t i = 0; i < ps.locregalloc.head - argc; ++i) {
         value_t v = pop_value(cs);
