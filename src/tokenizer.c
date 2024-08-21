@@ -10,8 +10,6 @@
 
 /// Hold state relative to parsing the source code.
 typedef struct tokenizer {
-    /// Name of the pile beeing parsed
-    char const* filename;
     /// Null terminated string of the source code.
     char const* source;
     uint32_t    source_len;
@@ -31,10 +29,9 @@ typedef struct tokenizer {
 } tokenizer_t;
 
 static inline void tokenizer_init(tokenizer_t* t, error_reporter_t* er,
-                                  char const* filename, char const* source,
-                                  uint32_t source_len, allocator_t alloc) {
+                                  char const* source, uint32_t source_len,
+                                  allocator_t alloc) {
     *t = (tokenizer_t){
-        .filename = filename,
         .source = source,
         .source_len = source_len,
         .head = source,
@@ -137,8 +134,7 @@ static void tokenize_str(tokenizer_t* t) {
     }
 
     if (is_at_end(t)) {
-        report_error(t->er, t->filename, t->source, mkspan(t),
-                     "unterminated string literal");
+        report_error(t->er, mkspan(t), "unterminated string literal");
         append_token(t, TT_ERR);
         return;
     }
@@ -241,17 +237,16 @@ static void tokenize_one(tokenizer_t* t) {
         case 'A' ... 'Z':
         case '_': return tokenize_ident(t);
         default:
-            report_error(t->er, t->filename, t->source, mkspan(t),
-                         "invalid character: '%c'", c);
+            report_error(t->er, mkspan(t), "invalid character: '%c'", c);
             append_token(t, TT_ERR);
             break;
     }
 }
 
-token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* filename,
-                  char const* source, uint32_t source_len) {
+token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* source,
+                  uint32_t source_len) {
     tokenizer_t t = {};
-    tokenizer_init(&t, er, filename, source, source_len, alloc);
+    tokenizer_init(&t, er, source, source_len, alloc);
 
     while (!is_at_end(&t)) {
         tokenize_one(&t);

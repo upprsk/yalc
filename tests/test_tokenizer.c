@@ -48,14 +48,13 @@ static MunitResult test_tokenize_empty(MunitParameter const params[],
     FILE*            errstream = tmpfile();
     error_reporter_t er = {.stream = errstream};
 
-    char const filename[] = ":mem:";
     char const source[] = "";
     uint32_t   source_len = sizeof(source) - 1;
 
     allocator_t alloc;
     allocator_init_stdc(&alloc);
 
-    token_t* tokens = tokenize(&er, alloc, filename, source, source_len);
+    token_t* tokens = tokenize(&er, alloc, source, source_len);
     munit_assert_not_null(tokens);
 
     munit_assert_uint32(da_get_size(tokens), ==, 1);
@@ -80,14 +79,13 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
     FILE*            errstream = tmpfile();
     error_reporter_t er = {.stream = errstream};
 
-    char const filename[] = ":mem:";
     char const source[] = "12 091 12.0 420.69";
     uint32_t   source_len = sizeof(source) - 1;
 
     allocator_t alloc;
     allocator_init_stdc(&alloc);
 
-    token_t* tokens = tokenize(&er, alloc, filename, source, source_len);
+    token_t* tokens = tokenize(&er, alloc, source, source_len);
     munit_assert_not_null(tokens);
 
     token_type_t expected_types[] = {TT_INT, TT_INT, TT_FLOAT, TT_FLOAT,

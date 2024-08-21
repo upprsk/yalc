@@ -16,8 +16,6 @@ typedef struct parser {
     uint32_t current;
     uint32_t source_len;
 
-    char const* filename;
-
     token_t const* tokens;
     char const*    source;
 
@@ -61,7 +59,7 @@ static void consume(parser_t* p, token_type_t expected) {
         char const* lit =
             span_str_parts(tok.span, p->source, p->source_len, &litlen);
 
-        report_error(p->er, p->filename, p->source, tok.span,
+        report_error(p->er, tok.span,
                      "unexpected token '%.*s' (%s), expected %s", litlen, lit,
                      token_to_str(tok.type), token_to_str(expected));
     }
@@ -454,8 +452,7 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
 
     if (match(p, TT_RBRACKET)) {
         // slice
-        report_error(p->er, p->filename, p->source, tok.span,
-                     "slices not implemented");
+        report_error(p->er, tok.span, "slices not implemented");
         munit_assert(false);
     }
 
@@ -489,8 +486,7 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
     return n;
 
     // array
-    report_error(p->er, p->filename, p->source, tok.span,
-                 "arrays not implemented");
+    report_error(p->er, tok.span, "arrays not implemented");
     munit_assert(false);
 }
 
@@ -564,7 +560,7 @@ static node_t* parse_prefix(parser_t* p) {
     char const* lit =
         span_str_parts(tok.span, p->source, p->source_len, &litlen);
 
-    report_error(p->er, p->filename, p->source, tok.span,
+    report_error(p->er, tok.span,
                  "expected prefix expression, found '%.*s' (%s)", litlen, lit,
                  token_to_str(tok.type));
 
@@ -597,7 +593,7 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
     char const* lit =
         span_str_parts(tok.span, p->source, p->source_len, &litlen);
 
-    report_error(p->er, p->filename, p->source, tok.span,
+    report_error(p->er, tok.span,
                  "expected infix expression, found '%.*s' (%s)", litlen, lit,
                  token_to_str(tok.type));
 
@@ -772,8 +768,7 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
 }
 
 node_t* parse(parse_params_t* params) {
-    parser_t p = {.filename = params->filename,
-                  .source_len = params->source_len,
+    parser_t p = {.source_len = params->source_len,
                   .source = params->source,
                   .tokens = params->tokens,
                   .er = params->er,

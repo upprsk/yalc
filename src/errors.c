@@ -83,19 +83,18 @@ static void show_message(error_reporter_t* er, char const* color,
     fprintf(er->stream, "\n");
 }
 
-void report_error(error_reporter_t* er, char const* filename,
-                  char const* source, span_t span, char const* format, ...) {
+void report_error_opt(error_reporter_t* er, char const* filename,
+                      char const* source, span_t span, char const* format,
+                      ...) {
     va_list va;
     va_start(va, format);
-
-    vreport_error(er, filename, source, span, format, va);
-
+    vreport_error_opt(er, filename, source, span, format, va);
     va_end(va);
 }
 
-void vreport_error(error_reporter_t* er, char const* filename,
-                   char const* source, span_t span, char const* format,
-                   va_list va) {
+void vreport_error_opt(error_reporter_t* er, char const* filename,
+                       char const* source, span_t span, char const* format,
+                       va_list va) {
     er->error_count++;
 
     uint32_t line = count_lines(source, span);
@@ -109,19 +108,23 @@ void vreport_error(error_reporter_t* er, char const* filename,
     show_span(er, ANSI_RED, source, span, line, line_start, line_end, line_col);
 }
 
-void report_note(error_reporter_t* er, char const* filename, char const* source,
-                 span_t span, char const* format, ...) {
+void report_note_opt(error_reporter_t* er, char const* filename,
+                     char const* source, span_t span, char const* format, ...) {
     va_list va;
     va_start(va, format);
 
-    vreport_note(er, filename, source, span, format, va);
+    vreport_note_opt(er, filename, source, span, format, va);
 
     va_end(va);
 }
 
-void vreport_note(error_reporter_t* er, char const* filename,
-                  char const* source, span_t span, char const* format,
-                  va_list va) {
+void vreport_note_opt(error_reporter_t* er, char const* filename,
+                      char const* source, span_t span, char const* format,
+                      va_list va) {
+    munit_assert_not_null(er);
+    munit_assert_not_null(filename);
+    munit_assert_not_null(source);
+
     uint32_t line = count_lines(source, span);
     uint32_t line_start = find_line_start(source, span);
     uint32_t line_end = find_line_end(source, span);
@@ -131,4 +134,28 @@ void vreport_note(error_reporter_t* er, char const* filename,
     show_message(er, ANSI_CYAN, "note", filename, line, line_col, format, va);
     show_span(er, ANSI_CYAN, source, span, line, line_start, line_end,
               line_col);
+}
+
+void report_error(error_reporter_t* er, span_t span, char const* format, ...) {
+    va_list va;
+    va_start(va, format);
+    vreport_error(er, span, format, va);
+    va_end(va);
+}
+
+void vreport_error(error_reporter_t* er, span_t span, char const* format,
+                   va_list va) {
+    vreport_error_opt(er, er->filename, er->source, span, format, va);
+}
+
+void report_note(error_reporter_t* er, span_t span, char const* format, ...) {
+    va_list va;
+    va_start(va, format);
+    vreport_note(er, span, format, va);
+    va_end(va);
+}
+
+void vreport_note(error_reporter_t* er, span_t span, char const* format,
+                  va_list va) {
+    vreport_note_opt(er, er->filename, er->source, span, format, va);
 }

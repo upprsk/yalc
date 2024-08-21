@@ -8,7 +8,6 @@
 
 typedef struct parse_params {
     error_reporter_t* er;
-    char const*       filename;
 
     char const* source;
     uint32_t    source_len;

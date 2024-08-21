@@ -6,10 +6,6 @@
 
 typedef struct typecheck_params {
     error_reporter_t* er;
-    char const*       filename;
-
-    char const* source;
-    uint32_t    source_len;
 
     node_t*      ast;
     typestore_t* ts;

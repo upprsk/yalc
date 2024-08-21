@@ -111,5 +111,5 @@ typedef struct token {
 
 da_declare(token_t, token);
 
-token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* filename,
-                  char const* source, uint32_t source_len);
+token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* source,
+                  uint32_t source_len);
