@@ -10,6 +10,8 @@ add_library(yal
   common.h
   da.c
   da.h
+  depg.c
+  depg.h
   errors.c
   errors.h
   parser.c

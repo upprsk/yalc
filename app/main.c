@@ -7,12 +7,14 @@
 #include "ast.h"
 #include "codegen/codegen_mips.h"
 #include "common.h"
+#include "da.h"
+#include "depg.h"
 #include "errors.h"
 #include "parser.h"
+#include "span.h"
 #include "tokenizer.h"
 #include "typecheck.h"
 #include "typestore.h"
-#include "yair.h"
 
 static char* read_entire_file(char const* filename, allocator_t alloc,
                               size_t* len) {
@@ -154,9 +156,14 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    error_reporter_t er = {.stream = stderr};
+    error_reporter_t er = {
+        .stream = stderr,
+        .filename = filename,
+        .source = source,
+        .source_len = source_len,
+    };
 
-    token_t* tokens = tokenize(&er, alloc, filename, source, source_len);
+    token_t* tokens = tokenize(&er, alloc, source, source_len);
     if (!tokens) {
         fprintf(stderr, "failed to tokenize\n");
         return EXIT_FAILURE;
@@ -175,7 +182,6 @@ int main(int argc, char* argv[]) {
 
     node_t* ast = parse(&(parse_params_t){
         .tokens = tokens,
-        .filename = filename,
         .source = source,
         .source_len = source_len,
         .node_alloc = node_alloc,
@@ -189,15 +195,25 @@ int main(int argc, char* argv[]) {
 
     if (er.error_count > 0) return EXIT_FAILURE;
 
+    node_t** nodes = pass_depgraph(&(depg_params_t){
+        .ast = ast,
+        .filename = filename,
+        .source = source,
+        .source_len = source_len,
+        .er = &er,
+        .alloc = node_alloc,
+    });
+
+    // replace the list of nodes with the sorted one (all nodes should be
+    // present)
+    ast->as.mod.decls = nodes;
+
     typestore_t ts = {};
     typestore_init(&ts, alloc);
 
     pass_typecheck(&(typecheck_params_t){
         .ast = ast,
         .ts = &ts,
-        .filename = filename,
-        .source = source,
-        .source_len = source_len,
         .alloc = node_alloc,
         .er = &er,
     });
@@ -225,11 +241,13 @@ int main(int argc, char* argv[]) {
         arena_free(&arena);
     }
 
-    if (er.error_count > 0) return EXIT_FAILURE;
-
-    pass_to_ir(&(pass_to_ir_params_t){
-        .ast = ast,
-    });
+    // if (er.error_count > 0) return EXIT_FAILURE;
+    //
+    // pass_to_ir(&(pass_to_ir_params_t){
+    //     .alloc = alloc,
+    //     .ast = ast,
+    //     .ts = &ts,
+    // });
 
     if (er.error_count > 0) return EXIT_FAILURE;
 
