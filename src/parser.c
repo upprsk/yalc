@@ -715,6 +715,27 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
         return n;
     }
 
+    if (match(p, TT_BREAK)) {
+        node_t* expr = NULL;
+
+        if (peek(p).type != TT_SEMICOLON) {
+            expr = parse_expr(p, 0);
+        }
+
+        token_t end_tok = peek(p);
+        consume(p, TT_SEMICOLON);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_STMT_BREAK,
+            .as.stmt_break = {.child = expr},
+            .span = {.start = stmt_start_tok.span.start,
+                              .end = end_tok.span.end}
+        };
+
+        return n;
+    }
+
     if (match(p, TT_IF)) {
         return parse_stmt_if(p, stmt_start_tok);
     }

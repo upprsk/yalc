@@ -153,6 +153,11 @@ typedef struct node_stmt_return {
     node_t* child;
 } node_stmt_return_t;
 
+typedef struct node_stmt_break {
+    // may be null in case it is a bare break.
+    node_t* child;
+} node_stmt_break_t;
+
 typedef struct node_stmt_if {
     node_t* condition;
     node_t* when_true;
@@ -242,6 +247,7 @@ typedef enum node_type : uint8_t {
 
     NODE_STMT_EXPR,
     NODE_STMT_RET,
+    NODE_STMT_BREAK,
     NODE_STMT_IF,
     NODE_STMT_WHILE,
     NODE_STMT_BLK,
@@ -275,6 +281,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_CAST: return "NODE_CAST";
         case NODE_STMT_EXPR: return "NODE_STMT_EXPR";
         case NODE_STMT_RET: return "NODE_STMT_RET";
+        case NODE_STMT_BREAK: return "NODE_STMT_BREAK";
         case NODE_STMT_IF: return "NODE_STMT_IF";
         case NODE_STMT_WHILE: return "NODE_STMT_WHILE";
         case NODE_STMT_BLK: return "NODE_STMT_BLK";
@@ -313,6 +320,7 @@ struct node {
         node_stmt_if_t     stmt_if;
         node_stmt_while_t  stmt_while;
         node_stmt_return_t stmt_ret;
+        node_stmt_break_t  stmt_break;
         node_stmt_block_t  stmt_blk;
         node_mod_t         mod;
         node_decl_t        decl;

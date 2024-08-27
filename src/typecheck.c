@@ -72,10 +72,15 @@ da_declare(scope_entry_t, scope_entry);
 typedef struct scope {
     struct scope*  parent;
     scope_entry_t* entries;
+
+    bool is_inside_loop;
 } scope_t;
 
-static void scope_init(scope_t* s, allocator_t alloc, scope_t* parent) {
-    *s = (scope_t){.entries = da_init_scope_entry(alloc), .parent = parent};
+static void scope_init(scope_t* s, allocator_t alloc, scope_t* parent,
+                       bool is_inside_loop) {
+    *s = (scope_t){.entries = da_init_scope_entry(alloc),
+                   .parent = parent,
+                   .is_inside_loop = is_inside_loop};
 }
 
 static value_t const* scope_find_direct(scope_t* s, char const* name) {
@@ -111,6 +116,14 @@ static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
 
     scope_add_unchecked(s, alloc, name, value);
     return NULL;
+}
+
+static bool scope_is_inside_loop(scope_t* s) {
+    if (s == NULL) return false;
+    if (s->is_inside_loop) return true;
+    if (scope_is_inside_loop(s->parent)) return true;
+
+    return false;
 }
 
 static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
@@ -523,7 +536,7 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
     }
 
     // if (env->has_returned) {
-    //     // TODO: Allow for more than one return
+    //     // todo: Allow for more than one return
     //     report_error(tc->er, tc->filename, tc->source, node->span,
     //                  "each function can only return once");
     // }
@@ -546,6 +559,27 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
     }
 
     env->has_returned = true;
+    return void_;
+}
+
+static type_id_t typecheck_node_stmt_break(typechecker_t* tc, env_t* env,
+                                           scope_t* scope, node_t* node) {
+    type_id_t void_ = tc->ts->primitives.void_;
+
+    if (node->as.stmt_break.child) {
+        typecheck_node(tc, env, scope, node->as.stmt_break.child);
+    }
+
+    if (node->as.stmt_break.child) {
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "breaks with payloads have not been implemented");
+    }
+
+    if (!scope_is_inside_loop(scope)) {
+        report_error(tc->er, tc->filename, tc->source, node->span,
+                     "can't break when outside of loop");
+    }
+
     return void_;
 }
 
@@ -601,7 +635,10 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
             conditionstr);
     }
 
-    typecheck_node(tc, env, scope, node->as.stmt_while.body);
+    scope_t blkscope;
+    scope_init(&blkscope, tc->tempalloc, scope, true);
+
+    typecheck_node(tc, env, &blkscope, node->as.stmt_while.body);
 
     return void_;
 }
@@ -611,7 +648,7 @@ static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
     type_id_t void_ = tc->ts->primitives.void_;
 
     scope_t blkscope;
-    scope_init(&blkscope, tc->tempalloc, scope);
+    scope_init(&blkscope, tc->tempalloc, scope, false);
 
     uint32_t size = da_get_size(node->as.stmt_blk.stmts);
     for (uint32_t i = 0; i < size; ++i) {
@@ -769,7 +806,7 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
     type_id_t*   args = da_init_type_id(tc->alloc);
 
     scope_t proc_scope;
-    scope_init(&proc_scope, tc->tempalloc, scope);
+    scope_init(&proc_scope, tc->tempalloc, scope, false);
 
     size_t argc = da_get_size(proc->args);
     for (size_t i = 0; i < argc; ++i) {
@@ -933,6 +970,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_STMT_RET:
             result = typecheck_node_stmt_ret(tc, env, scope, node);
             break;
+        case NODE_STMT_BREAK:
+            result = typecheck_node_stmt_break(tc, env, scope, node);
+            break;
         case NODE_STMT_IF:
             result = typecheck_node_stmt_if(tc, env, scope, node);
             break;
@@ -1018,7 +1058,7 @@ void pass_typecheck(typecheck_params_t const* params) {
 
     // FIXME: Check if temp_alloc is what we want for this
     scope_t root_scope = {};
-    scope_init(&root_scope, tc.tempalloc, NULL);
+    scope_init(&root_scope, tc.tempalloc, NULL, false);
     scope_add(&root_scope, tc.tempalloc, "true",
               &(value_t){.type = tc.ts->primitives.bool_});
     scope_add(&root_scope, tc.tempalloc, "false",
