@@ -56,6 +56,7 @@ char const* shift_args(int* argc, char*** argv) {
 typedef enum outopt {
     OUT_NONE,
     OUT_MIPS,
+    OUT_NULL,
 } outopt_t;
 
 int main(int argc, char* argv[]) {
@@ -81,6 +82,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "      --show-typed-ast    show the typed AST\n");
             fprintf(stderr, "      --show-typestore    show all of the types defined in the typestore\n");
             fprintf(stderr, "      --output-mips       output MIPS32 assembly\n");
+            fprintf(stderr, "      --output-nothing    output nothing\n");
             // clang-format on
 
             return EXIT_SUCCESS;
@@ -109,6 +111,15 @@ int main(int argc, char* argv[]) {
             }
 
             out = OUT_MIPS;
+        }
+
+        else if (streq(arg, "--output-nothing")) {
+            if (out) {
+                fprintf(stderr, "output mode already specified\n");
+                return EXIT_FAILURE;
+            }
+
+            out = OUT_NULL;
         }
 
         else if (filename) {
