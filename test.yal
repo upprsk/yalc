@@ -13,8 +13,11 @@ f := .(x: i32) -> bool {
 
     if x > 120 { return true; }
     if x > 50 { return false; }
-    // return true;
+     return true;
 };
 
 main := .() {
+    i := readi();
+    printi(i);
+    printc(10);
 };
