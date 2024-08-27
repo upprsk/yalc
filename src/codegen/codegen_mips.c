@@ -60,7 +60,7 @@ static value_t find_value(codegen_state_t* cs, char const* name) {
         if (streq(cs->values[i].name, name)) return cs->values[i];
     }
 
-    munit_assert(false);
+    return (value_t){};
 }
 
 static size_t gen_label_id(codegen_state_t* cs) { return cs->label_counter++; }
@@ -89,6 +89,7 @@ static void register_pop_from_stack(codegen_state_t* cs, uint8_t reg) {
 
 typedef struct proc_state {
     register_alloc_t locregalloc;
+    int              end_label;
 } proc_state_t;
 
 static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
@@ -99,9 +100,26 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
             fprintf(cs->out, "    li $%d, %lu\n", reg, node->as.int_.value);
         } break;
         case NODE_IDENT: {
-            value_t v = find_value(cs, node->as.ident.ident);
-            // fprintf(cs->out, "    # got thing %d: %s\n", v.reg, v.name);
-            push_value(cs, &v);
+            char const* ident = node->as.ident.ident;
+            value_t     v = find_value(cs, ident);
+            if (v.reg) {
+                // fprintf(cs->out, "    # got thing %d: %s\n", v.reg, v.name);
+                push_value(cs, &v);
+            } else {
+                int value = 0;
+                if (streq(ident, "true")) {
+                    value = 1;
+                } else if (streq(ident, "false")) {
+                    value = 0;
+                } else {
+                    fprintf(stderr, "could not find: %s\n", ident);
+                    munit_assert(false);
+                }
+
+                uint8_t reg = register_alloc(&cs->tmpregalloc);
+                fprintf(cs->out, "    li $%d, %d\n", reg, value);
+                push_value(cs, &(value_t){.reg = reg});
+            }
         } break;
         case NODE_BINOP: {
             codegen_expr(cs, ps, node->as.binop.left);
@@ -271,8 +289,7 @@ static void codegen_stmt_ret(codegen_state_t* cs, proc_state_t* ps,
 
     register_free_all(&cs->tmpregalloc);
 
-    register_pop_from_stack(cs, REGISTER_RA);
-    fprintf(cs->out, "    jr $ra\n");
+    fprintf(cs->out, "    j label_%d\n", ps->end_label);
 }
 
 static void codegen_stmt_if(codegen_state_t* cs, proc_state_t* ps,
@@ -394,7 +411,8 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
     size_t pushes_start = cs->register_stack_pushes;
 
     proc_state_t ps = {
-        .locregalloc = {.cap = 8, .off = 16}
+        .locregalloc = {.cap = 8, .off = 16},
+        .end_label = gen_label_id(cs),
     };
 
     node_proc_t*  proc = &node->as.proc;
@@ -440,6 +458,8 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
     codegen_blk(cs, &ps, proc->body);
     fprintf(cs->out, "    # body end\n");
 
+    fprintf(cs->out, "label_%d: # end\n", ps.end_label);
+
     for (size_t i = 0; i < ps.locregalloc.head - argc; ++i) {
         value_t v = pop_value(cs);
         register_pop_from_stack(cs, v.reg);
@@ -450,10 +470,8 @@ static void codegen_proc(codegen_state_t* cs, char const* decl_name,
         register_pop_from_stack(cs, v.reg);
     }
 
-    if (proc->uses_implicit_return) {
-        register_pop_from_stack(cs, REGISTER_RA);
-        fprintf(cs->out, "    jr $ra\n");
-    }
+    register_pop_from_stack(cs, REGISTER_RA);
+    fprintf(cs->out, "    jr $ra\n");
 
     munit_assert_size(da_get_size(cs->values), ==, 0);
     munit_assert_size(cs->register_stack_pushes, ==, pushes_start);
