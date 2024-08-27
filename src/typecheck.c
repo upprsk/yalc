@@ -569,7 +569,7 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t bool_ = tc->ts->primitives.bool_;
 
-    bool had_returned = env->has_returned;
+    // bool had_returned = env->has_returned;
     env->has_returned = false;
 
     type_id_t condition =
@@ -594,7 +594,8 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
         wf_returned = env->has_returned;
     }
 
-    env->has_returned = (wt_returned && wf_returned) || had_returned;
+    // env->has_returned = (wt_returned && wf_returned) || had_returned;
+    env->has_returned = wt_returned && wf_returned;
 
     return void_;
 }
