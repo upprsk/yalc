@@ -571,13 +571,12 @@ static type_id_t typecheck_node_stmt_break(typechecker_t* tc, env_t* env,
     }
 
     if (node->as.stmt_break.child) {
-        report_error(tc->er, tc->filename, tc->source, node->span,
+        report_error(tc->er, node->span,
                      "breaks with payloads have not been implemented");
     }
 
     if (!scope_is_inside_loop(scope)) {
-        report_error(tc->er, tc->filename, tc->source, node->span,
-                     "can't break when outside of loop");
+        report_error(tc->er, node->span, "can't break when outside of loop");
     }
 
     env->has_broken = true;
