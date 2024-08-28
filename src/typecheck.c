@@ -48,8 +48,8 @@ typedef struct env {
 
     span_t proc_type_span;
 
-    // TODO: Allow more than one return per procedure
     bool has_returned;
+    bool has_broken;
 } env_t;
 
 typedef struct value {
@@ -580,6 +580,8 @@ static type_id_t typecheck_node_stmt_break(typechecker_t* tc, env_t* env,
                      "can't break when outside of loop");
     }
 
+    env->has_broken = true;
+
     return void_;
 }
 
@@ -624,6 +626,11 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t bool_ = tc->ts->primitives.bool_;
 
+    // bool had_returned = env->has_returned;
+    env->has_returned = false;
+    bool had_broken = env->has_broken;
+    env->has_broken = false;
+
     type_id_t condition =
         typecheck_node(tc, env, scope, node->as.stmt_while.condition);
     if (!type_id_eq(condition, bool_)) {
@@ -639,6 +646,14 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
     scope_init(&blkscope, tc->tempalloc, scope, true);
 
     typecheck_node(tc, env, &blkscope, node->as.stmt_while.body);
+
+    // if a break was found, then any returns found inside the while are no
+    // longer valid.
+    if (env->has_broken) {
+        env->has_returned = false;
+    }
+
+    env->has_broken = had_broken;
 
     return void_;
 }
