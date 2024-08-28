@@ -31,21 +31,3 @@ extern "__builtin_print_i32"
 
 extern "__builtin_print_char"
     printc: .(c: i32) -> void;
-
-extern "__builtin_read_i32"
-    readi: .() -> i32;
-
-f := .(x: i32) -> bool {
-    if x > 200 { return true;  }
-    else       { return false; }
-
-    if x > 120 { return true; }
-    if x > 50 { return false; }
-     return true;
-};
-
-main := .() {
-    i := readi();
-    printi(i);
-    printc(10);
-};
