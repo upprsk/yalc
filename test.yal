@@ -19,7 +19,7 @@ reset := .(c: *Counter) {
 
 main := .() {
     c := new_counter(5);
-    while tick(&c) {
+    while tick(c&) {
         printf("tick...\n");
     }
 

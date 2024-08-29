@@ -140,6 +140,7 @@ static inline int get_precedence(token_type_t tt) {
         case TT_SLASH: return 30;
         case TT_AS: return 45;
         case TT_LPAREN:
+        case TT_AMPERSAND:
         case TT_DOT_STAR: return 50;
         case TT_KW: return 55;
         case TT_LBRACKET: return 60;
@@ -582,15 +583,15 @@ static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
     munit_assert(false);
 }
 
-static node_t* parse_ref(parser_t* p, token_t tok) {
-    node_t* child = parse_expr(p, unary_precedence);
+static node_t* parse_ref(parser_t* p, node_t* lhs, token_t tok) {
+    // node_t* child = parse_expr(p, unary_precedence);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_REF,
-        .as.ref = {.child = child},
-        .span.start = tok.span.start,
-        .span.end = child->span.end,
+        .as.ref = {.child = lhs},
+        .span.start = lhs->span.start,
+        .span.end = tok.span.end,
     };
 
     return n;
@@ -665,7 +666,6 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_DOT_LBRACE: return parse_cinit(p, tok);
         case TT_STAR: return parse_pointer(p, tok);
         case TT_LBRACKET: return parse_mptr_or_slice(p, tok);
-        case TT_AMPERSAND: return parse_ref(p, tok);
         default: break;
     }
 
@@ -689,6 +689,7 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_SLASH: return parse_binary(p, lhs, tok);
         case TT_LPAREN: return parse_call(p, lhs);
         case TT_DOT_STAR: return parse_deref(p, lhs, tok);
+        case TT_AMPERSAND: return parse_ref(p, lhs, tok);
         case TT_AND:
         case TT_OR: return parse_logic(p, lhs, tok);
         case TT_EQUAL_EQUAL:
