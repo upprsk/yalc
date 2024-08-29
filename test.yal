@@ -1,33 +1,26 @@
-printiln := .(n: i32) {
-    printi(n);
-    newline();
+Counter := record {
+    start: i32;
+    end: i32;
+    count: i32;
 };
 
-newline := .() { printc(10); };
+new_counter := .(end: i32) -> Counter {
+    return .{ .count=0, .start=0, .end=end };
+};
+
+tick := .(c: *Counter) -> bool {
+};
+
+f := .(x: *i32) {
+    x.* = 12;
+};
 
 main := .() {
-    print_10();
-    sum_and_print(15, 50);
+    c := new_counter(100);
+    while tick(&c) {
+        printf("tick...\n");
+    }
 };
 
-sum_and_print := .(a: i32, b: i32) {
-    s := sum(a, b);
-    printiln(s);
-};
-
-sum := .(a: i32, b: i32) -> i32 { return a + b; };
-sub := .(a: i32, b: i32) -> i32 { return a - b; };
-
-print_10 := .() {
-    VALUE := 10;
-    printiln(VALUE);
-};
-
-extern "__builtin_read_i32"
-    readi: .() -> i32;
-
-extern "__builtin_print_i32"
-    printi: .(n: i32) -> void;
-
-extern "__builtin_print_char"
-    printc: .(c: i32) -> void;
+// TODO: Implement variadic functions
+extern "printf" printf: .(fmt: [*]i8) -> void;

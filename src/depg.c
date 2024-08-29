@@ -167,10 +167,11 @@ static void check_node(state_t* s, node_t* node) {
     if (!node) return;
 
     switch (node->type) {
-        case NODE_ERR:         // nop
-        case NODE_INT:         // nop
-        case NODE_FLOAT:       // nop
-        case NODE_STR: break;  // nop
+        case NODE_ERR:        // nop
+        case NODE_INT:        // nop
+        case NODE_FLOAT:      // nop
+        case NODE_STR:        // nop
+        case NODE_KW: break;  // nop
         case NODE_BINOP: {
             check_node(s, node->as.binop.left);
             check_node(s, node->as.binop.right);
@@ -213,6 +214,9 @@ static void check_node(state_t* s, node_t* node) {
         } break;
         case NODE_STMT_RET: {
             check_node(s, node->as.stmt_ret.child);
+        } break;
+        case NODE_STMT_BREAK: {
+            check_node(s, node->as.stmt_break.child);
         } break;
         case NODE_STMT_IF: {
             check_node(s, node->as.stmt_if.condition);
@@ -291,6 +295,19 @@ static void check_node(state_t* s, node_t* node) {
             check_node(s, node->as.proc.body);
 
             s->curr_scope = proc_scope.parent;
+        } break;
+        case NODE_RECORD: {
+            check_node(s, node->as.record.blk);
+        } break;
+        case NODE_CINITF: {
+            check_node(s, node->as.cinitf.name);
+            check_node(s, node->as.cinitf.init);
+        } break;
+        case NODE_CINIT: {
+            size_t count = da_get_size(node->as.cinit.kids);
+            for (size_t i = 0; i < count; i++) {
+                check_node(s, node->as.cinit.kids[i]);
+            }
         } break;
         case NODE_ARRAY: {
             check_node(s, node->as.array.len);

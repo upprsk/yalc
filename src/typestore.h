@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "allocator.h"
+#include "common.h"
 #include "da.h"
 
 typedef struct type_id {
@@ -13,13 +14,15 @@ typedef struct type_id {
 #define INVALID_TYPEID \
     (type_id_t) { 0 }
 
-static inline bool type_id_is_valid(type_id_t id) { return id.id != 0; }
+static inline bool type_id_is_valid(type_id_t id) {
+    return id.id != 0 && id.id != 0xFF;
+}
 
 static inline bool type_id_eq(type_id_t lhs, type_id_t rhs) {
     return lhs.id == rhs.id;
 }
 
-typedef enum type_tag {
+typedef enum type_tag : uint8_t {
     TYPE_ERR,
     TYPE_VOID,
     TYPE_TYPE,
@@ -30,6 +33,8 @@ typedef enum type_tag {
     TYPE_PTR,
     TYPE_MPTR,
     TYPE_PROC,
+    TYPE_KW,
+    TYPE_RECORD,
 } type_tag_t;
 
 static inline char const* type_tag_to_str(type_tag_t tag) {
@@ -44,6 +49,8 @@ static inline char const* type_tag_to_str(type_tag_t tag) {
         case TYPE_PTR: return "TYPE_PTR";
         case TYPE_MPTR: return "TYPE_MPTR";
         case TYPE_PROC: return "TYPE_PROC";
+        case TYPE_KW: return "TYPE_KW";
+        case TYPE_RECORD: return "TYPE_RECORD";
     }
 
     return "?";
@@ -79,17 +86,47 @@ typedef struct type_proc {
     type_id_t* args;
 } type_proc_t;
 
+typedef struct record_field {
+    char const* name;
+    type_id_t   type;
+} record_field_t;
+
+da_declare(record_field_t, record_field);
+
+typedef struct type_record {
+    record_field_t* fields;
+} type_record_t;
+
+static inline record_field_t const* type_record_find_field(
+    type_record_t const* rec, char const* name, size_t* idx) {
+    size_t count = da_get_size(rec->fields);
+    for (size_t i = 0; i < count; ++i) {
+        if (streq(rec->fields[i].name, name)) {
+            if (idx) *idx = i;
+            return &rec->fields[i];
+        }
+    }
+
+    return NULL;
+}
+
+typedef struct type_kw {
+    char const* ident;
+} type_kw_t;
+
 da_declare(type_id_t, type_id);
 
 typedef struct type {
     type_tag_t tag;
     union {
-        type_int_t   int_;
-        type_float_t float_;
-        type_array_t array;
-        type_ptr_t   ptr;
-        type_mptr_t  mptr;
-        type_proc_t  proc;
+        type_int_t    int_;
+        type_float_t  float_;
+        type_array_t  array;
+        type_ptr_t    ptr;
+        type_mptr_t   mptr;
+        type_proc_t   proc;
+        type_record_t record;
+        type_kw_t     kw;
     } as;
 } type_t;
 
@@ -125,6 +162,13 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
 
             return true;
         } break;
+        case TYPE_RECORD: {
+            // WARN: For now, record types are always unique.
+            return false;
+        } break;
+        case TYPE_KW: {
+            return streq(lhs->as.kw.ident, rhs->as.kw.ident);
+        } break;
     }
 
     __builtin_unreachable();
@@ -146,6 +190,7 @@ typedef struct typestore_primitives {
     type_id_t i32;
     type_id_t f32;
     type_id_t f64;
+    type_id_t str;
 } typestore_primitives_t;
 
 typedef struct typestore {

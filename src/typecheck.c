@@ -11,32 +11,9 @@
 #include "span.h"
 #include "typestore.h"
 
-typedef struct typename_table_entry {
-    char const* name;
-    type_id_t   type;
-} typename_table_entry_t;
-
-// NOLINTNEXTLINE
-da_declare(typename_table_entry_t, typename_table_entry);
-
-typedef struct typename_table {
-    typename_table_entry_t* entries;
-} typename_table_t;
-
-static type_id_t typename_table_find(typename_table_t* tnt, char const* name) {
-    size_t size = da_get_size(tnt->entries);
-    for (size_t i = 0; i < size; ++i) {
-        if (strcmp(tnt->entries[i].name, name) == 0)
-            return tnt->entries[i].type;
-    }
-
-    return INVALID_TYPEID;
-}
-
 typedef struct typechecker {
     error_reporter_t* er;
     typestore_t*      ts;
-    typename_table_t* tnt;
 
     allocator_t tempalloc;
     allocator_t alloc;
@@ -50,16 +27,29 @@ typedef struct env {
 
     bool has_returned;
     bool has_broken;
+    bool in_type_context;
 } env_t;
 
 typedef struct value {
     type_id_t type;
     span_t    where;
 
+    // in case of types, we also want to store it's actual underlying type.
+    // `i32` has type `type` but when used in a type context, it is `i32`.
+    type_id_t type_payload;
+
     // FIXME: This is probably not how we should do this. Stores the extern name
     // of a procedure when declared
     char const* extern_name;
 } value_t;
+
+static inline type_id_t value_get_type(typestore_t* ts, value_t const* v) {
+    munit_assert_not_null(ts);
+    munit_assert_not_null(v);
+    munit_assert_uint32(v->type.id, ==, ts->primitives.type.id);
+
+    return v->type_payload;
+}
 
 typedef struct scope_entry {
     char const* name;
@@ -126,8 +116,18 @@ static bool scope_is_inside_loop(scope_t* s) {
     return false;
 }
 
+typedef struct inference {
+    type_id_t expression_expected;
+} inference_t;
+
+static inline inference_t infer_with(type_id_t type) {
+    return (inference_t){.expression_expected = type};
+}
+
 static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
-                                node_t* node);
+                                node_t* node, inference_t inf);
+static type_id_t eval_to_type(typechecker_t* tc, env_t* env, scope_t* scope,
+                              node_t* node);
 
 typedef enum typecheck_node_proc_opt {
     TC_NODE_PROC_OPT_ALLOW_NO_BODY = 1 << 0,
@@ -135,60 +135,158 @@ typedef enum typecheck_node_proc_opt {
 
 static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node,
+                                     inference_t               inf,
                                      typecheck_node_proc_opt_t opt);
 
-static type_id_t eval_to_type(typechecker_t* tc, env_t* env, scope_t* scope,
-                              node_t* node) {
-    munit_assert_not_null(node);
-
-    if (node->type == NODE_PTR) {
-        type_id_t inner = eval_to_type(tc, env, scope, node->as.ptr.child);
-
-        type_id_t ty = typestore_add_type(
-            tc->ts, &(type_t){.tag = TYPE_PTR, .as.ptr = {.inner = inner}});
-        node->type_id = ty;
-
-        return ty;
+static value_t const* eval_node_record(typechecker_t* tc, env_t* env,
+                                       scope_t* outer_scope, node_t* node) {
+    node_record_t* record = &node->as.record;
+    if (record->blk->type != NODE_STMT_BLK) {
+        report_error(tc->er, record->blk->span,
+                     "expected block as child of record, found %s",
+                     node_type_to_str(record->blk->type));
+        return NULL;
     }
 
-    if (node->type == NODE_MPTR) {
-        type_id_t inner = eval_to_type(tc, env, scope, node->as.mptr.child);
+    type_record_t rec_type = {
+        .fields = da_init_record_field(tc->alloc),
+    };
 
-        if (node->as.mptr.term) {
-            report_error(tc->er, node->span,
-                         "terminators have not been implemented");
+    scope_t scope;
+    scope_init(&scope, tc->tempalloc, outer_scope, false);
+
+    node_stmt_block_t* blk = &record->blk->as.stmt_blk;
+    size_t             count = da_get_size(blk->stmts);
+    for (size_t i = 0; i < count; i++) {
+        node_t* node = blk->stmts[i];
+        if (node->type != NODE_DECL) {
+            report_error(tc->er, node->span, "expected declaration, found %s",
+                         node_type_to_str(record->blk->type));
+            continue;
         }
 
-        type_id_t ty = typestore_add_type(
-            tc->ts, &(type_t){.tag = TYPE_MPTR, .as.mptr = {.inner = inner}});
-        node->type_id = ty;
+        // TODO: validate the declaration, forbid default initializers and add
+        // the record scope
 
-        return ty;
+        node_decl_t* decl = &node->as.decl;
+
+        if (decl->is_extern) {
+            report_error(tc->er, node->span,
+                         "fields can not be declared extern");
+        }
+
+        char const* field_name = decl->name;
+        type_id_t   field_type = eval_to_type(tc, env, &scope, decl->type);
+
+        if (decl->init) {
+            report_error(
+                tc->er, decl->init->span,
+                "default initializers for fields have not been implemented");
+        }
+
+        rec_type.fields = da_append_record_field(
+            rec_type.fields, tc->alloc,
+            &(record_field_t){.name = field_name, .type = field_type});
     }
 
-    if (node->type == NODE_PROC && !node->as.proc.body) {
-        return typecheck_node_proc(tc, env, scope, node,
-                                   TC_NODE_PROC_OPT_ALLOW_NO_BODY);
+    type_id_t ty = typestore_add_type(
+        tc->ts, &(type_t){.tag = TYPE_RECORD, .as.record = rec_type});
+
+    value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+    *v = (value_t){.type = tc->ts->primitives.type,
+                   .type_payload = ty,
+                   .where = node->span};
+
+    return v;
+}
+
+static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
+                                node_t* node) {
+    munit_assert_not_null(node);
+
+    type_id_t type = tc->ts->primitives.type;
+
+    switch (node->type) {
+        case NODE_IDENT: {
+            value_t const* v = scope_find(scope, node->as.ident.ident);
+            if (v) return v;
+        } break;
+        case NODE_PROC: {
+            type_id_t ty = node->type_id;
+            munit_assert_uint8(typestore_find_type(tc->ts, ty)->tag, ==,
+                               TYPE_PROC);
+
+            value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+            *v = (value_t){
+                .type = type, .type_payload = ty, .where = node->span};
+
+            return v;
+        } break;
+        case NODE_RECORD: return eval_node_record(tc, env, scope, node);
+        case NODE_PTR: {
+            value_t const* v = eval_node(tc, env, scope, node->as.ptr.child);
+            if (v) {
+                type_id_t ty = typestore_add_type(
+                    tc->ts,
+                    &(type_t){.tag = TYPE_PTR,
+                              .as.ptr = {.inner = value_get_type(tc->ts, v)}});
+                value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+                *v = (value_t){
+                    .type = type, .type_payload = ty, .where = node->span};
+
+                return v;
+            }
+        } break;
+        case NODE_MPTR: {
+            // TODO: Implement terminators
+
+            value_t const* inner =
+                eval_node(tc, env, scope, node->as.mptr.child);
+            if (inner) {
+                type_id_t ty = typestore_add_type(
+                    tc->ts, &(type_t){.tag = TYPE_MPTR,
+                                      .as.mptr = {.inner = value_get_type(
+                                                      tc->ts, inner)}});
+                value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+                *v = (value_t){
+                    .type = type, .type_payload = ty, .where = node->span};
+
+                return v;
+            }
+        } break;
+        default: report_error(tc->er, node->span, "can't evaluate to a type");
     }
 
-    if (node->type != NODE_IDENT) {
+    return NULL;
+}
+
+static type_id_t eval_to_type(typechecker_t* tc, env_t* outer_env,
+                              scope_t* scope, node_t* node) {
+    // report_note(tc->er, node->span, "eval_to_type", node->span);
+
+    munit_assert_not_null(node);
+
+    env_t env = *outer_env;
+    env.in_type_context = true;
+
+    type_id_t type = tc->ts->primitives.type;
+    type_id_t err = tc->ts->primitives.err;
+    type_id_t ty = typecheck_node(tc, &env, scope, node, infer_with(type));
+    if (!type_id_eq(ty, type) &&
+        typestore_find_type(tc->ts, ty)->tag != TYPE_PROC) {
         report_error(tc->er, node->span,
-                     "expression could not be evaluated to a type");
-
-        node->type_id = tc->ts->primitives.err;
-        return node->type_id;
+                     "expected a type, got value of type %s",
+                     typestore_type_id_to_str(tc->ts, tc->tempalloc, ty));
+        return err;
     }
 
-    char const* name = node->as.ident.ident;
-    type_id_t   type = typename_table_find(tc->tnt, name);
-    if (type_id_eq(type, INVALID_TYPEID)) {
-        report_error(tc->er, node->span, "undefined type: %s", name);
-        node->type_id = tc->ts->primitives.err;
-        return node->type_id;
+    value_t const* value = eval_node(tc, &env, scope, node);
+    if (!value) {
+        report_error(tc->er, node->span, "failed to evaluate to type");
+        return INVALID_TYPEID;
     }
 
-    node->type_id = tc->ts->primitives.type;
-    return type;
+    return value->type_payload;
 }
 
 static type_id_t typecheck_node_ident(typechecker_t* tc, env_t* env,
@@ -205,10 +303,26 @@ static type_id_t typecheck_node_ident(typechecker_t* tc, env_t* env,
     return v->type;
 }
 
+static type_id_t typecheck_node_kw(typechecker_t* tc, env_t* env,
+                                   scope_t* scope, node_t* node) {
+    (void)env;
+    (void)scope;
+
+    // FIXME: Not allocating a new string for the type and using the same as the
+    // node
+    type_id_t ty = typestore_add_type(
+        tc->ts,
+        &(type_t){.tag = TYPE_KW, .as.kw = {.ident = node->as.kw.ident}});
+
+    return ty;
+}
+
 static type_id_t typecheck_node_binop(typechecker_t* tc, env_t* env,
-                                      scope_t* scope, node_t* node) {
-    type_id_t lhs = typecheck_node(tc, env, scope, node->as.binop.left);
-    type_id_t rhs = typecheck_node(tc, env, scope, node->as.binop.right);
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
+    type_id_t lhs = typecheck_node(tc, env, scope, node->as.binop.left, inf);
+    type_id_t rhs =
+        typecheck_node(tc, env, scope, node->as.binop.right, infer_with(lhs));
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
@@ -240,8 +354,9 @@ static type_id_t typecheck_node_binop(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_unop(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node) {
-    type_id_t child = typecheck_node(tc, env, scope, node->as.unop.child);
+                                     scope_t* scope, node_t* node,
+                                     inference_t inf) {
+    type_id_t child = typecheck_node(tc, env, scope, node->as.unop.child, inf);
 
     type_t const* child_type = typestore_find_type(tc->ts, child);
     munit_assert_not_null(child_type);
@@ -265,9 +380,11 @@ static type_id_t typecheck_node_unop(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_logic(typechecker_t* tc, env_t* env,
-                                      scope_t* scope, node_t* node) {
-    type_id_t lhs = typecheck_node(tc, env, scope, node->as.logic.left);
-    type_id_t rhs = typecheck_node(tc, env, scope, node->as.logic.right);
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
+    type_id_t lhs = typecheck_node(tc, env, scope, node->as.logic.left, inf);
+    type_id_t rhs =
+        typecheck_node(tc, env, scope, node->as.logic.right, infer_with(lhs));
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
@@ -299,9 +416,11 @@ static type_id_t typecheck_node_logic(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node) {
-    type_id_t lhs = typecheck_node(tc, env, scope, node->as.comp.left);
-    type_id_t rhs = typecheck_node(tc, env, scope, node->as.comp.right);
+                                     scope_t* scope, node_t* node,
+                                     inference_t inf) {
+    type_id_t lhs = typecheck_node(tc, env, scope, node->as.comp.left, inf);
+    type_id_t rhs =
+        typecheck_node(tc, env, scope, node->as.comp.right, infer_with(lhs));
 
     if (!type_id_eq(lhs, rhs)) {
         char const* lhsstr =
@@ -333,10 +452,11 @@ static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node) {
+                                     scope_t* scope, node_t* node,
+                                     inference_t inf) {
     node_call_t* call = &node->as.call;
 
-    type_id_t     callee = typecheck_node(tc, env, scope, call->callee);
+    type_id_t     callee = typecheck_node(tc, env, scope, call->callee, inf);
     type_t const* callee_type = typestore_find_type(tc->ts, callee);
     munit_assert_not_null(callee_type);
 
@@ -361,7 +481,8 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
     argc = min(argc, proc_argc);
     for (size_t i = 0; i < argc; ++i) {
         type_id_t expectedt = callee_type->as.proc.args[i];
-        type_id_t argt = typecheck_node(tc, env, scope, call->args[i]);
+        type_id_t argt = typecheck_node(tc, env, scope, call->args[i],
+                                        infer_with(expectedt));
 
         if (!type_id_eq(expectedt, argt)) {
             char const* expectedstr =
@@ -387,16 +508,18 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_ref(typechecker_t* tc, env_t* env,
-                                    scope_t* scope, node_t* node) {
-    type_id_t child = typecheck_node(tc, env, scope, node->as.ref.child);
+                                    scope_t* scope, node_t* node,
+                                    inference_t inf) {
+    type_id_t child = typecheck_node(tc, env, scope, node->as.ref.child, inf);
 
     return typestore_add_type(
         tc->ts, &(type_t){.tag = TYPE_PTR, .as.ptr = {.inner = child}});
 }
 
 static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
-                                      scope_t* scope, node_t* node) {
-    type_id_t     inner = typecheck_node(tc, env, scope, node->as.deref.child);
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
+    type_id_t inner = typecheck_node(tc, env, scope, node->as.deref.child, inf);
     type_t const* inner_type = typestore_find_type(tc->ts, inner);
     munit_assert_not_null(inner_type);
 
@@ -415,9 +538,13 @@ static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node) {
-    type_id_t child = typecheck_node(tc, env, scope, node->as.cast.child);
+                                     scope_t* scope, node_t* node,
+                                     inference_t inf) {
+    (void)inf;
+
     type_id_t target = eval_to_type(tc, env, scope, node->as.cast.type);
+    type_id_t child =
+        typecheck_node(tc, env, scope, node->as.cast.child, infer_with(target));
 
     if (type_id_eq(child, target)) {
         char const* childstr =
@@ -477,10 +604,11 @@ static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_index(typechecker_t* tc, env_t* env,
-                                      scope_t* scope, node_t* node) {
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
     type_id_t receiver =
-        typecheck_node(tc, env, scope, node->as.index.receiver);
-    type_id_t index = typecheck_node(tc, env, scope, node->as.index.index);
+        typecheck_node(tc, env, scope, node->as.index.receiver, inf);
+    type_id_t index = typecheck_node(tc, env, scope, node->as.index.index, inf);
 
     type_t const* receiver_type = typestore_find_type(tc->ts, receiver);
     munit_assert_not_null(receiver_type);
@@ -507,11 +635,13 @@ static type_id_t typecheck_node_index(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
-                                          scope_t* scope, node_t* node) {
+                                          scope_t* scope, node_t* node,
+                                          inference_t inf) {
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t err = tc->ts->primitives.err;
 
-    type_id_t expr = typecheck_node(tc, env, scope, node->as.stmt_expr.expr);
+    type_id_t expr =
+        typecheck_node(tc, env, scope, node->as.stmt_expr.expr, inf);
     if (!type_id_eq(expr, void_) && !type_id_eq(expr, err)) {
         char const* exprstr =
             typestore_type_id_to_str(tc->ts, tc->tempalloc, expr);
@@ -525,7 +655,10 @@ static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
-                                         scope_t* scope, node_t* node) {
+                                         scope_t* scope, node_t* node,
+                                         inference_t inf) {
+    (void)inf;
+
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t err = tc->ts->primitives.err;
 
@@ -543,7 +676,8 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
 
     type_id_t expr = void_;
     if (node->as.stmt_ret.child) {
-        expr = typecheck_node(tc, env, scope, node->as.stmt_ret.child);
+        expr = typecheck_node(tc, env, scope, node->as.stmt_ret.child,
+                              infer_with(env->expected_return));
     }
 
     if (!type_id_eq(env->expected_return, expr)) {
@@ -563,11 +697,12 @@ static type_id_t typecheck_node_stmt_ret(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_stmt_break(typechecker_t* tc, env_t* env,
-                                           scope_t* scope, node_t* node) {
+                                           scope_t* scope, node_t* node,
+                                           inference_t inf) {
     type_id_t void_ = tc->ts->primitives.void_;
 
     if (node->as.stmt_break.child) {
-        typecheck_node(tc, env, scope, node->as.stmt_break.child);
+        typecheck_node(tc, env, scope, node->as.stmt_break.child, inf);
     }
 
     if (node->as.stmt_break.child) {
@@ -585,7 +720,8 @@ static type_id_t typecheck_node_stmt_break(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
-                                        scope_t* scope, node_t* node) {
+                                        scope_t* scope, node_t* node,
+                                        inference_t inf) {
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t bool_ = tc->ts->primitives.bool_;
 
@@ -593,7 +729,7 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
     env->has_returned = false;
 
     type_id_t condition =
-        typecheck_node(tc, env, scope, node->as.stmt_if.condition);
+        typecheck_node(tc, env, scope, node->as.stmt_if.condition, inf);
     if (!type_id_eq(condition, bool_)) {
         char const* conditionstr =
             typestore_type_id_to_str(tc->ts, tc->tempalloc, condition);
@@ -603,14 +739,14 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
             conditionstr);
     }
 
-    typecheck_node(tc, env, scope, node->as.stmt_if.when_true);
+    typecheck_node(tc, env, scope, node->as.stmt_if.when_true, inf);
     bool wt_returned = env->has_returned;
     bool wf_returned = false;
 
     env->has_returned = false;
 
     if (node->as.stmt_if.when_false) {
-        typecheck_node(tc, env, scope, node->as.stmt_if.when_false);
+        typecheck_node(tc, env, scope, node->as.stmt_if.when_false, inf);
         wf_returned = env->has_returned;
     }
 
@@ -621,7 +757,8 @@ static type_id_t typecheck_node_stmt_if(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
-                                           scope_t* scope, node_t* node) {
+                                           scope_t* scope, node_t* node,
+                                           inference_t inf) {
     type_id_t void_ = tc->ts->primitives.void_;
     type_id_t bool_ = tc->ts->primitives.bool_;
 
@@ -631,7 +768,7 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
     env->has_broken = false;
 
     type_id_t condition =
-        typecheck_node(tc, env, scope, node->as.stmt_while.condition);
+        typecheck_node(tc, env, scope, node->as.stmt_while.condition, inf);
     if (!type_id_eq(condition, bool_)) {
         char const* conditionstr =
             typestore_type_id_to_str(tc->ts, tc->tempalloc, condition);
@@ -644,7 +781,7 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
     scope_t blkscope;
     scope_init(&blkscope, tc->tempalloc, scope, true);
 
-    typecheck_node(tc, env, &blkscope, node->as.stmt_while.body);
+    typecheck_node(tc, env, &blkscope, node->as.stmt_while.body, inf);
 
     // if a break was found, then any returns found inside the while are no
     // longer valid.
@@ -658,7 +795,10 @@ static type_id_t typecheck_node_stmt_while(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
-                                         scope_t* scope, node_t* node) {
+                                         scope_t* scope, node_t* node,
+                                         inference_t inf) {
+    (void)inf;
+
     type_id_t void_ = tc->ts->primitives.void_;
 
     scope_t blkscope;
@@ -666,8 +806,8 @@ static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
 
     uint32_t size = da_get_size(node->as.stmt_blk.stmts);
     for (uint32_t i = 0; i < size; ++i) {
-        type_id_t id =
-            typecheck_node(tc, env, &blkscope, node->as.stmt_blk.stmts[i]);
+        type_id_t id = typecheck_node(
+            tc, env, &blkscope, node->as.stmt_blk.stmts[i], infer_with(void_));
         if (!type_id_eq(id, void_)) {
             char const* typestr =
                 typestore_type_id_to_str(tc->ts, tc->tempalloc, id);
@@ -681,7 +821,9 @@ static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
-                                    scope_t* scope, node_t* node) {
+                                    scope_t* scope, node_t* node,
+                                    inference_t inf) {
+    (void)inf;
     type_id_t void_ = tc->ts->primitives.void_;
 
     uint32_t size = da_get_size(node->as.mod.decls);
@@ -695,7 +837,7 @@ static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
             continue;
         }
 
-        type_id_t id = typecheck_node(tc, env, scope, it);
+        type_id_t id = typecheck_node(tc, env, scope, it, infer_with(void_));
         if (!type_id_eq(id, void_)) {
             char const* typestr =
                 typestore_type_id_to_str(tc->ts, tc->tempalloc, id);
@@ -709,7 +851,10 @@ static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node) {
+                                     scope_t* scope, node_t* node,
+                                     inference_t inf) {
+    (void)inf;
+
     type_id_t    void_ = tc->ts->primitives.void_;
     type_id_t    err = tc->ts->primitives.err;
     node_decl_t* decl = &node->as.decl;
@@ -718,16 +863,22 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     // wrong
     char const* extern_name = decl->is_extern ? decl->extern_name : decl->name;
 
+    type_id_t type_payload = INVALID_TYPEID;
+
     type_id_t type = INVALID_TYPEID;
     if (decl->type) type = eval_to_type(tc, env, scope, decl->type);
 
     type_id_t init = INVALID_TYPEID;
     if (decl->init) {
-        init = typecheck_node(tc, env, scope, decl->init);
+        init = typecheck_node(tc, env, scope, decl->init, infer_with(type));
         if (decl->is_extern) {
             report_error(tc->er, node->span,
                          "extern declarations can't have initializers");
             init = err;
+        }
+
+        if (type_id_eq(init, tc->ts->primitives.type)) {
+            type_payload = eval_to_type(tc, env, scope, decl->init);
         }
     }
 
@@ -759,7 +910,8 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     value_t const* prev = scope_add(scope, tc->tempalloc, decl->name,
                                     &(value_t){.type = type,
                                                .where = decl->name_span,
-                                               .extern_name = extern_name});
+                                               .extern_name = extern_name,
+                                               .type_payload = type_payload});
     if (prev) {
         report_error(tc->er, node->span, "identifier %s already defined",
                      decl->name);
@@ -771,10 +923,12 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
 }
 
 static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
-                                       scope_t* scope, node_t* node) {
+                                       scope_t* scope, node_t* node,
+                                       inference_t inf) {
     node_t*   lhs_node = node->as.assign.lhs;
-    type_id_t lhs = typecheck_node(tc, env, scope, lhs_node);
-    type_id_t rhs = typecheck_node(tc, env, scope, node->as.assign.rhs);
+    type_id_t lhs = typecheck_node(tc, env, scope, lhs_node, inf);
+    type_id_t rhs =
+        typecheck_node(tc, env, scope, node->as.assign.rhs, infer_with(lhs));
 
     bool lhs_is_lvalue = false;
     switch (lhs_node->type) {
@@ -800,9 +954,9 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
         report_error(tc->er, node->span,
                      "incompatible types in assignment, expected %s but got %s",
                      lhsstr, rhsstr);
-        report_note(tc->er, node->as.binop.left->span, "this has type %s",
-                    lhsstr);
-        report_note(tc->er, node->as.binop.right->span, "this has type %s",
+        report_note(tc->er, node->as.assign.lhs->span, "this has type %s",
+                    rhsstr);
+        report_note(tc->er, node->as.assign.rhs->span, "this has type %s",
                     rhsstr);
     }
 
@@ -811,7 +965,9 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
 
 static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node,
+                                     inference_t               inf,
                                      typecheck_node_proc_opt_t opt) {
+    (void)inf;
     (void)env;
 
     type_id_t void_ = tc->ts->primitives.void_;
@@ -862,7 +1018,8 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
                           .proc_type_span = proc->return_type
                                                 ? proc->return_type->span
                                                 : node->span};
-        body = typecheck_node(tc, &body_env, &proc_scope, proc->body);
+        body = typecheck_node(tc, &body_env, &proc_scope, proc->body,
+                              infer_with(void_));
         if (!type_id_eq(body, void_)) {
             char const* bodystr =
                 typestore_type_id_to_str(tc->ts, tc->tempalloc, body);
@@ -894,8 +1051,112 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
     return result;
 }
 
+static type_id_t typecheck_node_record(typechecker_t* tc, env_t* env,
+                                       scope_t* scope, node_t* node,
+                                       inference_t inf) {
+    typecheck_node(tc, env, scope, node->as.record.blk, inf);
+
+    return tc->ts->primitives.type;
+}
+
+static type_id_t typecheck_node_cinit(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
+    node_cinit_t* cinit = &node->as.cinit;
+
+    bool is_valid = type_id_is_valid(inf.expression_expected);
+    if (!is_valid) {
+        report_error(tc->er, node->span,
+                     "can't infer type of compound initializer");
+        return tc->ts->primitives.err;
+    }
+
+    type_t const* expression_expected =
+        typestore_find_type(tc->ts, inf.expression_expected);
+    if (expression_expected->tag != TYPE_RECORD) {
+        report_error(tc->er, node->span,
+                     "incompatible types, expected record but got %s",
+                     typestore_type_id_to_str(tc->ts, tc->tempalloc,
+                                              inf.expression_expected));
+        return tc->ts->primitives.err;
+    }
+
+    size_t* found_fields = da_init_size(tc->tempalloc);
+
+    size_t kids_count = da_get_size(cinit->kids);
+    for (size_t i = 0; i < kids_count; i++) {
+        node_t* node = cinit->kids[i];
+
+        if (node->type != NODE_CINITF) {
+            // still type check it?
+            type_id_t ty = typecheck_node(tc, env, scope, node, inf);
+
+            report_error(
+                tc->er, node->span,
+                "expected field initializer, but got expression of type %s",
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, ty));
+            continue;
+        }
+
+        node_cinitf_t* cinitf = &node->as.cinitf;
+        type_id_t      name = typecheck_node(tc, env, scope, cinitf->name, inf);
+
+        type_t const* name_type = typestore_find_type(tc->ts, name);
+        if (name_type->tag != TYPE_KW) {
+            report_error(
+                tc->er, cinitf->name->span, "expected field name, found %s",
+                typestore_type_to_str(tc->ts, tc->tempalloc, name_type));
+            continue;
+        }
+
+        size_t                idx = 0;
+        record_field_t const* field = type_record_find_field(
+            &expression_expected->as.record, name_type->as.kw.ident, &idx);
+        if (field == NULL) {
+            report_error(tc->er, cinitf->name->span, "unknown field %s",
+                         name_type->as.kw.ident);
+            continue;
+        }
+
+        type_id_t expr =
+            typecheck_node(tc, env, scope, cinitf->init, infer_with(name));
+        if (!type_id_eq(field->type, expr)) {
+            report_error(
+                tc->er, node->span,
+                "incompatible types, expected %s but got %s",
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, field->type),
+                typestore_type_id_to_str(tc->ts, tc->tempalloc, expr));
+        }
+
+        found_fields = da_append_size(found_fields, tc->tempalloc, &idx);
+    }
+
+    size_t nfound = da_get_size(found_fields);
+    size_t nexpected = da_get_size(expression_expected->as.record.fields);
+    munit_assert_size(nfound, <=, nexpected);
+    if (nfound < nexpected) {
+        for (size_t i = 0; i < nexpected; i++) {
+            bool found = false;
+            for (size_t j = 0; j < nfound; j++) {
+                if (found_fields[j] == i) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) continue;
+
+            report_error(tc->er, node->span, "missing field %s",
+                         expression_expected->as.record.fields[i].name);
+        }
+    }
+
+    return inf.expression_expected;
+}
+
 static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
-                                      scope_t* scope, node_t* node) {
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
     type_id_t     err = tc->ts->primitives.err;
     node_array_t* array = &node->as.array;
     munit_assert_not_null(array);
@@ -911,7 +1172,7 @@ static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
     size_t    count = da_get_size(array->initializer_list);
     for (size_t i = 0; i < count; ++i) {
         type_id_t expr =
-            typecheck_node(tc, env, scope, array->initializer_list[i]);
+            typecheck_node(tc, env, scope, array->initializer_list[i], inf);
         if (!type_id_eq(type, expr)) {
             char const* typestr =
                 typestore_type_id_to_str(tc->ts, tc->tempalloc, type);
@@ -935,8 +1196,54 @@ static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
     });
 }
 
+static type_id_t typecheck_node_ptr(typechecker_t* tc, env_t* env,
+                                    scope_t* scope, node_t* node,
+                                    inference_t inf) {
+    (void)inf;
+
+    type_id_t type = tc->ts->primitives.type;
+    type_id_t ty =
+        typecheck_node(tc, env, scope, node->as.ptr.child, infer_with(type));
+    if (!type_id_eq(ty, type)) {
+        char const* exprstr =
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, ty);
+        report_error(tc->er, node->span, "expected type for pointer, found %s",
+                     exprstr);
+        report_note(tc->er, node->as.ptr.child->span, "expression has type %s",
+                    exprstr);
+    }
+
+    return type;
+}
+
+static type_id_t typecheck_node_mptr(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node,
+                                     inference_t inf) {
+    (void)inf;
+
+    if (node->as.mptr.term) {
+        report_error(
+            tc->er, node->span,
+            "multi-pointers with terminators have not been implemented");
+    }
+
+    type_id_t type = tc->ts->primitives.type;
+    type_id_t ty =
+        typecheck_node(tc, env, scope, node->as.mptr.child, infer_with(type));
+    if (!type_id_eq(ty, type)) {
+        char const* exprstr =
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, ty);
+        report_error(tc->er, node->span,
+                     "expected type for multi-pointer, found %s", exprstr);
+        report_note(tc->er, node->as.mptr.child->span, "expression has type %s",
+                    exprstr);
+    }
+
+    return type;
+}
+
 static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
-                                node_t* node) {
+                                node_t* node, inference_t inf) {
     munit_assert_not_null(node);
 
     type_id_t err = tc->ts->primitives.err;
@@ -949,69 +1256,88 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_INT: result = tc->ts->primitives.i32; break;
         case NODE_FLOAT: result = tc->ts->primitives.f64; break;
-        case NODE_STR: result = tc->ts->primitives.err; break;
+        case NODE_STR: result = tc->ts->primitives.str; break;
         case NODE_IDENT:
             result = typecheck_node_ident(tc, env, scope, node);
             break;
+        case NODE_KW: result = typecheck_node_kw(tc, env, scope, node); break;
         case NODE_BINOP:
-            result = typecheck_node_binop(tc, env, scope, node);
+            result = typecheck_node_binop(tc, env, scope, node, inf);
             break;
         case NODE_UNOP:
-            result = typecheck_node_unop(tc, env, scope, node);
+            result = typecheck_node_unop(tc, env, scope, node, inf);
             break;
         case NODE_LOGIC:
-            result = typecheck_node_logic(tc, env, scope, node);
+            result = typecheck_node_logic(tc, env, scope, node, inf);
             break;
         case NODE_COMP:
-            result = typecheck_node_comp(tc, env, scope, node);
+            result = typecheck_node_comp(tc, env, scope, node, inf);
             break;
         case NODE_CALL:
-            result = typecheck_node_call(tc, env, scope, node);
+            result = typecheck_node_call(tc, env, scope, node, inf);
             break;
-        case NODE_REF: result = typecheck_node_ref(tc, env, scope, node); break;
+        case NODE_REF:
+            result = typecheck_node_ref(tc, env, scope, node, inf);
+            break;
         case NODE_DEREF:
-            result = typecheck_node_deref(tc, env, scope, node);
+            result = typecheck_node_deref(tc, env, scope, node, inf);
             break;
         case NODE_CAST:
-            result = typecheck_node_cast(tc, env, scope, node);
+            result = typecheck_node_cast(tc, env, scope, node, inf);
             break;
         case NODE_INDEX:
-            result = typecheck_node_index(tc, env, scope, node);
+            result = typecheck_node_index(tc, env, scope, node, inf);
             break;
         case NODE_STMT_EXPR:
-            result = typecheck_node_stmt_expr(tc, env, scope, node);
+            result = typecheck_node_stmt_expr(tc, env, scope, node, inf);
             break;
         case NODE_STMT_RET:
-            result = typecheck_node_stmt_ret(tc, env, scope, node);
+            result = typecheck_node_stmt_ret(tc, env, scope, node, inf);
             break;
         case NODE_STMT_BREAK:
-            result = typecheck_node_stmt_break(tc, env, scope, node);
+            result = typecheck_node_stmt_break(tc, env, scope, node, inf);
             break;
         case NODE_STMT_IF:
-            result = typecheck_node_stmt_if(tc, env, scope, node);
+            result = typecheck_node_stmt_if(tc, env, scope, node, inf);
             break;
         case NODE_STMT_WHILE:
-            result = typecheck_node_stmt_while(tc, env, scope, node);
+            result = typecheck_node_stmt_while(tc, env, scope, node, inf);
             break;
         case NODE_STMT_BLK:
-            result = typecheck_node_stmt_blk(tc, env, scope, node);
+            result = typecheck_node_stmt_blk(tc, env, scope, node, inf);
             break;
-        case NODE_MOD: result = typecheck_node_mod(tc, env, scope, node); break;
+        case NODE_MOD:
+            result = typecheck_node_mod(tc, env, scope, node, inf);
+            break;
         case NODE_DECL:
-            result = typecheck_node_decl(tc, env, scope, node);
+            result = typecheck_node_decl(tc, env, scope, node, inf);
             break;
         case NODE_ASSIGN:
-            result = typecheck_node_assign(tc, env, scope, node);
+            result = typecheck_node_assign(tc, env, scope, node, inf);
             break;
         case NODE_ARG: break;
-        case NODE_PROC:
-            result = typecheck_node_proc(tc, env, scope, node, 0);
+        case NODE_PROC: {
+            typecheck_node_proc_opt_t opts = 0;
+            if (env->in_type_context) opts |= TC_NODE_PROC_OPT_ALLOW_NO_BODY;
+
+            result = typecheck_node_proc(tc, env, scope, node, inf, opts);
+        } break;
+        case NODE_RECORD:
+            result = typecheck_node_record(tc, env, scope, node, inf);
+            break;
+        case NODE_CINITF: break;
+        case NODE_CINIT:
+            result = typecheck_node_cinit(tc, env, scope, node, inf);
             break;
         case NODE_ARRAY:
-            result = typecheck_node_array(tc, env, scope, node);
+            result = typecheck_node_array(tc, env, scope, node, inf);
             break;
-        case NODE_PTR: break;
-        case NODE_MPTR: break;
+        case NODE_PTR:
+            result = typecheck_node_ptr(tc, env, scope, node, inf);
+            break;
+        case NODE_MPTR:
+            result = typecheck_node_mptr(tc, env, scope, node, inf);
+            break;
     }
 
     node->type_id = result;
@@ -1031,39 +1357,9 @@ void pass_typecheck(typecheck_params_t const* params) {
     Arena       temp_arena = {0};
     allocator_init_arena(&temp_alloc, &temp_arena);
 
-    typename_table_t tnt = {
-        .entries = da_init_typename_table_entry(temp_alloc),
-    };
-
-    tnt.entries = da_append_typename_table_entry(
-        tnt.entries, temp_alloc,
-        &(typename_table_entry_t){.name = "i8",
-                                  .type = params->ts->primitives.i8});
-    tnt.entries = da_append_typename_table_entry(
-        tnt.entries, temp_alloc,
-        &(typename_table_entry_t){.name = "i32",
-                                  .type = params->ts->primitives.i32});
-    tnt.entries = da_append_typename_table_entry(
-        tnt.entries, temp_alloc,
-        &(typename_table_entry_t){.name = "void",
-                                  .type = params->ts->primitives.void_});
-    tnt.entries = da_append_typename_table_entry(
-        tnt.entries, temp_alloc,
-        &(typename_table_entry_t){.name = "f32",
-                                  .type = params->ts->primitives.f32});
-    tnt.entries = da_append_typename_table_entry(
-        tnt.entries, temp_alloc,
-        &(typename_table_entry_t){.name = "f64",
-                                  .type = params->ts->primitives.f64});
-    tnt.entries = da_append_typename_table_entry(
-        tnt.entries, temp_alloc,
-        &(typename_table_entry_t){.name = "bool",
-                                  .type = params->ts->primitives.bool_});
-
     typechecker_t tc = {
         .er = params->er,
         .ts = params->ts,
-        .tnt = &tnt,
         .tempalloc = temp_alloc,
         .alloc = params->alloc,
     };
@@ -1078,7 +1374,32 @@ void pass_typecheck(typecheck_params_t const* params) {
     scope_add(&root_scope, tc.tempalloc, "false",
               &(value_t){.type = tc.ts->primitives.bool_});
 
-    typecheck_node(&tc, &root_env, &root_scope, params->ast);
+    {
+        type_id_t type_ = tc.ts->primitives.type;
+        scope_add(
+            &root_scope, tc.tempalloc, "i32",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.i32});
+        scope_add(
+            &root_scope, tc.tempalloc, "i8",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.i8});
+        scope_add(
+            &root_scope, tc.tempalloc, "f32",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.f32});
+        scope_add(
+            &root_scope, tc.tempalloc, "f64",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.f64});
+        scope_add(
+            &root_scope, tc.tempalloc, "bool",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.bool_});
+        scope_add(
+            &root_scope, tc.tempalloc, "void",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.void_});
+    }
+
+    scope_t scope;
+    scope_init(&scope, tc.tempalloc, &root_scope, false);
+    typecheck_node(&tc, &root_env, &scope, params->ast,
+                   infer_with(tc.ts->primitives.err));
 
     arena_free(&temp_arena);
 }

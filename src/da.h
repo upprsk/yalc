@@ -77,6 +77,7 @@ bool da_pop_opt(void* arr, void* value);
     }
 
 da_declare(char, char);
+da_declare(size_t, size);
 
 #if 0
 

@@ -168,9 +168,17 @@ static void tokenize_ident(tokenizer_t* t) {
         append_token(t, TT_WHILE);
     } else if (strnneq(ident, len, "as", 2)) {
         append_token(t, TT_AS);
+    } else if (strnneq(ident, len, "record", 6)) {
+        append_token(t, TT_RECORD);
     } else {
         append_token(t, TT_IDENT);
     }
+}
+
+static void tokenize_kw(tokenizer_t* t) {
+    while (is_digit(peek(t)) || is_alpha(peek(t))) advance(t);
+
+    append_token(t, TT_KW);
 }
 
 static void tokenize_one(tokenizer_t* t) {
@@ -194,8 +202,12 @@ static void tokenize_one(tokenizer_t* t) {
         case '.':
             if (match(t, '('))
                 append_token(t, TT_DOT_LPAREN);
+            else if (match(t, '{'))
+                append_token(t, TT_DOT_LBRACE);
             else if (match(t, '*'))
                 append_token(t, TT_DOT_STAR);
+            else if (is_alpha(peek(t)))
+                tokenize_kw(t);
             else
                 append_token(t, TT_DOT);
             break;

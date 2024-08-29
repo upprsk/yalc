@@ -148,6 +148,7 @@ static inline int get_precedence(token_type_t tt) {
 
 typedef enum stmt_opt {
     STMT_OPT_IS_MODULE = 1 << 0,
+    STMT_OPT_IS_RECORD = 2 << 0,
 } stmt_opt_t;
 
 static node_t* parse_prefix(parser_t* p);
@@ -335,7 +336,19 @@ static node_t* parse_ident(parser_t* p, token_t tok) {
     return n;
 }
 
-static node_t* parse_block(parser_t* p) {
+static node_t* parse_kw(parser_t* p, token_t tok) {
+    // FIXME: allocating the string in the same pool as the nodes
+    span_t      span = {.start = tok.span.start + 1, .end = tok.span.end};
+    char const* ident =
+        span_dupe_str(span, p->source, p->source_len, p->node_alloc);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){.type = NODE_KW, .as.kw = {.ident = ident}, .span = tok.span};
+
+    return n;
+}
+
+static node_t* parse_block(parser_t* p, stmt_opt_t stmt_opt) {
     token_t open_tok = peek(p);
     consume(p, TT_LBRACE);
 
@@ -345,7 +358,7 @@ static node_t* parse_block(parser_t* p) {
                   .span.start = open_tok.span.start};
 
     while (peek(p).type != TT_EOF && peek(p).type != TT_RBRACE) {
-        node_t* stmt = parse_stmt(p, 0);
+        node_t* stmt = parse_stmt(p, stmt_opt);
         n->as.stmt_blk.stmts =
             da_append_node(n->as.stmt_blk.stmts, p->node_alloc, &stmt);
     }
@@ -396,7 +409,7 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
         return_type = parse_expr(p, 0);
     }
     node_t* body = NULL;
-    if (peek(p).type == TT_LBRACE) body = parse_block(p);
+    if (peek(p).type == TT_LBRACE) body = parse_block(p, 0);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
@@ -406,6 +419,59 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
         .span.end = body          ? body->span.end
                     : return_type ? return_type->span.end
                                   : rparen.span.end,
+    };
+
+    return n;
+}
+
+static node_t* parse_record(parser_t* p, token_t tok) {
+    node_t* blk = parse_block(p, STMT_OPT_IS_RECORD);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_RECORD,
+        .as.record = {.blk = blk},
+        .span.start = tok.span.start,
+        .span.end = blk->span.end,
+    };
+
+    return n;
+}
+
+static node_t* parse_cinit(parser_t* p, token_t tok) {
+    node_t** kids = da_init_node(p->node_alloc);
+
+    while (peek(p).type != TT_RBRACE) {
+        node_t* expr = parse_expr(p, 0);
+
+        if (match(p, TT_EQUAL)) {
+            node_t* init = parse_expr(p, 0);
+
+            node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+            *n = (node_t){
+                .type = NODE_CINITF,
+                .as.cinitf = {.name = expr, .init = init},
+                .span.start = expr->span.start,
+                .span.end = init->span.end,
+            };
+
+            expr = n;
+        }
+
+        kids = da_append_node(kids, p->node_alloc, &expr);
+
+        if (!match(p, TT_COMMA)) break;
+    }
+
+    token_t endt = peek(p);
+    consume(p, TT_RBRACE);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_CINIT,
+        .as.cinit = {.kids = kids},
+        .span.start = tok.span.start,
+        .span.end = endt.span.end,
     };
 
     return n;
@@ -549,7 +615,10 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_MINUS: return parse_unary(p, tok);
         case TT_LPAREN: return parse_grouping(p);
         case TT_IDENT: return parse_ident(p, tok);
+        case TT_KW: return parse_kw(p, tok);
         case TT_DOT_LPAREN: return parse_proc(p, tok);
+        case TT_RECORD: return parse_record(p, tok);
+        case TT_DOT_LBRACE: return parse_cinit(p, tok);
         case TT_STAR: return parse_pointer(p, tok);
         case TT_LBRACKET: return parse_mptr_or_slice(p, tok);
         case TT_AMPERSAND: return parse_ref(p, tok);
@@ -651,7 +720,7 @@ static node_t* parse_decl(parser_t* p, token_t tok, decl_opt_t opt,
 
 static node_t* parse_stmt_if(parser_t* p, token_t tok) {
     node_t* condition = parse_expr(p, 0);
-    node_t* when_true = parse_block(p);
+    node_t* when_true = parse_block(p, 0);
     node_t* when_false = NULL;
 
     if (match(p, TT_ELSE)) {
@@ -659,7 +728,7 @@ static node_t* parse_stmt_if(parser_t* p, token_t tok) {
         if (match(p, TT_IF)) {
             when_false = parse_stmt_if(p, if_tok);
         } else {
-            when_false = parse_block(p);
+            when_false = parse_block(p, 0);
         }
     }
 
@@ -679,7 +748,7 @@ static node_t* parse_stmt_if(parser_t* p, token_t tok) {
 
 static node_t* parse_stmt_while(parser_t* p, token_t tok) {
     node_t* condition = parse_expr(p, 0);
-    node_t* body = parse_block(p);
+    node_t* body = parse_block(p, 0);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){

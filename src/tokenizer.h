@@ -14,6 +14,7 @@ typedef enum token_type : uint8_t {
     TT_FLOAT,
     TT_STR,
     TT_IDENT,
+    TT_KW,
 
     TT_DOT,        // .
     TT_COMMA,      // ,
@@ -42,6 +43,7 @@ typedef enum token_type : uint8_t {
     TT_RBRACE,    // {
 
     TT_DOT_LPAREN,  // .(
+    TT_DOT_LBRACE,  // .{
     TT_DOT_STAR,    // .*
     TT_ARROW,       // ->
 
@@ -54,6 +56,7 @@ typedef enum token_type : uint8_t {
     TT_OR,      // or
     TT_WHILE,   // while
     TT_AS,      // as
+    TT_RECORD,  // record
 
     TT_EOF = 0xFF,
 } token_type_t;
@@ -65,6 +68,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_FLOAT: return "TT_FLOAT";
         case TT_STR: return "TT_STR";
         case TT_IDENT: return "TT_IDENT";
+        case TT_KW: return "TT_KW";
         case TT_DOT: return "TT_DOT";
         case TT_COMMA: return "TT_COMMA";
         case TT_COLON: return "TT_COLON";
@@ -89,6 +93,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_LBRACE: return "TT_LBRACE";
         case TT_RBRACE: return "TT_RBRACE";
         case TT_DOT_LPAREN: return "TT_DOT_LPAREN";
+        case TT_DOT_LBRACE: return "TT_DOT_LBRACE";
         case TT_DOT_STAR: return "TT_DOT_STAR";
         case TT_ARROW: return "TT_ARROW";
         case TT_RETURN: return "TT_RETURN";
@@ -100,6 +105,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_OR: return "TT_OR";
         case TT_WHILE: return "TT_WHILE";
         case TT_AS: return "TT_AS";
+        case TT_RECORD: return "TT_RECORD";
         case TT_EOF: return "TT_EOF";
     }
 

@@ -33,6 +33,7 @@ void dump_node(FILE* f, node_t* node, int indent) {
         case NODE_IDENT:
             fprintf(f, "IDENT '%s'\n", node->as.ident.ident);
             break;
+        case NODE_KW: fprintf(f, "KW %s\n", node->as.kw.ident); break;
         case NODE_BINOP:
             fprintf(f, "BINOP %s\n", binop_to_str(node->as.binop.type));
             dump_node(f, node->as.binop.left, indent + 1);
@@ -142,6 +143,23 @@ void dump_node(FILE* f, node_t* node, int indent) {
 
             dump_node(f, node->as.proc.return_type, indent + 1);
             dump_node(f, node->as.proc.body, indent + 1);
+        } break;
+        case NODE_RECORD:
+            fprintf(f, "RECORD\n");
+            dump_node(f, node->as.record.blk, indent + 1);
+            break;
+        case NODE_CINITF:
+            fprintf(f, "CINITF\n");
+            dump_node(f, node->as.cinitf.name, indent + 1);
+            dump_node(f, node->as.cinitf.init, indent + 1);
+            break;
+        case NODE_CINIT: {
+            fprintf(f, "CINIT\n");
+
+            uint32_t size = da_get_size(node->as.cinit.kids);
+            for (uint32_t i = 0; i < size; ++i) {
+                dump_node(f, node->as.cinit.kids[i], indent + 1);
+            }
         } break;
         case NODE_ARRAY: {
             fprintf(f, "ARRAY\n");

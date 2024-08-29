@@ -30,6 +30,11 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
         ts, &(type_t){.tag = TYPE_FLOAT, .as.float_ = {.bits = 32}});
     ts->primitives.f64 = typestore_add_type(
         ts, &(type_t){.tag = TYPE_FLOAT, .as.float_ = {.bits = 64}});
+
+    // TODO: Make an actual string type
+    ts->primitives.str = typestore_add_type(
+        ts,
+        &(type_t){.tag = TYPE_MPTR, .as.mptr = {.inner = ts->primitives.i8}});
 }
 
 void typestore_deinit(typestore_t* ts) {
@@ -147,6 +152,46 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
             da_free(b, alloc);
 
             return buf;
+        }
+        case TYPE_RECORD: {
+            char* b = da_init_char(alloc);
+            b = da_extend_char(b, alloc, "record {", 8);
+
+            size_t count = da_get_size(type->as.record.fields);
+            munit_assert_size(count, <, 255);  // arbitrary limit
+            for (size_t i = 0; i < count; i++) {
+                b = da_extend_char(b, alloc, type->as.record.fields[i].name,
+                                   strlen(type->as.record.fields[i].name));
+                b = da_extend_char(b, alloc, ": ", 2);
+
+                char const* fieldtype = typestore_type_id_to_str(
+                    ts, alloc, type->as.record.fields[i].type);
+                b = da_extend_char(b, alloc, fieldtype, strlen(fieldtype));
+                allocator_free(alloc, fieldtype);
+
+                b = da_extend_char(b, alloc, ", ", 2);
+                if (i > 10) {
+                    b = da_extend_char(b, alloc, "\n", 1);
+                    printf("\n%s\n", b);
+                    munit_assert(false);
+                }
+            }
+
+            b = da_extend_char(b, alloc, "}", 1);
+
+            char zero = 0;
+            b = da_append_char(b, alloc, &zero);
+
+            size_t size = da_get_size(b);
+            char*  buf = allocator_alloc(alloc, size);
+            memcpy(buf, b, size);
+
+            da_free(b, alloc);
+
+            return buf;
+        }
+        case TYPE_KW: {
+            return allocator_sprintf(alloc, ".%s", type->as.kw.ident);
         }
     }
 

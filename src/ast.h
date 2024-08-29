@@ -27,6 +27,10 @@ typedef struct node_ident {
     char const* ident;
 } node_ident_t;
 
+typedef struct node_kw {
+    char const* ident;
+} node_kw_t;
+
 typedef enum binop_type {
     BINOP_ADD,
     BINOP_SUB,
@@ -212,6 +216,19 @@ typedef struct node_proc {
     bool uses_implicit_return;
 } node_proc_t;
 
+typedef struct node_record {
+    node_t* blk;
+} node_record_t;
+
+typedef struct node_cinitf {
+    node_t* name;
+    node_t* init;
+} node_cinitf_t;
+
+typedef struct node_cinit {
+    node_t** kids;
+} node_cinit_t;
+
 typedef struct node_array {
     node_t*  len;
     node_t*  type;
@@ -234,6 +251,7 @@ typedef enum node_type : uint8_t {
     NODE_FLOAT,
     NODE_STR,
     NODE_IDENT,
+    NODE_KW,
 
     NODE_BINOP,
     NODE_UNOP,
@@ -258,6 +276,9 @@ typedef enum node_type : uint8_t {
 
     NODE_ARG,
     NODE_PROC,
+    NODE_RECORD,
+    NODE_CINITF,
+    NODE_CINIT,
     NODE_ARRAY,
     NODE_PTR,
     NODE_MPTR,
@@ -270,6 +291,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_FLOAT: return "NODE_FLOAT";
         case NODE_STR: return "NODE_STR";
         case NODE_IDENT: return "NODE_IDENT";
+        case NODE_KW: return "NODE_KW";
         case NODE_BINOP: return "NODE_BINOP";
         case NODE_UNOP: return "NODE_UNOP";
         case NODE_LOGIC: return "NODE_LOGIC";
@@ -290,6 +312,9 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_ASSIGN: return "NODE_ASSIGN";
         case NODE_ARG: return "NODE_ARG";
         case NODE_PROC: return "NODE_PROC";
+        case NODE_RECORD: return "NODE_RECORD";
+        case NODE_CINITF: return "NODE_CINITF";
+        case NODE_CINIT: return "NODE_CINIT";
         case NODE_ARRAY: return "NODE_ARRAY";
         case NODE_PTR: return "NODE_PTR";
         case NODE_MPTR: return "NODE_MPTR";
@@ -307,6 +332,7 @@ struct node {
         node_float_t       float_;
         node_str_t         str;
         node_ident_t       ident;
+        node_kw_t          kw;
         node_binop_t       binop;
         node_unop_t        unop;
         node_logic_t       logic;
@@ -327,6 +353,9 @@ struct node {
         node_assign_t      assign;
         node_arg_t         arg;
         node_proc_t        proc;
+        node_record_t      record;
+        node_cinitf_t      cinitf;
+        node_cinit_t       cinit;
         node_array_t       array;
         node_ptr_t         ptr;
         node_mptr_t        mptr;
