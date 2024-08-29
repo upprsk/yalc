@@ -130,7 +130,8 @@ void vreport_warn_opt(error_reporter_t* er, char const* filename,
 
     munit_assert_uint32(line_end, >=, line_start);
 
-    show_message(er, ANSI_YELLOW, "warning", filename, line, line_col, format, va);
+    show_message(er, ANSI_YELLOW, "warning", filename, line, line_col, format,
+                 va);
     show_span(er, ANSI_YELLOW, source, span, line, line_start, line_end,
               line_col);
 }
@@ -160,6 +161,36 @@ void vreport_note_opt(error_reporter_t* er, char const* filename,
     munit_assert_uint32(line_end, >=, line_start);
     show_message(er, ANSI_CYAN, "note", filename, line, line_col, format, va);
     show_span(er, ANSI_CYAN, source, span, line, line_start, line_end,
+              line_col);
+}
+
+void report_success_opt(error_reporter_t* er, char const* filename,
+                        char const* source, span_t span, char const* format,
+                        ...) {
+    va_list va;
+    va_start(va, format);
+
+    vreport_success_opt(er, filename, source, span, format, va);
+
+    va_end(va);
+}
+
+void vreport_success_opt(error_reporter_t* er, char const* filename,
+                         char const* source, span_t span, char const* format,
+                         va_list va) {
+    munit_assert_not_null(er);
+    munit_assert_not_null(filename);
+    munit_assert_not_null(source);
+
+    uint32_t line = count_lines(source, span);
+    uint32_t line_start = find_line_start(source, span);
+    uint32_t line_end = find_line_end(source, span);
+    uint32_t line_col = count_line_cols(line_start, span);
+
+    munit_assert_uint32(line_end, >=, line_start);
+    show_message(er, ANSI_GREEN, "success", filename, line, line_col, format,
+                 va);
+    show_span(er, ANSI_GREEN, source, span, line, line_start, line_end,
               line_col);
 }
 
@@ -197,4 +228,17 @@ void report_note(error_reporter_t* er, span_t span, char const* format, ...) {
 void vreport_note(error_reporter_t* er, span_t span, char const* format,
                   va_list va) {
     vreport_note_opt(er, er->filename, er->source, span, format, va);
+}
+
+void report_success(error_reporter_t* er, span_t span, char const* format,
+                    ...) {
+    va_list va;
+    va_start(va, format);
+    vreport_success(er, span, format, va);
+    va_end(va);
+}
+
+void vreport_success(error_reporter_t* er, span_t span, char const* format,
+                     va_list va) {
+    vreport_success_opt(er, er->filename, er->source, span, format, va);
 }
