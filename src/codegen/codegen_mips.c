@@ -507,8 +507,12 @@ static void codegen_mod(codegen_state_t* cs, node_t* node) {
         munit_assert_uint8(n->type, ==, NODE_DECL);
         munit_assert_not_null(n->as.decl.init);
 
-        char const* typestr = typestore_type_id_to_str(
-            cs->ts, cs->temp_alloc, n->as.decl.init->type_id);
+        type_t const* type =
+            typestore_find_type(cs->ts, n->as.decl.init->type_id);
+        if (type->tag == TYPE_TYPE) continue;
+
+        char const* typestr =
+            typestore_type_to_str(cs->ts, cs->temp_alloc, type);
         fprintf(cs->out,
                 "# name: %s\n"
                 "# type: %s\n",
