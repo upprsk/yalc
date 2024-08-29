@@ -10,9 +10,11 @@
 #define ANSI_ESC "\033["
 #define ANSI_END "m"
 
-#define ANSI_RED   ANSI_ESC "31" ANSI_END
-#define ANSI_CYAN  ANSI_ESC "36" ANSI_END
-#define ANSI_RESET ANSI_ESC "0" ANSI_END
+#define ANSI_RED    ANSI_ESC "31" ANSI_END
+#define ANSI_GREEN  ANSI_ESC "32" ANSI_END
+#define ANSI_YELLOW ANSI_ESC "33" ANSI_END
+#define ANSI_CYAN   ANSI_ESC "36" ANSI_END
+#define ANSI_RESET  ANSI_ESC "0" ANSI_END
 
 static uint32_t find_line_start(char const* source, span_t span) {
     uint32_t i = span.start;
@@ -108,6 +110,31 @@ void vreport_error_opt(error_reporter_t* er, char const* filename,
     show_span(er, ANSI_RED, source, span, line, line_start, line_end, line_col);
 }
 
+void report_warn_opt(error_reporter_t* er, char const* filename,
+                     char const* source, span_t span, char const* format, ...) {
+    va_list va;
+    va_start(va, format);
+    vreport_warn_opt(er, filename, source, span, format, va);
+    va_end(va);
+}
+
+void vreport_warn_opt(error_reporter_t* er, char const* filename,
+                      char const* source, span_t span, char const* format,
+                      va_list va) {
+    er->error_count++;
+
+    uint32_t line = count_lines(source, span);
+    uint32_t line_start = find_line_start(source, span);
+    uint32_t line_end = find_line_end(source, span);
+    uint32_t line_col = count_line_cols(line_start, span);
+
+    munit_assert_uint32(line_end, >=, line_start);
+
+    show_message(er, ANSI_YELLOW, "warning", filename, line, line_col, format, va);
+    show_span(er, ANSI_YELLOW, source, span, line, line_start, line_end,
+              line_col);
+}
+
 void report_note_opt(error_reporter_t* er, char const* filename,
                      char const* source, span_t span, char const* format, ...) {
     va_list va;
@@ -146,6 +173,18 @@ void report_error(error_reporter_t* er, span_t span, char const* format, ...) {
 void vreport_error(error_reporter_t* er, span_t span, char const* format,
                    va_list va) {
     vreport_error_opt(er, er->filename, er->source, span, format, va);
+}
+
+void report_warn(error_reporter_t* er, span_t span, char const* format, ...) {
+    va_list va;
+    va_start(va, format);
+    vreport_warn(er, span, format, va);
+    va_end(va);
+}
+
+void vreport_warn(error_reporter_t* er, span_t span, char const* format,
+                  va_list va) {
+    vreport_warn_opt(er, er->filename, er->source, span, format, va);
 }
 
 void report_note(error_reporter_t* er, span_t span, char const* format, ...) {

@@ -21,6 +21,12 @@ void vreport_error_opt(error_reporter_t* er, char const* filename,
                        char const* source, span_t span, char const* format,
                        va_list va);
 
+void report_warn_opt(error_reporter_t* er, char const* filename,
+                     char const* source, span_t span, char const* format, ...);
+void vreport_warn_opt(error_reporter_t* er, char const* filename,
+                      char const* source, span_t span, char const* format,
+                      va_list va);
+
 void report_note_opt(error_reporter_t* er, char const* filename,
                      char const* source, span_t span, char const* format, ...);
 void vreport_note_opt(error_reporter_t* er, char const* filename,
@@ -29,6 +35,10 @@ void vreport_note_opt(error_reporter_t* er, char const* filename,
 
 void report_error(error_reporter_t* er, span_t span, char const* format, ...);
 void vreport_error(error_reporter_t* er, span_t span, char const* format,
+                   va_list va);
+
+void report_warn(error_reporter_t* er, span_t span, char const* format, ...);
+void vreport_warn(error_reporter_t* er, span_t span, char const* format,
                    va_list va);
 
 void report_note(error_reporter_t* er, span_t span, char const* format, ...);
