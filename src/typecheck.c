@@ -933,7 +933,8 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
     bool lhs_is_lvalue = false;
     switch (lhs_node->type) {
         case NODE_DEREF:
-        case NODE_IDENT: lhs_is_lvalue = true; break;
+        case NODE_IDENT:
+        case NODE_FIELD: lhs_is_lvalue = true; break;
         default: break;
     }
 
@@ -1154,6 +1155,47 @@ static type_id_t typecheck_node_cinit(typechecker_t* tc, env_t* env,
     return inf.expression_expected;
 }
 
+static type_id_t typecheck_node_field(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
+    type_id_t receiver =
+        typecheck_node(tc, env, scope, node->as.field.receiver, inf);
+
+    type_t const* receiver_type = typestore_find_type(tc->ts, receiver);
+    if (receiver_type->tag != TYPE_RECORD) {
+        if (receiver_type->tag != TYPE_PTR) {
+            report_error(
+                tc->er, node->span, "can't access field of non-record type %s",
+                typestore_type_to_str(tc->ts, tc->tempalloc, receiver_type));
+
+            return tc->ts->primitives.err;
+        }
+
+        type_t const* inner_type =
+            typestore_find_type(tc->ts, receiver_type->as.ptr.inner);
+        if (inner_type->tag != TYPE_RECORD) {
+            report_error(
+                tc->er, node->span, "can't access field of non-record type %s",
+                typestore_type_to_str(tc->ts, tc->tempalloc, receiver_type));
+
+            return tc->ts->primitives.err;
+        }
+
+        receiver_type = inner_type;
+    }
+
+    record_field_t const* field = type_record_find_field(
+        &receiver_type->as.record, node->as.field.field, NULL);
+    if (field == NULL) {
+        report_error(tc->er, node->span, "undefined field %s",
+                     node->as.field.field);
+
+        return tc->ts->primitives.err;
+    }
+
+    return field->type;
+}
+
 static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
                                       scope_t* scope, node_t* node,
                                       inference_t inf) {
@@ -1328,6 +1370,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_CINITF: break;
         case NODE_CINIT:
             result = typecheck_node_cinit(tc, env, scope, node, inf);
+            break;
+        case NODE_FIELD:
+            result = typecheck_node_field(tc, env, scope, node, inf);
             break;
         case NODE_ARRAY:
             result = typecheck_node_array(tc, env, scope, node, inf);

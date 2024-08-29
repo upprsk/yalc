@@ -229,6 +229,11 @@ typedef struct node_cinit {
     node_t** kids;
 } node_cinit_t;
 
+typedef struct node_field {
+    node_t*     receiver;
+    char const* field;
+} node_field_t;
+
 typedef struct node_array {
     node_t*  len;
     node_t*  type;
@@ -279,6 +284,7 @@ typedef enum node_type : uint8_t {
     NODE_RECORD,
     NODE_CINITF,
     NODE_CINIT,
+    NODE_FIELD,
     NODE_ARRAY,
     NODE_PTR,
     NODE_MPTR,
@@ -315,6 +321,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_RECORD: return "NODE_RECORD";
         case NODE_CINITF: return "NODE_CINITF";
         case NODE_CINIT: return "NODE_CINIT";
+        case NODE_FIELD: return "NODE_FIELD";
         case NODE_ARRAY: return "NODE_ARRAY";
         case NODE_PTR: return "NODE_PTR";
         case NODE_MPTR: return "NODE_MPTR";
@@ -356,6 +363,7 @@ struct node {
         node_record_t      record;
         node_cinitf_t      cinitf;
         node_cinit_t       cinit;
+        node_field_t       field;
         node_array_t       array;
         node_ptr_t         ptr;
         node_mptr_t        mptr;

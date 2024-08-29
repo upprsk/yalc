@@ -309,6 +309,9 @@ static void check_node(state_t* s, node_t* node) {
                 check_node(s, node->as.cinit.kids[i]);
             }
         } break;
+        case NODE_FIELD: {
+            check_node(s, node->as.field.receiver);
+        } break;
         case NODE_ARRAY: {
             check_node(s, node->as.array.len);
             check_node(s, node->as.array.type);

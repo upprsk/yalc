@@ -161,6 +161,10 @@ void dump_node(FILE* f, node_t* node, int indent) {
                 dump_node(f, node->as.cinit.kids[i], indent + 1);
             }
         } break;
+        case NODE_FIELD:
+            fprintf(f, "FIELD .%s\n", node->as.field.field);
+            dump_node(f, node->as.field.receiver, indent + 1);
+            break;
         case NODE_ARRAY: {
             fprintf(f, "ARRAY\n");
             dump_node(f, node->as.array.len, indent + 1);

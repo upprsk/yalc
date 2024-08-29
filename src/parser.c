@@ -141,6 +141,7 @@ static inline int get_precedence(token_type_t tt) {
         case TT_AS: return 45;
         case TT_LPAREN:
         case TT_DOT_STAR: return 50;
+        case TT_KW: return 55;
         case TT_LBRACKET: return 60;
         default: return 0;
     }
@@ -606,6 +607,23 @@ static node_t* parse_deref(parser_t* p, node_t* lhs, token_t tok) {
     return n;
 }
 
+static node_t* parse_field(parser_t* p, node_t* lhs, token_t tok) {
+    // FIXME: allocating the string in the same pool as the nodes
+    span_t      span = {.start = tok.span.start + 1, .end = tok.span.end};
+    char const* field =
+        span_dupe_str(span, p->source, p->source_len, p->node_alloc);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_FIELD,
+        .as.field = {.receiver = lhs, .field = field},
+        .span.start = lhs->span.start,
+        .span.end = tok.span.end,
+    };
+
+    return n;
+}
+
 static node_t* parse_prefix(parser_t* p) {
     token_t tok = next(p);
     switch (tok.type) {
@@ -655,6 +673,7 @@ static node_t* parse_infix(parser_t* p, node_t* lhs) {
         case TT_LARGER_EQUAL: return parse_comp(p, lhs, tok);
         case TT_AS: return parse_cast(p, lhs, tok);
         case TT_LBRACKET: return parse_index(p, lhs, tok);
+        case TT_KW: return parse_field(p, lhs, tok);
         default: break;
     }
 
@@ -761,6 +780,8 @@ static node_t* parse_stmt_while(parser_t* p, token_t tok) {
 }
 
 static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
+    (void)opt;
+
     token_t stmt_start_tok = peek(p);
 
     if (match(p, TT_RETURN)) {

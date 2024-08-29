@@ -9,14 +9,16 @@ new_counter := .(end: i32) -> Counter {
 };
 
 tick := .(c: *Counter) -> bool {
+    c.count = c.count + 1;
+    return c.count < c.end;
 };
 
-f := .(x: *i32) {
-    x.* = 12;
+reset := .(c: *Counter) {
+    c.count = c.start;
 };
 
 main := .() {
-    c := new_counter(100);
+    c := new_counter(5);
     while tick(&c) {
         printf("tick...\n");
     }
