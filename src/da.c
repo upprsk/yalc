@@ -81,6 +81,8 @@ void* da_append_opt(void* arr, allocator_t alloc, void const* value) {
 
 void* da_extend_opt(void* arr, allocator_t alloc, void const* value,
                     size_t count) {
+    if (count == 0) return arr;
+
     da_header_t* header = da_get_header(arr);
     munit_assert_not_null(header);
 

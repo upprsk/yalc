@@ -7,6 +7,8 @@
 typedef struct typecheck_params {
     error_reporter_t* er;
 
+    char const* module_name;
+
     node_t*      ast;
     typestore_t* ts;
 

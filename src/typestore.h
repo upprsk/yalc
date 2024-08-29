@@ -94,6 +94,8 @@ typedef struct record_field {
 da_declare(record_field_t, record_field);
 
 typedef struct type_record {
+    char const*     extern_name;
+    char const*     inferred_name;
     record_field_t* fields;
 } type_record_t;
 

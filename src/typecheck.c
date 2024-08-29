@@ -20,6 +20,9 @@ typedef struct typechecker {
 } typechecker_t;
 
 typedef struct env {
+    struct env* parent;
+    char const* name;
+
     type_id_t expected_return;
     type_id_t curr_proc_type;
 
@@ -29,6 +32,52 @@ typedef struct env {
     bool has_broken;
     bool in_type_context;
 } env_t;
+
+static inline char* env_gen_full_name_iter(env_t* env, allocator_t alloc,
+                                           char* buf) {
+    munit_assert_not_null(env);
+
+    size_t len = env->name != NULL ? strlen(env->name) : 0;
+
+    if (env->parent != NULL) {
+        buf = env_gen_full_name_iter(env->parent, alloc, buf);
+
+        if (len) buf = da_extend_char(buf, alloc, "_", 1);
+    }
+
+    buf = da_extend_char(buf, alloc, env->name, len);
+
+    return buf;
+}
+
+static inline char* env_gen_full_name(env_t* env, allocator_t alloc) {
+    char* buf = env_gen_full_name_iter(env, alloc, da_init_char(alloc));
+
+    return da_extend_char(buf, alloc, "\0", 1);
+}
+
+static inline char* env_gen_module_name_iter(env_t* env, allocator_t alloc,
+                                             char* buf) {
+    munit_assert_not_null(env);
+
+    size_t len = env->name != NULL ? strlen(env->name) : 0;
+
+    if (env->parent != NULL) {
+        buf = env_gen_full_name_iter(env->parent, alloc, buf);
+
+        if (len) buf = da_extend_char(buf, alloc, ".", 1);
+    }
+
+    buf = da_extend_char(buf, alloc, env->name, len);
+
+    return buf;
+}
+
+static inline char* env_gen_module_name(env_t* env, allocator_t alloc) {
+    char* buf = env_gen_module_name_iter(env, alloc, da_init_char(alloc));
+
+    return da_extend_char(buf, alloc, "\0", 1);
+}
 
 typedef struct value {
     type_id_t type;
@@ -150,6 +199,8 @@ static value_t const* eval_node_record(typechecker_t* tc, env_t* env,
 
     type_record_t rec_type = {
         .fields = da_init_record_field(tc->alloc),
+        .extern_name = env_gen_full_name(env, tc->alloc),
+        .inferred_name = env_gen_module_name(env, tc->alloc),
     };
 
     scope_t scope;
@@ -850,7 +901,7 @@ static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
     return void_;
 }
 
-static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
+static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* outer_env,
                                      scope_t* scope, node_t* node,
                                      inference_t inf) {
     (void)inf;
@@ -859,18 +910,24 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
     type_id_t    err = tc->ts->primitives.err;
     node_decl_t* decl = &node->as.decl;
 
+    env_t env = *outer_env;
+    env.parent = outer_env;
+    env.name = decl->name;
+
     // FIXME: view other places that talk about extern name as for why this is
     // wrong
-    char const* extern_name = decl->is_extern ? decl->extern_name : decl->name;
+    char const* extern_name = decl->is_extern
+                                  ? decl->extern_name
+                                  : env_gen_full_name(&env, tc->alloc);
 
     type_id_t type_payload = INVALID_TYPEID;
 
     type_id_t type = INVALID_TYPEID;
-    if (decl->type) type = eval_to_type(tc, env, scope, decl->type);
+    if (decl->type) type = eval_to_type(tc, &env, scope, decl->type);
 
     type_id_t init = INVALID_TYPEID;
     if (decl->init) {
-        init = typecheck_node(tc, env, scope, decl->init, infer_with(type));
+        init = typecheck_node(tc, &env, scope, decl->init, infer_with(type));
         if (decl->is_extern) {
             report_error(tc->er, node->span,
                          "extern declarations can't have initializers");
@@ -878,7 +935,7 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* env,
         }
 
         if (type_id_eq(init, tc->ts->primitives.type)) {
-            type_payload = eval_to_type(tc, env, scope, decl->init);
+            type_payload = eval_to_type(tc, &env, scope, decl->init);
         }
     }
 
@@ -1014,7 +1071,8 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
     type_id_t body = INVALID_TYPEID;
 
     if (proc->body) {
-        env_t body_env = {.expected_return = ret,
+        env_t body_env = {.parent = env,
+                          .expected_return = ret,
                           .curr_proc_type = result,
                           .proc_type_span = proc->return_type
                                                 ? proc->return_type->span
@@ -1114,8 +1172,10 @@ static type_id_t typecheck_node_cinit(typechecker_t* tc, env_t* env,
         record_field_t const* field = type_record_find_field(
             &expression_expected->as.record, name_type->as.kw.ident, &idx);
         if (field == NULL) {
-            report_error(tc->er, cinitf->name->span, "unknown field %s",
-                         name_type->as.kw.ident);
+            report_error(tc->er, cinitf->name->span,
+                         "no field named %s in record %s",
+                         name_type->as.kw.ident,
+                         expression_expected->as.record.inferred_name);
             continue;
         }
 
@@ -1187,8 +1247,9 @@ static type_id_t typecheck_node_field(typechecker_t* tc, env_t* env,
     record_field_t const* field = type_record_find_field(
         &receiver_type->as.record, node->as.field.field, NULL);
     if (field == NULL) {
-        report_error(tc->er, node->span, "undefined field %s",
-                     node->as.field.field);
+        report_error(tc->er, node->span, "no field named %s in record %s",
+                     node->as.field.field,
+                     receiver_type->as.record.inferred_name);
 
         return tc->ts->primitives.err;
     }
@@ -1409,7 +1470,8 @@ void pass_typecheck(typecheck_params_t const* params) {
         .alloc = params->alloc,
     };
 
-    env_t root_env = {};
+    munit_assert_not_null(params->module_name);
+    env_t root_env = {.name = params->module_name};
 
     // FIXME: Check if temp_alloc is what we want for this
     scope_t root_scope = {};

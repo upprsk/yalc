@@ -55,6 +55,34 @@ char const* shift_args(int* argc, char*** argv) {
     return data;
 }
 
+static char const* make_sanitized_name(allocator_t alloc, char const* name) {
+    ssize_t len = strlen(name);
+
+    size_t file_start = 0;
+    size_t file_end = len;
+
+    for (ssize_t i = len - 1; i > 0; i--) {
+        if (name[i] == '/') {
+            file_start = i + 1;
+            break;
+        }
+    }
+
+    for (ssize_t i = file_start; i < len; i++) {
+        if (name[i] == '.') {
+            file_end = i;
+            break;
+        }
+    }
+
+    size_t size = file_end - file_start;
+    char*  buf = allocator_alloc(alloc, size + 1);
+    memcpy(buf, name + file_start, size);
+    buf[size] = 0;
+
+    return buf;
+}
+
 typedef enum outopt {
     OUT_NONE,
     OUT_MIPS,
@@ -211,7 +239,11 @@ int main(int argc, char* argv[]) {
     typestore_t ts = {};
     typestore_init(&ts, alloc);
 
+    // FIXME: This should be freed
+    char const* module_name = make_sanitized_name(alloc, filename);
+
     pass_typecheck(&(typecheck_params_t){
+        .module_name = module_name,
         .ast = ast,
         .ts = &ts,
         .alloc = node_alloc,
