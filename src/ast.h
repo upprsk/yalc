@@ -15,7 +15,7 @@ typedef struct node_int {
 } node_int_t;
 
 typedef struct node_float {
-    double value;
+    uint64_t parts[2];
 } node_float_t;
 
 typedef struct node_str {

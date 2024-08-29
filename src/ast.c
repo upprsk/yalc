@@ -25,7 +25,8 @@ void dump_node(FILE* f, node_t* node, int indent) {
         case NODE_ERR: fprintf(f, "ERR\n"); break;
         case NODE_INT: fprintf(f, "INT (%lu)\n", node->as.int_.value); break;
         case NODE_FLOAT:
-            fprintf(f, "FLOAT (%f)\n", node->as.float_.value);
+            fprintf(f, "FLOAT (%lu.%lu)\n", node->as.float_.parts[0],
+                    node->as.float_.parts[1]);
             break;
         case NODE_STR:
             fprintf(f, "STR \"%.*s\"\n", node->as.str.len, node->as.str.str);

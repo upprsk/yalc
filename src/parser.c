@@ -172,6 +172,31 @@ static node_t* parse_int(parser_t* p, token_t tok) {
     return n;
 }
 
+static node_t* parse_float(parser_t* p, token_t tok) {
+    uint32_t    len;
+    char const* str = span_str_parts(tok.span, p->source, p->source_len, &len);
+
+    size_t   j = 0;
+    uint64_t parts[2] = {0, 0};
+    for (size_t i = 0; i < len; ++i) {
+        munit_assert_size(j, <, 2);
+
+        if (str[i] == '.') {
+            ++j;
+            continue;
+        }
+
+        parts[j] = parts[j] * 10 + str[i] - '0';
+    }
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){.type = NODE_FLOAT,
+                  .as.float_ = {.parts = {parts[0], parts[1]}},
+                  .span = tok.span};
+
+    return n;
+}
+
 static node_t* parse_str(parser_t* p, token_t tok) {
     uint32_t    len;
     char const* contents = span_conv_strlit(tok.span, p->source, p->source_len,
@@ -628,6 +653,7 @@ static node_t* parse_prefix(parser_t* p) {
     token_t tok = next(p);
     switch (tok.type) {
         case TT_INT: return parse_int(p, tok);
+        case TT_FLOAT: return parse_float(p, tok);
         case TT_STR: return parse_str(p, tok);
         case TT_BANG:
         case TT_MINUS: return parse_unary(p, tok);
