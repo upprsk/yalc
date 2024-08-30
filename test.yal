@@ -4,7 +4,7 @@ export "main" main := .() -> int {
     c_printf("enter number:\n");
 
     v := 0;
-    _ := c_scanf("%d", v&);
+    _ = c_scanf("%d", v&);
 
     while v > 0 {
         c_printf("[%d] hello!\n", v);

@@ -1234,7 +1234,15 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* outer_env,
 static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
                                        scope_t* scope, node_t* node,
                                        inference_t inf) {
-    node_t*   lhs_node = node->as.assign.lhs;
+    node_t* lhs_node = node->as.assign.lhs;
+
+    if (lhs_node->type == NODE_IDENT && streq(lhs_node->as.ident.ident, "_")) {
+        // this is a discard, just evaluate the rhs
+        typecheck_node(tc, env, scope, node->as.assign.rhs, inf);
+
+        return tc->ts->primitives.void_;
+    }
+
     type_id_t lhs = typecheck_node(tc, env, scope, lhs_node, inf);
     type_id_t rhs =
         typecheck_node(tc, env, scope, node->as.assign.rhs, infer_with(lhs));

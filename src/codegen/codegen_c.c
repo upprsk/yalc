@@ -352,12 +352,21 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
             fprintf(cs->out, "// local %s at %d\n", node->as.decl.name, v.idx);
         } break;
         case NODE_ASSIGN: {
-            codegen_expr(cs, node->as.assign.lhs);
-            codegen_expr(cs, node->as.assign.rhs);
-            value_t rhs = vstack_pop(&cs->vstack);
-            value_t lhs = vstack_pop(&cs->vstack);
+            if (node->as.assign.lhs->type == NODE_IDENT &&
+                streq(node->as.assign.lhs->as.ident.ident, "_")) {
+                // this is a discard
+                codegen_expr(cs, node->as.assign.rhs);
+                value_t rhs = vstack_pop(&cs->vstack);
 
-            fprintf(cs->out, TMP " = " TMP ";\n", lhs.idx, rhs.idx);
+                fprintf(cs->out, "(void)" TMP ";\n", rhs.idx);
+            } else {
+                codegen_expr(cs, node->as.assign.lhs);
+                codegen_expr(cs, node->as.assign.rhs);
+                value_t rhs = vstack_pop(&cs->vstack);
+                value_t lhs = vstack_pop(&cs->vstack);
+
+                fprintf(cs->out, TMP " = " TMP ";\n", lhs.idx, rhs.idx);
+            }
         } break;
         case NODE_STMT_EXPR: {
             codegen_expr(cs, node->as.stmt_expr.expr);
