@@ -46,6 +46,12 @@ static inline void* da_init_default(allocator_t alloc, uint32_t elem_size) {
     return da_init_capacity(alloc, elem_size, DA_DEFAULT_CAPACITY);
 }
 
+static inline void da_clear(void* arr) {
+    if (!arr) return;
+
+    da_get_header(arr)->size = 0;
+}
+
 static inline void* da_free(void* arr, allocator_t alloc) {
     allocator_free(alloc, da_get_header(arr));
 
