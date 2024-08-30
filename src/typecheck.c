@@ -697,7 +697,8 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
     }
 
     size_t proc_argc = da_get_size(callee_type->as.proc.args);
-    size_t argc = da_get_size(call->args);
+    size_t call_argc = da_get_size(call->args);
+    size_t argc = call_argc;
     if (!callee_type->as.proc.is_variadic && argc != proc_argc) {
         report_error(tc->er, node->span,
                      "procedure expects %d arguments, but %d were given",
@@ -771,6 +772,12 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
             report_error(tc->er, call->args[i]->span,
                          "procedure expects type %s at position %d, got %s",
                          expectedstr, i + 1, argstr);
+        }
+    }
+
+    if (callee_type->as.proc.is_variadic) {
+        for (size_t i = 0; i < call_argc; ++i) {
+            typecheck_node(tc, env, scope, call->args[i], inf);
         }
     }
 
