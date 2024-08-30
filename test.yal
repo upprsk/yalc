@@ -1,3 +1,17 @@
+Counter := record {
+    count: i32;
+    end: i32;
+};
+
+new_counter := .(end: i32) -> Counter {
+    return .{.count=0, .end=end};
+};
+
+step := .(c: *Counter) -> bool {
+    c.count = c.count + 1;
+    return c.count < c.end;
+};
+
 int := i32;
 
 export "main" main := .() -> int {
@@ -5,10 +19,10 @@ export "main" main := .() -> int {
 
     v := 0;
     _ = c_scanf("%d", v&);
+    c := new_counter(v);
 
-    while v > 0 {
-        c_printf("[%d] hello!\n", v);
-        v = v - 1;
+    while step(c&) {
+        c_printf("hello!\n");
     }
 
     return 0;
