@@ -193,6 +193,9 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
         case TYPE_KW: {
             return allocator_sprintf(alloc, ".%s", type->as.kw.ident);
         }
+        case TYPE_PLACEHOLDER: {
+            return allocator_sprintf(alloc, "placeholder");
+        }
     }
 
     return allocator_sprintf(alloc, "<invalid %d>", type->tag);

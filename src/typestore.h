@@ -35,6 +35,7 @@ typedef enum type_tag : uint8_t {
     TYPE_PROC,
     TYPE_KW,
     TYPE_RECORD,
+    TYPE_PLACEHOLDER,
 } type_tag_t;
 
 static inline char const* type_tag_to_str(type_tag_t tag) {
@@ -51,6 +52,7 @@ static inline char const* type_tag_to_str(type_tag_t tag) {
         case TYPE_PROC: return "TYPE_PROC";
         case TYPE_KW: return "TYPE_KW";
         case TYPE_RECORD: return "TYPE_RECORD";
+        case TYPE_PLACEHOLDER: return "TYPE_PLACEHOLDER";
     }
 
     return "?";
@@ -81,9 +83,11 @@ typedef struct type_mptr {
 
 typedef struct type_proc {
     type_id_t return_type;
+    uint32_t  generic_count;
 
     // array of argument types
     type_id_t* args;
+    type_id_t* generic_args;
 } type_proc_t;
 
 typedef struct record_field {
@@ -170,6 +174,10 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
         } break;
         case TYPE_KW: {
             return streq(lhs->as.kw.ident, rhs->as.kw.ident);
+        } break;
+        case TYPE_PLACEHOLDER: {
+            // WARN: For now, placeholder types are always unique.
+            return false;
         } break;
     }
 

@@ -11,12 +11,26 @@
 #include "span.h"
 #include "typestore.h"
 
+typedef struct generic_instance {
+    type_id_t generic_id;
+    node_t*   proc;
+} generic_instance_t;
+da_declare(generic_instance_t, generic_instance);
+
+typedef struct generic_bind {
+    type_id_t placeholder;
+    type_id_t bound_to;
+} generic_bind_t;
+da_declare(generic_bind_t, generic_bind);
+
 typedef struct typechecker {
     error_reporter_t* er;
     typestore_t*      ts;
 
     allocator_t tempalloc;
     allocator_t alloc;
+
+    generic_instance_t* generic_instances;
 } typechecker_t;
 
 typedef struct env {
@@ -173,6 +187,36 @@ static inline inference_t infer_with(type_id_t type) {
     return (inference_t){.expression_expected = type};
 }
 
+static generic_instance_t* find_generic_instance(typechecker_t* tc,
+                                                 type_id_t      id) {
+    size_t count = da_get_size(tc->generic_instances);
+    for (size_t i = 0; i < count; i++) {
+        if (type_id_eq(tc->generic_instances[i].generic_id, id))
+            return &tc->generic_instances[i];
+    }
+
+    return NULL;
+}
+
+static void define_generic_instance(typechecker_t* tc, type_id_t id,
+                                    node_t* node) {
+    munit_assert_null(find_generic_instance(tc, id));
+
+    tc->generic_instances = da_append_generic_instance(
+        tc->generic_instances, tc->tempalloc,
+        &(generic_instance_t){.generic_id = id, .proc = node});
+}
+
+static generic_bind_t* find_generic_bound(generic_bind_t* binds,
+                                          type_id_t       placeholder) {
+    size_t count = da_get_size(binds);
+    for (size_t i = 0; i < count; i++) {
+        if (type_id_eq(binds[i].placeholder, placeholder)) return &binds[i];
+    }
+
+    return NULL;
+}
+
 static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
                                 node_t* node, inference_t inf);
 static type_id_t eval_to_type(typechecker_t* tc, env_t* env, scope_t* scope,
@@ -320,11 +364,13 @@ static type_id_t eval_to_type(typechecker_t* tc, env_t* outer_env,
     env_t env = *outer_env;
     env.in_type_context = true;
 
-    type_id_t type = tc->ts->primitives.type;
-    type_id_t err = tc->ts->primitives.err;
-    type_id_t ty = typecheck_node(tc, &env, scope, node, infer_with(type));
-    if (!type_id_eq(ty, type) &&
-        typestore_find_type(tc->ts, ty)->tag != TYPE_PROC) {
+    type_id_t     type = tc->ts->primitives.type;
+    type_id_t     err = tc->ts->primitives.err;
+    type_id_t     ty = typecheck_node(tc, &env, scope, node, infer_with(type));
+    type_t const* ty_inst = typestore_find_type(tc->ts, ty);
+
+    if (!type_id_eq(ty, type) && ty_inst->tag != TYPE_PROC &&
+        ty_inst->tag != TYPE_PLACEHOLDER) {
         report_error(tc->er, node->span,
                      "expected a type, got value of type %s",
                      typestore_type_id_to_str(tc->ts, tc->tempalloc, ty));
@@ -530,10 +576,53 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
     }
 
     argc = min(argc, proc_argc);
+
+    generic_instance_t* generic_instance = NULL;
+    if (callee_type->as.proc.generic_count) {
+        generic_instance = find_generic_instance(tc, callee);
+        if (generic_instance == NULL) {
+            report_error(
+                tc->er, call->callee->span,
+                "procedure %s is marked as generic, but was not found on the "
+                "generic instances array",
+                typestore_type_to_str(tc->ts, tc->tempalloc, callee_type));
+
+            return tc->ts->primitives.err;
+        }
+    }
+
+    type_id_t type_ = tc->ts->primitives.type;
+
+    generic_bind_t* binds = da_init_generic_bind(tc->tempalloc);
+
     for (size_t i = 0; i < argc; ++i) {
         type_id_t expectedt = callee_type->as.proc.args[i];
         type_id_t argt = typecheck_node(tc, env, scope, call->args[i],
                                         infer_with(expectedt));
+
+        if (type_id_eq(expectedt, type_)) {
+            type_t const* ty = typestore_find_type(tc->ts, expectedt);
+            munit_assert_uint8(ty->tag, ==, TYPE_TYPE);
+
+            munit_assert_size(da_get_size(callee_type->as.proc.args), ==,
+                              da_get_size(callee_type->as.proc.generic_args));
+
+            type_id_t p = callee_type->as.proc.generic_args[i];
+
+            binds = da_append_generic_bind(
+                binds, tc->tempalloc,
+                &(generic_bind_t){
+                    .bound_to = eval_to_type(tc, env, scope, call->args[i]),
+                    .placeholder = p});
+        }
+
+        type_t const* ty = typestore_find_type(tc->ts, expectedt);
+        if (ty->tag == TYPE_PLACEHOLDER) {
+            generic_bind_t* bind = find_generic_bound(binds, expectedt);
+            munit_assert_not_null(bind);
+
+            expectedt = bind->bound_to;
+        }
 
         if (!type_id_eq(expectedt, argt)) {
             char const* expectedstr =
@@ -555,7 +644,17 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
         call->call_extern_name = v->extern_name;
     }
 
-    return callee_type->as.proc.return_type;
+    type_id_t ret = callee_type->as.proc.return_type;
+
+    type_t const* ty = typestore_find_type(tc->ts, ret);
+    if (ty->tag == TYPE_PLACEHOLDER) {
+        generic_bind_t* bind = find_generic_bound(binds, ret);
+        munit_assert_not_null(bind);
+
+        ret = bind->bound_to;
+    }
+
+    return ret;
 }
 
 static type_id_t typecheck_node_ref(typechecker_t* tc, env_t* env,
@@ -1021,6 +1120,126 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
     return tc->ts->primitives.void_;
 }
 
+static uint32_t typecheck_node_proc_args(typechecker_t* tc, env_t* env,
+                                         scope_t* scope, node_proc_t* proc,
+                                         type_id_t** pargs,
+                                         type_id_t** pgargs) {
+    uint32_t generic_count = 0;
+
+    type_id_t* args = *pargs;
+    type_id_t* gargs = *pgargs;
+
+    size_t argc = da_get_size(proc->args);
+    for (size_t i = 0; i < argc; ++i) {
+        node_t* arg_node = proc->args[i];
+        munit_assert_uint8(arg_node->type, ==, NODE_ARG);
+
+        arg_node->type_id = tc->ts->primitives.void_;
+
+        node_arg_t* arg = &arg_node->as.arg;
+        if (arg->type) {
+            type_id_t argtype = eval_to_type(tc, env, scope, arg->type);
+            type_id_t type_payload = INVALID_TYPEID;
+
+            if (type_id_eq(argtype, tc->ts->primitives.type)) {
+                // report_success(tc->er, arg_node->span,
+                //                "got type type, creating new thing");
+
+                if (generic_count == 0) {
+                    // this is the first generic argument, add all previous as
+                    // non-generic arguments
+                    gargs = da_init_type_id(tc->alloc);
+
+                    for (size_t j = 0; j < i; j++) {
+                        gargs = da_append_type_id(gargs, tc->alloc,
+                                                  &INVALID_TYPEID);
+                    }
+                }
+
+                ++generic_count;
+                type_payload = typestore_add_type(
+                    tc->ts, &(type_t){.tag = TYPE_PLACEHOLDER});
+
+                gargs = da_append_type_id(gargs, tc->alloc, &type_payload);
+            } else if (generic_count > 0) {
+                gargs = da_append_type_id(gargs, tc->alloc, &argtype);
+            }
+
+            scope_add(scope, tc->tempalloc, arg->name,
+                      &(value_t){.type = argtype,
+                                 .where = arg_node->span,
+                                 .type_payload = type_payload});
+
+            args = da_append_type_id(args, tc->alloc, &argtype);
+        } else {
+            report_error(tc->er, arg_node->span,
+                         "arguments without types (using inference) "
+                         "are not supported (yet)");
+        }
+    }
+
+    *pargs = args;
+    *pgargs = gargs;
+
+    // if (generic_count > 0) {
+    //     munit_assert_size(da_get_size(args), ==, da_get_size(gargs));
+    //
+    //     for (size_t i = 0; i < da_get_size(args); i++) {
+    //         report_success(
+    //             tc->er, (span_t){}, "got arg [%d] %s", args[i].id,
+    //             typestore_type_id_to_str(tc->ts, tc->tempalloc, args[i]));
+    //     }
+    //
+    //     for (size_t i = 0; i < da_get_size(gargs); i++) {
+    //         report_success(
+    //             tc->er, (span_t){}, "got garg [%d] %s", gargs[i].id,
+    //             typestore_type_id_to_str(tc->ts, tc->tempalloc, gargs[i]));
+    //     }
+    // }
+
+    return generic_count;
+}
+
+static void typecheck_node_proc_body(typechecker_t* tc, env_t* env,
+                                     scope_t* scope, node_t* node,
+                                     node_proc_t* proc, type_id_t ret,
+                                     type_id_t result) {
+    type_id_t void_ = tc->ts->primitives.void_;
+
+    env_t body_env = {
+        .parent = env,
+        .expected_return = ret,
+        .curr_proc_type = result,
+        .proc_type_span =
+            proc->return_type ? proc->return_type->span : node->span,
+    };
+
+    type_id_t body =
+        typecheck_node(tc, &body_env, scope, proc->body, infer_with(void_));
+    if (!type_id_eq(body, void_)) {
+        char const* bodystr =
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, body);
+        report_error(tc->er, node->span, "invalid type for procedure body: %s",
+                     bodystr);
+    }
+
+    if (!body_env.has_returned &&
+        !type_id_eq(body_env.expected_return, void_)) {
+        char const* retstr = typestore_type_id_to_str(tc->ts, tc->tempalloc,
+                                                      body_env.expected_return);
+
+        report_error(tc->er, node->span,
+                     "procedure with non-void return type returns "
+                     "implicitly. Expected to return value of type %s",
+                     retstr);
+
+        report_note(tc->er, body_env.proc_type_span,
+                    "return type declared here");
+    }
+
+    proc->uses_implicit_return = !body_env.has_returned;
+}
+
 static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node,
                                      inference_t               inf,
@@ -1032,75 +1251,34 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
 
     node_proc_t* proc = &node->as.proc;
     type_id_t*   args = da_init_type_id(tc->alloc);
+    type_id_t*   gargs = NULL;
 
     scope_t proc_scope;
     scope_init(&proc_scope, tc->tempalloc, scope, false);
 
-    size_t argc = da_get_size(proc->args);
-    for (size_t i = 0; i < argc; ++i) {
-        node_t* arg_node = proc->args[i];
-        munit_assert_uint8(arg_node->type, ==, NODE_ARG);
-
-        arg_node->type_id = void_;
-
-        node_arg_t* arg = &arg_node->as.arg;
-        if (arg->type) {
-            type_id_t argtype = eval_to_type(tc, env, &proc_scope, arg->type);
-            scope_add(&proc_scope, tc->tempalloc, arg->name,
-                      &(value_t){.type = argtype, .where = arg_node->span});
-
-            args = da_append_type_id(args, tc->alloc, &argtype);
-        } else {
-            report_error(tc->er, arg_node->span,
-                         "arguments without types (using inference) "
-                         "are not supported (yet)");
-        }
-    }
+    uint32_t generic_count =
+        typecheck_node_proc_args(tc, env, &proc_scope, proc, &args, &gargs);
 
     type_id_t ret = void_;
     if (proc->return_type) {
         ret = eval_to_type(tc, env, &proc_scope, proc->return_type);
     }
 
-    type_id_t result = typestore_add_type(
-        tc->ts,
-        &(type_t){
-            .tag = TYPE_PROC, .as.proc = {.return_type = ret, .args = args}
-    });
+    type_t type = {
+        .tag = TYPE_PROC,
+        .as.proc = {.return_type = ret,
+                    .args = args,
+                    .generic_args = gargs,
+                    .generic_count = generic_count},
+    };
+    type_id_t result = typestore_add_type(tc->ts, &type);
 
-    type_id_t body = INVALID_TYPEID;
+    if (generic_count) {
+        define_generic_instance(tc, result, node);
+    }
 
-    if (proc->body) {
-        env_t body_env = {.parent = env,
-                          .expected_return = ret,
-                          .curr_proc_type = result,
-                          .proc_type_span = proc->return_type
-                                                ? proc->return_type->span
-                                                : node->span};
-        body = typecheck_node(tc, &body_env, &proc_scope, proc->body,
-                              infer_with(void_));
-        if (!type_id_eq(body, void_)) {
-            char const* bodystr =
-                typestore_type_id_to_str(tc->ts, tc->tempalloc, body);
-            report_error(tc->er, node->span,
-                         "invalid type for procedure body: %s", bodystr);
-        }
-
-        if (!body_env.has_returned &&
-            !type_id_eq(body_env.expected_return, void_)) {
-            char const* retstr = typestore_type_id_to_str(
-                tc->ts, tc->tempalloc, body_env.expected_return);
-
-            report_error(tc->er, node->span,
-                         "procedure with non-void return type returns "
-                         "implicitly. Expected to return value of type %s",
-                         retstr);
-
-            report_note(tc->er, body_env.proc_type_span,
-                        "return type declared here");
-        }
-
-        proc->uses_implicit_return = !body_env.has_returned;
+    if (proc->body && !generic_count) {
+        typecheck_node_proc_body(tc, env, &proc_scope, node, proc, ret, result);
     }
 
     if (!proc->body && (opt & TC_NODE_PROC_OPT_ALLOW_NO_BODY) == 0) {
@@ -1468,6 +1646,7 @@ void pass_typecheck(typecheck_params_t const* params) {
         .ts = params->ts,
         .tempalloc = temp_alloc,
         .alloc = params->alloc,
+        .generic_instances = da_init_generic_instance(temp_alloc),
     };
 
     munit_assert_not_null(params->module_name);
@@ -1501,6 +1680,8 @@ void pass_typecheck(typecheck_params_t const* params) {
         scope_add(
             &root_scope, tc.tempalloc, "void",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.void_});
+        scope_add(&root_scope, tc.tempalloc, "type",
+                  &(value_t){.type = type_, .type_payload = type_});
     }
 
     scope_t scope;

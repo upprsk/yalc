@@ -1,30 +1,14 @@
-Counter := record {
-    start: i32;
-    end: i32;
-    count: i32;
-};
-
-new_counter := .(end: i32) -> Counter {
-    return .{ .count=0, .start=0, .end=end };
-};
-
-tick := .(c: *Counter) -> bool {
-    c.count = c.count + 1;
-    return c.count < c.end;
-};
-
-reset := .(c: *Counter) {
-    c.count = c.start;
+add_generic := .(T: type, a: T, b: T) -> T {
+    return a + b;
 };
 
 main := .() {
-    c := new_counter(5);
-    while tick(c&) {
-        printf("tick...\n");
-    }
+    a := add_generic(i32, 10, 12);
+    printf("r=%d\n", a);
 
-    12.0;
+    b := add_generic(i8, 10 as i8, 12 as i8);
+    printf("r=%d\n", b as i32);
 };
 
 // TODO: Implement variadic functions
-extern "printf" printf: .(fmt: [*]i8) -> void;
+extern "printf" printf: .(fmt: [*]i8, arg0: i32) -> void;
