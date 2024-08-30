@@ -142,6 +142,11 @@ void dump_node(FILE* f, node_t* node, int indent) {
                 dump_node(f, node->as.proc.args[i], indent + 1);
             }
 
+            if (node->as.proc.is_variadic) {
+                indent_by_2(f, indent + 1);
+                fprintf(f, "VAR ...\n");
+            }
+
             dump_node(f, node->as.proc.return_type, indent + 1);
             dump_node(f, node->as.proc.body, indent + 1);
         } break;

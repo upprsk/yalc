@@ -399,9 +399,15 @@ static node_t* parse_block(parser_t* p, stmt_opt_t stmt_opt) {
 }
 
 static node_t* parse_proc(parser_t* p, token_t tok) {
+    bool     is_variadic = false;
     node_t** args = da_init_node(p->node_alloc);
 
     while (peek(p).type != TT_RPAREN) {
+        if (match(p, TT_DOT_DOT_DOT)) {
+            is_variadic = true;
+            break;
+        }
+
         token_t argname = peek(p);
         consume(p, TT_IDENT);
 
@@ -441,7 +447,10 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_PROC,
-        .as.proc = {.return_type = return_type, .args = args, .body = body},
+        .as.proc = {.return_type = return_type,
+                    .args = args,
+                    .body = body,
+                    .is_variadic = is_variadic},
         .span.start = tok.span.start,
         .span.end = body          ? body->span.end
                     : return_type ? return_type->span.end

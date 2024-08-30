@@ -7,7 +7,7 @@ Pair := .(T: type) -> type {
 
 main := .() {
     p: Pair(i32) = .{.first = 0, .second = 0};
+    printf("p=.{.first=%d, .second=%d}\n", p.first, p.second);
 };
 
-// TODO: Implement variadic functions
-extern "printf" printf: .(fmt: [*]i8, arg0: i32) -> void;
+extern "printf" printf: .(fmt: [*]i8, ...) -> void;

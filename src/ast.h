@@ -214,6 +214,7 @@ typedef struct node_proc {
     node_t* body;
 
     bool uses_implicit_return;
+    bool is_variadic;
 } node_proc_t;
 
 typedef struct node_record {

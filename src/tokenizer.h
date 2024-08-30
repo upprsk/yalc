@@ -42,10 +42,12 @@ typedef enum token_type : uint8_t {
     TT_LBRACE,    // {
     TT_RBRACE,    // {
 
-    TT_DOT_LPAREN,  // .(
-    TT_DOT_LBRACE,  // .{
-    TT_DOT_STAR,    // .*
-    TT_ARROW,       // ->
+    TT_DOT_LPAREN,   // .(
+    TT_DOT_LBRACE,   // .{
+    TT_DOT_STAR,     // .*
+    TT_DOT_DOT,      // ..
+    TT_DOT_DOT_DOT,  // ...
+    TT_ARROW,        // ->
 
     TT_RETURN,  // return
     TT_BREAK,   // break
@@ -95,6 +97,8 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_DOT_LPAREN: return "TT_DOT_LPAREN";
         case TT_DOT_LBRACE: return "TT_DOT_LBRACE";
         case TT_DOT_STAR: return "TT_DOT_STAR";
+        case TT_DOT_DOT: return "TT_DOT_DOT";
+        case TT_DOT_DOT_DOT: return "TT_DOT_DOT_DOT";
         case TT_ARROW: return "TT_ARROW";
         case TT_RETURN: return "TT_RETURN";
         case TT_BREAK: return "TT_BREAK";

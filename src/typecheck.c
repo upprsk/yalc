@@ -670,10 +670,19 @@ static type_id_t typecheck_node_call(typechecker_t* tc, env_t* env,
 
     size_t proc_argc = da_get_size(callee_type->as.proc.args);
     size_t argc = da_get_size(call->args);
-    if (argc != proc_argc) {
+    if (!callee_type->as.proc.is_variadic && argc != proc_argc) {
         report_error(tc->er, node->span,
                      "procedure expects %d arguments, but %d were given",
                      proc_argc, argc);
+    }
+
+    if (callee_type->as.proc.is_variadic) {
+        if (argc < proc_argc) {
+            report_error(tc->er, node->span,
+                         "variadic procedure expects at least %d arguments, "
+                         "but %d were given",
+                         proc_argc, argc);
+        }
     }
 
     argc = min(argc, proc_argc);
@@ -1371,7 +1380,8 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
         .as.proc = {.return_type = ret,
                     .args = args,
                     .generic_args = gargs,
-                    .generic_count = generic_count},
+                    .generic_count = generic_count,
+                    .is_variadic = proc->is_variadic},
     };
     type_id_t result = typestore_add_type(tc->ts, &type);
 

@@ -135,6 +135,10 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
                 }
             }
 
+            if (type->as.proc.is_variadic) {
+                b = da_extend_char(b, alloc, "...", 3);
+            }
+
             b = da_extend_char(b, alloc, ") -> ", 5);
 
             char const* rettype =

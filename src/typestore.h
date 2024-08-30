@@ -88,6 +88,8 @@ typedef struct type_proc {
     // array of argument types
     type_id_t* args;
     type_id_t* generic_args;
+
+    bool is_variadic;
 } type_proc_t;
 
 typedef struct record_field {

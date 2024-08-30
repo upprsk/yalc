@@ -206,7 +206,12 @@ static void tokenize_one(tokenizer_t* t) {
                 append_token(t, TT_DOT_LBRACE);
             else if (match(t, '*'))
                 append_token(t, TT_DOT_STAR);
-            else if (is_alpha(peek(t)))
+            else if (match(t, '.')) {
+                if (match(t, '.'))
+                    append_token(t, TT_DOT_DOT_DOT);
+                else
+                    append_token(t, TT_DOT_DOT);
+            } else if (is_alpha(peek(t)))
                 tokenize_kw(t);
             else
                 append_token(t, TT_DOT);
