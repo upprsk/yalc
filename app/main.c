@@ -91,6 +91,7 @@ typedef enum outopt {
 
 int main(int argc, char* argv[]) {
     char const* filename = NULL;
+    char const* output_filename = NULL;
     bool        show_tokens = false;
     bool        show_ast = false;
     bool        show_typed_ast = false;
@@ -107,6 +108,7 @@ int main(int argc, char* argv[]) {
             // clang-format off
             fprintf(stderr, "usage: %s <root filename> [options]\n", self_path);
             fprintf(stderr, "      -h, --help          show this message\n");
+            fprintf(stderr, "      -o <filename>       set name of output file\n");
             fprintf(stderr, "      --show-tokens       show all tokens from file\n");
             fprintf(stderr, "      --show-ast          show the parse tree\n");
             fprintf(stderr, "      --show-typed-ast    show the typed AST\n");
@@ -118,7 +120,15 @@ int main(int argc, char* argv[]) {
             return EXIT_SUCCESS;
         }
 
-        if (streq(arg, "--show-tokens")) {
+        if (streq(arg, "-o")) {
+            output_filename = shift_args(&argc, &argv);
+            if (!output_filename) {
+                fprintf(stderr, "missing filename for option\n");
+                return EXIT_FAILURE;
+            }
+        }
+
+        else if (streq(arg, "--show-tokens")) {
             show_tokens = true;
         }
 
@@ -284,6 +294,7 @@ int main(int argc, char* argv[]) {
     if (er.error_count > 0) return EXIT_FAILURE;
 
     if (out == OUT_MIPS) {
+        // TODO: Implement output_filename for mips codegen
         codegen_mips(&(codegen_mips_params_t){
             .ast = ast,
             .ts = &ts,
