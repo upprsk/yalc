@@ -5,6 +5,7 @@
 
 #include "allocator.h"
 #include "ast.h"
+#include "codegen/codegen_c.h"
 #include "codegen/codegen_mips.h"
 #include "common.h"
 #include "da.h"
@@ -85,6 +86,7 @@ static char const* make_sanitized_name(allocator_t alloc, char const* name) {
 
 typedef enum outopt {
     OUT_NONE,
+    OUT_C,
     OUT_MIPS,
     OUT_NULL,
 } outopt_t;
@@ -113,6 +115,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "      --show-ast          show the parse tree\n");
             fprintf(stderr, "      --show-typed-ast    show the typed AST\n");
             fprintf(stderr, "      --show-typestore    show all of the types defined in the typestore\n");
+            fprintf(stderr, "      --output-c          output C source code\n");
             fprintf(stderr, "      --output-mips       output MIPS32 assembly\n");
             fprintf(stderr, "      --output-nothing    output nothing\n");
             // clang-format on
@@ -142,6 +145,15 @@ int main(int argc, char* argv[]) {
 
         else if (streq(arg, "--show-typestore")) {
             show_typestore = true;
+        }
+
+        else if (streq(arg, "--output-c")) {
+            if (out) {
+                fprintf(stderr, "output mode already specified\n");
+                return EXIT_FAILURE;
+            }
+
+            out = OUT_C;
         }
 
         else if (streq(arg, "--output-mips")) {
@@ -293,7 +305,25 @@ int main(int argc, char* argv[]) {
 
     if (er.error_count > 0) return EXIT_FAILURE;
 
-    if (out == OUT_MIPS) {
+    if (out == OUT_C) {
+        FILE* out = NULL;
+        if (!output_filename)
+            out = stdout;
+        else
+            out = fopen(output_filename, "wb");
+
+        munit_assert_not_null(out);
+
+        codegen_c(&(codegen_c_params_t){
+            .ast = ast,
+            .ts = &ts,
+            .filename = filename,
+            .er = &er,
+            .out = out,
+        });
+
+        if (output_filename) fclose(out);
+    } else if (out == OUT_MIPS) {
         // TODO: Implement output_filename for mips codegen
         codegen_mips(&(codegen_mips_params_t){
             .ast = ast,

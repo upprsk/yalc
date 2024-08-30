@@ -5,6 +5,8 @@ add_library(yal
   arena/arena.h
   ast.c
   ast.h
+  codegen/codegen_c.c
+  codegen/codegen_c.h
   codegen/codegen_mips.c
   codegen/codegen_mips.h
   common.h

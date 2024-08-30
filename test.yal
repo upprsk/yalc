@@ -1,5 +1,12 @@
-main := .() {
-    printf("Hello %s!\n", "World");
+export "main" main := .() -> i32 {
+    v := 0;
+    _ = c_scanf("%d", v&);
+
+    w := "World";
+    c_printf("Hello %s! %d\n", w, v);
+
+    return 0;
 };
 
-extern "printf" printf: .(fmt: [*:0]i8, ...) -> void;
+extern "printf" c_printf: .(fmt: [*:0]i8, ...) -> void;
+extern "scanf" c_scanf: .(fmt: [*:0]i8, ...) -> i32;
