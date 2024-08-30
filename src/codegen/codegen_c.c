@@ -319,6 +319,14 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
             fprintf(cs->out, TYPE " " TMP " = &" TMP ";\n", node->type_id.id,
                     idx, v.idx);
         } break;
+        case NODE_CAST: {
+            codegen_expr(cs, node->as.ref.child);
+            value_t  v = vstack_pop(&cs->vstack);
+            uint32_t idx = vstack_push_tmp(&cs->vstack);
+
+            fprintf(cs->out, TYPE " " TMP " = " TMP ";\n", node->type_id.id,
+                    idx, v.idx);
+        } break;
         case NODE_CALL: {
             codegen_expr(cs, node->as.call.callee);
             value_t v = vstack_pop(&cs->vstack);
