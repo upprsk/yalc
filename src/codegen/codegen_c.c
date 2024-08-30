@@ -55,7 +55,7 @@ static inline value_t vstack_pop(vstack_t* s) {
 static value_t* vstack_find(vstack_t* s, char const* name) {
     size_t count = da_get_size(s->values);
     for (size_t i = 0; i < count; i++) {
-        fprintf(stderr, "vstack_find(%s): %s\n", name, s->values[i].name);
+        // fprintf(stderr, "vstack_find(%s): %s\n", name, s->values[i].name);
         if (streq(s->values[i].name, name)) return &s->values[i];
     }
 
@@ -193,8 +193,8 @@ static void codegen_stmt_blk(codegen_state_t* cs, node_t* body);
 static void codegen_expr(codegen_state_t* cs, node_t* node) {
     munit_assert_not_null(node);
 
-    fprintf(stderr, "# codegen_expr(%s)\n", node_type_to_str(node->type));
-    vstack_dump(&cs->vstack);
+    // fprintf(stderr, "# codegen_expr(%s)\n", node_type_to_str(node->type));
+    // vstack_dump(&cs->vstack);
 
     // fprintf(cs->out, "// %s\n", node_type_to_str(node->type));
 
@@ -213,7 +213,7 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
             munit_assert_uint8(ty->tag, ==, TYPE_MPTR);
             type_id_t inner = ty->as.mptr.inner;
 
-            fprintf(cs->out, TYPE " " TMP "[] = {", inner.id, idx);
+            fprintf(cs->out, "static " TYPE " " TMP "[] = {", inner.id, idx);
             for (size_t i = 0; i < node->as.str.len; i++) {
                 fprintf(cs->out, "(" TYPE ")%d,", inner.id,
                         node->as.str.str[i]);
@@ -288,8 +288,6 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
                     idx, v.idx);
         } break;
         case NODE_CALL: {
-            vstack_dump(&cs->vstack);
-
             codegen_expr(cs, node->as.call.callee);
             value_t v = vstack_pop(&cs->vstack);
 
@@ -302,8 +300,6 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
                 value_t value = vstack_pop(&cs->vstack);
                 args = da_append_value(args, cs->tempalloc, &value);
             }
-
-            vstack_dump(&cs->vstack);
 
             type_t const* ty =
                 typestore_find_type(cs->ts, node->as.call.callee->type_id);
@@ -325,8 +321,6 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
             }
 
             fprintf(cs->out, ");\n");
-
-            vstack_dump(&cs->vstack);
         } break;
         default:
             fprintf(cs->out, "// UNIMPLEMENTED EXPR %s\n",
@@ -397,8 +391,8 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
             // munit_assert(false);
     }
 
-    fprintf(stderr, "# end of statment\n");
-    vstack_dump(&cs->vstack);
+    // fprintf(stderr, "# end of statment\n");
+    // vstack_dump(&cs->vstack);
 
     munit_assert_size(da_get_size(cs->vstack.values), ==, stack_expected_size);
 }
