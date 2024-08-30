@@ -18,7 +18,9 @@
     })
 
 static inline bool streq(char const* a, char const* b) {
-    return strcmp(a, b) == 0;
+    if (a && b) return strcmp(a, b) == 0;
+    if (!a && !b) return true;
+    return false;
 }
 
 static inline bool strnneq(char const* a, size_t alen, char const* b,
