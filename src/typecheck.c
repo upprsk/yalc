@@ -33,9 +33,37 @@ typedef struct typechecker {
     generic_instance_t* generic_instances;
 } typechecker_t;
 
+typedef struct value {
+    type_id_t type;
+    span_t    where;
+
+    // in case of types, we also want to store it's actual underlying type.
+    // `i32` has type `type` but when used in a type context, it is `i32`.
+    type_id_t type_payload;
+
+    // in case of procedures, we want to be able to evaluate them at compile
+    // time. So store their AST here.
+    node_t* node;
+
+    // FIXME: This is probably not how we should do this. Stores the extern name
+    // of a procedure when declared
+    char const* extern_name;
+} value_t;
+
+static inline type_id_t value_get_type(typestore_t* ts, value_t const* v) {
+    munit_assert_not_null(ts);
+    munit_assert_not_null(v);
+    munit_assert_uint32(v->type.id, ==, ts->primitives.type.id);
+
+    return v->type_payload;
+}
+
 typedef struct env {
     struct env* parent;
     char const* name;
+
+    // when evaluating a procedure, this allows setting the return value.
+    value_t const* ret_value;
 
     type_id_t expected_return;
     type_id_t curr_proc_type;
@@ -91,27 +119,6 @@ static inline char* env_gen_module_name(env_t* env, allocator_t alloc) {
     char* buf = env_gen_module_name_iter(env, alloc, da_init_char(alloc));
 
     return da_extend_char(buf, alloc, "\0", 1);
-}
-
-typedef struct value {
-    type_id_t type;
-    span_t    where;
-
-    // in case of types, we also want to store it's actual underlying type.
-    // `i32` has type `type` but when used in a type context, it is `i32`.
-    type_id_t type_payload;
-
-    // FIXME: This is probably not how we should do this. Stores the extern name
-    // of a procedure when declared
-    char const* extern_name;
-} value_t;
-
-static inline type_id_t value_get_type(typestore_t* ts, value_t const* v) {
-    munit_assert_not_null(ts);
-    munit_assert_not_null(v);
-    munit_assert_uint32(v->type.id, ==, ts->primitives.type.id);
-
-    return v->type_payload;
 }
 
 typedef struct scope_entry {
@@ -226,10 +233,12 @@ typedef enum typecheck_node_proc_opt {
     TC_NODE_PROC_OPT_ALLOW_NO_BODY = 1 << 0,
 } typecheck_node_proc_opt_t;
 
-static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
-                                     scope_t* scope, node_t* node,
-                                     inference_t               inf,
-                                     typecheck_node_proc_opt_t opt);
+static type_id_t      typecheck_node_proc(typechecker_t* tc, env_t* env,
+                                          scope_t* scope, node_t* node,
+                                          inference_t               inf,
+                                          typecheck_node_proc_opt_t opt);
+static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
+                                node_t* node);
 
 static value_t const* eval_node_record(typechecker_t* tc, env_t* env,
                                        scope_t* outer_scope, node_t* node) {
@@ -295,11 +304,53 @@ static value_t const* eval_node_record(typechecker_t* tc, env_t* env,
     return v;
 }
 
+da_declare(value_t const*, value);
+
+static value_t const* call_node(typechecker_t* tc, env_t* outer_env,
+                                scope_t* outer_scope, node_t* proc_node,
+                                value_t const** args) {
+    node_proc_t* proc = &proc_node->as.proc;
+
+    env_t env = *outer_env;
+
+    scope_t scope;
+    scope_init(&scope, tc->tempalloc, outer_scope, false);
+
+    size_t argc = da_get_size(args);
+    munit_assert_size(argc, ==, da_get_size(proc->args));
+
+    for (size_t i = 0; i < argc; i++) {
+        node_t* arg_node = proc->args[i];
+        munit_assert_uint8(arg_node->type, ==, NODE_ARG);
+
+        node_arg_t* arg = &arg_node->as.arg;
+
+        value_t const* prev =
+            scope_add(&scope, tc->tempalloc, arg->name, args[i]);
+        munit_assert_null(prev);
+    }
+
+    value_t const* body_value = eval_node(tc, &env, &scope, proc->body);
+    if (!body_value) {
+        report_error(tc->er, proc->body->span,
+                     "failed to evaluate procedure body");
+        return NULL;
+    }
+
+    if (!env.ret_value) {
+        report_error(tc->er, proc->body->span, "procedure did not return");
+        return NULL;
+    }
+
+    return env.ret_value;
+}
+
 static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
                                 node_t* node) {
     munit_assert_not_null(node);
 
     type_id_t type = tc->ts->primitives.type;
+    type_id_t void_ = tc->ts->primitives.void_;
 
     switch (node->type) {
         case NODE_IDENT: {
@@ -349,7 +400,57 @@ static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
                 return v;
             }
         } break;
-        default: report_error(tc->er, node->span, "can't evaluate to a type");
+        case NODE_CALL: {
+            value_t const* callee =
+                eval_node(tc, env, scope, node->as.call.callee);
+            munit_assert_not_null(callee);
+            munit_assert_not_null(callee->node);
+
+            type_t const* callee_type =
+                typestore_find_type(tc->ts, callee->type);
+            munit_assert_uint8(callee_type->tag, ==, TYPE_PROC);
+
+            value_t const** args = da_init_value(tc->tempalloc);
+
+            size_t count = da_get_size(node->as.call.args);
+            for (size_t i = 0; i < count; i++) {
+                value_t const* arg =
+                    eval_node(tc, env, scope, node->as.call.args[i]);
+
+                args = da_append_value(args, tc->tempalloc, &arg);
+            }
+
+            value_t const* result =
+                call_node(tc, env, scope, callee->node, args);
+            return result;
+        } break;
+        case NODE_STMT_BLK: {
+            size_t count = da_get_size(node->as.stmt_blk.stmts);
+            for (size_t i = 0; i < count; i++) {
+                value_t const* value =
+                    eval_node(tc, env, scope, node->as.stmt_blk.stmts[i]);
+                if (!value) {
+                    report_error(tc->er, node->as.stmt_blk.stmts[i]->span,
+                                 "failed to evaluate statement");
+                    return NULL;
+                }
+            }
+
+            value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+            *v = (value_t){.type = void_, .where = node->span};
+            return v;
+        } break;
+        case NODE_STMT_RET: {
+            env->has_returned = true;
+            env->ret_value = eval_node(tc, env, scope, node->as.stmt_ret.child);
+
+            value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+            *v = (value_t){.type = void_, .where = node->span};
+            return v;
+        } break;
+        default:
+            report_error(tc->er, node->span, "can't evaluate AST node: %s",
+                         node_type_to_str(node->type));
     }
 
     return NULL;
@@ -1067,7 +1168,8 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* outer_env,
                                     &(value_t){.type = type,
                                                .where = decl->name_span,
                                                .extern_name = extern_name,
-                                               .type_payload = type_payload});
+                                               .type_payload = type_payload,
+                                               .node = decl->init});
     if (prev) {
         report_error(tc->er, node->span, "identifier %s already defined",
                      decl->name);

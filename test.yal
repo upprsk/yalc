@@ -1,13 +1,12 @@
-add_generic := .(T: type, a: T, b: T) -> T {
-    return a + b;
+Pair := .(T: type) -> type {
+    return record {
+        first: T;
+        second: T;
+    };
 };
 
 main := .() {
-    a := add_generic(i32, 10, 12);
-    printf("r=%d\n", a);
-
-    b := add_generic(i8, 10 as i8, 12 as i8);
-    printf("r=%d\n", b as i32);
+    p: Pair(i32) = .{.first = 0, .second = 0};
 };
 
 // TODO: Implement variadic functions
