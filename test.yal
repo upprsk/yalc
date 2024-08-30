@@ -1,9 +1,9 @@
 Counter := record {
-    count: i32;
-    end: i32;
+    count: u32;
+    end: u32;
 };
 
-new_counter := .(end: i32) -> Counter {
+new_counter := .(end: u32) -> Counter {
     return .{.count=0, .end=end};
 };
 
@@ -17,7 +17,7 @@ int := i32;
 export "main" main := .() -> int {
     c_printf("enter number:\n");
 
-    v := 0;
+    v: u32 = 0;
     _ = c_scanf("%d", v&);
     c := new_counter(v);
 

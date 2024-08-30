@@ -361,8 +361,10 @@ static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
 
     switch (node->type) {
         case NODE_INT: {
+            type_id_t type = tc->ts->primitives.i32;
+
             value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
-            *v = (value_t){.type = tc->ts->primitives.i32,
+            *v = (value_t){.type = type,
                            .where = node->span,
                            .int_value = node->as.int_.value};
 
@@ -839,9 +841,15 @@ static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
 static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
                                      scope_t* scope, node_t* node,
                                      inference_t inf) {
-    (void)inf;
+    type_id_t target = INVALID_TYPEID;
+    if (node->as.cast.type->type == NODE_IDENT &&
+        streq(node->as.cast.type->as.ident.ident, "_")) {
+        target = inf.expression_expected;
+    } else {
+        // not inferred
+        target = eval_to_type(tc, env, scope, node->as.cast.type);
+    }
 
-    type_id_t target = eval_to_type(tc, env, scope, node->as.cast.type);
     type_id_t child =
         typecheck_node(tc, env, scope, node->as.cast.child, infer_with(target));
 
@@ -1519,8 +1527,8 @@ static type_id_t typecheck_node_cinit(typechecker_t* tc, env_t* env,
             continue;
         }
 
-        type_id_t expr =
-            typecheck_node(tc, env, scope, cinitf->init, infer_with(name));
+        type_id_t expr = typecheck_node(tc, env, scope, cinitf->init,
+                                        infer_with(field->type));
         if (!type_id_eq(field->type, expr)) {
             report_error(
                 tc->er, node->span,
@@ -1703,7 +1711,17 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             report_error(tc->er, node->span, "found error node in typecheck");
             result = err;
             break;
-        case NODE_INT: result = tc->ts->primitives.i32; break;
+        case NODE_INT: {
+            type_id_t     type = tc->ts->primitives.i32;
+            type_t const* ty =
+                typestore_find_type(tc->ts, inf.expression_expected);
+            if (ty) {
+                // allow automatic casting integer literals
+                if (ty->tag == TYPE_INT) result = inf.expression_expected;
+            } else {
+                result = type;
+            }
+        } break;
         case NODE_FLOAT: result = tc->ts->primitives.f64; break;
         case NODE_STR: result = tc->ts->primitives.str; break;
         case NODE_IDENT:
@@ -1833,6 +1851,9 @@ void pass_typecheck(typecheck_params_t const* params) {
         scope_add(
             &root_scope, tc.tempalloc, "i32",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.i32});
+        scope_add(
+            &root_scope, tc.tempalloc, "u32",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.u32});
         scope_add(
             &root_scope, tc.tempalloc, "i8",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.i8});
