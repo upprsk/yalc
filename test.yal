@@ -1,13 +1,5 @@
-Pair := .(T: type) -> type {
-    return record {
-        first: T;
-        second: T;
-    };
-};
-
 main := .() {
-    p: Pair(i32) = .{.first = 0, .second = 0};
-    printf("p=.{.first=%d, .second=%d}\n", p.first, p.second);
+    printf("Hello %s!\n", "World");
 };
 
-extern "printf" printf: .(fmt: [*]i8, ...) -> void;
+extern "printf" printf: .(fmt: [*:0]i8, ...) -> void;

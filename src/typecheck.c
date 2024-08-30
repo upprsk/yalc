@@ -45,6 +45,9 @@ typedef struct value {
     // time. So store their AST here.
     node_t* node;
 
+    // in case of integers, we want to be able to know their value
+    uint64_t int_value;
+
     // FIXME: This is probably not how we should do this. Stores the extern name
     // of a procedure when declared
     char const* extern_name;
@@ -353,6 +356,14 @@ static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
     type_id_t void_ = tc->ts->primitives.void_;
 
     switch (node->type) {
+        case NODE_INT: {
+            value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+            *v = (value_t){.type = tc->ts->primitives.i32,
+                           .where = node->span,
+                           .int_value = node->as.int_.value};
+
+            return v;
+        } break;
         case NODE_IDENT: {
             value_t const* v = scope_find(scope, node->as.ident.ident);
             if (v) return v;
@@ -384,21 +395,38 @@ static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
             }
         } break;
         case NODE_MPTR: {
-            // TODO: Implement terminators
+            bool     has_term = false;
+            uint64_t term_value = 0;
 
             value_t const* inner =
                 eval_node(tc, env, scope, node->as.mptr.child);
-            if (inner) {
-                type_id_t ty = typestore_add_type(
-                    tc->ts, &(type_t){.tag = TYPE_MPTR,
-                                      .as.mptr = {.inner = value_get_type(
-                                                      tc->ts, inner)}});
-                value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
-                *v = (value_t){
-                    .type = type, .type_payload = ty, .where = node->span};
+            if (!inner) return NULL;
 
-                return v;
+            if (node->as.mptr.term) {
+                value_t const* term =
+                    eval_node(tc, env, scope, node->as.mptr.term);
+                if (!term) return NULL;
+
+                type_t const* ty = typestore_find_type(tc->ts, term->type);
+                munit_assert_uint8(ty->tag, ==, TYPE_INT);
+
+                term_value = term->int_value;
+                has_term = true;
             }
+
+            type_id_t ty = typestore_add_type(
+                tc->ts, &(type_t){
+                            .tag = TYPE_MPTR,
+                            .as.mptr = {.inner = value_get_type(tc->ts, inner),
+                                        .has_term = has_term,
+                                        .term = term_value}
+            });
+            value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+            *v = (value_t){
+                .type = type, .type_payload = ty, .where = node->span};
+
+            return v;
+
         } break;
         case NODE_CALL: {
             value_t const* callee =
@@ -1615,9 +1643,15 @@ static type_id_t typecheck_node_mptr(typechecker_t* tc, env_t* env,
     (void)inf;
 
     if (node->as.mptr.term) {
-        report_error(
-            tc->er, node->span,
-            "multi-pointers with terminators have not been implemented");
+        type_id_t     term = typecheck_node(tc, env, scope, node->as.mptr.term,
+                                            infer_with(tc->ts->primitives.i32));
+        type_t const* ty = typestore_find_type(tc->ts, term);
+        if (ty->tag != TYPE_INT) {
+            report_error(tc->er, node->span,
+                         "the terminator of a multi-pointer must be an "
+                         "integer, found %s",
+                         typestore_type_to_str(tc->ts, tc->tempalloc, ty));
+        }
     }
 
     type_id_t type = tc->ts->primitives.type;

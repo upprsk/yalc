@@ -76,9 +76,10 @@ typedef struct type_ptr {
     type_id_t inner;
 } type_ptr_t;
 
-// TODO: Add support for terminated multi pointers
 typedef struct type_mptr {
     type_id_t inner;
+    uint64_t  term;
+    bool      has_term;
 } type_mptr_t;
 
 typedef struct type_proc {
@@ -155,7 +156,9 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
                    type_id_eq(lhs->as.array.inner, rhs->as.array.inner);
         case TYPE_PTR: return type_id_eq(lhs->as.ptr.inner, rhs->as.ptr.inner);
         case TYPE_MPTR:
-            return type_id_eq(lhs->as.mptr.inner, rhs->as.mptr.inner);
+            return type_id_eq(lhs->as.mptr.inner, rhs->as.mptr.inner) &&
+                   lhs->as.mptr.has_term == rhs->as.mptr.has_term &&
+                   lhs->as.mptr.term == rhs->as.mptr.term;
         case TYPE_PROC: {
             if (!type_id_eq(lhs->as.proc.return_type, rhs->as.proc.return_type))
                 return false;

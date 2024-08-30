@@ -33,8 +33,10 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
 
     // TODO: Make an actual string type
     ts->primitives.str = typestore_add_type(
-        ts,
-        &(type_t){.tag = TYPE_MPTR, .as.mptr = {.inner = ts->primitives.i8}});
+        ts, &(type_t){
+                .tag = TYPE_MPTR,
+                .as.mptr = {.inner = ts->primitives.i8, .has_term = true}
+    });
 }
 
 void typestore_deinit(typestore_t* ts) {
@@ -107,9 +109,15 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
         }
         case TYPE_MPTR: {
             char const* inner =
-                typestore_type_id_to_str(ts, alloc, type->as.ptr.inner);
+                typestore_type_id_to_str(ts, alloc, type->as.mptr.inner);
 
-            char const* s = allocator_sprintf(alloc, "[*]%s", inner);
+            char const* term = "";
+            if (type->as.mptr.has_term)
+                term = allocator_sprintf(alloc, ":%lu", type->as.mptr.term);
+
+            char const* s = allocator_sprintf(alloc, "[*%s]%s", term, inner);
+
+            if (type->as.mptr.has_term) allocator_free(alloc, (char*)term);
             allocator_free(alloc, (char*)inner);
 
             return s;
