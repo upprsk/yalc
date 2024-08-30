@@ -156,6 +156,8 @@ static void tokenize_ident(tokenizer_t* t) {
         append_token(t, TT_BREAK);
     } else if (strnneq(ident, len, "extern", 6)) {
         append_token(t, TT_EXTERN);
+    } else if (strnneq(ident, len, "export", 6)) {
+        append_token(t, TT_EXPORT);
     } else if (strnneq(ident, len, "if", 2)) {
         append_token(t, TT_IF);
     } else if (strnneq(ident, len, "else", 4)) {

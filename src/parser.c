@@ -734,6 +734,7 @@ static node_t* parse_expr(parser_t* p, int precedence) {
 
 typedef enum decl_opt {
     DECL_OPT_IS_EXTERN = 1 << 0,
+    DECL_OPT_IS_EXPORT = 1 << 1,
 } decl_opt_t;
 
 static node_t* parse_decl(parser_t* p, token_t tok, decl_opt_t opt,
@@ -766,7 +767,8 @@ static node_t* parse_decl(parser_t* p, token_t tok, decl_opt_t opt,
                     .name_span = name.span,
                     .type = type,
                     .init = init,
-                    .is_extern = (opt & DECL_OPT_IS_EXTERN) != 0},
+                    .is_extern = (opt & DECL_OPT_IS_EXTERN) != 0,
+                    .is_export = (opt & DECL_OPT_IS_EXPORT) != 0},
         .span = {.start = tok.span.start, .end = end_tok.span.end}
     };
 
@@ -879,6 +881,17 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
             span_conv_strlit(extern_name_tok.span, p->source, p->source_len,
                              p->node_alloc, NULL);
         return parse_decl(p, stmt_start_tok, DECL_OPT_IS_EXTERN, extern_name);
+    }
+
+    if (peek(p).type == TT_EXPORT) {
+        consume(p, TT_EXPORT);
+        token_t export_name_tok = peek(p);
+        consume(p, TT_STR);
+
+        char const* extern_name =
+            span_conv_strlit(export_name_tok.span, p->source, p->source_len,
+                             p->node_alloc, NULL);
+        return parse_decl(p, stmt_start_tok, DECL_OPT_IS_EXPORT, extern_name);
     }
 
     if (peek_next(p).type == TT_COLON) {

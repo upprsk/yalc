@@ -282,6 +282,10 @@ static value_t const* eval_node_record(typechecker_t* tc, env_t* env,
                          "fields can not be declared extern");
         }
 
+        if (decl->is_export) {
+            report_error(tc->er, node->span, "fields can not be exported");
+        }
+
         char const* field_name = decl->name;
         type_id_t   field_type = eval_to_type(tc, env, &scope, decl->type);
 
@@ -1160,7 +1164,7 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* outer_env,
 
     // FIXME: view other places that talk about extern name as for why this is
     // wrong
-    char const* extern_name = decl->is_extern
+    char const* extern_name = decl->is_extern || decl->is_export
                                   ? decl->extern_name
                                   : env_gen_full_name(&env, tc->alloc);
 
@@ -1220,6 +1224,9 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* outer_env,
         if (prev->where.start != 0 && prev->where.end != 0)
             report_note(tc->er, prev->where, "declared here");
     }
+
+    decl->declared_type = type;
+    decl->extern_name = extern_name;
 
     return void_;
 }

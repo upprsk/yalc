@@ -192,6 +192,9 @@ typedef struct node_decl {
     node_t* init;
 
     bool is_extern;
+    bool is_export;
+
+    type_id_t declared_type;
 } node_decl_t;
 
 typedef struct node_arg {
