@@ -188,6 +188,8 @@ static void codegen_proc_proto(codegen_state_t* cs, node_decl_t* decl,
     fprintf(cs->out, ")");
 }
 
+static void codegen_stmt_blk(codegen_state_t* cs, node_t* body);
+
 static void codegen_expr(codegen_state_t* cs, node_t* node) {
     munit_assert_not_null(node);
 
@@ -234,6 +236,48 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
                 fprintf(cs->out, "// local %s at %d\n", ident, v->idx);
                 vstack_push_idx(&cs->vstack, v->idx);
             }
+        } break;
+        case NODE_COMP: {
+            codegen_expr(cs, node->as.comp.left);
+            codegen_expr(cs, node->as.comp.right);
+
+            value_t rhs = vstack_pop(&cs->vstack);
+            value_t lhs = vstack_pop(&cs->vstack);
+
+            uint32_t idx = vstack_push_tmp(&cs->vstack);
+
+            char const* op = "";
+            switch (node->as.comp.type) {
+                case COMP_EQ: op = "=="; break;
+                case COMP_NEQ: op = "!="; break;
+                case COMP_LT: op = "<"; break;
+                case COMP_LTE: op = "<="; break;
+                case COMP_GT: op = ">"; break;
+                case COMP_GTE: op = ">="; break;
+            }
+
+            fprintf(cs->out, TYPE " " TMP " = " TMP " %s " TMP ";\n",
+                    node->type_id.id, idx, lhs.idx, op, rhs.idx);
+        } break;
+        case NODE_BINOP: {
+            codegen_expr(cs, node->as.binop.left);
+            codegen_expr(cs, node->as.binop.right);
+
+            value_t rhs = vstack_pop(&cs->vstack);
+            value_t lhs = vstack_pop(&cs->vstack);
+
+            uint32_t idx = vstack_push_tmp(&cs->vstack);
+
+            char const* op = "";
+            switch (node->as.binop.type) {
+                case BINOP_ADD: op = "+"; break;
+                case BINOP_SUB: op = "-"; break;
+                case BINOP_MUL: op = "*"; break;
+                case BINOP_DIV: op = "/"; break;
+            }
+
+            fprintf(cs->out, TYPE " " TMP " = " TMP " %s " TMP ";\n",
+                    node->type_id.id, idx, lhs.idx, op, rhs.idx);
         } break;
         case NODE_REF: {
             codegen_expr(cs, node->as.ref.child);
@@ -313,6 +357,14 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
 
             fprintf(cs->out, "// local %s at %d\n", node->as.decl.name, v.idx);
         } break;
+        case NODE_ASSIGN: {
+            codegen_expr(cs, node->as.assign.lhs);
+            codegen_expr(cs, node->as.assign.rhs);
+            value_t rhs = vstack_pop(&cs->vstack);
+            value_t lhs = vstack_pop(&cs->vstack);
+
+            fprintf(cs->out, TMP " = " TMP ";\n", lhs.idx, rhs.idx);
+        } break;
         case NODE_STMT_EXPR: {
             codegen_expr(cs, node->as.stmt_expr.expr);
             vstack_pop(&cs->vstack);
@@ -322,6 +374,22 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
             value_t v = vstack_pop(&cs->vstack);
 
             fprintf(cs->out, "return " TMP ";\n", v.idx);
+        } break;
+        case NODE_STMT_WHILE: {
+            fprintf(cs->out, "while (true) {\n");
+
+            codegen_expr(cs, node->as.stmt_while.condition);
+            value_t v = vstack_pop(&cs->vstack);
+            fprintf(cs->out, "if (!(" TMP ")) {\n", v.idx);
+            fprintf(cs->out, "break;\n");
+            fprintf(cs->out, "}\n");
+
+            codegen_stmt(cs, node->as.stmt_while.body);
+
+            fprintf(cs->out, "}\n");
+        } break;
+        case NODE_STMT_BLK: {
+            codegen_stmt_blk(cs, node);
         } break;
         default:
             fprintf(cs->out, "// UNIMPLEMENTED STMT %s\n",
@@ -335,7 +403,7 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
     munit_assert_size(da_get_size(cs->vstack.values), ==, stack_expected_size);
 }
 
-static void codegen_proc_body(codegen_state_t* cs, node_t* body) {
+static void codegen_stmt_blk(codegen_state_t* cs, node_t* body) {
     munit_assert_uint8(body->type, ==, NODE_STMT_BLK);
 
     fprintf(cs->out, "{\n");
@@ -360,7 +428,7 @@ static void codegen_proc(codegen_state_t* cs, node_decl_t* decl, node_t* node) {
     codegen_proc_proto(cs, decl, node, proc_type);
 
     node_proc_t* proc = &node->as.proc;
-    codegen_proc_body(cs, proc->body);
+    codegen_stmt_blk(cs, proc->body);
 }
 
 static void codegen_module_decl(codegen_state_t* cs, node_t* node) {
@@ -391,6 +459,8 @@ static void codegen_module_decl(codegen_state_t* cs, node_t* node) {
 
     if (ty->tag == TYPE_PROC) {
         codegen_proc(cs, decl, decl->init);
+    } else if (ty->tag == TYPE_TYPE) {
+        // ignore types
     } else {
         munit_assert(false);
     }
