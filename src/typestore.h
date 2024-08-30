@@ -203,6 +203,7 @@ typedef struct typestore_primitives {
     type_id_t bool_;
     type_id_t i8;
     type_id_t i32;
+    type_id_t u32;
     type_id_t f32;
     type_id_t f64;
     type_id_t str;
