@@ -864,6 +864,20 @@ static node_t* parse_stmt(parser_t* p, stmt_opt_t opt) {
         return n;
     }
 
+    if (match(p, TT_DEFER)) {
+        node_t* stmt = parse_stmt(p, 0);
+
+        node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+        *n = (node_t){
+            .type = NODE_STMT_DEFER,
+            .as.defer.stmt = stmt,
+            .span = {.start = stmt_start_tok.span.start,
+                     .end = stmt->span.end}
+        };
+
+        return n;
+    }
+
     if (match(p, TT_IF)) {
         return parse_stmt_if(p, stmt_start_tok);
     }

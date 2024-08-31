@@ -120,6 +120,10 @@ void dump_node(FILE* f, node_t* node, int indent) {
                 dump_node(f, node->as.mod.decls[i], indent + 1);
             }
         } break;
+        case NODE_STMT_DEFER:
+            fprintf(f, "STMT_DEFER\n");
+            dump_node(f, node->as.defer.stmt, indent + 1);
+            break;
         case NODE_DECL:
             fprintf(f, "DECL \"%s\"\n", node->as.decl.name);
             dump_node(f, node->as.decl.type, indent + 1);

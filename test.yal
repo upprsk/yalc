@@ -16,6 +16,7 @@ int := i32;
 
 export "main" main := .() -> int {
     c_printf("enter number:\n");
+    defer c_printf("done\n");
 
     v: u32 = 0;
     _ = c_scanf("%d", v&);

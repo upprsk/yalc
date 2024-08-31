@@ -182,6 +182,10 @@ typedef struct node_mod {
     node_t** decls;
 } node_mod_t;
 
+typedef struct node_stmt_defer {
+    node_t* stmt;
+} node_stmt_defer_t;
+
 typedef struct node_decl {
     char const* name;
     char const* extern_name;
@@ -280,6 +284,7 @@ typedef enum node_type : uint8_t {
     NODE_STMT_BLK,
 
     NODE_MOD,
+    NODE_STMT_DEFER,
     NODE_DECL,
     NODE_ASSIGN,
 
@@ -318,6 +323,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_STMT_WHILE: return "NODE_STMT_WHILE";
         case NODE_STMT_BLK: return "NODE_STMT_BLK";
         case NODE_MOD: return "NODE_MOD";
+        case NODE_STMT_DEFER: return "NODE_STMT_DEFER";
         case NODE_DECL: return "NODE_DECL";
         case NODE_ASSIGN: return "NODE_ASSIGN";
         case NODE_ARG: return "NODE_ARG";
@@ -360,6 +366,7 @@ struct node {
         node_stmt_break_t  stmt_break;
         node_stmt_block_t  stmt_blk;
         node_mod_t         mod;
+        node_stmt_defer_t  defer;
         node_decl_t        decl;
         node_assign_t      assign;
         node_arg_t         arg;

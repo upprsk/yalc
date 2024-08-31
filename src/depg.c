@@ -259,6 +259,9 @@ static void check_node(state_t* s, node_t* node) {
 
             s->curr_scope = mod_scope.parent;
         } break;
+        case NODE_STMT_DEFER: {
+            check_node(s, node->as.defer.stmt);
+        } break;
         case NODE_DECL: {
             node_t* prev_decl = s->curr_decl;
 

@@ -1127,6 +1127,31 @@ static type_id_t typecheck_node_stmt_blk(typechecker_t* tc, env_t* env,
     return void_;
 }
 
+static type_id_t typecheck_node_defer(typechecker_t* tc, env_t* env,
+                                      scope_t* scope, node_t* node,
+                                      inference_t inf) {
+    type_id_t void_ = tc->ts->primitives.void_;
+
+    bool had_returned = env->has_returned;
+    env->has_returned = false;
+
+    type_id_t ty = typecheck_node(tc, env, scope, node->as.defer.stmt, inf);
+    if (!type_id_eq(ty, void_)) {
+        char const* typestr =
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, ty);
+        report_error(tc->er, node->span, "invalid type for defer statement: %s",
+                     typestr);
+    }
+
+    if (env->has_returned) {
+        report_error(tc->er, node->span, "can't return from inside defer");
+    }
+
+    env->has_returned = had_returned;
+
+    return void_;
+}
+
 static type_id_t typecheck_node_mod(typechecker_t* tc, env_t* env,
                                     scope_t* scope, node_t* node,
                                     inference_t inf) {
@@ -1772,6 +1797,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             break;
         case NODE_STMT_BLK:
             result = typecheck_node_stmt_blk(tc, env, scope, node, inf);
+            break;
+        case NODE_STMT_DEFER:
+            result = typecheck_node_defer(tc, env, scope, node, inf);
             break;
         case NODE_MOD:
             result = typecheck_node_mod(tc, env, scope, node, inf);
