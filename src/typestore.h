@@ -15,7 +15,7 @@ typedef struct type_id {
     (type_id_t) { 0 }
 
 static inline bool type_id_is_valid(type_id_t id) {
-    return id.id != 0 && id.id != 0xFF;
+    return id.id != 0 && id.id != (uint32_t)-1;
 }
 
 static inline bool type_id_eq(type_id_t lhs, type_id_t rhs) {

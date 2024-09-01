@@ -1730,7 +1730,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
     munit_assert_not_null(node);
 
     type_id_t err = tc->ts->primitives.err;
-    type_id_t result = {0xFE};
+    type_id_t result = {-1};
 
     switch (node->type) {
         case NODE_ERR:
@@ -1841,7 +1841,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
 
     node->type_id = result;
 
-    if (type_id_eq(result, (type_id_t){0xFE})) {
+    if (type_id_eq(result, (type_id_t){-1})) {
         report_error(tc->er, node->span, "unimplemented node type: '%s'",
                      node_type_to_str(node->type));
 
