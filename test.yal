@@ -15,34 +15,22 @@ step := .(c: *Counter) -> bool {
 int := i32;
 
 export "main" main := .() -> int {
-    c_printf("enter number:\n");
-    defer c_printf("done\n");
+    c_fprintf(c_stdout, "age > ");
+    c_fflush(c_stdout);
 
-    v: u32 = 0;
-    _ = c_scanf("%d", v&);
-    c := new_counter(v);
-    defer c_printf("done 2\n");
+    age := 0;
+    _ = c_scanf("%d", age&);
 
-    while step(c&) {
-        defer c_printf("bye!\n");
-        say_hello_n(c.count);
-
-        if c.count == 4 {
-            c_printf("ending early\n");
-            return 1;
-        } else {
-            c_printf("too soon\n");
-        }
-    }
+    c_fprintf(c_stdout, "got age: %d\n", age);
 
     return 0;
 };
 
-say_hello_n := .(n: u32) {
-    defer c_printf("\n");
+FILE := opaque record {};
+extern "stdout"  c_stdout: *FILE;
+extern "stderr"  c_stderr: *FILE;
 
-    c_printf("hello %d!", n);
-};
-
-extern "printf" c_printf: .(fmt: [*:0]i8, ...) -> void;
-extern "scanf" c_scanf: .(fmt: [*:0]i8, ...) -> i32;
+extern "fprintf" c_fprintf: .(file: *FILE, fmt: [*:0]i8, ...) -> void;
+extern "fflush"  c_fflush: .(file: *FILE) -> void;
+extern "printf"  c_printf:  .(fmt: [*:0]i8, ...) -> void;
+extern "scanf"   c_scanf:   .(fmt: [*:0]i8, ...) -> i32;

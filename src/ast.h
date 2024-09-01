@@ -226,6 +226,8 @@ typedef struct node_proc {
 
 typedef struct node_record {
     node_t* blk;
+
+    bool is_opaque;
 } node_record_t;
 
 typedef struct node_cinitf {

@@ -104,6 +104,7 @@ typedef struct type_record {
     char const*     extern_name;
     char const*     inferred_name;
     record_field_t* fields;
+    bool            is_opaque;
 } type_record_t;
 
 static inline record_field_t const* type_record_find_field(

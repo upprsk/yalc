@@ -460,18 +460,29 @@ static node_t* parse_proc(parser_t* p, token_t tok) {
     return n;
 }
 
-static node_t* parse_record(parser_t* p, token_t tok) {
+typedef enum record_opt {
+    RECORD_OPT_IS_OPAQUE = 1 << 0,
+} record_opt_t;
+
+static node_t* parse_record(parser_t* p, token_t tok, record_opt_t opt) {
     node_t* blk = parse_block(p, STMT_OPT_IS_RECORD);
 
     node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
     *n = (node_t){
         .type = NODE_RECORD,
-        .as.record = {.blk = blk},
+        .as.record = {.blk = blk,
+                      .is_opaque = (opt & RECORD_OPT_IS_OPAQUE) != 0},
         .span.start = tok.span.start,
         .span.end = blk->span.end,
     };
 
     return n;
+}
+
+static node_t* parse_opaque(parser_t* p, token_t tok) {
+    consume(p, TT_RECORD);
+
+    return parse_record(p, tok, RECORD_OPT_IS_OPAQUE);
 }
 
 static node_t* parse_cinit(parser_t* p, token_t tok) {
@@ -671,7 +682,8 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_IDENT: return parse_ident(p, tok);
         case TT_KW: return parse_kw(p, tok);
         case TT_DOT_LPAREN: return parse_proc(p, tok);
-        case TT_RECORD: return parse_record(p, tok);
+        case TT_OPAQUE: return parse_opaque(p, tok);
+        case TT_RECORD: return parse_record(p, tok, 0);
         case TT_DOT_LBRACE: return parse_cinit(p, tok);
         case TT_STAR: return parse_pointer(p, tok);
         case TT_LBRACKET: return parse_mptr_or_slice(p, tok);

@@ -257,6 +257,7 @@ static value_t const* eval_node_record(typechecker_t* tc, env_t* env,
         .fields = da_init_record_field(tc->alloc),
         .extern_name = env_gen_full_name(env, tc->alloc),
         .inferred_name = env_gen_module_name(env, tc->alloc),
+        .is_opaque = record->is_opaque,
     };
 
     scope_t scope;
@@ -1740,7 +1741,7 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
             type_id_t     type = tc->ts->primitives.i32;
             type_t const* ty =
                 typestore_find_type(tc->ts, inf.expression_expected);
-            if (ty) {
+            if (type_id_is_valid(inf.expression_expected) && ty) {
                 // allow automatic casting integer literals
                 if (ty->tag == TYPE_INT) result = inf.expression_expected;
             } else {

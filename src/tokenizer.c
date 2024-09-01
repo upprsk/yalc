@@ -172,6 +172,8 @@ static void tokenize_ident(tokenizer_t* t) {
         append_token(t, TT_AS);
     } else if (strnneq(ident, len, "record", 6)) {
         append_token(t, TT_RECORD);
+    } else if (strnneq(ident, len, "opaque", 6)) {
+        append_token(t, TT_OPAQUE);
     } else if (strnneq(ident, len, "defer", 5)) {
         append_token(t, TT_DEFER);
     } else {

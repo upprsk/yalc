@@ -171,6 +171,11 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
         }
         case TYPE_RECORD: {
             char* b = da_init_char(alloc);
+
+            if (type->as.record.is_opaque) {
+                b = da_extend_char(b, alloc, "opaque ", 7);
+            }
+
             b = da_extend_char(b, alloc, "record {", 8);
 
             size_t count = da_get_size(type->as.record.fields);
