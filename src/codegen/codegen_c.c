@@ -103,6 +103,17 @@ typedef struct codegen_state {
     vstack_t          globals;
 } codegen_state_t;
 
+typedef struct blk_state {
+    struct blk_state* outer;
+    node_t**          defers;
+    bool              has_returned;
+} blk_state_t;
+
+static inline void append_defer(blk_state_t* bs, allocator_t alloc,
+                                node_t* defer_stmt) {
+    bs->defers = da_append_node(bs->defers, alloc, &defer_stmt);
+}
+
 #define TYPE "T%d"
 #define TMP  "l%d"
 
@@ -220,7 +231,10 @@ static void codegen_proc_proto(codegen_state_t* cs, node_decl_t* decl,
     fprintf(cs->out, ")");
 }
 
-static void codegen_stmt_blk(codegen_state_t* cs, node_t* body);
+static void codegen_stmt_blk(codegen_state_t* cs, blk_state_t* bs,
+                             node_t* body);
+static void codegen_defers(codegen_state_t* cs, blk_state_t* bs);
+static void codegen_defers_rec(codegen_state_t* cs, blk_state_t* bs);
 
 static void codegen_expr(codegen_state_t* cs, node_t* node) {
     munit_assert_not_null(node);
@@ -414,7 +428,7 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
     }
 }
 
-static void codegen_stmt(codegen_state_t* cs, node_t* node) {
+static void codegen_stmt(codegen_state_t* cs, blk_state_t* bs, node_t* node) {
     size_t stack_expected_size = da_get_size(cs->vstack.values);
 
     switch (node->type) {
@@ -491,9 +505,15 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
             codegen_expr(cs, node->as.stmt_expr.expr);
             vstack_pop(&cs->vstack);
         } break;
+        case NODE_STMT_DEFER: {
+            append_defer(bs, cs->tempalloc, node->as.defer.stmt);
+        } break;
         case NODE_STMT_RET: {
             codegen_expr(cs, node->as.stmt_ret.child);
             value_t v = vstack_pop(&cs->vstack);
+
+            codegen_defers_rec(cs, bs);
+            bs->has_returned = true;
 
             fprintf(cs->out, "return " TMP ";\n", v.idx);
         } break;
@@ -506,12 +526,12 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
             fprintf(cs->out, "break;\n");
             fprintf(cs->out, "}\n");
 
-            codegen_stmt(cs, node->as.stmt_while.body);
+            codegen_stmt(cs, bs, node->as.stmt_while.body);
 
             fprintf(cs->out, "}\n");
         } break;
         case NODE_STMT_BLK: {
-            codegen_stmt_blk(cs, node);
+            codegen_stmt_blk(cs, bs, node);
         } break;
         default:
             fprintf(cs->out, "// UNIMPLEMENTED STMT %s\n",
@@ -525,8 +545,11 @@ static void codegen_stmt(codegen_state_t* cs, node_t* node) {
     munit_assert_size(da_get_size(cs->vstack.values), ==, stack_expected_size);
 }
 
-static void codegen_stmt_blk(codegen_state_t* cs, node_t* body) {
+static void codegen_stmt_blk(codegen_state_t* cs, blk_state_t* outer_bs,
+                             node_t* body) {
     munit_assert_uint8(body->type, ==, NODE_STMT_BLK);
+
+    blk_state_t bs = {.defers = da_init_node(cs->tempalloc), .outer = outer_bs};
 
     fprintf(cs->out, "{\n");
 
@@ -534,10 +557,29 @@ static void codegen_stmt_blk(codegen_state_t* cs, node_t* body) {
     for (size_t i = 0; i < count; i++) {
         node_t* stmt = body->as.stmt_blk.stmts[i];
 
-        codegen_stmt(cs, stmt);
+        codegen_stmt(cs, &bs, stmt);
     }
 
+    if (!bs.has_returned) codegen_defers(cs, &bs);
+
     fprintf(cs->out, "}\n");
+}
+
+static void codegen_defers(codegen_state_t* cs, blk_state_t* bs) {
+    // defers
+    size_t count = da_get_size(bs->defers);
+    for (size_t i = 0; i < count; i++) {
+        fprintf(cs->out, "// defer %zu\n{\n", i);
+
+        codegen_stmt(cs, bs, bs->defers[i]);
+        fprintf(cs->out, "}\n");
+    }
+}
+
+static void codegen_defers_rec(codegen_state_t* cs, blk_state_t* bs) {
+    codegen_defers(cs, bs);
+
+    if (bs->outer) codegen_defers_rec(cs, bs->outer);
 }
 
 static void codegen_proc(codegen_state_t* cs, node_decl_t* decl, node_t* node) {
@@ -549,8 +591,10 @@ static void codegen_proc(codegen_state_t* cs, node_decl_t* decl, node_t* node) {
 
     codegen_proc_proto(cs, decl, node, proc_type);
 
+    blk_state_t bs = {.defers = da_init_node(cs->tempalloc)};
+
     node_proc_t* proc = &node->as.proc;
-    codegen_stmt_blk(cs, proc->body);
+    codegen_stmt_blk(cs, &bs, proc->body);
 }
 
 static void codegen_module_decl(codegen_state_t* cs, node_t* node) {
