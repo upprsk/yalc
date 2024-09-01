@@ -15,7 +15,6 @@ typedef struct value {
     char const* name;
     char const* extern_name;
     uint32_t    idx;
-    bool        is_implicit_ptr;
 } value_t;
 da_declare(value_t, value);
 
@@ -36,7 +35,7 @@ static inline void vstack_push_idx(vstack_t* s, uint32_t idx) {
 }
 
 static inline void vstack_push_idx_lvalue(vstack_t* s, uint32_t idx) {
-    vstack_push(s, (value_t){.idx = idx, .is_implicit_ptr = true});
+    vstack_push(s, (value_t){.idx = idx});
 }
 
 static inline uint32_t vstack_push_tmp(vstack_t* s) {
@@ -59,7 +58,7 @@ static inline uint32_t vstack_push_named_tmp(vstack_t* s, char const* name) {
 
 static inline uint32_t vstack_push_tmp_from_global(vstack_t* s) {
     uint32_t idx = s->next_idx++;
-    vstack_push(s, (value_t){.idx = idx, .is_implicit_ptr = true});
+    vstack_push(s, (value_t){.idx = idx});
     return idx;
 }
 
@@ -85,10 +84,8 @@ static value_t* vstack_dump(vstack_t* s) {
 
     size_t count = da_get_size(s->values);
     for (size_t i = 0; i < count; i++) {
-        fprintf(stderr,
-                "[%zu] idx=%d, name='%s', extern_name='%s', is_global_ptr=%d\n",
-                i, s->values[i].idx, s->values[i].name,
-                s->values[i].extern_name, s->values[i].is_implicit_ptr);
+        fprintf(stderr, "[%zu] idx=%d, name='%s', extern_name='%s'\n", i,
+                s->values[i].idx, s->values[i].name, s->values[i].extern_name);
     }
 
     return NULL;
@@ -274,10 +271,20 @@ static void codegen_expr(codegen_state_t* cs, node_t* node) {
                 v = vstack_find(&cs->globals, ident);
                 munit_assert_not_null(v);
 
+                type_t const* ty = typestore_find_type(cs->ts, node->type_id);
+                munit_assert_not_null(ty);
+
+                char const* ref = "";
+                char const* ptr = "";
+                if (ty->tag == TYPE_PROC) {
+                    ref = "&";
+                    ptr = "*";
+                }
+
                 uint32_t idx = vstack_push_tmp_from_global(&cs->vstack);
                 fprintf(cs->out, "// global %s\n", ident);
-                fprintf(cs->out, TYPE "* " TMP " = &%s;\n", node->type_id.id,
-                        idx, v->extern_name);
+                fprintf(cs->out, TYPE "%s " TMP " = %s%s;\n", node->type_id.id,
+                        ptr, idx, ref, v->extern_name);
             } else {
                 fprintf(cs->out, "// local %s at %d\n", ident, v->idx);
                 vstack_push_idx_lvalue(&cs->vstack, v->idx);
@@ -628,7 +635,8 @@ static void codegen_module_decl(codegen_state_t* cs, node_t* node) {
             codegen_proc_proto(cs, decl, decl->type, ty);
             fprintf(cs->out, ";\n\n");
         } else {
-            munit_assert(false);
+            fprintf(cs->out, TYPE " %s;\n\n", decl->declared_type.id,
+                    decl->extern_name);
         }
 
         vstack_clean(&cs->vstack);
