@@ -568,10 +568,10 @@ static void codegen_stmt_blk(codegen_state_t* cs, blk_state_t* outer_bs,
 static void codegen_defers(codegen_state_t* cs, blk_state_t* bs) {
     // defers
     size_t count = da_get_size(bs->defers);
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = count; i > 0; i--) {
         fprintf(cs->out, "// defer %zu\n{\n", i);
 
-        codegen_stmt(cs, bs, bs->defers[i]);
+        codegen_stmt(cs, bs, bs->defers[i - 1]);
         fprintf(cs->out, "}\n");
     }
 }
