@@ -27,8 +27,11 @@ export "main" main := .() -> int {
         defer c_printf("bye!\n");
         say_hello_n(c.count);
 
-        while c.count == 2 {
+        if c.count == 4 {
+            c_printf("ending early\n");
             return 1;
+        } else {
+            c_printf("too soon\n");
         }
     }
 

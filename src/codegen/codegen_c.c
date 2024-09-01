@@ -517,6 +517,20 @@ static void codegen_stmt(codegen_state_t* cs, blk_state_t* bs, node_t* node) {
 
             fprintf(cs->out, "return " TMP ";\n", v.idx);
         } break;
+        case NODE_STMT_IF: {
+            codegen_expr(cs, node->as.stmt_if.condition);
+            value_t v = vstack_pop(&cs->vstack);
+
+            fprintf(cs->out, "if (" TMP ") {\n", v.idx);
+            codegen_stmt_blk(cs, bs, node->as.stmt_if.when_true);
+
+            if (node->as.stmt_if.when_false) {
+                fprintf(cs->out, "} else {\n");
+                codegen_stmt_blk(cs, bs, node->as.stmt_if.when_false);
+            }
+
+            fprintf(cs->out, "}\n");
+        } break;
         case NODE_STMT_WHILE: {
             fprintf(cs->out, "while (true) {\n");
 
