@@ -435,6 +435,20 @@ static value_t const* eval_node(typechecker_t* tc, env_t* env, scope_t* scope,
             return v;
 
         } break;
+        case NODE_OPT: {
+            value_t const* v = eval_node(tc, env, scope, node->as.opt.child);
+            if (v) {
+                type_id_t ty = typestore_add_type(
+                    tc->ts,
+                    &(type_t){.tag = TYPE_OPT,
+                              .as.opt = {.inner = value_get_type(tc->ts, v)}});
+                value_t* v = allocator_alloc(tc->tempalloc, sizeof(*v));
+                *v = (value_t){
+                    .type = type, .type_payload = ty, .where = node->span};
+
+                return v;
+            }
+        } break;
         case NODE_CALL: {
             value_t const* callee =
                 eval_node(tc, env, scope, node->as.call.callee);
@@ -656,10 +670,27 @@ static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
         typecheck_node(tc, env, scope, node->as.comp.right, infer_with(lhs));
 
     if (!type_id_eq(lhs, rhs)) {
+        type_t const* lhsty = typestore_find_type(tc->ts, lhs);
+        munit_assert_not_null(lhsty);
+        type_t const* rhsty = typestore_find_type(tc->ts, rhs);
+        munit_assert_not_null(rhsty);
+
         char const* lhsstr =
-            typestore_type_id_to_str(tc->ts, tc->tempalloc, lhs);
+            typestore_type_to_str(tc->ts, tc->tempalloc, lhsty);
         char const* rhsstr =
-            typestore_type_id_to_str(tc->ts, tc->tempalloc, rhs);
+            typestore_type_to_str(tc->ts, tc->tempalloc, rhsty);
+
+        if (lhsty->tag == TYPE_NIL && rhsty->tag == TYPE_OPT) {
+            // report_note(tc->er, node->span, "lhs is NIL and rhs is OPT");
+
+            return tc->ts->primitives.bool_;
+        }
+
+        if (lhsty->tag == TYPE_OPT && rhsty->tag == TYPE_NIL) {
+            // report_note(tc->er, node->span, "lhs is OPT and rhs is NIL");
+
+            return tc->ts->primitives.bool_;
+        }
 
         report_error(tc->er, node->span,
                      "incompatible types in %s, expected %s but got %s",
@@ -825,18 +856,16 @@ static type_id_t typecheck_node_deref(typechecker_t* tc, env_t* env,
     type_t const* inner_type = typestore_find_type(tc->ts, inner);
     munit_assert_not_null(inner_type);
 
-    if (inner_type->tag != TYPE_PTR) {
-        char const* innerstr =
-            typestore_type_to_str(tc->ts, tc->tempalloc, inner_type);
+    if (inner_type->tag == TYPE_OPT) return inner_type->as.opt.inner;
+    if (inner_type->tag == TYPE_PTR) return inner_type->as.ptr.inner;
 
-        report_error(tc->er, node->as.deref.child->span,
-                     "can't dereference non-pointer value of type %s",
-                     innerstr);
+    char const* innerstr =
+        typestore_type_to_str(tc->ts, tc->tempalloc, inner_type);
 
-        return tc->ts->primitives.err;
-    }
+    report_error(tc->er, node->as.deref.child->span,
+                 "can't dereference non-pointer value of type %s", innerstr);
 
-    return inner_type->as.ptr.inner;
+    return tc->ts->primitives.err;
 }
 
 static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
@@ -873,6 +902,14 @@ static type_id_t typecheck_node_cast(typechecker_t* tc, env_t* env,
     munit_assert_not_null(child_type);
     type_t const* target_type = typestore_find_type(tc->ts, target);
     munit_assert_not_null(target_type);
+
+    if (child_type->tag == TYPE_PTR && target_type->tag == TYPE_MPTR) {
+        return target;
+    }
+
+    if (child_type->tag == TYPE_MPTR && target_type->tag == TYPE_PTR) {
+        return target;
+    }
 
     if (child_type->tag != target_type->tag) {
         char const* childstr =
@@ -930,16 +967,20 @@ static type_id_t typecheck_node_index(typechecker_t* tc, env_t* env,
                      "index must be an integer, got %s", indexstr);
     }
 
-    if (receiver_type->tag != TYPE_ARRAY) {
-        char const* receiverstr =
-            typestore_type_to_str(tc->ts, tc->tempalloc, receiver_type);
-        report_error(tc->er, node->as.index.receiver->span,
-                     "can't index into non-array %s", receiverstr);
-
-        return tc->ts->primitives.err;
+    if (receiver_type->tag == TYPE_ARRAY) {
+        return receiver_type->as.array.inner;
     }
 
-    return receiver_type->as.array.inner;
+    if (receiver_type->tag == TYPE_MPTR) {
+        return receiver_type->as.mptr.inner;
+    }
+
+    char const* receiverstr =
+        typestore_type_to_str(tc->ts, tc->tempalloc, receiver_type);
+    report_error(tc->er, node->as.index.receiver->span,
+                 "can't index into non-array %s", receiverstr);
+
+    return tc->ts->primitives.err;
 }
 
 static type_id_t typecheck_node_stmt_expr(typechecker_t* tc, env_t* env,
@@ -1285,6 +1326,7 @@ static type_id_t typecheck_node_assign(typechecker_t* tc, env_t* env,
     switch (lhs_node->type) {
         case NODE_DEREF:
         case NODE_IDENT:
+        case NODE_INDEX:
         case NODE_FIELD: lhs_is_lvalue = true; break;
         default: break;
     }
@@ -1673,6 +1715,26 @@ static type_id_t typecheck_node_array(typechecker_t* tc, env_t* env,
     });
 }
 
+static type_id_t typecheck_node_opt(typechecker_t* tc, env_t* env,
+                                    scope_t* scope, node_t* node,
+                                    inference_t inf) {
+    (void)inf;
+
+    type_id_t type = tc->ts->primitives.type;
+    type_id_t ty =
+        typecheck_node(tc, env, scope, node->as.opt.child, infer_with(type));
+    if (!type_id_eq(ty, type)) {
+        char const* exprstr =
+            typestore_type_id_to_str(tc->ts, tc->tempalloc, ty);
+        report_error(tc->er, node->span, "expected type for optional, found %s",
+                     exprstr);
+        report_note(tc->er, node->as.opt.child->span, "expression has type %s",
+                    exprstr);
+    }
+
+    return type;
+}
+
 static type_id_t typecheck_node_ptr(typechecker_t* tc, env_t* env,
                                     scope_t* scope, node_t* node,
                                     inference_t inf) {
@@ -1831,6 +1893,9 @@ static type_id_t typecheck_node(typechecker_t* tc, env_t* env, scope_t* scope,
         case NODE_ARRAY:
             result = typecheck_node_array(tc, env, scope, node, inf);
             break;
+        case NODE_OPT:
+            result = typecheck_node_opt(tc, env, scope, node, inf);
+            break;
         case NODE_PTR:
             result = typecheck_node_ptr(tc, env, scope, node, inf);
             break;
@@ -1874,6 +1939,8 @@ void pass_typecheck(typecheck_params_t const* params) {
               &(value_t){.type = tc.ts->primitives.bool_});
     scope_add(&root_scope, tc.tempalloc, "false",
               &(value_t){.type = tc.ts->primitives.bool_});
+    scope_add(&root_scope, tc.tempalloc, "nil",
+              &(value_t){.type = tc.ts->primitives.nil});
 
     {
         type_id_t type_ = tc.ts->primitives.type;
@@ -1883,6 +1950,12 @@ void pass_typecheck(typecheck_params_t const* params) {
         scope_add(
             &root_scope, tc.tempalloc, "u32",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.u32});
+        scope_add(
+            &root_scope, tc.tempalloc, "i64",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.i64});
+        scope_add(
+            &root_scope, tc.tempalloc, "u64",
+            &(value_t){.type = type_, .type_payload = tc.ts->primitives.u64});
         scope_add(
             &root_scope, tc.tempalloc, "i8",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.i8});

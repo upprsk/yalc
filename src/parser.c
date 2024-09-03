@@ -538,6 +538,20 @@ static node_t* parse_pointer(parser_t* p, token_t tok) {
     return n;
 }
 
+static node_t* parse_opt(parser_t* p, token_t tok) {
+    node_t* expr = parse_prefix(p);
+
+    node_t* n = allocator_alloc(p->node_alloc, sizeof(*n));
+    *n = (node_t){
+        .type = NODE_OPT,
+        .as.opt = {.child = expr},
+        .span.start = tok.span.start,
+        .span.end = expr->span.end,
+    };
+
+    return n;
+}
+
 static node_t* parse_mptr_or_slice(parser_t* p, token_t tok) {
     if (match(p, TT_STAR)) {
         node_t* term = NULL;
@@ -686,6 +700,7 @@ static node_t* parse_prefix(parser_t* p) {
         case TT_RECORD: return parse_record(p, tok, 0);
         case TT_DOT_LBRACE: return parse_cinit(p, tok);
         case TT_STAR: return parse_pointer(p, tok);
+        case TT_QUESTION: return parse_opt(p, tok);
         case TT_LBRACKET: return parse_mptr_or_slice(p, tok);
         default: break;
     }

@@ -32,6 +32,8 @@ typedef enum type_tag : uint8_t {
     TYPE_ARRAY,
     TYPE_PTR,
     TYPE_MPTR,
+    TYPE_OPT,
+    TYPE_NIL,
     TYPE_PROC,
     TYPE_KW,
     TYPE_RECORD,
@@ -49,6 +51,8 @@ static inline char const* type_tag_to_str(type_tag_t tag) {
         case TYPE_ARRAY: return "TYPE_ARRAY";
         case TYPE_PTR: return "TYPE_PTR";
         case TYPE_MPTR: return "TYPE_MPTR";
+        case TYPE_OPT: return "TYPE_OPT";
+        case TYPE_NIL: return "TYPE_NIL";
         case TYPE_PROC: return "TYPE_PROC";
         case TYPE_KW: return "TYPE_KW";
         case TYPE_RECORD: return "TYPE_RECORD";
@@ -81,6 +85,10 @@ typedef struct type_mptr {
     uint64_t  term;
     bool      has_term;
 } type_mptr_t;
+
+typedef struct type_opt {
+    type_id_t inner;
+} type_opt_t;
 
 typedef struct type_proc {
     type_id_t return_type;
@@ -134,6 +142,7 @@ typedef struct type {
         type_array_t  array;
         type_ptr_t    ptr;
         type_mptr_t   mptr;
+        type_opt_t    opt;
         type_proc_t   proc;
         type_record_t record;
         type_kw_t     kw;
@@ -160,6 +169,8 @@ static inline bool type_eq(type_t const* lhs, type_t const* rhs) {
             return type_id_eq(lhs->as.mptr.inner, rhs->as.mptr.inner) &&
                    lhs->as.mptr.has_term == rhs->as.mptr.has_term &&
                    lhs->as.mptr.term == rhs->as.mptr.term;
+        case TYPE_OPT: return type_id_eq(lhs->as.opt.inner, rhs->as.opt.inner);
+        case TYPE_NIL: return true;
         case TYPE_PROC: {
             if (!type_id_eq(lhs->as.proc.return_type, rhs->as.proc.return_type))
                 return false;
@@ -200,11 +211,14 @@ da_declare(typestore_entry_t, typestore_entry);
 typedef struct typestore_primitives {
     type_id_t err;
     type_id_t void_;
+    type_id_t nil;
     type_id_t type;
     type_id_t bool_;
     type_id_t i8;
     type_id_t i32;
     type_id_t u32;
+    type_id_t i64;
+    type_id_t u64;
     type_id_t f32;
     type_id_t f64;
     type_id_t str;

@@ -250,6 +250,10 @@ typedef struct node_array {
     node_t** initializer_list;
 } node_array_t;
 
+typedef struct node_opt {
+    node_t* child;
+} node_opt_t;
+
 typedef struct node_ptr {
     node_t* child;
 } node_ptr_t;
@@ -297,6 +301,7 @@ typedef enum node_type : uint8_t {
     NODE_CINIT,
     NODE_FIELD,
     NODE_ARRAY,
+    NODE_OPT,
     NODE_PTR,
     NODE_MPTR,
 } node_type_t;
@@ -335,6 +340,7 @@ static inline char const* node_type_to_str(node_type_t type) {
         case NODE_CINIT: return "NODE_CINIT";
         case NODE_FIELD: return "NODE_FIELD";
         case NODE_ARRAY: return "NODE_ARRAY";
+        case NODE_OPT: return "NODE_OPT";
         case NODE_PTR: return "NODE_PTR";
         case NODE_MPTR: return "NODE_MPTR";
     }
@@ -378,6 +384,7 @@ struct node {
         node_cinit_t       cinit;
         node_field_t       field;
         node_array_t       array;
+        node_opt_t         opt;
         node_ptr_t         ptr;
         node_mptr_t        mptr;
     } as;

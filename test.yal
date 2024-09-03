@@ -1,36 +1,47 @@
-Counter := record {
-    count: u32;
-    end: u32;
-};
+export "main" main := .() -> i32 {
+    f := fopen("test.yal", "rb");
+    if f == nil {
+        printf("failed to open\n");
+        return 1;
+    }
+    defer fclose(f.*);
 
-new_counter := .(end: u32) -> Counter {
-    return .{.count=0, .end=end};
-};
+    SEEK_SET := 0;
+    SEEK_END := 2;
+    fseek(f.*, 0, SEEK_END);
+    size := ftell(f.*);
+    fseek(f.*, 0, SEEK_SET);
 
-step := .(c: *Counter) -> bool {
-    c.count = c.count + 1;
-    return c.count < c.end;
-};
+    data := malloc((size + 1) as _);
+    defer free(data);
 
-int := i32;
+    read := fread(data, 1, size as _, f.*);
+    if read as i64 != size {
+        printf("failed to read (%d != %d) (%d,%d)\n", read, size, ferror(f.*), feof(f.*));
+        return 1;
+    }
 
-export "main" main := .() -> int {
-    c_fprintf(c_stdout, "age > ");
-    c_fflush(c_stdout);
+    data[size] = 0;
 
-    age := 0;
-    _ = c_scanf("%d", age&);
-
-    c_fprintf(c_stdout, "got age: %d\n", age);
+    printf("%s\n", data);
 
     return 0;
 };
 
 FILE := opaque record {};
-extern "stdout"  c_stdout: *FILE;
-extern "stderr"  c_stderr: *FILE;
+extern "stdout"  stdout: *FILE;
+extern "stderr"  stderr: *FILE;
 
-extern "fprintf" c_fprintf: .(file: *FILE, fmt: [*:0]i8, ...) -> void;
-extern "fflush"  c_fflush: .(file: *FILE) -> void;
-extern "printf"  c_printf:  .(fmt: [*:0]i8, ...) -> void;
-extern "scanf"   c_scanf:   .(fmt: [*:0]i8, ...) -> i32;
+extern "fopen"   fopen:   .(path: [*:0]i8, mode: [*:0]i8) -> ?*FILE;
+extern "fclose"  fclose:  .(file: *FILE) -> void;
+extern "fseek"   fseek:   .(file: *FILE, off: i64, whence: i32) -> void;
+extern "ftell"   ftell:   .(file: *FILE) -> i64;
+extern "fread"   fread:   .(ptr: [*]i8, size: u64, nmemb: u64, file: *FILE) -> u64;
+extern "fprintf" fprintf: .(file: *FILE, fmt: [*:0]i8, ...) -> void;
+extern "fflush"  fflush:  .(file: *FILE) -> void;
+extern "feof"    feof:    .(file: *FILE) -> i32;
+extern "ferror"  ferror:  .(file: *FILE) -> i32;
+extern "malloc"  malloc:  .(size: u64) -> [*]i8;
+extern "free"    free:    .(ptr: [*]i8) -> void;
+extern "printf"  printf:  .(fmt: [*:0]i8, ...) -> void;
+extern "scanf"   scanf:   .(fmt: [*:0]i8, ...) -> i32;

@@ -324,6 +324,9 @@ static void check_node(state_t* s, node_t* node) {
                 check_node(s, node->as.array.initializer_list[i]);
             }
         } break;
+        case NODE_OPT: {
+            check_node(s, node->as.opt.child);
+        } break;
         case NODE_PTR: {
             check_node(s, node->as.ptr.child);
         } break;

@@ -15,6 +15,7 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
 
     typestore_add_type(ts, &(type_t){.tag = -1});
     ts->primitives.err = typestore_add_type(ts, &(type_t){.tag = TYPE_ERR});
+    ts->primitives.nil = typestore_add_type(ts, &(type_t){.tag = TYPE_NIL});
     ts->primitives.void_ = typestore_add_type(ts, &(type_t){.tag = TYPE_VOID});
     ts->primitives.type = typestore_add_type(ts, &(type_t){.tag = TYPE_TYPE});
     ts->primitives.bool_ = typestore_add_type(ts, &(type_t){.tag = TYPE_BOOL});
@@ -29,6 +30,14 @@ void typestore_init(typestore_t* ts, allocator_t alloc) {
     ts->primitives.u32 = typestore_add_type(
         ts, &(type_t){
                 .tag = TYPE_INT, .as.int_ = {.bits = 32, .signed_ = false}
+    });
+    ts->primitives.i64 = typestore_add_type(
+        ts, &(type_t){
+                .tag = TYPE_INT, .as.int_ = {.bits = 64, .signed_ = true}
+    });
+    ts->primitives.u64 = typestore_add_type(
+        ts, &(type_t){
+                .tag = TYPE_INT, .as.int_ = {.bits = 64, .signed_ = false}
     });
     ts->primitives.f32 = typestore_add_type(
         ts, &(type_t){.tag = TYPE_FLOAT, .as.float_ = {.bits = 32}});
@@ -126,6 +135,16 @@ char const* typestore_type_to_str(typestore_t* ts, allocator_t alloc,
 
             return s;
         }
+        case TYPE_OPT: {
+            char const* inner =
+                typestore_type_id_to_str(ts, alloc, type->as.opt.inner);
+
+            char const* s = allocator_sprintf(alloc, "?%s", inner);
+            allocator_free(alloc, (char*)inner);
+
+            return s;
+        }
+        case TYPE_NIL: return allocator_sprintf(alloc, "nil");
         case TYPE_PROC: {
             char* b = da_init_char(alloc);
             char  c = '(';

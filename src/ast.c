@@ -185,6 +185,10 @@ void dump_node(FILE* f, node_t* node, int indent) {
                 dump_node(f, node->as.array.initializer_list[i], indent + 1);
             }
         } break;
+        case NODE_OPT:
+            fprintf(f, "OPT\n");
+            dump_node(f, node->as.opt.child, indent + 1);
+            break;
         case NODE_PTR:
             fprintf(f, "PTR\n");
             dump_node(f, node->as.ptr.child, indent + 1);

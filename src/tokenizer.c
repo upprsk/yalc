@@ -250,6 +250,7 @@ static void tokenize_one(tokenizer_t* t) {
             else
                 append_token(t, TT_BANG);
             break;
+        case '?': append_token(t, TT_QUESTION); break;
         case '(': append_token(t, TT_LPAREN); break;
         case ')': append_token(t, TT_RPAREN); break;
         case '[': append_token(t, TT_LBRACKET); break;

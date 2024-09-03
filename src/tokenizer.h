@@ -23,6 +23,7 @@ typedef enum token_type : uint8_t {
     TT_EQUAL,      // =
     TT_AMPERSAND,  // &
     TT_BANG,       // !
+    TT_QUESTION,   // ?
 
     TT_PLUS,           // +
     TT_MINUS,          // -
@@ -81,6 +82,7 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_EQUAL: return "TT_EQUAL";
         case TT_AMPERSAND: return "TT_AMPERSAND";
         case TT_BANG: return "TT_BANG";
+        case TT_QUESTION: return "TT_QUESTION";
         case TT_PLUS: return "TT_PLUS";
         case TT_MINUS: return "TT_MINUS";
         case TT_STAR: return "TT_STAR";
