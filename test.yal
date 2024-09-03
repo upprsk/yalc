@@ -4,20 +4,22 @@ export "main" main := .() -> i32 {
         printf("failed to open\n");
         return 1;
     }
-    defer fclose(f.*);
+    f := f.*;
+
+    defer fclose(f);
 
     SEEK_SET := 0;
     SEEK_END := 2;
-    fseek(f.*, 0, SEEK_END);
-    size := ftell(f.*);
-    fseek(f.*, 0, SEEK_SET);
+    fseek(f, 0, SEEK_END);
+    size := ftell(f);
+    fseek(f, 0, SEEK_SET);
 
     data := malloc((size + 1) as _);
     defer free(data);
 
-    read := fread(data, 1, size as _, f.*);
+    read := fread(data, 1, size as _, f);
     if read as i64 != size {
-        printf("failed to read (%d != %d) (%d,%d)\n", read, size, ferror(f.*), feof(f.*));
+        printf("failed to read (%d != %d) (%d,%d)\n", read, size, ferror(f), feof(f));
         return 1;
     }
 

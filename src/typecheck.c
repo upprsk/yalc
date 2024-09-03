@@ -148,8 +148,9 @@ static void scope_init(scope_t* s, allocator_t alloc, scope_t* parent,
 
 static value_t const* scope_find_direct(scope_t* s, char const* name) {
     size_t size = da_get_size(s->entries);
-    for (size_t i = 0; i < size; ++i) {
-        if (strcmp(s->entries[i].name, name) == 0) return &s->entries[i].value;
+    for (size_t i = size; i > 0; --i) {
+        if (strcmp(s->entries[i - 1].name, name) == 0)
+            return &s->entries[i - 1].value;
     }
 
     return NULL;
@@ -172,13 +173,22 @@ static void scope_add_unchecked(scope_t* s, allocator_t alloc, char const* name,
         s->entries, alloc, &(scope_entry_t){.name = name, .value = *value});
 }
 
-static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
-                                value_t const* value) {
+static value_t const* scope_add_or_get(scope_t* s, allocator_t alloc,
+                                       char const* name, value_t const* value) {
     value_t const* prev = scope_find(s, name);
     if (prev) return prev;
 
     scope_add_unchecked(s, alloc, name, value);
     return NULL;
+}
+
+static value_t const* scope_add(scope_t* s, allocator_t alloc, char const* name,
+                                value_t const* value, bool allow_shadow) {
+    value_t const* prev = scope_find(s, name);
+    if (prev && !allow_shadow) return prev;
+
+    scope_add_unchecked(s, alloc, name, value);
+    return prev;
 }
 
 static bool scope_is_inside_loop(scope_t* s) {
@@ -334,7 +344,7 @@ static value_t const* call_node(typechecker_t* tc, env_t* outer_env,
         node_arg_t* arg = &arg_node->as.arg;
 
         value_t const* prev =
-            scope_add(&scope, tc->tempalloc, arg->name, args[i]);
+            scope_add_or_get(&scope, tc->tempalloc, arg->name, args[i]);
         munit_assert_null(prev);
     }
 
@@ -1292,8 +1302,9 @@ static type_id_t typecheck_node_decl(typechecker_t* tc, env_t* outer_env,
                                                .where = decl->name_span,
                                                .extern_name = extern_name,
                                                .type_payload = type_payload,
-                                               .node = decl->init});
-    if (prev) {
+                                               .node = decl->init},
+                                    type_id_is_valid(env.curr_proc_type));
+    if (prev && !type_id_is_valid(env.curr_proc_type)) {
         report_error(tc->er, node->span, "identifier %s already defined",
                      decl->name);
         if (prev->where.start != 0 && prev->where.end != 0)
@@ -1402,10 +1413,10 @@ static uint32_t typecheck_node_proc_args(typechecker_t* tc, env_t* env,
                 gargs = da_append_type_id(gargs, tc->alloc, &argtype);
             }
 
-            scope_add(scope, tc->tempalloc, arg->name,
-                      &(value_t){.type = argtype,
-                                 .where = arg_node->span,
-                                 .type_payload = type_payload});
+            scope_add_or_get(scope, tc->tempalloc, arg->name,
+                             &(value_t){.type = argtype,
+                                        .where = arg_node->span,
+                                        .type_payload = type_payload});
 
             args = da_append_type_id(args, tc->alloc, &argtype);
         } else {
@@ -1526,10 +1537,14 @@ static type_id_t typecheck_node_proc(typechecker_t* tc, env_t* env,
     return result;
 }
 
-static type_id_t typecheck_node_record(typechecker_t* tc, env_t* env,
+static type_id_t typecheck_node_record(typechecker_t* tc, env_t* outer_env,
                                        scope_t* scope, node_t* node,
                                        inference_t inf) {
-    typecheck_node(tc, env, scope, node->as.record.blk, inf);
+    env_t env = {
+        .parent = outer_env,
+    };
+
+    typecheck_node(tc, &env, scope, node->as.record.blk, inf);
 
     return tc->ts->primitives.type;
 }
@@ -1935,44 +1950,44 @@ void pass_typecheck(typecheck_params_t const* params) {
     // FIXME: Check if temp_alloc is what we want for this
     scope_t root_scope = {};
     scope_init(&root_scope, tc.tempalloc, NULL, false);
-    scope_add(&root_scope, tc.tempalloc, "true",
-              &(value_t){.type = tc.ts->primitives.bool_});
-    scope_add(&root_scope, tc.tempalloc, "false",
-              &(value_t){.type = tc.ts->primitives.bool_});
-    scope_add(&root_scope, tc.tempalloc, "nil",
-              &(value_t){.type = tc.ts->primitives.nil});
+    scope_add_or_get(&root_scope, tc.tempalloc, "true",
+                     &(value_t){.type = tc.ts->primitives.bool_});
+    scope_add_or_get(&root_scope, tc.tempalloc, "false",
+                     &(value_t){.type = tc.ts->primitives.bool_});
+    scope_add_or_get(&root_scope, tc.tempalloc, "nil",
+                     &(value_t){.type = tc.ts->primitives.nil});
 
     {
         type_id_t type_ = tc.ts->primitives.type;
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "i32",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.i32});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "u32",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.u32});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "i64",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.i64});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "u64",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.u64});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "i8",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.i8});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "f32",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.f32});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "f64",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.f64});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "bool",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.bool_});
-        scope_add(
+        scope_add_or_get(
             &root_scope, tc.tempalloc, "void",
             &(value_t){.type = type_, .type_payload = tc.ts->primitives.void_});
-        scope_add(&root_scope, tc.tempalloc, "type",
-                  &(value_t){.type = type_, .type_payload = type_});
+        scope_add_or_get(&root_scope, tc.tempalloc, "type",
+                         &(value_t){.type = type_, .type_payload = type_});
     }
 
     scope_t scope;
