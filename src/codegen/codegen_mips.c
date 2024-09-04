@@ -377,7 +377,7 @@ static void codegen_stmt_decl(codegen_state_t* cs, proc_state_t* ps,
     fprintf(cs->out,
             "    # local %s\n"
             "    move $%d, $%d\n",
-            node->as.decl.name, reg, v.reg);
+            node->as.decl.extern_name, reg, v.reg);
 
     push_value(cs, &(value_t){.reg = reg, .name = node->as.decl.name});
 }
