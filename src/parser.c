@@ -111,10 +111,10 @@ static char const* span_conv_strlit(span_t s, char const* source,
     append(0);
 #undef append
 
-    if (out_len) *out_len = i;
-
     size_t size = da_get_size(str);
-    char*  buf = allocator_alloc(alloc, size);
+    if (out_len) *out_len = size;
+
+    char* buf = allocator_alloc(alloc, size);
     memcpy(buf, str, size);
 
     da_free(str, alloc);
