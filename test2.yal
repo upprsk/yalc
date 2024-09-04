@@ -1,16 +1,14 @@
-f := .(x: i32) -> i32 {
-    return x / 2;
-};
-
 export "main" main := .() {
-    a := 69;
-    b := f(a);
-
-    print_i32(a);
-    print_char(10);
-    print_i32(b);
-    print_char(10);
+    print_str("entre com a idade: ");
+    idade := read_i32();
+    if idade < 18 {
+        print_str("menor de idade\n");
+    } else {
+        print_str("maior de idade\n");
+    }
 };
 
+extern "__builtin_read_i32"   read_i32:   .() -> i32;
 extern "__builtin_print_i32"  print_i32:  .(v: i32) -> void;
 extern "__builtin_print_char" print_char: .(c: i8) -> void;
+extern "__builtin_print_str"  print_str:  .(s: [*:0]i8) -> void;

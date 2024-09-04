@@ -31,6 +31,12 @@ typedef struct value {
 
 da_declare(value_t, value);
 
+typedef struct string_lit {
+    char const* literal;
+} string_lit_t;
+
+da_declare(string_lit_t, string_lit);
+
 typedef struct codegen_state {
     allocator_t  temp_alloc;
     typestore_t* ts;
@@ -41,6 +47,7 @@ typedef struct codegen_state {
 
     register_alloc_t tmpregalloc;
     value_t*         values;
+    string_lit_t*    string_literals;
 } codegen_state_t;
 
 static void push_value(codegen_state_t* cs, value_t const* v) {
@@ -89,6 +96,11 @@ static void register_pop_from_stack(codegen_state_t* cs, uint8_t reg) {
             reg, reg);
 }
 
+static void add_string_literal(codegen_state_t* cs, char const* lit) {
+    cs->string_literals = da_append_string_lit(
+        cs->string_literals, cs->temp_alloc, &(string_lit_t){.literal = lit});
+}
+
 typedef struct proc_state {
     register_alloc_t locregalloc;
     uint8_t          ret_label;
@@ -100,6 +112,11 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
             uint8_t reg = register_alloc(&cs->tmpregalloc);
             push_value(cs, &(value_t){.reg = reg});
             fprintf(cs->out, "    li $%d, %lu\n", reg, node->as.int_.value);
+        } break;
+        case NODE_STR: {
+            uint8_t reg = register_alloc(&cs->tmpregalloc);
+            push_value(cs, &(value_t){.reg = reg});
+            fprintf(cs->out, "    la $%d, str_%p\n", reg, node->as.str.str);
         } break;
         case NODE_IDENT: {
             char const* ident = node->as.ident.ident;
@@ -529,6 +546,149 @@ static void codegen_mod(codegen_state_t* cs, node_t* node) {
     }
 }
 
+static void find_string_literals(codegen_state_t* cs, node_t* node) {
+    if (!node) return;
+
+    switch (node->type) {
+        case NODE_STR: add_string_literal(cs, node->as.str.str); break;
+        case NODE_BINOP:
+            find_string_literals(cs, node->as.binop.left);
+            find_string_literals(cs, node->as.binop.right);
+            break;
+        case NODE_UNOP: find_string_literals(cs, node->as.unop.child); break;
+        case NODE_LOGIC:
+            find_string_literals(cs, node->as.logic.left);
+            find_string_literals(cs, node->as.logic.right);
+            break;
+        case NODE_COMP:
+            find_string_literals(cs, node->as.comp.left);
+            find_string_literals(cs, node->as.comp.right);
+            break;
+        case NODE_INDEX:
+            find_string_literals(cs, node->as.index.receiver);
+            find_string_literals(cs, node->as.index.index);
+            break;
+        case NODE_CALL: {
+            find_string_literals(cs, node->as.call.callee);
+            size_t count = da_get_size(node->as.call.args);
+            for (size_t i = 0; i < count; i++) {
+                find_string_literals(cs, node->as.call.args[i]);
+            }
+        } break;
+        case NODE_REF: find_string_literals(cs, node->as.ref.child); break;
+        case NODE_DEREF: find_string_literals(cs, node->as.deref.child); break;
+        case NODE_CAST:
+            find_string_literals(cs, node->as.cast.child);
+            find_string_literals(cs, node->as.cast.type);
+            break;
+        case NODE_STMT_EXPR:
+            find_string_literals(cs, node->as.stmt_expr.expr);
+            break;
+        case NODE_STMT_RET:
+            find_string_literals(cs, node->as.stmt_ret.child);
+            break;
+        case NODE_STMT_BREAK:
+            find_string_literals(cs, node->as.stmt_break.child);
+            break;
+        case NODE_STMT_IF:
+            find_string_literals(cs, node->as.stmt_if.condition);
+            find_string_literals(cs, node->as.stmt_if.when_true);
+            find_string_literals(cs, node->as.stmt_if.when_false);
+            break;
+        case NODE_STMT_WHILE:
+            find_string_literals(cs, node->as.stmt_while.condition);
+            find_string_literals(cs, node->as.stmt_while.body);
+            break;
+        case NODE_STMT_BLK: {
+            size_t count = da_get_size(node->as.stmt_blk.stmts);
+            for (size_t i = 0; i < count; i++) {
+                find_string_literals(cs, node->as.stmt_blk.stmts[i]);
+            }
+        } break;
+        case NODE_MOD: {
+            size_t count = da_get_size(node->as.mod.decls);
+            for (size_t i = 0; i < count; i++) {
+                find_string_literals(cs, node->as.mod.decls[i]);
+            }
+        } break;
+        case NODE_STMT_DEFER:
+            find_string_literals(cs, node->as.defer.stmt);
+            break;
+        case NODE_DECL:
+            find_string_literals(cs, node->as.decl.type);
+            find_string_literals(cs, node->as.decl.init);
+            break;
+        case NODE_ASSIGN:
+            find_string_literals(cs, node->as.assign.lhs);
+            find_string_literals(cs, node->as.assign.rhs);
+            break;
+        case NODE_ARG: find_string_literals(cs, node->as.arg.type); break;
+        case NODE_PROC: {
+            size_t count = da_get_size(node->as.proc.args);
+            for (size_t i = 0; i < count; i++) {
+                find_string_literals(cs, node->as.proc.args[i]);
+            }
+            find_string_literals(cs, node->as.proc.body);
+        } break;
+        case NODE_RECORD: find_string_literals(cs, node->as.record.blk); break;
+        case NODE_CINITF:
+            find_string_literals(cs, node->as.cinitf.name);
+            find_string_literals(cs, node->as.cinitf.init);
+            break;
+        case NODE_CINIT: {
+            size_t count = da_get_size(node->as.cinit.kids);
+            for (size_t i = 0; i < count; i++) {
+                find_string_literals(cs, node->as.cinit.kids[i]);
+            }
+        } break;
+        case NODE_FIELD:
+            find_string_literals(cs, node->as.field.receiver);
+            break;
+        case NODE_ARRAY: {
+            find_string_literals(cs, node->as.array.type);
+            find_string_literals(cs, node->as.array.len);
+            size_t count = da_get_size(node->as.array.initializer_list);
+            for (size_t i = 0; i < count; i++) {
+                find_string_literals(cs, node->as.array.initializer_list[i]);
+            }
+        } break;
+        case NODE_OPT: find_string_literals(cs, node->as.opt.child); break;
+        case NODE_PTR: find_string_literals(cs, node->as.ptr.child); break;
+        case NODE_MPTR:
+            find_string_literals(cs, node->as.mptr.child);
+            find_string_literals(cs, node->as.mptr.term);
+            break;
+        case NODE_ERR:
+        case NODE_INT:
+        case NODE_FLOAT:
+        case NODE_IDENT:
+        case NODE_KW: break;
+    }
+}
+
+static void encode_string(codegen_state_t* cs, char const* str) {
+    for (size_t i = 0; str[i] != '\0'; i++) {
+        if (str[i] == '\n') {
+            fprintf(cs->out, "\\n");
+        } else if (str[i] == '\t') {
+            fprintf(cs->out, "\\t");
+        } else if (str[i] == '\r') {
+            fprintf(cs->out, "\\r");
+        } else {
+            fprintf(cs->out, "%c", str[i]);
+        }
+    }
+}
+
+static void codegen_string_literals(codegen_state_t* cs) {
+    size_t count = da_get_size(cs->string_literals);
+    for (size_t i = 0; i < count; i++) {
+        fprintf(cs->out, "str_%p: .asciiz \"", cs->string_literals[i].literal);
+        encode_string(cs, cs->string_literals[i].literal);
+        fprintf(cs->out, "\"\n");
+    }
+}
+
 void codegen_mips(codegen_mips_params_t const* params) {
     Arena       arena = {};
     allocator_t temp_alloc = {};
@@ -540,11 +700,17 @@ void codegen_mips(codegen_mips_params_t const* params) {
         .out = params->out,
         .values = da_init_value(temp_alloc),
         .tmpregalloc = {.cap = 8, .off = 8},
+        .string_literals = da_init_string_lit(temp_alloc),
     };
 
     // Tell assembler to not insert instructions to fill branch delay slots.
     // This is necessary when branch delay slots are disabled.
-    fprintf(cs.out, ".set noreorder\n\n");
+    fprintf(cs.out, ".set noreorder\n\n.data\n");
+
+    find_string_literals(&cs, params->ast);
+    codegen_string_literals(&cs);
+
+    fprintf(cs.out, "\n.text\n");
 
     // procedure to use syscal to print a single integer
     fprintf(cs.out,
@@ -557,6 +723,13 @@ void codegen_mips(codegen_mips_params_t const* params) {
     fprintf(cs.out,
             "__builtin_print_char:\n"
             "    li $v0, 11\n"
+            "    syscall\n"
+            "    jr $ra\n\n");
+
+    // procedure to use syscal to print a null-terminated string
+    fprintf(cs.out,
+            "__builtin_print_str:\n"
+            "    li $v0, 4\n"
             "    syscall\n"
             "    jr $ra\n\n");
 
