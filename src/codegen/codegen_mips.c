@@ -273,7 +273,11 @@ static void codegen_expr(codegen_state_t* cs, proc_state_t* ps, node_t* node) {
             if (type->tag != TYPE_VOID)
                 fprintf(cs->out, "    move $%d, $%d\n", reg, 2);
         } break;
-        default: munit_assert(false);
+        default: {
+            fprintf(stderr, "not supported: %s\n",
+                    node_type_to_str(node->type));
+            munit_assert(false);
+        }
     }
 }
 
