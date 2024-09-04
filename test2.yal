@@ -1,0 +1,16 @@
+f := .(x: i32) -> i32 {
+    return x / 2;
+};
+
+export "main" main := .() {
+    a := 69;
+    b := f(a);
+
+    print_i32(a);
+    print_char(10);
+    print_i32(b);
+    print_char(10);
+};
+
+extern "__builtin_print_i32"  print_i32:  .(v: i32) -> void;
+extern "__builtin_print_char" print_char: .(c: i8) -> void;
