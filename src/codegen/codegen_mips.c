@@ -522,7 +522,7 @@ static void codegen_mod(codegen_state_t* cs, node_t* node) {
                 "# type: %s\n",
                 n->as.decl.name, typestr);
 
-        codegen_proc(cs, n->as.decl.name, n->as.decl.init);
+        codegen_proc(cs, n->as.decl.extern_name, n->as.decl.init);
         munit_assert_size(cs->register_stack_pushes, ==, 0);
 
         fprintf(cs->out, "# end: %s\n\n", n->as.decl.name);
