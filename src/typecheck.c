@@ -690,13 +690,15 @@ static type_id_t typecheck_node_comp(typechecker_t* tc, env_t* env,
         char const* rhsstr =
             typestore_type_to_str(tc->ts, tc->tempalloc, rhsty);
 
-        if (lhsty->tag == TYPE_NIL && rhsty->tag == TYPE_OPT) {
+        if (lhsty->tag == TYPE_NIL && rhsty->tag == TYPE_OPT &&
+            (node->as.comp.type == COMP_EQ || node->as.comp.type == COMP_NEQ)) {
             // report_note(tc->er, node->span, "lhs is NIL and rhs is OPT");
 
             return tc->ts->primitives.bool_;
         }
 
-        if (lhsty->tag == TYPE_OPT && rhsty->tag == TYPE_NIL) {
+        if (lhsty->tag == TYPE_OPT && rhsty->tag == TYPE_NIL &&
+            (node->as.comp.type == COMP_EQ || node->as.comp.type == COMP_NEQ)) {
             // report_note(tc->er, node->span, "lhs is OPT and rhs is NIL");
 
             return tc->ts->primitives.bool_;
