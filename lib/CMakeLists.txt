@@ -6,5 +6,6 @@ add_library(lib
   utils/minmax.h
 )
 
+target_compile_options(lib PUBLIC -Wall -Wextra)
 target_include_directories(lib PUBLIC .)
 target_link_libraries(lib PUBLIC munit)
