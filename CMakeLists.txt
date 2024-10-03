@@ -25,8 +25,10 @@ if(NOT munit_POPULATED)
 
   add_library(munit ${munit_content_SOURCE_DIR}/munit.h ${munit_content_SOURCE_DIR}/munit.c)
   target_include_directories(munit PUBLIC ${munit_content_SOURCE_DIR})
+  target_compile_definitions(munit PUBLIC -DMUNIT_ENABLE_ASSERT_ALIASES=1)
 endif()
 
+add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(app)
 add_subdirectory(tests)
