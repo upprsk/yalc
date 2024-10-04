@@ -5,6 +5,10 @@ add_library(lib
   da/da.h
   lst/lst.h
   map/map.h
+  utils/fnv1a.h
+  utils/fs.c
+  utils/fs.h
+  utils/macros.h
   utils/minmax.h
 )
 
