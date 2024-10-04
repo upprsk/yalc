@@ -1,5 +1,6 @@
 #include "alloc/allocator.h"
 #include "da/da.h"
+#include "slice/slice.h"
 #include "test.h"
 
 static MunitResult test_da_create(MunitParameter const params[],
@@ -264,6 +265,48 @@ static MunitResult test_da_clear(MunitParameter const params[],
     return MUNIT_OK;
 }
 
+static MunitResult test_da_slice(MunitParameter const params[],
+                                 void*                user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    static int items[] = {1, 2,  3,  4,  5,  6,  7,  8,
+                          9, 10, 11, 12, 13, 14, 15, 16};
+
+    allocator_t alloc = c_allocator();
+    da_int_t    arr = {.alloc = alloc};
+
+    da_append(&arr, sizeof(items) / sizeof(items[0]), items);
+    assert_not_null(arr.items);
+    assert_uint32(arr.size, ==, 16);
+    assert_uint32(arr.capacity, ==, 16);
+
+    slice_int_t s = da_to_slice(arr);
+    assert_not_null(s.ptr);
+    assert_uint32(s.len, ==, 16);
+
+    da_free(&arr);
+
+    assert_null(arr.items);
+    assert_uint32(arr.size, ==, 0);
+    assert_uint32(arr.capacity, ==, 0);
+
+    da_append(&arr, sizeof(items) / sizeof(items[0]), items);
+    assert_not_null(arr.items);
+    assert_uint32(arr.size, ==, 16);
+    assert_uint32(arr.capacity, ==, 16);
+
+    s = da_to_slice_of(arr, slice_int_t);
+    assert_not_null(s.ptr);
+    assert_uint32(s.len, ==, 16);
+
+    slice_free(alloc, s);
+    assert_null(s.ptr);
+    assert_uint32(s.len, ==, 0);
+
+    return MUNIT_OK;
+}
+
 static MunitResult test_da_sprintf(MunitParameter const params[],
                                    void*                user_data_or_fixture) {
     (void)params;
@@ -353,6 +396,15 @@ void test_lib_da_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/lib/da/clear",
                           test_da_clear,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/lib/da/slice",
+                          test_da_slice,
                           NULL,
                           NULL,
                           MUNIT_TEST_OPTION_NONE,
