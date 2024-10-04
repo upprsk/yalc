@@ -173,6 +173,19 @@ typedef enum da_sts {
 #define da_foreach(_da, _i) \
     for (typeof((_da)->size) _i = 0; _i < (_da)->size; (_i)++)
 
+/// Convert the dynamic array to a slice. Note that this does not reduce the
+/// capacity to size (that would be a potential allocation) or create a copy.
+/// The returned slice is a view over the array.
+///
+/// ```c
+/// str_t s = da_to_slice(da);
+/// ```
+#define da_to_slice(_da) \
+    { .ptr = (_da).items, .len = (_da).size }
+
+/// Same as `da_to_slice` but with an explicit type.
+#define da_to_slice_of(_da, T) (T) da_to_slice(_da)
+
 /// Spread all of the fields of the dynamic array to be used by implementation
 /// functions.
 #define da_spread(_da) \

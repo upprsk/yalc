@@ -59,4 +59,5 @@
     (str_t) { _s, sizeof(_s) - 1 }
 
 typedef slice_t(char) slice_char_t;
+typedef slice_t(int) slice_int_t;
 typedef slice_t(char const) str_t;
