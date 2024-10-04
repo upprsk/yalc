@@ -4,22 +4,12 @@
 #include <stdint.h>
 
 #include "munit.h"
+#include "slice/slice.h"
 
 typedef struct span {
-    uint32_t start, end;
+    uint32_t start, len;
 } span_t;
 
-/// Get a pointer to the start of string and it's length from a span.
-static inline char const* span_str_parts(span_t s, char const* source,
-                                         uint32_t  source_len,
-                                         uint32_t* str_len) {
-    munit_assert_uint32(s.start, <=, source_len);
-    munit_assert_uint32(s.end, <=, source_len);
-    munit_assert_uint32(s.end, >=, s.start);
-
-    char const* start = &source[s.start];
-    uint32_t    len = s.end - s.start;
-
-    *str_len = len;
-    return start;
+static inline str_t span_to_slice(span_t s, str_t source) {
+    return slice_s(source, s.start, s.start + s.len);
 }

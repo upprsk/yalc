@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
-#include "allocator.h"
-#include "da.h"
+#include "alloc/allocator.h"
+#include "da/da.h"
 #include "errors.h"
 #include "span.h"
 
@@ -129,7 +129,6 @@ typedef struct token {
     span_t       span;
 } token_t;
 
-da_declare(token_t, token);
+typedef da_t(token_t) da_token_t;
 
-token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* source,
-                  uint32_t source_len);
+da_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source);

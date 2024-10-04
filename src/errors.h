@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "slice/slice.h"
 #include "span.h"
 
 typedef struct error_reporter {
@@ -11,34 +12,8 @@ typedef struct error_reporter {
     FILE* stream;
 
     char const* filename;
-    char const* source;
-    size_t      source_len;
+    str_t       source;
 } error_reporter_t;
-
-void report_error_opt(error_reporter_t* er, char const* filename,
-                      char const* source, span_t span, char const* format, ...);
-void vreport_error_opt(error_reporter_t* er, char const* filename,
-                       char const* source, span_t span, char const* format,
-                       va_list va);
-
-void report_warn_opt(error_reporter_t* er, char const* filename,
-                     char const* source, span_t span, char const* format, ...);
-void vreport_warn_opt(error_reporter_t* er, char const* filename,
-                      char const* source, span_t span, char const* format,
-                      va_list va);
-
-void report_note_opt(error_reporter_t* er, char const* filename,
-                     char const* source, span_t span, char const* format, ...);
-void vreport_note_opt(error_reporter_t* er, char const* filename,
-                      char const* source, span_t span, char const* format,
-                      va_list va);
-
-void report_success_opt(error_reporter_t* er, char const* filename,
-                        char const* source, span_t span, char const* format,
-                        ...);
-void vreport_success_opt(error_reporter_t* er, char const* filename,
-                         char const* source, span_t span, char const* format,
-                         va_list va);
 
 void report_error(error_reporter_t* er, span_t span, char const* format, ...);
 void vreport_error(error_reporter_t* er, span_t span, char const* format,

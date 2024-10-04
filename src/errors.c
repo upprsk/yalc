@@ -51,18 +51,18 @@ static uint32_t find_line_end(char const* source, span_t span) {
     return i;
 }
 
-static void show_span(error_reporter_t* er, char const* color,
-                      char const* source, span_t span, uint32_t line,
-                      uint32_t line_start, uint32_t line_end,
+static void show_span(error_reporter_t* er, char const* color, span_t span,
+                      uint32_t line, uint32_t line_start, uint32_t line_end,
                       uint32_t line_col) {
     fprintf(er->stream, "% 4d | %.*s\n", line + 1, line_end - line_start,
-            &source[line_start]);
+            &er->source.ptr[line_start]);
     fprintf(er->stream, "       ");
     for (size_t i = 0; i < line_col; ++i) fputc(' ', er->stream);
 
     if (isatty(fileno(er->stream))) fprintf(er->stream, "%s", color);
 
-    for (size_t i = span.start; i < span.end && i < line_end; ++i)
+    size_t end = span.start + span.len;
+    for (size_t i = span.start; i < end && i < line_end; ++i)
         fputc('^', er->stream);
 
     if (isatty(fileno(er->stream))) fprintf(er->stream, ANSI_RESET);
@@ -71,9 +71,9 @@ static void show_span(error_reporter_t* er, char const* color,
 }
 
 static void show_message(error_reporter_t* er, char const* color,
-                         char const* kind, char const* filename, uint32_t line,
-                         uint32_t line_col, char const* format, va_list va) {
-    fprintf(er->stream, "%s:%d:%d: ", filename, line + 1, line_col + 1);
+                         char const* kind, uint32_t line, uint32_t line_col,
+                         char const* format, va_list va) {
+    fprintf(er->stream, "%s:%d:%d: ", er->filename, line + 1, line_col + 1);
 
     if (isatty(fileno(er->stream))) {
         fprintf(er->stream, "%s%s:" ANSI_RESET " ", color, kind);
@@ -85,115 +85,6 @@ static void show_message(error_reporter_t* er, char const* color,
     fprintf(er->stream, "\n");
 }
 
-void report_error_opt(error_reporter_t* er, char const* filename,
-                      char const* source, span_t span, char const* format,
-                      ...) {
-    va_list va;
-    va_start(va, format);
-    vreport_error_opt(er, filename, source, span, format, va);
-    va_end(va);
-}
-
-void vreport_error_opt(error_reporter_t* er, char const* filename,
-                       char const* source, span_t span, char const* format,
-                       va_list va) {
-    er->error_count++;
-
-    uint32_t line = count_lines(source, span);
-    uint32_t line_start = find_line_start(source, span);
-    uint32_t line_end = find_line_end(source, span);
-    uint32_t line_col = count_line_cols(line_start, span);
-
-    munit_assert_uint32(line_end, >=, line_start);
-
-    show_message(er, ANSI_RED, "error", filename, line, line_col, format, va);
-    show_span(er, ANSI_RED, source, span, line, line_start, line_end, line_col);
-}
-
-void report_warn_opt(error_reporter_t* er, char const* filename,
-                     char const* source, span_t span, char const* format, ...) {
-    va_list va;
-    va_start(va, format);
-    vreport_warn_opt(er, filename, source, span, format, va);
-    va_end(va);
-}
-
-void vreport_warn_opt(error_reporter_t* er, char const* filename,
-                      char const* source, span_t span, char const* format,
-                      va_list va) {
-    er->error_count++;
-
-    uint32_t line = count_lines(source, span);
-    uint32_t line_start = find_line_start(source, span);
-    uint32_t line_end = find_line_end(source, span);
-    uint32_t line_col = count_line_cols(line_start, span);
-
-    munit_assert_uint32(line_end, >=, line_start);
-
-    show_message(er, ANSI_YELLOW, "warning", filename, line, line_col, format,
-                 va);
-    show_span(er, ANSI_YELLOW, source, span, line, line_start, line_end,
-              line_col);
-}
-
-void report_note_opt(error_reporter_t* er, char const* filename,
-                     char const* source, span_t span, char const* format, ...) {
-    va_list va;
-    va_start(va, format);
-
-    vreport_note_opt(er, filename, source, span, format, va);
-
-    va_end(va);
-}
-
-void vreport_note_opt(error_reporter_t* er, char const* filename,
-                      char const* source, span_t span, char const* format,
-                      va_list va) {
-    munit_assert_not_null(er);
-    munit_assert_not_null(filename);
-    munit_assert_not_null(source);
-
-    uint32_t line = count_lines(source, span);
-    uint32_t line_start = find_line_start(source, span);
-    uint32_t line_end = find_line_end(source, span);
-    uint32_t line_col = count_line_cols(line_start, span);
-
-    munit_assert_uint32(line_end, >=, line_start);
-    show_message(er, ANSI_CYAN, "note", filename, line, line_col, format, va);
-    show_span(er, ANSI_CYAN, source, span, line, line_start, line_end,
-              line_col);
-}
-
-void report_success_opt(error_reporter_t* er, char const* filename,
-                        char const* source, span_t span, char const* format,
-                        ...) {
-    va_list va;
-    va_start(va, format);
-
-    vreport_success_opt(er, filename, source, span, format, va);
-
-    va_end(va);
-}
-
-void vreport_success_opt(error_reporter_t* er, char const* filename,
-                         char const* source, span_t span, char const* format,
-                         va_list va) {
-    munit_assert_not_null(er);
-    munit_assert_not_null(filename);
-    munit_assert_not_null(source);
-
-    uint32_t line = count_lines(source, span);
-    uint32_t line_start = find_line_start(source, span);
-    uint32_t line_end = find_line_end(source, span);
-    uint32_t line_col = count_line_cols(line_start, span);
-
-    munit_assert_uint32(line_end, >=, line_start);
-    show_message(er, ANSI_GREEN, "success", filename, line, line_col, format,
-                 va);
-    show_span(er, ANSI_GREEN, source, span, line, line_start, line_end,
-              line_col);
-}
-
 void report_error(error_reporter_t* er, span_t span, char const* format, ...) {
     va_list va;
     va_start(va, format);
@@ -203,7 +94,18 @@ void report_error(error_reporter_t* er, span_t span, char const* format, ...) {
 
 void vreport_error(error_reporter_t* er, span_t span, char const* format,
                    va_list va) {
-    vreport_error_opt(er, er->filename, er->source, span, format, va);
+    assert_not_null(er);
+    er->error_count++;
+
+    uint32_t line = count_lines(er->source.ptr, span);
+    uint32_t line_start = find_line_start(er->source.ptr, span);
+    uint32_t line_end = find_line_end(er->source.ptr, span);
+    uint32_t line_col = count_line_cols(line_start, span);
+
+    assert_uint32(line_end, >=, line_start);
+
+    show_message(er, ANSI_RED, "error", line, line_col, format, va);
+    show_span(er, ANSI_RED, span, line, line_start, line_end, line_col);
 }
 
 void report_warn(error_reporter_t* er, span_t span, char const* format, ...) {
@@ -215,7 +117,18 @@ void report_warn(error_reporter_t* er, span_t span, char const* format, ...) {
 
 void vreport_warn(error_reporter_t* er, span_t span, char const* format,
                   va_list va) {
-    vreport_warn_opt(er, er->filename, er->source, span, format, va);
+    assert_not_null(er);
+    er->error_count++;
+
+    uint32_t line = count_lines(er->source.ptr, span);
+    uint32_t line_start = find_line_start(er->source.ptr, span);
+    uint32_t line_end = find_line_end(er->source.ptr, span);
+    uint32_t line_col = count_line_cols(line_start, span);
+
+    assert_uint32(line_end, >=, line_start);
+
+    show_message(er, ANSI_YELLOW, "warning", line, line_col, format, va);
+    show_span(er, ANSI_YELLOW, span, line, line_start, line_end, line_col);
 }
 
 void report_note(error_reporter_t* er, span_t span, char const* format, ...) {
@@ -227,7 +140,16 @@ void report_note(error_reporter_t* er, span_t span, char const* format, ...) {
 
 void vreport_note(error_reporter_t* er, span_t span, char const* format,
                   va_list va) {
-    vreport_note_opt(er, er->filename, er->source, span, format, va);
+    assert_not_null(er);
+
+    uint32_t line = count_lines(er->source.ptr, span);
+    uint32_t line_start = find_line_start(er->source.ptr, span);
+    uint32_t line_end = find_line_end(er->source.ptr, span);
+    uint32_t line_col = count_line_cols(line_start, span);
+
+    assert_uint32(line_end, >=, line_start);
+    show_message(er, ANSI_CYAN, "note", line, line_col, format, va);
+    show_span(er, ANSI_CYAN, span, line, line_start, line_end, line_col);
 }
 
 void report_success(error_reporter_t* er, span_t span, char const* format,
@@ -240,5 +162,14 @@ void report_success(error_reporter_t* er, span_t span, char const* format,
 
 void vreport_success(error_reporter_t* er, span_t span, char const* format,
                      va_list va) {
-    vreport_success_opt(er, er->filename, er->source, span, format, va);
+    assert_not_null(er);
+
+    uint32_t line = count_lines(er->source.ptr, span);
+    uint32_t line_start = find_line_start(er->source.ptr, span);
+    uint32_t line_end = find_line_end(er->source.ptr, span);
+    uint32_t line_col = count_line_cols(line_start, span);
+
+    assert_uint32(line_end, >=, line_start);
+    show_message(er, ANSI_GREEN, "success", line, line_col, format, va);
+    show_span(er, ANSI_GREEN, span, line, line_start, line_end, line_col);
 }

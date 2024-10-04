@@ -19,7 +19,7 @@ static inline void ctx_add_test(ctx_t* ctx, MunitTest const* test) {
 
 // ============================================================================
 
-// void test_tokenizer_add_tests(ctx_t* ctx);
+void test_tokenizer_add_tests(ctx_t* ctx);
 void test_lib_allocator_add_tests(ctx_t* ctx);
 void test_lib_da_add_tests(ctx_t* ctx);
 void test_lib_lst_add_tests(ctx_t* ctx);

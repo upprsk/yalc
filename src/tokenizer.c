@@ -3,16 +3,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "allocator.h"
-#include "common.h"
+#include "da/da.h"
 #include "errors.h"
+#include "slice/slice.h"
 #include "span.h"
 
 /// Hold state relative to parsing the source code.
 typedef struct tokenizer {
     /// Null terminated string of the source code.
-    char const* source;
-    uint32_t    source_len;
+    str_t source;
     /// Tokenizing head, points to the current character.
     char const* head;
     /// Start of the current token.
@@ -25,20 +24,18 @@ typedef struct tokenizer {
     allocator_t alloc;
 
     /// array of the tokens
-    token_t* tokens;
+    da_token_t tokens;
 } tokenizer_t;
 
 static inline void tokenizer_init(tokenizer_t* t, error_reporter_t* er,
-                                  char const* source, uint32_t source_len,
-                                  allocator_t alloc) {
+                                  str_t source, allocator_t alloc) {
     *t = (tokenizer_t){
         .source = source,
-        .source_len = source_len,
-        .head = source,
-        .start = source,
+        .head = source.ptr,
+        .start = source.ptr,
         .er = er,
         .alloc = alloc,
-        .tokens = da_init_token(alloc),
+        .tokens.alloc = alloc,
     };
 }
 
@@ -68,16 +65,15 @@ static inline char peek_next(tokenizer_t const* t) {
 }
 
 static inline span_t mkspan(tokenizer_t const* t) {
-    uint32_t start = t->start - t->source;
-    uint32_t end = t->head - t->source;
+    uint32_t start = t->start - t->source.ptr;
+    uint32_t end = t->head - t->source.ptr;
 
-    munit_assert_uint32(start, <=, end);
-    return (span_t){.start = start, .end = end};
+    assert_uint32(start, <=, end);
+    return (span_t){.start = start, .len = end - start};
 }
 
 static void append_token(tokenizer_t* t, token_type_t ty) {
-    token_t tok = {.type = ty, .span = mkspan(t)};
-    t->tokens = da_append_token(t->tokens, t->alloc, &tok);
+    da_push_back(&t->tokens, (token_t){.type = ty, .span = mkspan(t)});
 }
 
 static void skip_whitespace(tokenizer_t* t) {
@@ -146,35 +142,33 @@ static void tokenize_str(tokenizer_t* t) {
 static void tokenize_ident(tokenizer_t* t) {
     while (is_digit(peek(t)) || is_alpha(peek(t))) advance(t);
 
-    uint32_t    len;
-    char const* ident =
-        span_str_parts(mkspan(t), t->source, t->source_len, &len);
+    str_t ident = span_to_slice(mkspan(t), t->source);
 
-    if (strnneq(ident, len, "return", 6)) {
+    if (slice_eq(ident, str_from_lit("return"))) {
         append_token(t, TT_RETURN);
-    } else if (strnneq(ident, len, "break", 5)) {
+    } else if (slice_eq(ident, str_from_lit("break"))) {
         append_token(t, TT_BREAK);
-    } else if (strnneq(ident, len, "extern", 6)) {
+    } else if (slice_eq(ident, str_from_lit("extern"))) {
         append_token(t, TT_EXTERN);
-    } else if (strnneq(ident, len, "export", 6)) {
+    } else if (slice_eq(ident, str_from_lit("export"))) {
         append_token(t, TT_EXPORT);
-    } else if (strnneq(ident, len, "if", 2)) {
+    } else if (slice_eq(ident, str_from_lit("if"))) {
         append_token(t, TT_IF);
-    } else if (strnneq(ident, len, "else", 4)) {
+    } else if (slice_eq(ident, str_from_lit("else"))) {
         append_token(t, TT_ELSE);
-    } else if (strnneq(ident, len, "and", 3)) {
+    } else if (slice_eq(ident, str_from_lit("and"))) {
         append_token(t, TT_AND);
-    } else if (strnneq(ident, len, "or", 2)) {
+    } else if (slice_eq(ident, str_from_lit("or"))) {
         append_token(t, TT_OR);
-    } else if (strnneq(ident, len, "while", 5)) {
+    } else if (slice_eq(ident, str_from_lit("while"))) {
         append_token(t, TT_WHILE);
-    } else if (strnneq(ident, len, "as", 2)) {
+    } else if (slice_eq(ident, str_from_lit("as"))) {
         append_token(t, TT_AS);
-    } else if (strnneq(ident, len, "record", 6)) {
+    } else if (slice_eq(ident, str_from_lit("record"))) {
         append_token(t, TT_RECORD);
-    } else if (strnneq(ident, len, "opaque", 6)) {
+    } else if (slice_eq(ident, str_from_lit("opaque"))) {
         append_token(t, TT_OPAQUE);
-    } else if (strnneq(ident, len, "defer", 5)) {
+    } else if (slice_eq(ident, str_from_lit("defer"))) {
         append_token(t, TT_DEFER);
     } else {
         append_token(t, TT_IDENT);
@@ -269,10 +263,9 @@ static void tokenize_one(tokenizer_t* t) {
     }
 }
 
-token_t* tokenize(error_reporter_t* er, allocator_t alloc, char const* source,
-                  uint32_t source_len) {
+da_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source) {
     tokenizer_t t = {};
-    tokenizer_init(&t, er, source, source_len, alloc);
+    tokenizer_init(&t, er, source, alloc);
 
     while (!is_at_end(&t)) {
         tokenize_one(&t);
