@@ -1,14 +1,7 @@
-export "main" main := .() {
-    print_str("entre com a idade: ");
-    idade := read_i32();
-    if idade < 18 {
-        print_str("menor de idade\n");
-    } else {
-        print_str("maior de idade\n");
-    }
-};
+// main :: .() -> i32 {
+//     return 0;
+// };
 
-extern "__builtin_read_i32"   read_i32:   .() -> i32;
-extern "__builtin_print_i32"  print_i32:  .(v: i32) -> void;
-extern "__builtin_print_char" print_char: .(c: i8) -> void;
-extern "__builtin_print_str"  print_str:  .(s: [*:0]i8) -> void;
+f    :: 1;
+// main :: 12 + 30;
+g    :: 2;

@@ -300,7 +300,7 @@ static MunitResult test_da_slice(MunitParameter const params[],
     assert_not_null(s.ptr);
     assert_uint32(s.len, ==, 16);
 
-    slice_free(alloc, s);
+    slice_free(alloc, &s);
     assert_null(s.ptr);
     assert_uint32(s.len, ==, 0);
 

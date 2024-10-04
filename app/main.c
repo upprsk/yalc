@@ -5,8 +5,9 @@
 
 #include "alloc/allocator.h"
 #include "args.h"
-#include "da/da.h"
+#include "ast.h"
 #include "errors.h"
+#include "parser.h"
 #include "slice/slice.h"
 #include "span.h"
 #include "tokenizer.h"
@@ -63,19 +64,42 @@ int main(int argc, char* argv[]) {
     error_reporter_t er = {
         .stream = stderr, .filename = args.root_filename, .source = source};
 
-    da_token_t tokens = tokenize(&er, c_alloc, source);
+    slice_token_t tokens = tokenize(&er, c_alloc, source);
     if (args.show_tokens) {
-        da_foreach(&tokens, i) {
-            token_t tok = da_at(tokens, i);
+        slice_foreach(tokens, i) {
+            token_t tok = slice_at(tokens, i);
             str_t   tok_slice = span_to_slice(tok.span, source);
 
-            printf("[%u] %s (%d) '%.*s'\n", i, token_to_str(tok.type), tok.type,
-                   (int)tok_slice.len, tok_slice.ptr);
+            printf("[%zu] %s (%d) '%.*s'\n", i, token_to_str(tok.type),
+                   tok.type, (int)tok_slice.len, tok_slice.ptr);
         }
     }
 
-    da_free(&tokens);
-    slice_free(c_alloc, source);
+    arena_allocator_t main_arena = {0};
+    arena_allocator_t temp_arena = {0};
+
+    allocator_t main_alloc = arena_allocator(&main_arena);
+    allocator_t temp_alloc = arena_allocator(&temp_arena);
+
+    size_t errs = er.error_count;
+
+    ast_t      ast = {0};
+    node_ref_t ast_root = parse(&(parser_desc_t){.alloc = main_alloc,
+                                                 .temp_alloc = temp_alloc,
+                                                 .source = source,
+                                                 .tokens = tokens,
+                                                 .er = &er},
+                                &ast);
+    if (errs != er.error_count) return EXIT_FAILURE;
+
+    string_t s = ast_dump(&ast, ast_root, temp_alloc);
+    printf("ast:\n%s\n", s.items);
+
+    arena_clear_all(&main_arena);
+    arena_clear_all(&temp_arena);
+
+    slice_free(c_alloc, &tokens);
+    slice_free(c_alloc, &source);
 
     return EXIT_SUCCESS;
 }

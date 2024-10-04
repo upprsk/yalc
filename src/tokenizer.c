@@ -263,7 +263,7 @@ static void tokenize_one(tokenizer_t* t) {
     }
 }
 
-da_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source) {
+slice_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source) {
     tokenizer_t t = {};
     tokenizer_init(&t, er, source, alloc);
 
@@ -274,5 +274,5 @@ da_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source) {
     t.start = t.head;
     append_token(&t, TT_EOF);
 
-    return t.tokens;
+    return da_to_slice_of(t.tokens, slice_token_t);
 }

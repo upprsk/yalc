@@ -41,15 +41,39 @@
     (((_lhs).len == (__VA_ARGS__).len) && \
      (memcmp((_lhs).ptr, (__VA_ARGS__).ptr, (_lhs).len) == 0))
 
+/// Helper for iterating slices
+#define slice_foreach(_s, _i) \
+    for (typeof((_s).len) _i = 0; _i < (_s).len; (_i)++)
+
 /// In case the slice was dinamically allocated, use this to free it. The fields
 /// will also be reset to an empty slice.
-#define slice_free(_alloc, _s)                   \
-    do {                                         \
-        allocator_free(_alloc, (void*)(_s).ptr); \
-        (_s).ptr = NULL;                         \
-        (_s).len = 0;                            \
+#define slice_free(_alloc, _s)                    \
+    do {                                          \
+        allocator_free(_alloc, (void*)(_s)->ptr); \
+        (_s)->ptr = NULL;                         \
+        (_s)->len = 0;                            \
     } while (0)
 
+/// Move the pointer one element forward and reduce the length by one. Asserst
+/// that the slice is not empty. Returns the removed element.
+#define slice_shift(_s)                         \
+    ({                                          \
+        assert_not_null((_s)->ptr);             \
+        assert_size((_s)->len, >, 0);           \
+        typeof(*(_s)->ptr) item = (_s)->ptr[0]; \
+        (_s)->ptr++;                            \
+        (_s)->len--;                            \
+        item;                                   \
+    })
+
+#define slice_dupe(_alloc, _s)                                     \
+    ({                                                             \
+        typeof((_s).ptr) duped =                                   \
+            allocator_alloc(_alloc, sizeof(*(_s).ptr) * (_s).len); \
+        assert_not_null(duped);                                    \
+        memcpy(duped, (_s).ptr, (_s).len * sizeof(*(_s).ptr));     \
+        (typeof(_s)){duped, (_s).len};                             \
+    })
 /// Create a slice from a string literal:
 ///
 /// ```c

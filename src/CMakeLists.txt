@@ -1,6 +1,10 @@
 add_library(yal
+  ast.c
+  ast.h
   errors.c
   errors.h
+  parser.c
+  parser.h
   span.h
   tokenizer.c
   tokenizer.h

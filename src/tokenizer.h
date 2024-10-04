@@ -5,6 +5,7 @@
 #include "alloc/allocator.h"
 #include "da/da.h"
 #include "errors.h"
+#include "slice/slice.h"
 #include "span.h"
 
 typedef enum token_type : uint8_t {
@@ -130,5 +131,6 @@ typedef struct token {
 } token_t;
 
 typedef da_t(token_t) da_token_t;
+typedef slice_t(token_t) slice_token_t;
 
-da_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source);
+slice_token_t tokenize(error_reporter_t* er, allocator_t alloc, str_t source);

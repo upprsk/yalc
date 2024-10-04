@@ -2,7 +2,6 @@
 #include <stdio.h>
 
 #include "alloc/allocator.h"
-#include "da/da.h"
 #include "span.h"
 #include "test.h"
 #include "tokenizer.h"
@@ -52,18 +51,18 @@ static MunitResult test_tokenize_empty(MunitParameter const params[],
 
     allocator_t alloc = c_allocator();
 
-    da_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
-    assert_not_null(tokens.items);
+    slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
+    assert_not_null(tokens.ptr);
 
-    assert_uint32(tokens.size, ==, 1);
-    assert_uint8(da_at(tokens, 0).type, ==, TT_EOF);
-    assert_uint32(da_at(tokens, 0).span.start, ==, 0);
-    assert_uint32(da_at(tokens, 0).span.len, ==, 0);
+    assert_uint32(tokens.len, ==, 1);
+    assert_uint8(slice_at(tokens, 0).type, ==, TT_EOF);
+    assert_uint32(slice_at(tokens, 0).span.start, ==, 0);
+    assert_uint32(slice_at(tokens, 0).span.len, ==, 0);
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
 
-    da_free(&tokens);
+    slice_free(alloc, &tokens);
     fclose(errstream);
 
     return MUNIT_OK;
@@ -82,8 +81,8 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
 
     allocator_t alloc = c_allocator();
 
-    da_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
-    assert_not_null(tokens.items);
+    slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
+    assert_not_null(tokens.ptr);
 
     token_type_t expected_types[] = {TT_INT, TT_INT, TT_FLOAT, TT_FLOAT,
                                      TT_EOF};
@@ -92,16 +91,17 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
                 sizeof(expected_strs) / sizeof(expected_strs[0]));
 
     size_t count = sizeof(expected_types) / sizeof(expected_types[0]);
-    assert_uint32(tokens.size, ==, count);
+    assert_uint32(tokens.len, ==, count);
 
     for (size_t i = 0; i < count; ++i) {
-        assert_uint8(da_at(tokens, i).type, ==, expected_types[i]);
+        assert_uint8(slice_at(tokens, i).type, ==, expected_types[i]);
 
-        str_t slice =
-            span_to_slice(da_at(tokens, i).span, (str_t){source, source_len});
+        str_t slice = span_to_slice(slice_at(tokens, i).span,
+                                    (str_t){source, source_len});
 
         fprintf(stderr, "[%zu] %s: '%.*s'\n", i,
-                token_to_str(da_at(tokens, i).type), (int)slice.len, slice.ptr);
+                token_to_str(slice_at(tokens, i).type), (int)slice.len,
+                slice.ptr);
 
         uint32_t expected_len = strlen(expected_strs[i]);
         assert_uint32(slice.len, ==, expected_len);
@@ -111,7 +111,7 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
 
-    da_free(&tokens);
+    slice_free(alloc, &tokens);
     fclose(errstream);
 
     return MUNIT_OK;
