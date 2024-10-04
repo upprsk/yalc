@@ -52,12 +52,13 @@ typedef enum da_sts {
 
 /// Index into the dynamic array, but first do a bounds check.
 ///
-/// IMPORTANT: _idx is used **twice** inside the macro, don't anything with side
-/// effects!
-#define da_at(_da, _idx)                    \
-    ({                                      \
-        assert_uint32(_idx, <, (_da).size); \
-        (_da).items[_idx];                  \
+/// `_idx` is only used once in the macro, so it may include side effects.
+#define da_at(_da, _idx)                   \
+    ({                                     \
+        typeof((_da).size) idx = _idx;     \
+        assert_not_null((_da).items);      \
+        assert_uint32(idx, <, (_da).size); \
+        (_da).items[idx];                  \
     })
 
 /// Same as `da_reserve_opt`, but asserts that the allocation was succesful.
