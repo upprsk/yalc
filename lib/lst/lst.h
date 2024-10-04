@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 #include "utils/macros.h"
 
 #define LST_TYPENAME(line) MERGE(lst_, line)
@@ -64,7 +66,8 @@
     })
 
 /// Free the linked list. Note that this frees the entire list. Make sure that
-/// there are no other references to the nodes.
+/// there are no other references to the nodes. This function **MODIFIES** the
+/// list. After this function the list will be set to null.
 #define lst_free(_alloc, _lst)                    \
     do {                                          \
         typeof((_lst)->next) it = _lst;           \
@@ -73,6 +76,7 @@
             allocator_free(_alloc, it);           \
             it = next;                            \
         }                                         \
+        _lst = NULL;                              \
     } while (0)
 
 /// A for-each construct for linked lists.
