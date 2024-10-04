@@ -3,8 +3,8 @@ add_library(lib
   alloc/allocator.h
   da/da.c
   da/da.h
-  lst/lst.c
   lst/lst.h
+  map/map.h
   utils/minmax.h
 )
 
