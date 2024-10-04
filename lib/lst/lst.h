@@ -1,14 +1,18 @@
 #pragma once
 
+#include "utils/macros.h"
+
+#define LST_TYPENAME(line) MERGE(lst_, line)
+
 /// Define the linked list type.
 ///
 /// ```c
 /// typedef lst_t(int) lst_int_t;
 /// ```
-#define lst_t(T)                     \
-    struct lst_##__LINE__ {          \
-        struct lst_##__LINE__* next; \
-        T                      data; \
+#define lst_t(T)                              \
+    struct LST_TYPENAME(__LINE__) {           \
+        struct LST_TYPENAME(__LINE__) * next; \
+        T data;                               \
     }
 
 /// Calculate the length of the list by iterating all elements.
@@ -81,3 +85,4 @@
     for (typeof((_lst)->next) _it = _lst; _it; _it = (_it)->next)
 
 typedef lst_t(int) lst_int_t;
+typedef lst_t(size_t) lst_size_t;
