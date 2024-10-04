@@ -13,6 +13,7 @@ static MunitResult test_lst_create(MunitParameter const params[],
     assert_size(lst_len(lst), ==, 0);
 
     lst_free(alloc, lst);
+    assert_size(lst_len(lst), ==, 0);
 
     return MUNIT_OK;
 }
@@ -34,6 +35,7 @@ static MunitResult test_lst_prepend(MunitParameter const params[],
     assert_size(lst_len(lst), ==, 2);
 
     lst_free(alloc, lst);
+    assert_size(lst_len(lst), ==, 0);
 
     return MUNIT_OK;
 }
@@ -68,6 +70,8 @@ static MunitResult test_lst_pop(MunitParameter const params[],
 
     lst_free(alloc, lst);
     lst_free(alloc, front);
+
+    assert_size(lst_len(lst), ==, 0);
 
     return MUNIT_OK;
 }
