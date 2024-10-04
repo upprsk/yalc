@@ -3,10 +3,12 @@
 #include <stdio.h>
 
 #include "alloc/allocator.h"
+#include "slice/slice.h"
 
-char* read_entire_file(char const* filename, allocator_t alloc, size_t* len) {
+fs_result_t read_entire_file(char const* filename, allocator_t alloc,
+                             slice_char_t* c) {
     FILE* f = fopen(filename, "rb");
-    if (!f) return NULL;
+    if (!f) return FSR_NOT_OPEN;
 
     char* buf = NULL;
 
@@ -21,14 +23,17 @@ char* read_entire_file(char const* filename, allocator_t alloc, size_t* len) {
     long read = fread(buf, sizeof(char), tell_len, f);
     if (read != tell_len) goto error;
 
-    *len = tell_len;
+    fclose(f);
+
     buf[tell_len] = 0;
 
-    return buf;
+    *c = (slice_char_t){.ptr = buf, .len = tell_len};
+
+    return FSR_OK;
 
 error:
     if (f) fclose(f);
     if (buf) allocator_free(alloc, buf);
 
-    return NULL;
+    return FSR_OK;
 }
