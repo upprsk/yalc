@@ -168,6 +168,10 @@ typedef enum da_sts {
         (_da)->items = NULL;                        \
     } while (0)
 
+/// Helper to iterate an array.
+#define da_foreach(_da, _i) \
+    for (typeof((_da)->size) _i = 0; _i < (_da)->size; (_i)++)
+
 /// Spread all of the fields of the dynamic array to be used by implementation
 /// functions.
 #define da_spread(_da) \
