@@ -37,6 +37,8 @@ void* allocator_realloc(allocator_t a, void* ptr, size_t size) {
 // ----------------------------------------------------------------------------
 
 static void* c_allocator_fn(void* ctx, void* ptr, size_t size) {
+    (void)ctx;
+
     // handle no-op case
     if (!ptr && !size) return NULL;
 
@@ -69,7 +71,7 @@ static arena_block_t* arena_allocate_new_block(arena_block_t* next,
                                                size_t         size) {
     assert_size(size, !=, 0);
 
-    long page_size = sysconf(_SC_PAGESIZE);
+    size_t page_size = sysconf(_SC_PAGESIZE);
     while (page_size < size) page_size <<= 1;  // multiply by 2
 
     arena_block_t* blk = mmap(NULL, page_size, PROT_READ | PROT_WRITE,
