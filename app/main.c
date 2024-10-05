@@ -90,10 +90,13 @@ int main(int argc, char* argv[]) {
                                                  .tokens = tokens,
                                                  .er = &er},
                                 &ast);
-    if (errs != er.error_count) return EXIT_FAILURE;
 
-    string_t s = ast_dump(&ast, ast_root, temp_alloc);
-    printf("ast:\n%s\n", s.items);
+    if (args.show_ast) {
+        string_t s = ast_dump(&ast, ast_root, temp_alloc);
+        printf("ast:\n%s\n", s.items);
+    }
+
+    if (errs != er.error_count) return EXIT_FAILURE;
 
     arena_clear_all(&main_arena);
     arena_clear_all(&temp_arena);

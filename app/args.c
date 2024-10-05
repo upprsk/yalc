@@ -40,6 +40,10 @@ argparse_result_t parse_args(int argc, char* argv[], args_t* args) {
             args->show_tokens = true;
         }
 
+        else if (streq(arg, "--show-ast")) {
+            args->show_ast = true;
+        }
+
         else {
             if (args->root_filename) {
                 fprintf(stderr, "invalid argument: %s\n", arg);

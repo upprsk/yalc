@@ -166,7 +166,7 @@ static node_ref_t parse_decl(parser_t* p, recover_mode_t rec) {
     node_t* decl_node = ast_get(&p->ast, decln_ref);
     *decl_node = (node_t){
         .kind = NODE_DECL,
-        .as.decl = {.name = slice_dupe(p->alloc, name_str),
+        .as.decl = {.name = str_dupe(p->alloc, name_str),
                     .type = type,
                     .init = init},
     };
@@ -179,6 +179,8 @@ static node_ref_t parse_decl(parser_t* p, recover_mode_t rec) {
 static int const  unary_precedence = 50;
 static inline int get_precedence(token_type_t tt) {
     switch (tt) {
+        case TT_PLUS:
+        case TT_MINUS: return 10;
         default: return 0;
     }
 }
@@ -187,7 +189,9 @@ static inline int get_precedence(token_type_t tt) {
 
 static node_ref_t parse_int(parser_t* p) {
     token_t t = peek(p);
-    str_t   s = span_to_slice(t.span, p->source);
+    advance(p);
+
+    str_t s = span_to_slice(t.span, p->source);
 
     uint64_t v = parse_uint64(s);
 
@@ -201,14 +205,54 @@ static node_ref_t parse_int(parser_t* p) {
     return ref;
 }
 
+static node_ref_t parse_ident(parser_t* p) {
+    token_t t = peek(p);
+    advance(p);
+
+    str_t s = span_to_slice(t.span, p->source);
+
+    node_ref_t ref = {0};
+    node_t*    n = ast_alloc_node(&p->ast, &ref);
+    *n = (node_t){
+        .kind = NODE_IDENT,
+        .as.ident = {.ident = str_dupe(p->alloc, s)},
+    };
+
+    return ref;
+}
+
+static node_ref_t parse_binary(parser_t* p, node_ref_t left,
+                               recover_mode_t rec) {
+    token_type_t tt = peek_tt(p);
+    advance(p);
+
+    node_kind_t kind = NODE_INVAL;
+    switch (tt) {
+        case TT_PLUS: kind = NODE_ADD; break;
+        case TT_MINUS: kind = NODE_SUB; break;
+        default: assert(false);
+    }
+
+    node_ref_t right = parse_expr(p, get_precedence(tt), rec);
+
+    node_ref_t ref = {0};
+    node_t*    n = ast_alloc_node(&p->ast, &ref);
+    *n = (node_t){
+        .kind = kind,
+        .as.binary = {.left = left, .right = right},
+    };
+
+    return ref;
+}
+
 // ----------------------------------------------------------------------------
 
 static node_ref_t parse_prefix(parser_t* p, recover_mode_t rec) {
     token_t tok = peek(p);
-    advance(p);
 
     switch (tok.type) {
         case TT_INT: return parse_int(p);
+        case TT_IDENT: return parse_ident(p);
         default: break;
     }
 
@@ -225,6 +269,8 @@ static node_ref_t parse_infix(parser_t* p, node_ref_t left,
     token_t tok = peek(p);
 
     switch (tok.type) {
+        case TT_PLUS:
+        case TT_MINUS: return parse_binary(p, left, rec);
         default: break;
     }
 

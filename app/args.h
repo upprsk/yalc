@@ -16,6 +16,8 @@ typedef struct args {
 
     // --show-tokens
     bool show_tokens;
+    // --show-ast
+    bool show_ast;
 } args_t;
 
 // The result from parsing args.
