@@ -6,7 +6,7 @@ project(
   LANGUAGES C CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 17)
 
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "Do not update everytime I run cmake, please")
 
