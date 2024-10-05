@@ -163,7 +163,7 @@ typedef enum da_sts {
 /// free all of the memory used by the array and reset it.
 #define da_free(_da)                                \
     do {                                            \
-        allocator_free((_da)->alloc, (_da)->items); \
+        if ((_da)->alloc.alloc) allocator_free((_da)->alloc, (_da)->items); \
         (_da)->size = 0;                            \
         (_da)->capacity = 0;                        \
         (_da)->items = NULL;                        \
