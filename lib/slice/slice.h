@@ -2,6 +2,29 @@
 
 #include <stddef.h>
 
+#include "alloc/allocator.h"
+#include "munit.h"
+
+// clang-format off
+
+#if defined(__clang__)
+#define disable_warnings                                            \
+    _Pragma("GCC diagnostic push");                                 \
+    _Pragma("GCC diagnostic ignored \"-Wincompatible-pointer-types-discards-qualifiers\"");
+
+#define enable_warnings _Pragma("GCC diagnostic pop");
+
+#elif defined(__GNUC__) || defined(__GNUG__)
+#define disable_warnings                                            \
+    _Pragma("GCC diagnostic push");                                 \
+    _Pragma("GCC diagnostic ignored \"-Wdiscarded-qualifiers\"");
+
+#define enable_warnings _Pragma("GCC diagnostic pop");
+
+#endif
+
+// clang-format on
+
 /// Define the slice type.
 ///
 /// ```c
@@ -71,9 +94,12 @@
         typeof((_s).ptr) duped =                                   \
             allocator_alloc(_alloc, sizeof(*(_s).ptr) * (_s).len); \
         assert_not_null(duped);                                    \
+        disable_warnings;                                          \
         memcpy(duped, (_s).ptr, (_s).len * sizeof(*(_s).ptr));     \
+        enable_warnings;                                           \
         (typeof(_s)){duped, (_s).len};                             \
     })
+
 /// Create a slice from a string literal:
 ///
 /// ```c
@@ -85,3 +111,13 @@
 typedef slice_t(char) slice_char_t;
 typedef slice_t(int) slice_int_t;
 typedef slice_t(char const) str_t;
+
+static inline str_t str_dupe(allocator_t alloc, str_t s) {
+    char* duped = allocator_alloc(alloc, sizeof(*s.ptr) * (s.len + 1));
+    assert_not_null(duped);
+
+    memcpy(duped, s.ptr, s.len * sizeof(*s.ptr));
+    duped[s.len] = 0;
+
+    return (typeof(s)){duped, s.len};
+}
