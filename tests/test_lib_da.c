@@ -1,4 +1,5 @@
 #include "alloc/allocator.h"
+#include "ast.h"
 #include "da/da.h"
 #include "slice/slice.h"
 #include "test.h"
@@ -299,6 +300,11 @@ static MunitResult test_da_slice(MunitParameter const params[],
     s = da_to_slice_of(arr, slice_int_t);
     assert_not_null(s.ptr);
     assert_uint32(s.len, ==, 16);
+
+    slice_int_t ss = slice_s(s, 2, 5);
+    assert_not_null(ss.ptr);
+    assert_ptr_equal(ss.ptr, arr.items + 2);
+    assert_size(ss.len, ==, 5 - 2);
 
     slice_free(alloc, &s);
     assert_null(s.ptr);
