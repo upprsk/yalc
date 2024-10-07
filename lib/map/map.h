@@ -188,10 +188,9 @@ static inline bool strkey_eq(strkey_t lhs, strkey_t rhs) {
     return memcmp(lhs.s, rhs.s, lhs.len) == 0;
 }
 
-#define map_get_kstr(_map, _key)  map_get(_map, _key, strkey_eq)
-#define map_del_kstr(_map, _key)  map_del(_map, _key, strkey_eq)
-#define map_contains_kstr(_map, _key)  map_contains(_map, _key, strkey_eq)
-
+#define map_get_kstr(_map, _key)      map_get(_map, _key, strkey_eq)
+#define map_del_kstr(_map, _key)      map_del(_map, _key, strkey_eq)
+#define map_contains_kstr(_map, _key) map_contains(_map, _key, strkey_eq)
 
 /// Helper to defining a string map.
 #define map_str_t(V) map_t(strkey_t, V)
