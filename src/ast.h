@@ -32,6 +32,10 @@ typedef enum node_kind : uint8_t {
 
     NODE_ADD,  // binary
     NODE_SUB,  // binary
+    NODE_MUL,  // binary
+    NODE_DIV,  // binary
+    NODE_NEG,  // w_child
+    NODE_NOT,  // w_child
     NODE_RET,  // w_child
 
     NODE_IDENT,  // ident
@@ -48,6 +52,10 @@ static inline char const* node_kind_str(node_kind_t nk) {
         case NODE_ADD: return "NODE_ADD";
         case NODE_ARG: return "NODE_ARG";
         case NODE_SUB: return "NODE_SUB";
+        case NODE_MUL: return "NODE_MUL";
+        case NODE_DIV: return "NODE_DIV";
+        case NODE_NEG: return "NODE_NEG";
+        case NODE_NOT: return "NODE_NOT";
         case NODE_RET: return "NODE_RET";
         case NODE_IDENT: return "NODE_IDENT";
         case NODE_INT: return "NODE_INT";
@@ -232,6 +240,11 @@ static inline void node_init_binary(node_t* n, span_t span, node_kind_t kind,
     };
 }
 
+static inline void node_init_unary(node_t* n, span_t span, node_kind_t kind,
+                                   node_ref_t child) {
+    *n = (node_t){.kind = kind, .span = span, .as.w_child = {.child = child}};
+}
+
 static inline void node_init_ret(node_t* n, span_t span, node_ref_t child) {
     *n = (node_t){
         .kind = NODE_RET, .span = span, .as.w_child = {.child = child}};
@@ -271,8 +284,14 @@ static inline node_w_children_t* node_as_blk(node_t* n) {
 }
 
 static inline node_binary_t* node_as_binary(node_t* n) {
-    assert(n->kind == NODE_ADD || n->kind == NODE_SUB);
+    assert(n->kind == NODE_ADD || n->kind == NODE_SUB || n->kind == NODE_MUL ||
+           n->kind == NODE_DIV);
     return &n->as.binary;
+}
+
+static inline node_w_child_t* node_as_unary(node_t* n) {
+    assert(n->kind == NODE_NOT || n->kind == NODE_NEG);
+    return &n->as.w_child;
 }
 
 static inline node_w_child_t* node_as_ret(node_t* n) {

@@ -100,6 +100,8 @@ static inline int get_precedence(token_type_t tt) {
     switch (tt) {
         case TT_PLUS:
         case TT_MINUS: return 10;
+        case TT_STAR:
+        case TT_SLASH: return 20;
         default: return 0;
     }
 }
@@ -275,7 +277,26 @@ static node_ref_t parse_infix(parser_t* p, node_ref_t left) {
 }
 
 // <unary>    ::= ( "-" | "!" ) <expr> ;
-static node_ref_t parse_unary(parser_t* p) { assert(false); }
+static node_ref_t parse_unary(parser_t* p) {
+    token_t tok = peek(p);
+    advance(p);
+
+    node_kind_t kind;
+    switch (tok.type) {
+        case TT_MINUS: kind = NODE_NEG; break;
+        case TT_BANG: kind = NODE_NOT; break;
+        default: assert(false);
+    }
+
+    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t child = parse_expr(p, unary_precedence);
+
+    node_init_unary(ast_get(&p->ast, node_ref),
+                    span_between(tok.span, ast_get_span(&p->ast, child)), kind,
+                    child);
+
+    return node_ref;
+}
 
 // <proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] <blk> ;
 static node_ref_t parse_proc(parser_t* p) {
@@ -363,7 +384,26 @@ static node_ref_t parse_additive(parser_t* p, node_ref_t left) {
 
 // <multiplicative> ::= <expr> ( "*" | "/" ) <expr> ;
 static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left) {
-    assert(false);
+    token_type_t tt = peek_tt(p);
+    advance(p);
+
+    node_kind_t kind = NODE_INVAL;
+    switch (tt) {
+        case TT_STAR: kind = NODE_MUL; break;
+        case TT_SLASH: kind = NODE_DIV; break;
+        default: assert(false);
+    }
+
+    node_ref_t right = parse_expr(p, get_precedence(tt));
+
+    node_t*    n = NULL;
+    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_init_binary(
+        n,
+        span_between(ast_get_span(&p->ast, left), ast_get_span(&p->ast, right)),
+        kind, left, right);
+
+    return ref;
 }
 
 // <proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," ] ;

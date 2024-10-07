@@ -144,7 +144,9 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
             return ss;
         }
         case NODE_ADD:  // fallthrough
-        case NODE_SUB: {
+        case NODE_SUB:  // fallthrough
+        case NODE_MUL:  // fallthrough
+        case NODE_DIV: {
             node_binary_t* node = node_as_binary(n);
             string_t       lhs = ast_dump(a, node->left, alloc);
             string_t       rhs = ast_dump(a, node->right, alloc);
@@ -153,6 +155,8 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
             switch (n->kind) {
                 case NODE_ADD: kind = "add"; break;
                 case NODE_SUB: kind = "sub"; break;
+                case NODE_MUL: kind = "mul"; break;
+                case NODE_DIV: kind = "div"; break;
                 default: assert(false);
             }
 
@@ -161,6 +165,23 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
 
             da_free(&lhs);
             da_free(&rhs);
+            return s;
+        }
+        case NODE_NEG:
+        case NODE_NOT: {
+            node_w_child_t* node = node_as_unary(n);
+            string_t        c = ast_dump(a, node->child, alloc);
+
+            char const* kind;
+            switch (n->kind) {
+                case NODE_NEG: kind = "neg"; break;
+                case NODE_NOT: kind = "not"; break;
+                default: assert(false);
+            }
+
+            string_t s = da_sprintf(alloc, "(%s %s)", kind, c.items);
+
+            da_free(&c);
             return s;
         }
         case NODE_RET: {
