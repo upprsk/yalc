@@ -120,16 +120,15 @@ static inline void ast_init(ast_t* a, allocator_t alloc) {
     da_push_back(&a->nodes, (node_t){});
 }
 
-static inline node_t* ast_alloc_node(ast_t* a, node_ref_t* ref) {
+static inline node_ref_t ast_alloc_node(ast_t* a, node_t** node) {
     assert_not_null(a);
-    assert_not_null(ref);
 
     uint32_t idx = a->nodes.size;
     da_push_back(&a->nodes, (node_t){});
 
-    ref->id = idx;
+    if (node) *node = &a->nodes.items[idx];
 
-    return &a->nodes.items[idx];
+    return (node_ref_t){idx};
 }
 
 static inline node_t* ast_get(ast_t const* a, node_ref_t ref) {
@@ -140,7 +139,7 @@ static inline node_t* ast_get(ast_t const* a, node_ref_t ref) {
 
 static inline slice_node_ref_t ast_get_arr(ast_t const* a, node_arr_t arr) {
     slice_node_ref_t s = da_to_slice(a->refs);
-    return slice_s(s, arr.start, arr.len);
+    return slice_s(s, arr.start, arr.start + arr.len);
 }
 
 static inline node_arr_t ast_add_refs(ast_t* a, da_node_ref_t refs) {
@@ -151,3 +150,45 @@ static inline node_arr_t ast_add_refs(ast_t* a, da_node_ref_t refs) {
 }
 
 string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc);
+
+static inline void node_init_mod(node_t* n, node_arr_t children) {
+    *n = (node_t){.kind = NODE_MOD, .as.w_children = {.children = children}};
+}
+
+static inline void node_init_decl(node_t* n, str_t name, node_ref_t type,
+                                  node_ref_t init) {
+    *n = (node_t){
+        .kind = NODE_DECL,
+        .as.decl = {.name = name, .type = type, .init = init}
+    };
+}
+
+static inline void node_init_proc(node_t* n, node_arr_t args, node_ref_t ret,
+                                  node_ref_t body) {
+    *n = (node_t){
+        .kind = NODE_PROC, .as.proc = {.args = args, .ret = ret, .body = body}
+    };
+}
+
+static inline void node_init_blk(node_t* n, node_arr_t children) {
+    *n = (node_t){.kind = NODE_BLK, .as.w_children = {.children = children}};
+}
+
+static inline void node_init_binary(node_t* n, node_kind_t kind,
+                                    node_ref_t left, node_ref_t right) {
+    *n = (node_t){
+        .kind = kind, .as.binary = {.left = left, .right = right}
+    };
+}
+
+static inline void node_init_ret(node_t* n, node_ref_t child) {
+    *n = (node_t){.kind = NODE_RET, .as.w_child = {.child = child}};
+}
+
+static inline void node_init_ident(node_t* n, str_t ident) {
+    *n = (node_t){.kind = NODE_RET, .as.ident = {.ident = ident}};
+}
+
+static inline void node_init_int(node_t* n, uint64_t value) {
+    *n = (node_t){.kind = NODE_INT, .as.int_ = {.value = value}};
+}

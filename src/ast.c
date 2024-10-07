@@ -53,8 +53,61 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
             da_free(&init);
             return s;
         }
-        case NODE_PROC: return da_sprintf(alloc, "<proc>");
-        case NODE_BLK: return da_sprintf(alloc, "<blk>");
+        case NODE_PROC: {
+            string_t s = da_sprintf(alloc, "(proc");
+
+            slice_node_ref_t args = ast_get_arr(a, n->as.proc.args);
+            slice_foreach(args, i) {
+                string_t c = ast_dump(a, slice_at(args, i), alloc);
+                string_t ss = da_sprintf(alloc, "%s %s", s.items, c.items);
+
+                da_free(&c);
+                da_free(&s);
+
+                s = ss;
+            }
+
+            if (node_ref_valid(n->as.proc.ret)) {
+                string_t r = ast_dump(a, n->as.proc.ret, alloc);
+                string_t ss = da_sprintf(alloc, "%s %s", s.items, r.items);
+
+                da_free(&r);
+                da_free(&s);
+
+                s = ss;
+            } else {
+                string_t ss = da_sprintf(alloc, "%s nil", s.items);
+                da_free(&s);
+                s = ss;
+            }
+
+            string_t b = ast_dump(a, n->as.proc.body, alloc);
+            string_t ss = da_sprintf(alloc, "%s %s)", s.items, b.items);
+
+            da_free(&b);
+            da_free(&s);
+
+            return ss;
+        }
+        case NODE_BLK: {
+            slice_node_ref_t children =
+                ast_get_arr(a, n->as.w_children.children);
+
+            string_t s = da_sprintf(alloc, "(blk");
+            slice_foreach(children, i) {
+                string_t c = ast_dump(a, slice_at(children, i), alloc);
+                string_t ss = da_sprintf(alloc, "%s %s", s.items, c.items);
+
+                da_free(&c);
+                da_free(&s);
+
+                s = ss;
+            }
+
+            string_t ss = da_sprintf(alloc, "%s)", s.items);
+            da_free(&s);
+            return ss;
+        }
         case NODE_ADD:  // fallthrough
         case NODE_SUB: {
             string_t lhs = ast_dump(a, n->as.binary.left, alloc);
@@ -84,4 +137,6 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
         case NODE_IDENT: return da_sprintf(alloc, "%s", n->as.ident.ident.ptr);
         case NODE_INT: return da_sprintf(alloc, "%lu", n->as.int_.value);
     }
+
+    assert(false);
 }

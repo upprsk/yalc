@@ -70,6 +70,7 @@ typedef enum recover_mode {
     RECM_MOD = 1 << 0,
     RECM_DECL_TYPE = 1 << 1,
     RECM_DECL_INIT = 1 << 2,
+    RECM_STMT = 1 << 3,
 } recover_mode_t;
 
 /// Recover from a parsing failure.
@@ -94,6 +95,10 @@ static void recover(parser_t* p, recover_mode_t mode) {
         if (mode & RECM_DECL_INIT) {
             if (tt == TT_IDENT || tt == TT_SEMICOLON) break;
         }
+
+        if (mode & RECM_STMT) {
+            if (tt == TT_RETURN || tt == TT_SEMICOLON) break;
+        }
     } while (!is_at_end(p));
 }
 
@@ -105,8 +110,11 @@ static void recover(parser_t* p, recover_mode_t mode) {
     }
 
 /// Helper to call consume, recover if an error happens and return.
-#define try_consume(_p, _tt, _rec, _pr) \
-    if ((_pr = consume(_p, _tt))) do_recover(_p, _rec)
+#define try_consume(_p, _tt, _rec)                         \
+    do {                                                   \
+        pr_t pr;                                           \
+        if ((pr = consume(_p, _tt))) do_recover(_p, _rec); \
+    } while (0)
 
 // ----------------------------------------------------------------------------
 
@@ -116,62 +124,102 @@ static node_ref_t parse_stmt(parser_t* p, recover_mode_t rec);
 static node_ref_t parse_expr(parser_t* p, int precedence, recover_mode_t rec);
 
 static node_ref_t parse_mod(parser_t* p) {
-    node_ref_t modn_ref;
-    ast_alloc_node(&p->ast, &modn_ref);
-
+    node_ref_t    node_ref = ast_alloc_node(&p->ast, NULL);
     da_node_ref_t children = da_init(p->temp_alloc);
 
     while (!is_at_end(p)) {
-        node_ref_t node = parse_decl(p, RECM_MOD);
-        da_push_back(&children, node);
+        node_ref_t child = parse_decl(p, RECM_MOD);
+        da_push_back(&children, child);
     }
 
     node_arr_t children_refs = ast_add_refs(&p->ast, children);
-    node_t*    mod_node = ast_get(&p->ast, modn_ref);
-    *mod_node = (node_t){
-        .kind = NODE_MOD,
-        .as.w_children = {.children = children_refs},
-    };
+    node_init_mod(ast_get(&p->ast, node_ref), children_refs);
 
-    return modn_ref;
+    return node_ref;
 }
 
 /// Parse a declaration.
 static node_ref_t parse_decl(parser_t* p, recover_mode_t rec) {
-    pr_t       pr = PRES_OK;
-    node_ref_t decln_ref;
-    ast_alloc_node(&p->ast, &decln_ref);
+    node_ref_t decln_ref = ast_alloc_node(&p->ast, NULL);
 
     token_t    name = peek(p);
-    node_ref_t type = {0};
-    node_ref_t init = {0};
+    node_ref_t type = {};
+    node_ref_t init = {};
 
-    try_consume(p, TT_IDENT, rec, pr);
-    try_consume(p, TT_COLON, rec, pr);
+    try_consume(p, TT_IDENT, rec);
+    try_consume(p, TT_COLON, rec);
 
     if (peek_tt(p) != TT_COLON) {
         type = parse_expr(p, 0, rec | RECM_DECL_TYPE);
     }
 
-    try_consume(p, TT_COLON, rec, pr);
+    try_consume(p, TT_COLON, rec);
 
     if (peek_tt(p) != TT_SEMICOLON) {
         init = parse_expr(p, 0, rec | RECM_DECL_INIT);
     }
 
-    try_consume(p, TT_SEMICOLON, rec, pr);
+    try_consume(p, TT_SEMICOLON, rec);
 
     str_t name_str = span_to_slice(name.span, p->source);
-
-    node_t* decl_node = ast_get(&p->ast, decln_ref);
-    *decl_node = (node_t){
-        .kind = NODE_DECL,
-        .as.decl = {.name = str_dupe(p->alloc, name_str),
-                    .type = type,
-                    .init = init},
-    };
+    node_init_decl(ast_get(&p->ast, decln_ref), str_dupe(p->alloc, name_str),
+                   type, init);
 
     return decln_ref;
+}
+
+static node_ref_t parse_stmt(parser_t* p, recover_mode_t rec) {
+    token_t tok = peek(p);
+    if (tok.type == TT_RETURN) {
+        advance(p);
+
+        node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+
+        node_ref_t child = {};
+        if (peek_tt(p) != TT_SEMICOLON) {
+            child = parse_expr(p, 0, rec);
+        }
+
+        try_consume(p, TT_SEMICOLON, rec);
+
+        node_init_ret(ast_get(&p->ast, node_ref), child);
+
+        return node_ref;
+    }
+
+    assert(false);
+}
+
+static node_ref_t parse_block_item(parser_t* p, recover_mode_t rec) {
+    token_t tok = peek(p);
+    if (tok.type == TT_RETURN) return parse_stmt(p, rec);
+
+    str_t s = span_to_slice(tok.span, p->source);
+    report_error(p->er, tok.span, "expected block item, found \"%.*s\" (%s)",
+                 (int)s.len, s.ptr, token_to_str(tok.type));
+
+    recover(p, rec);
+    return (node_ref_t){0};
+}
+
+static node_ref_t parse_block(parser_t* p, recover_mode_t rec) {
+    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+
+    try_consume(p, TT_LBRACE, rec);
+
+    da_node_ref_t children = da_init(p->temp_alloc);
+
+    while (!is_at_end(p) && peek_tt(p) != TT_RBRACE) {
+        node_ref_t node = parse_block_item(p, rec | RECM_STMT);
+        da_push_back(&children, node);
+    }
+
+    try_consume(p, TT_RBRACE, rec);
+
+    node_arr_t children_refs = ast_add_refs(&p->ast, children);
+    node_init_blk(ast_get(&p->ast, node_ref), children_refs);
+
+    return node_ref;
 }
 
 // ----------------------------------------------------------------------------
@@ -191,16 +239,12 @@ static node_ref_t parse_int(parser_t* p) {
     token_t t = peek(p);
     advance(p);
 
-    str_t s = span_to_slice(t.span, p->source);
-
+    str_t    s = span_to_slice(t.span, p->source);
     uint64_t v = parse_uint64(s);
 
-    node_ref_t ref = {0};
-    node_t*    n = ast_alloc_node(&p->ast, &ref);
-    *n = (node_t){
-        .kind = NODE_INT,
-        .as.int_ = {.value = v},
-    };
+    node_t*    n = NULL;
+    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_init_int(n, v);
 
     return ref;
 }
@@ -211,14 +255,24 @@ static node_ref_t parse_ident(parser_t* p) {
 
     str_t s = span_to_slice(t.span, p->source);
 
-    node_ref_t ref = {0};
-    node_t*    n = ast_alloc_node(&p->ast, &ref);
-    *n = (node_t){
-        .kind = NODE_IDENT,
-        .as.ident = {.ident = str_dupe(p->alloc, s)},
-    };
+    node_t*    n = NULL;
+    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_init_ident(n, str_dupe(p->alloc, s));
 
     return ref;
+}
+
+static node_ref_t parse_proc(parser_t* p, recover_mode_t rec) {
+    node_ref_t procn_ref = ast_alloc_node(&p->ast, NULL);
+    advance(p);
+
+    try_consume(p, TT_RPAREN, rec);
+
+    node_ref_t body = parse_block(p, rec);
+    node_init_proc(ast_get(&p->ast, procn_ref), (node_arr_t){}, (node_ref_t){},
+                   body);
+
+    return procn_ref;
 }
 
 static node_ref_t parse_binary(parser_t* p, node_ref_t left,
@@ -235,12 +289,9 @@ static node_ref_t parse_binary(parser_t* p, node_ref_t left,
 
     node_ref_t right = parse_expr(p, get_precedence(tt), rec);
 
-    node_ref_t ref = {0};
-    node_t*    n = ast_alloc_node(&p->ast, &ref);
-    *n = (node_t){
-        .kind = kind,
-        .as.binary = {.left = left, .right = right},
-    };
+    node_t*    n = NULL;
+    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_init_binary(n, kind, left, right);
 
     return ref;
 }
@@ -253,6 +304,7 @@ static node_ref_t parse_prefix(parser_t* p, recover_mode_t rec) {
     switch (tok.type) {
         case TT_INT: return parse_int(p);
         case TT_IDENT: return parse_ident(p);
+        case TT_DOT_LPAREN: return parse_proc(p, rec);
         default: break;
     }
 
