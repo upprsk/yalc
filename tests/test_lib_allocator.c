@@ -28,6 +28,7 @@ static MunitResult test_arena_allocator_create(MunitParameter const params[],
 
     arena_allocator_t arena = {};
     allocator_t       alloc = arena_allocator(&arena);
+    (void)alloc;
 
     arena_clear_all(&arena);
 
