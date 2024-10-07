@@ -26,6 +26,7 @@ typedef enum node_kind : uint8_t {
     NODE_MOD,   // w_children
     NODE_DECL,  // decl
     NODE_PROC,  // proc
+    NODE_CALL,  // call
     NODE_BLK,   // w_children
 
     NODE_ARG,  // arg
@@ -48,6 +49,7 @@ static inline char const* node_kind_str(node_kind_t nk) {
         case NODE_MOD: return "NODE_MOD";
         case NODE_DECL: return "NODE_DECL";
         case NODE_PROC: return "NODE_PROC";
+        case NODE_CALL: return "NODE_CALL";
         case NODE_BLK: return "NODE_BLK";
         case NODE_ADD: return "NODE_ADD";
         case NODE_ARG: return "NODE_ARG";
@@ -107,6 +109,11 @@ typedef struct node_proc {
     node_ref_t body;
 } node_proc_t;
 
+typedef struct node_call {
+    node_ref_t callee;
+    node_arr_t args;
+} node_call_t;
+
 typedef struct node_ident {
     str_t ident;
 } node_ident_t;
@@ -127,6 +134,7 @@ typedef struct node {
 
         node_decl_t decl;
         node_proc_t proc;
+        node_call_t call;
 
         node_ident_t ident;
         node_int_t   int_;
@@ -218,6 +226,15 @@ static inline void node_init_proc(node_t* n, span_t span, node_arr_t args,
     };
 }
 
+static inline void node_init_call(node_t* n, span_t span, node_ref_t callee,
+                                  node_arr_t args) {
+    *n = (node_t){
+        .kind = NODE_CALL,
+        .span = span,
+        .as.call = {.callee = callee, .args = args}
+    };
+}
+
 static inline void node_init_arg(node_t* n, span_t span, str_t name,
                                  node_ref_t type) {
     *n = (node_t){
@@ -273,6 +290,12 @@ static inline node_proc_t* node_as_proc(node_t* n) {
     assert_int(n->kind, ==, NODE_PROC);
     return &n->as.proc;
 }
+
+static inline node_call_t* node_as_call(node_t* n) {
+    assert_int(n->kind, ==, NODE_CALL);
+    return &n->as.call;
+}
+
 static inline node_arg_t* node_as_arg(node_t* n) {
     assert_int(n->kind, ==, NODE_ARG);
     return &n->as.arg;

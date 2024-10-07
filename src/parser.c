@@ -102,6 +102,7 @@ static inline int get_precedence(token_type_t tt) {
         case TT_MINUS: return 10;
         case TT_STAR:
         case TT_SLASH: return 20;
+        case TT_LPAREN: return 70;
         default: return 0;
     }
 }
@@ -128,8 +129,11 @@ static node_ref_t parse_ident(parser_t* p);
 
 static node_ref_t parse_additive(parser_t* p, node_ref_t left);
 static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left);
+static node_ref_t parse_call(parser_t* p, node_ref_t left);
 
 static node_ref_t parse_ptr_arr(parser_t* p);
+
+static da_node_ref_t parse_call_args(parser_t* p);
 
 static da_node_ref_t parse_proc_args(parser_t* p);
 static node_ref_t    parse_proc_arg(parser_t* p);
@@ -253,6 +257,7 @@ static node_ref_t parse_prefix(parser_t* p) {
 
 // <infix>  ::= <additive>
 //            | <multiplicative>
+//            | <call>
 //            ;
 static node_ref_t parse_infix(parser_t* p, node_ref_t left) {
     token_t tok = peek(p);
@@ -262,6 +267,7 @@ static node_ref_t parse_infix(parser_t* p, node_ref_t left) {
         case TT_MINUS: return parse_additive(p, left);
         case TT_STAR:
         case TT_SLASH: return parse_multiplicative(p, left);
+        case TT_LPAREN: return parse_call(p, left);
         default: break;
     }
 
@@ -404,6 +410,42 @@ static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left) {
         kind, left, right);
 
     return ref;
+}
+
+// <call>           ::= <expr> "(" [ <call_args> ] ")" ;
+static node_ref_t parse_call(parser_t* p, node_ref_t left) {
+    try_consume(p, TT_LPAREN);
+
+    node_ref_t    node_ref = ast_alloc_node(&p->ast, NULL);
+    da_node_ref_t args = parse_call_args(p);
+
+    span_t end = peek(p).span;
+    try_consume(p, TT_RPAREN);
+
+    node_init_call(ast_get(&p->ast, node_ref),
+                   span_between(ast_get_span(&p->ast, left), end), left,
+                   ast_add_refs(&p->ast, args));
+
+    return node_ref;
+}
+
+// <ptr_arr> ::= "*" [ ":" <expr> "]"
+//             | <expr>
+//             ;
+static node_ref_t parse_ptr_arr(parser_t* p) { assert(false); }
+
+// <call_args> ::= <expr> { "," <expr> } [ "," ] ;
+static da_node_ref_t parse_call_args(parser_t* p) {
+    da_node_ref_t args = da_init(p->temp_alloc);
+
+    while (!is_at_end(p) && peek_tt(p) != TT_RPAREN) {
+        node_ref_t arg_ref = parse_expr(p, 0);
+        da_push_back(&args, arg_ref);
+
+        if (!match(p, TT_COMMA)) break;
+    }
+
+    return args;
 }
 
 // <proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," ] ;

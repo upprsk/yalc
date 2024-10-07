@@ -14,12 +14,8 @@ f :: .(x: i32) i32 {
     return x + off;
 };
 
-// is_zero :: .(i: i32) bool { return i == 0; };
-
 main :: .() {
-    // if !is_zero(0) {
-    //     return 1;
-    // }
+    r := f(12);
 
     return 0;
 };

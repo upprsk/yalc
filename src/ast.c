@@ -106,6 +106,27 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
 
             return ss;
         }
+        case NODE_CALL: {
+            node_call_t* node = node_as_call(n);
+
+            string_t c = ast_dump(a, node->callee, alloc);
+            string_t s = da_sprintf(alloc, "(call %s", c.items);
+
+            slice_node_ref_t args = ast_get_arr(a, node->args);
+            slice_foreach(args, i) {
+                string_t c = ast_dump(a, slice_at(args, i), alloc);
+                string_t ss = da_sprintf(alloc, "%s %s", s.items, c.items);
+
+                da_free(&c);
+                da_free(&s);
+
+                s = ss;
+            }
+
+            string_t ss = da_sprintf(alloc, "%s)", s.items);
+            da_free(&s);
+            return ss;
+        }
         case NODE_BLK: {
             node_w_children_t* node = node_as_blk(n);
             slice_node_ref_t   children = ast_get_arr(a, node->children);

@@ -13,6 +13,7 @@
            ;
 <infix>  ::= <additive>
            | <multiplicative>
+           | <call>
            ;
 
 <unary>    ::= ( "-" | "!" ) <expr> ;
@@ -25,6 +26,7 @@
 
 <additive>       ::= <expr> ( "+" | "-" ) <expr> ;
 <multiplicative> ::= <expr> ( "*" | "/" ) <expr> ;
+<call>           ::= <expr> "(" [ <call_args> ] ")" ;
 
 <proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," ] ;
 <proc_arg>  ::= <ident> [ ":" <expr> ] ;
@@ -32,6 +34,8 @@
 <ptr_arr> ::= "*" [ ":" <expr> "]"
             | <expr>
             ;
+
+<call_args> ::= <expr> { "," <expr> } [ "," ] ;
 
 <blk>      ::= "{" { <blk_item> } "}" ;
 <blk_item> ::= <blk_decl> | <stmt> ;
