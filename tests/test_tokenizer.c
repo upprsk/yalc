@@ -57,7 +57,7 @@ static MunitResult test_tokenize_empty(MunitParameter const params[],
     assert_uint32(tokens.len, ==, 1);
     assert_uint8(slice_at(tokens, 0).type, ==, TT_EOF);
     assert_uint32(slice_at(tokens, 0).span.start, ==, 0);
-    assert_uint32(slice_at(tokens, 0).span.len, ==, 0);
+    assert_uint32(slice_at(tokens, 0).span.end, ==, 0);
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);

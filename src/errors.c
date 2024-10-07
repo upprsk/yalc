@@ -61,8 +61,7 @@ static void show_span(error_reporter_t* er, char const* color, span_t span,
 
     if (isatty(fileno(er->stream))) fprintf(er->stream, "%s", color);
 
-    size_t end = span.start + span.len;
-    for (size_t i = span.start; i < end && i < line_end; ++i)
+    for (size_t i = span.start; i < span.end && i < line_end; ++i)
         fputc('^', er->stream);
 
     if (isatty(fileno(er->stream))) fprintf(er->stream, ANSI_RESET);

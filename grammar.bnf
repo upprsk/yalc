@@ -1,0 +1,44 @@
+<file> ::= <mod> EOF ;
+<mod>  ::= { <decl> } ;
+
+<decl>     ::= [ "extern" [ <string> ] ] <blk_decl> ;
+<blk_decl> ::= <ident> ":" [ <expr> ] [ ( ":" | "=" ) <expr> ] ";" ;
+
+<expr>   ::= <prefix> | <infix>;
+<prefix> ::= <unary>
+           | <proc>
+           | <ptr>
+           | <int>
+           | <ident>
+           ;
+<infix>  ::= <additive>
+           | <multiplicative>
+           ;
+
+<unary>    ::= ( "-" | "!" ) <expr> ;
+<proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] <blk> ;
+<ptr>      ::= "*" [ "const" ] <expr>
+             | "[" [ <ptr_arr> ] "]" [ "const" ] <expr>
+             ;
+<int>      ::= INTEGER ;
+<ident>    ::= IDENT ;
+
+<additive>       ::= <expr> ( "+" | "-" ) <expr> ;
+<multiplicative> ::= <expr> ( "*" | "/" ) <expr> ;
+
+<proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," ] ;
+<proc_arg>  ::= <ident> [ ":" <expr> ] ;
+
+<ptr_arr> ::= "*" [ ":" <expr> "]"
+            | <expr>
+            ;
+
+<blk>      ::= "{" { <blk_item> } "}" ;
+<blk_item> ::= <blk_decl> | <stmt> ;
+
+<stmt> ::= <stmt_ret>
+         | <stmt_expr>
+         ;
+
+<stmt_ret> ::= "return" [ <expr> ] ";" ;
+<stmt_expr> ::= <expr> ";" ;

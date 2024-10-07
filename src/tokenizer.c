@@ -69,7 +69,7 @@ static inline span_t mkspan(tokenizer_t const* t) {
     uint32_t end = t->head - t->source.ptr;
 
     assert_uint32(start, <=, end);
-    return (span_t){.start = start, .len = end - start};
+    return (span_t){.start = start, .end = end};
 }
 
 static void append_token(tokenizer_t* t, token_type_t ty) {
