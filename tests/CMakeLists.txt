@@ -5,6 +5,7 @@ add_executable(tests
   test_lib_lst.c
   test_lib_map.c
   test_main.c
+  test_parser.c
   test_tokenizer.c
 )
 

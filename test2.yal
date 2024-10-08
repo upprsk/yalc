@@ -9,6 +9,9 @@
 // extern printf:  .(format: c_str, ...) c_int ---;
 // extern fprintf: .(FILE: *FILE, format: c_str, ...) c_int ---;
 
+c_int :: i32;
+extern printf: .(format: c_str) c_int ...;
+
 f :: .(x: i32) i32 {
     off :: 4;
     return x + off;
