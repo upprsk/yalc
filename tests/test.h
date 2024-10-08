@@ -12,7 +12,7 @@ typedef struct ctx {
 } ctx_t;
 
 static inline void ctx_add_test(ctx_t* ctx, MunitTest const* test) {
-    assert_size(ctx->test_count, <=, ctx->test_capacity);
+    assert_size(ctx->test_count, <, ctx->test_capacity);
 
     memcpy(&ctx->tests[ctx->test_count++], test, sizeof(*test));
 }
