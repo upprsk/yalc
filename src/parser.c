@@ -141,8 +141,6 @@ static node_ref_t parse_additive(parser_t* p, node_ref_t left);
 static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left);
 static node_ref_t parse_call(parser_t* p, node_ref_t left);
 
-static node_ref_t parse_ptr_arr(parser_t* p);
-
 static da_node_ref_t parse_call_args(parser_t* p);
 
 static da_node_ref_t parse_proc_args(parser_t* p);
@@ -253,7 +251,8 @@ static node_ref_t parse_prefix(parser_t* p) {
         case TT_MINUS:
         case TT_BANG: return parse_unary(p);
         case TT_DOT_LPAREN: return parse_proc(p);
-        case TT_STAR: return parse_proc(p);
+        case TT_STAR: return parse_ptr(p);
+        case TT_LBRACKET: return parse_ptr(p);
         case TT_INT: return parse_int(p);
         case TT_IDENT: return parse_ident(p);
         default: break;
@@ -348,7 +347,64 @@ static node_ref_t parse_proc(parser_t* p) {
 // <ptr>      ::= "*" [ "const" ] <expr>
 //              | "[" [ <ptr_arr> ] "]" [ "const" ] <expr>
 //              ;
-static node_ref_t parse_ptr(parser_t* p) { assert(false); }
+// <ptr_arr> ::= "*" [ ":" <expr> "]"
+//             | <expr>
+//             ;
+static node_ref_t parse_ptr(parser_t* p) {
+    node_ptr_flags_t flags = 0;
+    node_ref_t       term = {0};
+    span_t           start = peek(p).span;
+
+    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+
+    if (match(p, TT_LBRACKET)) {
+        // <ptr_arr>
+        if (match(p, TT_RBRACKET)) {
+            // a slice
+            flags |= PTR_SLICE;
+            if (match(p, TT_CONST)) flags |= PTR_CONST;
+
+            node_ref_t child = parse_expr(p, 0);
+            span_t     end = ast_get_span(&p->ast, child);
+
+            node_init_ptr(ast_get(&p->ast, node_ref), span_between(start, end),
+                          flags, child, term);
+
+            return node_ref;
+        }
+
+        if (match(p, TT_STAR)) {
+            flags |= PTR_MULTI;
+
+            if (match(p, TT_COLON)) term = parse_expr(p, 0);
+
+            try_consume(p, TT_RBRACKET);
+            if (match(p, TT_CONST)) flags |= PTR_CONST;
+
+            node_ref_t child = parse_expr(p, 0);
+            span_t     end = ast_get_span(&p->ast, child);
+
+            node_init_ptr(ast_get(&p->ast, node_ref), span_between(start, end),
+                          flags, child, term);
+
+            return node_ref;
+        }
+
+        // this would be an array, which is not implemented
+        assert(false);
+    }
+
+    try_consume(p, TT_STAR);
+    if (match(p, TT_CONST)) flags |= PTR_CONST;
+
+    node_ref_t child = parse_expr(p, 0);
+    span_t     end = ast_get_span(&p->ast, child);
+
+    node_init_ptr(ast_get(&p->ast, node_ref), span_between(start, end), flags,
+                  child, term);
+
+    return node_ref;
+}
 
 // <int>      ::= INTEGER ;
 static node_ref_t parse_int(parser_t* p) {
@@ -443,11 +499,6 @@ static node_ref_t parse_call(parser_t* p, node_ref_t left) {
 
     return node_ref;
 }
-
-// <ptr_arr> ::= "*" [ ":" <expr> "]"
-//             | <expr>
-//             ;
-static node_ref_t parse_ptr_arr(parser_t* p) { assert(false); }
 
 // <call_args> ::= <expr> { "," <expr> } [ "," ] ;
 static da_node_ref_t parse_call_args(parser_t* p) {

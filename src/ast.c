@@ -221,6 +221,30 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
 
             return da_sprintf(alloc, "(return)");
         }
+        case NODE_PTR: {
+            node_ptr_t* node = node_as_ptr(n);
+
+            char const* multi = ptr_is_multi(node->flags) ? " multi" : "";
+            char const* const_ = ptr_is_const(node->flags) ? " const" : "";
+            char const* slice = ptr_is_slice(node->flags) ? " slice" : "";
+
+            string_t s = da_sprintf(alloc, "(ptr%s%s%s", multi, slice, const_);
+            if (node_ref_valid(node->term)) {
+                string_t c = ast_dump(a, node->term, alloc);
+                string_t ss = da_sprintf(alloc, "%s %s", s.items, c.items);
+
+                da_free(&c);
+                da_free(&s);
+                s = ss;
+            }
+
+            string_t c = ast_dump(a, node->child, alloc);
+            string_t ss = da_sprintf(alloc, "%s %s)", s.items, c.items);
+
+            da_free(&c);
+            da_free(&s);
+            return ss;
+        }
         case NODE_IDENT: {
             node_ident_t* node = node_as_ident(n);
             return da_sprintf(alloc, "%s", node->ident.ptr);

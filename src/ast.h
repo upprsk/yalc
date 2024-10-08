@@ -39,6 +39,8 @@ typedef enum node_kind : uint8_t {
     NODE_NOT,  // w_child
     NODE_RET,  // w_child
 
+    NODE_PTR,  // ptr
+
     NODE_IDENT,  // ident
     NODE_INT,    // int
 } node_kind_t;
@@ -59,6 +61,7 @@ static inline char const* node_kind_str(node_kind_t nk) {
         case NODE_NEG: return "NODE_NEG";
         case NODE_NOT: return "NODE_NOT";
         case NODE_RET: return "NODE_RET";
+        case NODE_PTR: return "NODE_PTR";
         case NODE_IDENT: return "NODE_IDENT";
         case NODE_INT: return "NODE_INT";
     }
@@ -114,6 +117,22 @@ typedef struct node_call {
     node_arr_t args;
 } node_call_t;
 
+typedef enum node_ptr_flags {
+    PTR_MULTI = 1 << 0,
+    PTR_CONST = 1 << 1,
+    PTR_SLICE = 1 << 2,
+} node_ptr_flags_t;
+
+static inline bool ptr_is_multi(node_ptr_flags_t f) { return f & PTR_MULTI; }
+static inline bool ptr_is_const(node_ptr_flags_t f) { return f & PTR_CONST; }
+static inline bool ptr_is_slice(node_ptr_flags_t f) { return f & PTR_SLICE; }
+
+typedef struct node_ptr {
+    node_ref_t       term;
+    node_ref_t       child;
+    node_ptr_flags_t flags;
+} node_ptr_t;
+
 typedef struct node_ident {
     str_t ident;
 } node_ident_t;
@@ -135,6 +154,7 @@ typedef struct node {
         node_decl_t decl;
         node_proc_t proc;
         node_call_t call;
+        node_ptr_t  ptr;
 
         node_ident_t ident;
         node_int_t   int_;
@@ -272,6 +292,15 @@ static inline void node_init_ident(node_t* n, span_t span, str_t ident) {
         .kind = NODE_IDENT, .span = span, .as.ident = {.ident = ident}};
 }
 
+static inline void node_init_ptr(node_t* n, span_t span, node_ptr_flags_t flags,
+                                 node_ref_t child, node_ref_t term) {
+    *n = (node_t){
+        .kind = NODE_PTR,
+        .span = span,
+        .as.ptr = {.flags = flags, .child = child, .term = term}
+    };
+}
+
 static inline void node_init_int(node_t* n, span_t span, uint64_t value) {
     *n = (node_t){.kind = NODE_INT, .span = span, .as.int_ = {.value = value}};
 }
@@ -320,6 +349,11 @@ static inline node_w_child_t* node_as_unary(node_t* n) {
 static inline node_w_child_t* node_as_ret(node_t* n) {
     assert_int(n->kind, ==, NODE_RET);
     return &n->as.w_child;
+}
+
+static inline node_ptr_t* node_as_ptr(node_t* n) {
+    assert_int(n->kind, ==, NODE_PTR);
+    return &n->as.ptr;
 }
 
 static inline node_ident_t* node_as_ident(node_t* n) {

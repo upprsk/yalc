@@ -249,15 +249,21 @@ static MunitResult test_parser_trailing_commas(MunitParameter const params[],
     return MUNIT_OK;
 }
 
-static MunitResult test_parser_extern_printf(MunitParameter const params[],
-                                             void* user_data_or_fixture) {
+static MunitResult test_parser_ptrs(MunitParameter const params[],
+                                    void*                user_data_or_fixture) {
     (void)params;
     (void)user_data_or_fixture;
 
-    return MUNIT_SKIP;
-
     char const source[] =
-        "extern printf: .(format: [*:0]const u8, ...) i32 ...;\n"
+        "a :: *u8;\n"
+        "b :: *const u8;\n"
+        "c :: []u8;\n"
+        "d :: []const u8;\n"
+        "e :: [*]u8;\n"
+        "f :: [*]const u8;\n"
+        "g :: [*:0]u8;\n"
+        "h :: [*:0]const u8;\n"
+        "i :: [][]u8;\n"
         //
         ;
     uint32_t source_len = sizeof(source) - 1;
@@ -270,11 +276,48 @@ static MunitResult test_parser_extern_printf(MunitParameter const params[],
         tokenize_and_parse(alloc, &ast, (str_t){source, source_len});
 
     string_t s = ast_dump(&ast, ast_root, alloc);
-    assert_string_equal(
-        s.items,
-        "(mod"
-        " (decl \"printf\" (extern) (proc (arg format) i32 nil) nil)"
-        ")");
+    assert_string_equal(s.items,
+                        "(mod"
+                        " (decl \"a\" nil (ptr u8))"
+                        " (decl \"b\" nil (ptr const u8))"
+                        " (decl \"c\" nil (ptr slice u8))"
+                        " (decl \"d\" nil (ptr slice const u8))"
+                        " (decl \"e\" nil (ptr multi u8))"
+                        " (decl \"f\" nil (ptr multi const u8))"
+                        " (decl \"g\" nil (ptr multi 0 u8))"
+                        " (decl \"h\" nil (ptr multi const 0 u8))"
+                        " (decl \"i\" nil (ptr slice (ptr slice u8)))"
+                        ")");
+
+    arena_clear_all(&arena);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_parser_extern_printf(MunitParameter const params[],
+                                             void* user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    char const source[] = "extern printf: .(format: [*:0]const u8) i32 ...;\n"
+        //
+        ;
+    uint32_t source_len = sizeof(source) - 1;
+
+    arena_allocator_t arena = {0};
+    allocator_t       alloc = arena_allocator(&arena);
+
+    ast_t      ast = {0};
+    node_ref_t ast_root =
+        tokenize_and_parse(alloc, &ast, (str_t){source, source_len});
+
+    string_t s = ast_dump(&ast, ast_root, alloc);
+    assert_string_equal(s.items,
+                        "(mod"
+                        " (decl \"printf\" (extern) (proc"
+                        " (arg format (ptr multi const 0 u8)) i32 nil)"
+                        " nil)"
+                        ")");
 
     arena_clear_all(&arena);
 
@@ -330,6 +373,15 @@ void test_parser_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/parser/trailing_commas",
                           test_parser_trailing_commas,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/parser/ptrs",
+                          test_parser_ptrs,
                           NULL,
                           NULL,
                           MUNIT_TEST_OPTION_NONE,
