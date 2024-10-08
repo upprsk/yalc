@@ -66,7 +66,7 @@ typedef enum token_type : uint8_t {
     TT_OPAQUE,  // opaque
     TT_DEFER,   // defer
 
-    TT_EOF = 0xFF,
+    TT_EOF,
 } token_type_t;
 
 static inline char const* token_to_str(token_type_t tt) {
