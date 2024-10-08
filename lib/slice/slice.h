@@ -100,6 +100,14 @@
         (typeof(_s)){duped, (_s).len};                             \
     })
 
+#define slice_pop(_s)                                     \
+    ({                                                    \
+        assert_not_null((_s)->ptr);                       \
+        assert_size((_s)->len, >, 0);                     \
+        typeof(*(_s)->ptr) item = (_s)->ptr[--(_s)->len]; \
+        item;                                             \
+    })
+
 /// Create a slice from a string literal:
 ///
 /// ```c
