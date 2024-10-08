@@ -107,6 +107,16 @@ static inline int get_precedence(token_type_t tt) {
     }
 }
 
+static str_t validate_string_lit(parser_t* p, str_t s) {
+    assert_char(slice_at(s, 0), ==, '"');
+    assert_char(slice_at(s, s.len - 1), ==, '"');
+
+    slice_shift(&s);
+    slice_pop(&s);
+
+    return str_dupe(p->alloc, s);
+}
+
 // ----------------------------------------------------------------------------
 // Parsing functions
 // ----------------------------------------------------------------------------
@@ -180,7 +190,8 @@ static node_ref_t parse_decl(parser_t* p) {
             token_t t = peek(p);
             advance(p);
 
-            extern_name = str_dupe(p->alloc, span_to_slice(t.span, p->source));
+            extern_name =
+                validate_string_lit(p, span_to_slice(t.span, p->source));
         }
     }
 
