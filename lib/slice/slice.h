@@ -54,7 +54,7 @@
         assert_size(begin, <=, end);                               \
         assert_size(begin, <=, (_s).len);                          \
         assert_size(end, <=, (_s).len);                            \
-        assert_not_null((_s).ptr);                                 \
+        assert(!(_s).len || (_s).ptr);                             \
         (typeof(_s)){.ptr = (_s).ptr + begin, .len = end - begin}; \
     })
 
