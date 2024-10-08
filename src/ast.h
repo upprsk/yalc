@@ -169,14 +169,13 @@ typedef slice_t(node_ref_t) slice_node_ref_t;
 typedef struct ast {
     da_node_t     nodes;
     da_node_ref_t refs;
-    allocator_t   alloc;
+    // allocator_t   alloc;
 } ast_t;
 
 static inline void ast_init(ast_t* a, allocator_t alloc) {
     assert_not_null(a);
 
-    *a = (ast_t){
-        .nodes = da_init(alloc), .refs = da_init(alloc), .alloc = alloc};
+    *a = (ast_t){.nodes = da_init(alloc), .refs = da_init(alloc)};
 
     // push a dummy node to occupy index zero
     da_push_back(&a->nodes, (node_t){});
