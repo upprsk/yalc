@@ -98,7 +98,11 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
                 s = ss;
             }
 
-            string_t b = ast_dump(a, node->body, alloc);
+            string_t b = node_ref_valid(node->body)
+                             ? ast_dump(a, node->body, alloc)
+                             : (string_t){
+                                   "nil", 3, 3, {NULL, NULL}
+            };
             string_t ss = da_sprintf(alloc, "%s %s)", s.items, b.items);
 
             da_free(&b);

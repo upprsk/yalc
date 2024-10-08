@@ -329,14 +329,18 @@ static node_ref_t parse_proc(parser_t* p) {
         ret = parse_expr(p, 0);
     }
 
-    node_ref_t body = parse_blk(p);
+    node_ref_t body = {};
+    span_t     end = peek(p).span;
+    if (!match(p, TT_DOT_DOT_DOT)) {
+        body = parse_blk(p);
+        end = ast_get_span(&p->ast, body);
+    }
 
     node_arr_t args =
         args_arr.size ? ast_add_refs(&p->ast, args_arr) : (node_arr_t){};
 
-    node_init_proc(ast_get(&p->ast, node_ref),
-                   span_between(start.span, ast_get_span(&p->ast, body)), args,
-                   ret, body);
+    node_init_proc(ast_get(&p->ast, node_ref), span_between(start.span, end),
+                   args, ret, body);
 
     return node_ref;
 }
