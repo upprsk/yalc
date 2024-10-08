@@ -43,13 +43,15 @@ static MunitResult test_tokenize_empty(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
-    FILE*            errstream = tmpfile();
-    error_reporter_t er = {.stream = errstream};
-
     char const source[] = "";
     uint32_t   source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {
+        .stream = errstream, .source = {source, source_len}
+    };
 
     slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
     assert_not_null(tokens.ptr);
@@ -74,13 +76,15 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
-    FILE*            errstream = tmpfile();
-    error_reporter_t er = {.stream = errstream};
-
     char const source[] = "12 091 12.0 420.69";
     uint32_t   source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {
+        .stream = errstream, .source = {source, source_len}
+    };
 
     slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
     assert_not_null(tokens.ptr);
@@ -124,13 +128,15 @@ static MunitResult test_tokenize_ident(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
-    FILE*            errstream = tmpfile();
-    error_reporter_t er = {.stream = errstream};
-
     char const source[] = "test _123 a_b_c Yay";
     uint32_t   source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {
+        .stream = errstream, .source = {source, source_len}
+    };
 
     slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
     assert_not_null(tokens.ptr);
@@ -174,14 +180,16 @@ static MunitResult test_tokenize_symbols(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
-    FILE*            errstream = tmpfile();
-    error_reporter_t er = {.stream = errstream};
-
     char const source[] =
         ". , : ; = & ! ? + - * / < > <= >= == != () [] {} .( .{ .* .. ... ->";
     uint32_t source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {
+        .stream = errstream, .source = {source, source_len}
+    };
 
     slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
     assert_not_null(tokens.ptr);
@@ -238,15 +246,17 @@ static MunitResult test_tokenize_keywords(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
-    FILE*            errstream = tmpfile();
-    error_reporter_t er = {.stream = errstream};
-
     char const source[] =
         "return break extern export if else and or while as record opaque "
         "defer";
     uint32_t source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {
+        .stream = errstream, .source = {source, source_len}
+    };
 
     slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
     assert_not_null(tokens.ptr);
