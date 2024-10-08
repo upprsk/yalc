@@ -42,7 +42,7 @@ typedef enum token_type : uint8_t {
     TT_LBRACKET,  // [
     TT_RBRACKET,  // [
     TT_LBRACE,    // {
-    TT_RBRACE,    // {
+    TT_RBRACE,    // }
 
     TT_DOT_LPAREN,   // .(
     TT_DOT_LBRACE,   // .{
