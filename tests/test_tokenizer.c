@@ -117,6 +117,172 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
     return MUNIT_OK;
 }
 
+static MunitResult test_tokenize_ident(MunitParameter const params[],
+                                       void* user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {.stream = errstream};
+
+    char const source[] = "test _123 a_b_c Yay";
+    uint32_t   source_len = sizeof(source) - 1;
+
+    allocator_t alloc = c_allocator();
+
+    slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
+    assert_not_null(tokens.ptr);
+
+    token_type_t expected_types[] = {TT_IDENT, TT_IDENT, TT_IDENT, TT_IDENT,
+                                     TT_EOF};
+    char const*  expected_strs[] = {"test", "_123", "a_b_c", "Yay", ""};
+    assert_size(sizeof(expected_types) / sizeof(expected_types[0]), ==,
+                sizeof(expected_strs) / sizeof(expected_strs[0]));
+
+    size_t count = sizeof(expected_types) / sizeof(expected_types[0]);
+    assert_uint32(tokens.len, ==, count);
+
+    for (size_t i = 0; i < count; ++i) {
+        assert_uint8(slice_at(tokens, i).type, ==, expected_types[i]);
+
+        str_t slice = span_to_slice(slice_at(tokens, i).span,
+                                    (str_t){source, source_len});
+
+        fprintf(stderr, "[%zu] %s: '%.*s'\n", i,
+                token_to_str(slice_at(tokens, i).type), (int)slice.len,
+                slice.ptr);
+
+        uint32_t expected_len = strlen(expected_strs[i]);
+        assert_uint32(slice.len, ==, expected_len);
+        assert_memory_equal(slice.len, slice.ptr, expected_strs[i]);
+    }
+
+    long errstream_size = ftell(errstream);
+    assert_long(errstream_size, ==, 0);
+
+    slice_free(alloc, &tokens);
+    fclose(errstream);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_tokenize_symbols(MunitParameter const params[],
+                                         void* user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {.stream = errstream};
+
+    char const source[] =
+        ". , : ; = & ! ? + - * / < > <= >= == != () [] {} .( .{ .* .. ... ->";
+    uint32_t source_len = sizeof(source) - 1;
+
+    allocator_t alloc = c_allocator();
+
+    slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
+    assert_not_null(tokens.ptr);
+
+    token_type_t expected_types[] = {
+        TT_DOT,          TT_COMMA,       TT_COLON,
+        TT_SEMICOLON,    TT_EQUAL,       TT_AMPERSAND,
+        TT_BANG,         TT_QUESTION,    TT_PLUS,
+        TT_MINUS,        TT_STAR,        TT_SLASH,
+        TT_SMALLER,      TT_LARGER,      TT_SMALLER_EQUAL,
+        TT_LARGER_EQUAL, TT_EQUAL_EQUAL, TT_BANG_EQUAL,
+        TT_LPAREN,       TT_RPAREN,      TT_LBRACKET,
+        TT_RBRACKET,     TT_LBRACE,      TT_RBRACE,
+        TT_DOT_LPAREN,   TT_DOT_LBRACE,  TT_DOT_STAR,
+        TT_DOT_DOT,      TT_DOT_DOT_DOT, TT_ARROW,
+        TT_EOF};
+    char const* expected_strs[] = {
+        ".", ",", ":",  ";",  "=",  "&",  "!",   "?",  "+", "-", "*",
+        "/", "<", ">",  "<=", ">=", "==", "!=",  "(",  ")", "[", "]",
+        "{", "}", ".(", ".{", ".*", "..", "...", "->", ""};
+    assert_size(sizeof(expected_types) / sizeof(expected_types[0]), ==,
+                sizeof(expected_strs) / sizeof(expected_strs[0]));
+
+    size_t count = sizeof(expected_types) / sizeof(expected_types[0]);
+    assert_uint32(tokens.len, ==, count);
+
+    for (size_t i = 0; i < count; ++i) {
+        assert_uint8(slice_at(tokens, i).type, ==, expected_types[i]);
+
+        str_t slice = span_to_slice(slice_at(tokens, i).span,
+                                    (str_t){source, source_len});
+
+        fprintf(stderr, "[%zu] %s: '%.*s'\n", i,
+                token_to_str(slice_at(tokens, i).type), (int)slice.len,
+                slice.ptr);
+
+        uint32_t expected_len = strlen(expected_strs[i]);
+        assert_uint32(slice.len, ==, expected_len);
+        assert_memory_equal(slice.len, slice.ptr, expected_strs[i]);
+    }
+
+    long errstream_size = ftell(errstream);
+    assert_long(errstream_size, ==, 0);
+
+    slice_free(alloc, &tokens);
+    fclose(errstream);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_tokenize_keywords(MunitParameter const params[],
+                                          void* user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    FILE*            errstream = tmpfile();
+    error_reporter_t er = {.stream = errstream};
+
+    char const source[] =
+        "return break extern export if else and or while as record opaque "
+        "defer";
+    uint32_t source_len = sizeof(source) - 1;
+
+    allocator_t alloc = c_allocator();
+
+    slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
+    assert_not_null(tokens.ptr);
+
+    token_type_t expected_types[] = {
+        TT_RETURN, TT_BREAK, TT_EXTERN, TT_EXPORT, TT_IF,     TT_ELSE,  TT_AND,
+        TT_OR,     TT_WHILE, TT_AS,     TT_RECORD, TT_OPAQUE, TT_DEFER, TT_EOF};
+    char const* expected_strs[] = {"return", "break",  "extern", "export", "if",
+                                   "else",   "and",    "or",     "while",  "as",
+                                   "record", "opaque", "defer",  ""};
+    assert_size(sizeof(expected_types) / sizeof(expected_types[0]), ==,
+                sizeof(expected_strs) / sizeof(expected_strs[0]));
+
+    size_t count = sizeof(expected_types) / sizeof(expected_types[0]);
+    assert_uint32(tokens.len, ==, count);
+
+    for (size_t i = 0; i < count; ++i) {
+        assert_uint8(slice_at(tokens, i).type, ==, expected_types[i]);
+
+        str_t slice = span_to_slice(slice_at(tokens, i).span,
+                                    (str_t){source, source_len});
+
+        fprintf(stderr, "[%zu] %s: '%.*s'\n", i,
+                token_to_str(slice_at(tokens, i).type), (int)slice.len,
+                slice.ptr);
+
+        uint32_t expected_len = strlen(expected_strs[i]);
+        assert_uint32(slice.len, ==, expected_len);
+        assert_memory_equal(slice.len, slice.ptr, expected_strs[i]);
+    }
+
+    long errstream_size = ftell(errstream);
+    assert_long(errstream_size, ==, 0);
+
+    slice_free(alloc, &tokens);
+    fclose(errstream);
+
+    return MUNIT_OK;
+}
+
 void test_tokenizer_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/token/token-to-str",
@@ -139,6 +305,33 @@ void test_tokenizer_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/tokenize/numbers",
                           test_tokenize_numbers,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/tokenize/ident",
+                          test_tokenize_ident,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/tokenize/symbols",
+                          test_tokenize_symbols,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/tokenize/keywords",
+                          test_tokenize_keywords,
                           NULL,
                           NULL,
                           MUNIT_TEST_OPTION_NONE,

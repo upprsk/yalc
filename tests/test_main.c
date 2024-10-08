@@ -2,7 +2,7 @@
 #include "test.h"
 
 int main(int argc, char* argv[]) {
-    size_t test_capacity = 32;
+    size_t test_capacity = 64;
     ctx_t  ctx = {.tests = calloc(test_capacity, sizeof(*ctx.tests)),
                   .test_capacity = test_capacity};
 
