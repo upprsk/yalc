@@ -46,22 +46,22 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
                                       "nil", 3, 3, {NULL, NULL}
             };
 
-            char const* var_s = decl_is_var(node->flags) ? "var" : "";
+            char const* var_s = decl_is_var(node->flags) ? " var" : "";
 
             string_t s;
             if (decl_is_extern(node->flags)) {
                 if (node->extern_name.ptr) {
                     s = da_sprintf(alloc,
-                                   "(decl %s \"%s\" (extern \"%s\") %s %s)",
+                                   "(decl%s \"%s\" (extern \"%s\") %s %s)",
                                    var_s, node->name.ptr, node->extern_name.ptr,
                                    type.items, init.items);
                 } else {
-                    s = da_sprintf(alloc, "(decl %s \"%s\" (extern) %s %s)",
+                    s = da_sprintf(alloc, "(decl%s \"%s\" (extern) %s %s)",
                                    var_s, node->name.ptr, type.items,
                                    init.items);
                 }
             } else {
-                s = da_sprintf(alloc, "(decl %s \"%s\" %s %s)", var_s,
+                s = da_sprintf(alloc, "(decl%s \"%s\" %s %s)", var_s,
                                node->name.ptr, type.items, init.items);
             }
 
