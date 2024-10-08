@@ -61,6 +61,7 @@ static MunitResult test_tokenize_empty(MunitParameter const params[],
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
+    assert_size(er.error_count, ==, 0);
 
     slice_free(alloc, &tokens);
     fclose(errstream);
@@ -110,6 +111,7 @@ static MunitResult test_tokenize_numbers(MunitParameter const params[],
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
+    assert_size(er.error_count, ==, 0);
 
     slice_free(alloc, &tokens);
     fclose(errstream);
@@ -159,6 +161,7 @@ static MunitResult test_tokenize_ident(MunitParameter const params[],
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
+    assert_size(er.error_count, ==, 0);
 
     slice_free(alloc, &tokens);
     fclose(errstream);
@@ -222,6 +225,7 @@ static MunitResult test_tokenize_symbols(MunitParameter const params[],
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
+    assert_size(er.error_count, ==, 0);
 
     slice_free(alloc, &tokens);
     fclose(errstream);
@@ -276,6 +280,7 @@ static MunitResult test_tokenize_keywords(MunitParameter const params[],
 
     long errstream_size = ftell(errstream);
     assert_long(errstream_size, ==, 0);
+    assert_size(er.error_count, ==, 0);
 
     slice_free(alloc, &tokens);
     fclose(errstream);
