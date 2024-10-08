@@ -247,8 +247,8 @@ static MunitResult test_tokenize_keywords(MunitParameter const params[],
     (void)user_data_or_fixture;
 
     char const source[] =
-        "return break extern export if else and or while as record opaque "
-        "defer";
+        "return const break extern export if else and or while as record "
+        "opaque defer";
     uint32_t source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
@@ -261,12 +261,13 @@ static MunitResult test_tokenize_keywords(MunitParameter const params[],
     slice_token_t tokens = tokenize(&er, alloc, (str_t){source, source_len});
     assert_not_null(tokens.ptr);
 
-    token_type_t expected_types[] = {
-        TT_RETURN, TT_BREAK, TT_EXTERN, TT_EXPORT, TT_IF,     TT_ELSE,  TT_AND,
-        TT_OR,     TT_WHILE, TT_AS,     TT_RECORD, TT_OPAQUE, TT_DEFER, TT_EOF};
-    char const* expected_strs[] = {"return", "break",  "extern", "export", "if",
-                                   "else",   "and",    "or",     "while",  "as",
-                                   "record", "opaque", "defer",  ""};
+    token_type_t expected_types[] = {TT_RETURN, TT_CONST, TT_BREAK, TT_EXTERN,
+                                     TT_EXPORT, TT_IF,    TT_ELSE,  TT_AND,
+                                     TT_OR,     TT_WHILE, TT_AS,    TT_RECORD,
+                                     TT_OPAQUE, TT_DEFER, TT_EOF};
+    char const*  expected_strs[] = {
+        "return", "const", "break", "extern", "export", "if",    "else", "and",
+        "or",     "while", "as",    "record", "opaque", "defer", ""};
     assert_size(sizeof(expected_types) / sizeof(expected_types[0]), ==,
                 sizeof(expected_strs) / sizeof(expected_strs[0]));
 

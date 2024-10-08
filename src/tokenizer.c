@@ -146,6 +146,8 @@ static void tokenize_ident(tokenizer_t* t) {
 
     if (slice_eq(ident, str_from_lit("return"))) {
         append_token(t, TT_RETURN);
+    } else if (slice_eq(ident, str_from_lit("const"))) {
+        append_token(t, TT_CONST);
     } else if (slice_eq(ident, str_from_lit("break"))) {
         append_token(t, TT_BREAK);
     } else if (slice_eq(ident, str_from_lit("extern"))) {
