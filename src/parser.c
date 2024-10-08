@@ -143,7 +143,7 @@ static node_ref_t parse_call(parser_t* p, node_ref_t left);
 
 static da_node_ref_t parse_call_args(parser_t* p);
 
-static da_node_ref_t parse_proc_args(parser_t* p);
+static da_node_ref_t parse_proc_args(parser_t* p, bool* is_varargs);
 static node_ref_t    parse_proc_arg(parser_t* p);
 
 static node_ref_t parse_blk(parser_t* p);
@@ -319,9 +319,10 @@ static node_ref_t parse_proc(parser_t* p) {
     token_t    start = peek(p);
     node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
     node_ref_t ret = {};
+    bool       is_varargs = false;
 
     try_consume(p, TT_DOT_LPAREN);
-    da_node_ref_t args_arr = parse_proc_args(p);
+    da_node_ref_t args_arr = parse_proc_args(p, &is_varargs);
     try_consume(p, TT_RPAREN);
 
     if (peek_tt(p) != TT_LBRACE) {
@@ -339,7 +340,7 @@ static node_ref_t parse_proc(parser_t* p) {
         args_arr.size ? ast_add_refs(&p->ast, args_arr) : (node_arr_t){};
 
     node_init_proc(ast_get(&p->ast, node_ref), span_between(start.span, end),
-                   args, ret, body);
+                   is_varargs, args, ret, body);
 
     return node_ref;
 }
@@ -515,10 +516,17 @@ static da_node_ref_t parse_call_args(parser_t* p) {
 }
 
 // <proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," ] ;
-static da_node_ref_t parse_proc_args(parser_t* p) {
+static da_node_ref_t parse_proc_args(parser_t* p, bool* is_varargs) {
     da_node_ref_t args = da_init(p->temp_alloc);
 
     while (!is_at_end(p) && peek_tt(p) != TT_RPAREN) {
+        if (match(p, TT_DOT_DOT_DOT)) {
+            *is_varargs = true;
+            match(p, TT_COMMA);
+
+            break;
+        }
+
         node_ref_t arg_ref = parse_proc_arg(p);
         da_push_back(&args, arg_ref);
 

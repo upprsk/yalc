@@ -299,7 +299,8 @@ static MunitResult test_parser_extern_printf(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
-    char const source[] = "extern printf: .(format: [*:0]const u8) i32 ...;\n"
+    char const source[] =
+        "extern printf: .(format: [*:0]const u8, ...) i32 ...;\n"
         //
         ;
     uint32_t source_len = sizeof(source) - 1;
@@ -315,7 +316,7 @@ static MunitResult test_parser_extern_printf(MunitParameter const params[],
     assert_string_equal(s.items,
                         "(mod"
                         " (decl \"printf\" (extern) (proc"
-                        " (arg format (ptr multi const 0 u8)) i32 nil)"
+                        " (arg format (ptr multi const 0 u8)) ... i32 nil)"
                         " nil)"
                         ")");
 

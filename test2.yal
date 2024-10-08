@@ -11,7 +11,7 @@
 
 c_str :: [*:0]const u8;
 c_int :: i32;
-extern printf: .(format: c_str) c_int ...;
+extern printf: .(format: c_str, ...) c_int ...;
 
 // f :: .(x: i32) i32 {
 //     off :: 4;

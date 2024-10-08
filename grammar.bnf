@@ -28,7 +28,7 @@
 <multiplicative> ::= <expr> ( "*" | "/" ) <expr> ;
 <call>           ::= <expr> "(" [ <call_args> ] ")" ;
 
-<proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," ] ;
+<proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," [ "..." [ "," ] ] ] ;
 <proc_arg>  ::= <ident> [ ":" <expr> ] ;
 
 <ptr_arr> ::= "*" [ ":" <expr> "]"

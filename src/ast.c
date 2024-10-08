@@ -84,6 +84,12 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
                 s = ss;
             }
 
+            if (node->is_vararg) {
+                string_t ss = da_sprintf(alloc, "%s ...", s.items);
+                da_free(&s);
+                s = ss;
+            }
+
             if (node_ref_valid(node->ret)) {
                 string_t r = ast_dump(a, node->ret, alloc);
                 string_t ss = da_sprintf(alloc, "%s %s", s.items, r.items);

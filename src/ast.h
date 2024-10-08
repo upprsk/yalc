@@ -107,6 +107,7 @@ typedef struct node_decl {
 } node_decl_t;
 
 typedef struct node_proc {
+    bool       is_vararg;
     node_arr_t args;
     node_ref_t ret;
     node_ref_t body;
@@ -237,12 +238,14 @@ static inline void node_init_decl(node_t* n, span_t span,
     };
 }
 
-static inline void node_init_proc(node_t* n, span_t span, node_arr_t args,
-                                  node_ref_t ret, node_ref_t body) {
+static inline void node_init_proc(node_t* n, span_t span, bool is_vararg,
+                                  node_arr_t args, node_ref_t ret,
+                                  node_ref_t body) {
     *n = (node_t){
         .kind = NODE_PROC,
         .span = span,
-        .as.proc = {.args = args, .ret = ret, .body = body}
+        .as.proc = {
+                    .args = args, .ret = ret, .body = body, .is_vararg = is_vararg}
     };
 }
 
