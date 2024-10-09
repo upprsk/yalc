@@ -44,14 +44,14 @@ static MunitResult test_tstore_ints(MunitParameter const params[],
     tstore_t ts;
     tstore_init(&ts, alloc);
 
-    assert_uint32(tstore_add_int(&ts, true, 8).id, ==, 2);
-    assert_uint32(tstore_add_int(&ts, false, 8).id, ==, 3);
-    assert_uint32(tstore_add_int(&ts, true, 16).id, ==, 4);
-    assert_uint32(tstore_add_int(&ts, false, 16).id, ==, 5);
-    assert_uint32(tstore_add_int(&ts, true, 32).id, ==, 6);
-    assert_uint32(tstore_add_int(&ts, false, 32).id, ==, 7);
-    assert_uint32(tstore_add_int(&ts, true, 64).id, ==, 8);
-    assert_uint32(tstore_add_int(&ts, false, 64).id, ==, 9);
+    assert_uint32(tstore_add_int(&ts, true, 8).id, ==, 3);
+    assert_uint32(tstore_add_int(&ts, false, 8).id, ==, 4);
+    assert_uint32(tstore_add_int(&ts, true, 16).id, ==, 5);
+    assert_uint32(tstore_add_int(&ts, false, 16).id, ==, 6);
+    assert_uint32(tstore_add_int(&ts, true, 32).id, ==, 7);
+    assert_uint32(tstore_add_int(&ts, false, 32).id, ==, 8);
+    assert_uint32(tstore_add_int(&ts, true, 64).id, ==, 9);
+    assert_uint32(tstore_add_int(&ts, false, 64).id, ==, 10);
 
     tstore_deinit(&ts);
 
@@ -73,16 +73,16 @@ static MunitResult test_tstore_ptr(MunitParameter const params[],
     type_ref_t i32 = ts.builtins.i32;
 
     type_ref_t ptr1 = tstore_add_ptr(&ts, 0, i32, 0);
-    assert_uint32(ptr1.id, ==, 10);
+    assert_uint32(ptr1.id, ==, 11);
     type_ref_t ptr2 = tstore_add_ptr(&ts, PTR_CONST, i32, 0);
-    assert_uint32(ptr2.id, ==, 11);
+    assert_uint32(ptr2.id, ==, 12);
     type_ref_t ptr3 = tstore_add_ptr(&ts, PTR_CONST | PTR_MULTI, u8, 0);
-    assert_uint32(ptr3.id, ==, 12);
+    assert_uint32(ptr3.id, ==, 13);
     type_ref_t ptr4 = tstore_add_ptr(&ts, 0, ptr1, 0);
-    assert_uint32(ptr4.id, ==, 13);
+    assert_uint32(ptr4.id, ==, 14);
 
-    assert_uint32(tstore_add_ptr(&ts, PTR_CONST, i32, 0).id, ==, 11);
-    assert_uint32(tstore_add_ptr(&ts, 0, ptr1, 0).id, ==, 13);
+    assert_uint32(tstore_add_ptr(&ts, PTR_CONST, i32, 0).id, ==, 12);
+    assert_uint32(tstore_add_ptr(&ts, 0, ptr1, 0).id, ==, 14);
 
     da_args_t proc1_args = da_init(alloc);
     da_push_back(&proc1_args, (type_proc_arg_t){.type = i32});
@@ -90,7 +90,7 @@ static MunitResult test_tstore_ptr(MunitParameter const params[],
         tstore_add_proc(&ts, tstore_add_args(&ts, proc1_args), i32, false);
 
     type_ref_t ptr5 = tstore_add_ptr(&ts, PTR_CONST, proc1, 0);
-    assert_uint32(ptr5.id, ==, 15);
+    assert_uint32(ptr5.id, ==, 16);
 
     tstore_deinit(&ts);
     arena_clear_all(&arena);
@@ -117,7 +117,7 @@ static MunitResult test_tstore_proc(MunitParameter const params[],
 
     type_ref_t proc1 =
         tstore_add_proc(&ts, tstore_add_args(&ts, proc1_args), i32, false);
-    assert_uint32(proc1.id, ==, 10);
+    assert_uint32(proc1.id, ==, 11);
 
     da_args_t proc2_args = da_init(alloc);
     da_push_back(&proc2_args, (type_proc_arg_t){.type = u32});
@@ -125,14 +125,14 @@ static MunitResult test_tstore_proc(MunitParameter const params[],
 
     type_ref_t proc2 =
         tstore_add_proc(&ts, tstore_add_args(&ts, proc2_args), u32, false);
-    assert_uint32(proc2.id, ==, 11);
+    assert_uint32(proc2.id, ==, 12);
 
     da_args_t proc3_args = da_init(alloc);
     da_push_back(&proc3_args, (type_proc_arg_t){.type = i32});
 
     type_ref_t proc3 =
         tstore_add_proc(&ts, tstore_add_args(&ts, proc3_args), i32, false);
-    assert_uint32(proc3.id, ==, 10);
+    assert_uint32(proc3.id, ==, 11);
 
     da_args_t proc4_args = da_init(alloc);
     da_push_back(&proc4_args, (type_proc_arg_t){.type = u32});
@@ -140,7 +140,7 @@ static MunitResult test_tstore_proc(MunitParameter const params[],
 
     type_ref_t proc4 =
         tstore_add_proc(&ts, tstore_add_args(&ts, proc4_args), u32, false);
-    assert_uint32(proc4.id, ==, 11);
+    assert_uint32(proc4.id, ==, 12);
 
     tstore_deinit(&ts);
     arena_clear_all(&arena);
