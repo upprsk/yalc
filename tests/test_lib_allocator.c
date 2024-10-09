@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 #include "alloc/allocator.h"
+#include "ast.h"
 #include "test.h"
 
 static MunitResult test_c_allocator_basic(MunitParameter const params[],
@@ -129,12 +130,39 @@ static MunitResult test_arena_allocator_realloc_latest(
 
     int* p1 = allocator_alloc(alloc, 4 * sizeof(*p1));
     assert_not_null(p1);
+    memset(p1, 0xCC, 4 * sizeof(*p1));
 
     int* p2 = allocator_realloc(alloc, p1, 12 * sizeof(*p2));
     assert_not_null(p2);
 
+    {
+        int expected[4];
+        memset(expected, 0xCC, sizeof(expected));
+        assert_memory_equal(4 * sizeof(*p2), p2, expected);
+    }
+
     // should still be the same allocation
     assert_ptr_equal(p1, p2);
+
+    int* p3 = allocator_alloc(alloc, 32 * sizeof(*p3));
+    assert_not_null(p3);
+    memset(p1, 0xCC, 32 * sizeof(*p1));
+
+    int* p4 = allocator_alloc(alloc, 32 * sizeof(*p4));
+    assert_not_null(p4);
+
+    arena_block_t* blk = arena.head;
+
+    int* p5 = allocator_realloc(alloc, p3, 8 * sizeof(*p5));
+    assert_not_null(p5);
+    assert_ptr_equal(p3, p5);
+    assert_ptr_equal(blk->head, arena.head->head);
+
+    {
+        int expected[8];
+        memset(expected, 0xCC, sizeof(expected));
+        assert_memory_equal(8 * sizeof(*p5), p5, expected);
+    }
 
     arena_clear_all(&arena);
 
