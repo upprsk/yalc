@@ -182,8 +182,7 @@ typedef enum da_sts {
     } while (0)
 
 /// Helper to iterate an array.
-#define da_foreach(_da, _i) \
-    for (typeof((_da)->size) _i = 0; _i < (_da)->size; (_i)++)
+#define da_foreach(_da, _i) for (uint32_t _i = 0; _i < (_da)->size; (_i)++)
 
 /// Convert the dynamic array to a slice. Note that this does not reduce the
 /// capacity to size (that would be a potential allocation) or create a copy.
