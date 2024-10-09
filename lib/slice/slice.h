@@ -65,7 +65,7 @@
      (memcmp((_lhs).ptr, (__VA_ARGS__).ptr, (_lhs).len) == 0))
 
 /// Helper for iterating slices
-#define slice_foreach(_s, _i) for (uint32_t _i = 0; _i < (_s).len; (_i)++)
+#define slice_foreach(_s, _i) for (size_t _i = 0; _i < (_s).len; (_i)++)
 
 /// In case the slice was dinamically allocated, use this to free it. The fields
 /// will also be reset to an empty slice.
