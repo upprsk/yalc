@@ -200,6 +200,13 @@ static MunitResult test_arena_allocator_realloc_endpage(
     // but should have the same contents
     assert_int(p1[0], ==, p2[0]);
 
+    arena_block_t* blk2 = arena.head;
+
+    int* p3 = allocator_realloc(alloc, p, very_large_boy / 2);
+    assert_not_null(p3);
+    assert_ptr_equal(blk2, arena.head);
+    assert_ptr_equal(blk2->head, arena.head->head);
+
     arena_clear_all(&arena);
 
     return MUNIT_OK;
