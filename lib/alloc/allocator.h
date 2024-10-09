@@ -42,6 +42,13 @@ allocator_t c_allocator(void);
 
 /// An allocation block for the arena allocator.
 typedef struct arena_block arena_block_t;
+struct arena_block {
+    arena_block_t* next;
+
+    uint8_t* end;
+    uint8_t* head;
+    uint8_t  start[];
+};
 
 /// An arena allocator, free is a no-op.
 typedef struct arena_allocator {

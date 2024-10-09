@@ -59,14 +59,6 @@ allocator_t c_allocator(void) { return (allocator_t){.alloc = c_allocator_fn}; }
 
 // ----------------------------------------------------------------------------
 
-struct arena_block {
-    arena_block_t* next;
-
-    uint8_t* end;
-    uint8_t* head;
-    uint8_t  start[];
-};
-
 static arena_block_t* arena_allocate_new_block(arena_block_t* next,
                                                size_t         size) {
     assert_size(size, !=, 0);
