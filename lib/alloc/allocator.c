@@ -226,18 +226,10 @@ static void* arena_allocator_fn(void* ctx, void* ptr, size_t size) {
         // it is not the most recent allocation, but if the new size is smaller,
         // the we don't need to allocate anything new, so we check for that.
         if (size < prev_size) {
-            blk->head = alloc + size;
-
-            // align the final address up (so that the next allocation is
-            // pointer aligned)
-            uintptr_t addr = ((uintptr_t)blk->head + (sizeof(uintptr_t) - 1)) &
-                             -sizeof(uintptr_t);
-
-            // make shure that the head is before the end after alignment
-            blk->head = MIN(blk->end, (uint8_t*)addr);
+            fprintf(stderr, "size<prev_size\n");
 
             // update the size of the allocation
-            // FIXME: adjust the size to include the aligment
+            // FIXME: somehow keep track of the extra space?
             *size_ptr = size;
 
             // return the same pointer
