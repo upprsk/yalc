@@ -18,12 +18,16 @@ typedef struct parser {
     str_t         source;
     slice_token_t tokens;
 
-    ast_t ast;
+    ast_t* ast;
 
     error_reporter_t* er;
 } parser_t;
 
-typedef parse_result_t pr_t;
+typedef enum parse_result {
+    PRES_OK,
+    PRES_UNEXP,
+    PRES_EEXPR,
+} pr_t;
 
 /// Get the current token to be parsed.
 static inline token_t peek(parser_t const* p) { return slice_at(p->tokens, 0); }
@@ -157,7 +161,7 @@ static node_ref_t parse_stmt_expr(parser_t* p);
 
 // <mod> ::= { <decl> } ;
 static node_ref_t parse_mod(parser_t* p) {
-    node_ref_t    node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t    node_ref = ast_alloc_node(p->ast, NULL);
     da_node_ref_t children = da_init(p->temp_alloc);
 
     span_t span = peek(p).span;
@@ -166,11 +170,11 @@ static node_ref_t parse_mod(parser_t* p) {
         node_ref_t child = parse_decl(p);
         da_push_back(&children, child);
 
-        span.end = ast_get_span(&p->ast, child).end;
+        span.end = ast_get_span(p->ast, child).end;
     }
 
-    node_arr_t children_refs = ast_add_refs(&p->ast, children);
-    node_init_mod(ast_get(&p->ast, node_ref), span, children_refs);
+    node_arr_t children_refs = ast_add_refs(p->ast, children);
+    node_init_mod(ast_get(p->ast, node_ref), span, children_refs);
 
     return node_ref;
 }
@@ -203,7 +207,7 @@ static node_ref_t parse_blk_decl(parser_t* p, span_t start,
     try_consume(p, TT_IDENT);
     try_consume(p, TT_COLON);
 
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
     node_ref_t type = {};
     node_ref_t init = {};
 
@@ -223,7 +227,7 @@ static node_ref_t parse_blk_decl(parser_t* p, span_t start,
     try_consume(p, TT_SEMICOLON);
 
     str_t name = str_dupe(p->alloc, span_to_slice(name_tok.span, p->source));
-    node_init_decl(ast_get(&p->ast, node_ref), span_between(start, end), flags,
+    node_init_decl(ast_get(p->ast, node_ref), span_between(start, end), flags,
                    extern_name, name, type, init);
 
     return node_ref;
@@ -281,7 +285,7 @@ static node_ref_t parse_infix(parser_t* p, node_ref_t left) {
         default: break;
     }
 
-    node_t* left_node = ast_get(&p->ast, left);
+    node_t* left_node = ast_get(p->ast, left);
 
     str_t s = span_to_slice(tok.span, p->source);
     report_error(p->er, tok.span,
@@ -304,11 +308,11 @@ static node_ref_t parse_unary(parser_t* p) {
         default: assert(false);
     }
 
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
     node_ref_t child = parse_expr(p, unary_precedence);
 
-    node_init_unary(ast_get(&p->ast, node_ref),
-                    span_between(tok.span, ast_get_span(&p->ast, child)), kind,
+    node_init_unary(ast_get(p->ast, node_ref),
+                    span_between(tok.span, ast_get_span(p->ast, child)), kind,
                     child);
 
     return node_ref;
@@ -317,7 +321,7 @@ static node_ref_t parse_unary(parser_t* p) {
 // <proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] <blk> ;
 static node_ref_t parse_proc(parser_t* p) {
     token_t    start = peek(p);
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
     node_ref_t ret = {};
     bool       is_varargs = false;
 
@@ -333,13 +337,13 @@ static node_ref_t parse_proc(parser_t* p) {
     span_t     end = peek(p).span;
     if (!match(p, TT_DOT_DOT_DOT)) {
         body = parse_blk(p);
-        end = ast_get_span(&p->ast, body);
+        end = ast_get_span(p->ast, body);
     }
 
     node_arr_t args =
-        args_arr.size ? ast_add_refs(&p->ast, args_arr) : (node_arr_t){};
+        args_arr.size ? ast_add_refs(p->ast, args_arr) : (node_arr_t){};
 
-    node_init_proc(ast_get(&p->ast, node_ref), span_between(start.span, end),
+    node_init_proc(ast_get(p->ast, node_ref), span_between(start.span, end),
                    is_varargs, args, ret, body);
 
     return node_ref;
@@ -356,19 +360,22 @@ static node_ref_t parse_ptr(parser_t* p) {
     node_ref_t       term = {0};
     span_t           start = peek(p).span;
 
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
 
     if (match(p, TT_LBRACKET)) {
         // <ptr_arr>
         if (match(p, TT_RBRACKET)) {
             // a slice
+
+            // TODO: handle terminates slices
+
             flags |= PTR_SLICE;
             if (match(p, TT_CONST)) flags |= PTR_CONST;
 
             node_ref_t child = parse_expr(p, 0);
-            span_t     end = ast_get_span(&p->ast, child);
+            span_t     end = ast_get_span(p->ast, child);
 
-            node_init_ptr(ast_get(&p->ast, node_ref), span_between(start, end),
+            node_init_ptr(ast_get(p->ast, node_ref), span_between(start, end),
                           flags, child, term);
 
             return node_ref;
@@ -383,9 +390,9 @@ static node_ref_t parse_ptr(parser_t* p) {
             if (match(p, TT_CONST)) flags |= PTR_CONST;
 
             node_ref_t child = parse_expr(p, 0);
-            span_t     end = ast_get_span(&p->ast, child);
+            span_t     end = ast_get_span(p->ast, child);
 
-            node_init_ptr(ast_get(&p->ast, node_ref), span_between(start, end),
+            node_init_ptr(ast_get(p->ast, node_ref), span_between(start, end),
                           flags, child, term);
 
             return node_ref;
@@ -399,9 +406,9 @@ static node_ref_t parse_ptr(parser_t* p) {
     if (match(p, TT_CONST)) flags |= PTR_CONST;
 
     node_ref_t child = parse_expr(p, 0);
-    span_t     end = ast_get_span(&p->ast, child);
+    span_t     end = ast_get_span(p->ast, child);
 
-    node_init_ptr(ast_get(&p->ast, node_ref), span_between(start, end), flags,
+    node_init_ptr(ast_get(p->ast, node_ref), span_between(start, end), flags,
                   child, term);
 
     return node_ref;
@@ -416,7 +423,7 @@ static node_ref_t parse_int(parser_t* p) {
     uint64_t v = parse_uint64(s);
 
     node_t*    n = NULL;
-    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_ref_t ref = ast_alloc_node(p->ast, &n);
     node_init_int(n, t.span, v);
 
     return ref;
@@ -430,7 +437,7 @@ static node_ref_t parse_ident(parser_t* p) {
     str_t s = span_to_slice(t.span, p->source);
 
     node_t*    n = NULL;
-    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_ref_t ref = ast_alloc_node(p->ast, &n);
     node_init_ident(n, t.span, str_dupe(p->alloc, s));
 
     return ref;
@@ -451,10 +458,10 @@ static node_ref_t parse_additive(parser_t* p, node_ref_t left) {
     node_ref_t right = parse_expr(p, get_precedence(tt));
 
     node_t*    n = NULL;
-    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_ref_t ref = ast_alloc_node(p->ast, &n);
     node_init_binary(
         n,
-        span_between(ast_get_span(&p->ast, left), ast_get_span(&p->ast, right)),
+        span_between(ast_get_span(p->ast, left), ast_get_span(p->ast, right)),
         kind, left, right);
 
     return ref;
@@ -475,10 +482,10 @@ static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left) {
     node_ref_t right = parse_expr(p, get_precedence(tt));
 
     node_t*    n = NULL;
-    node_ref_t ref = ast_alloc_node(&p->ast, &n);
+    node_ref_t ref = ast_alloc_node(p->ast, &n);
     node_init_binary(
         n,
-        span_between(ast_get_span(&p->ast, left), ast_get_span(&p->ast, right)),
+        span_between(ast_get_span(p->ast, left), ast_get_span(p->ast, right)),
         kind, left, right);
 
     return ref;
@@ -488,15 +495,15 @@ static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left) {
 static node_ref_t parse_call(parser_t* p, node_ref_t left) {
     try_consume(p, TT_LPAREN);
 
-    node_ref_t    node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t    node_ref = ast_alloc_node(p->ast, NULL);
     da_node_ref_t args = parse_call_args(p);
 
     span_t end = peek(p).span;
     try_consume(p, TT_RPAREN);
 
-    node_init_call(ast_get(&p->ast, node_ref),
-                   span_between(ast_get_span(&p->ast, left), end), left,
-                   ast_add_refs(&p->ast, args));
+    node_init_call(ast_get(p->ast, node_ref),
+                   span_between(ast_get_span(p->ast, left), end), left,
+                   ast_add_refs(p->ast, args));
 
     return node_ref;
 }
@@ -538,7 +545,7 @@ static da_node_ref_t parse_proc_args(parser_t* p, bool* is_varargs) {
 
 // <proc_arg>  ::= <ident> [ ":" <expr> ] ;
 static node_ref_t parse_proc_arg(parser_t* p) {
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
     token_t    name_tok = peek(p);
     span_t     span = name_tok.span;
 
@@ -547,10 +554,10 @@ static node_ref_t parse_proc_arg(parser_t* p) {
     node_ref_t type = {};
     if (match(p, TT_COLON)) {
         type = parse_expr(p, 0);
-        span = span_between(span, ast_get_span(&p->ast, type));
+        span = span_between(span, ast_get_span(p->ast, type));
     }
 
-    node_init_arg(ast_get(&p->ast, node_ref), span,
+    node_init_arg(ast_get(p->ast, node_ref), span,
                   str_dupe(p->alloc, span_to_slice(name_tok.span, p->source)),
                   type);
 
@@ -561,7 +568,7 @@ static node_ref_t parse_proc_arg(parser_t* p) {
 static node_ref_t parse_blk(parser_t* p) {
     try_consume(p, TT_LBRACE);
 
-    node_ref_t    node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t    node_ref = ast_alloc_node(p->ast, NULL);
     da_node_ref_t children = da_init(p->temp_alloc);
     span_t        start = peek(p).span;
 
@@ -573,8 +580,8 @@ static node_ref_t parse_blk(parser_t* p) {
     try_consume(p, TT_RBRACE);
 
     span_t     end = peek(p).span;
-    node_arr_t refs = ast_add_refs(&p->ast, children);
-    node_init_blk(ast_get(&p->ast, node_ref), span_between(start, end), refs);
+    node_arr_t refs = ast_add_refs(p->ast, children);
+    node_init_blk(ast_get(p->ast, node_ref), span_between(start, end), refs);
 
     return node_ref;
 }
@@ -605,7 +612,7 @@ static node_ref_t parse_stmt_ret(parser_t* p) {
     span_t start = peek(p).span;
     try_consume(p, TT_RETURN);
 
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
 
     node_ref_t child = {};
     if (peek_tt(p) != TT_SEMICOLON) child = parse_expr(p, 0);
@@ -613,7 +620,7 @@ static node_ref_t parse_stmt_ret(parser_t* p) {
     span_t end = peek(p).span;
     try_consume(p, TT_SEMICOLON);
 
-    node_init_ret(ast_get(&p->ast, node_ref), span_between(start, end), child);
+    node_init_ret(ast_get(p->ast, node_ref), span_between(start, end), child);
 
     return node_ref;
 }
@@ -621,13 +628,13 @@ static node_ref_t parse_stmt_ret(parser_t* p) {
 // <stmt_expr> ::= <expr> ";" ;
 static node_ref_t parse_stmt_expr(parser_t* p) {
     span_t     start = peek(p).span;
-    node_ref_t node_ref = ast_alloc_node(&p->ast, NULL);
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
     node_ref_t child = parse_expr(p, 0);
 
     span_t end = peek(p).span;
     try_consume(p, TT_SEMICOLON);
 
-    node_init_ret(ast_get(&p->ast, node_ref), span_between(start, end), child);
+    node_init_ret(ast_get(p->ast, node_ref), span_between(start, end), child);
 
     return node_ref;
 }
@@ -650,13 +657,11 @@ node_ref_t parse(parser_desc_t* desc, ast_t* ast) {
         .temp_alloc = desc->temp_alloc,
         .source = desc->source,
         .tokens = desc->tokens,
+        .ast = ast,
         .er = desc->er,
     };
 
-    ast_init(&p.ast, p.alloc);
+    ast_init(p.ast, p.alloc);
 
-    node_ref_t root = parse_file(&p);
-
-    *ast = p.ast;
-    return root;
+    return parse_file(&p);
 }

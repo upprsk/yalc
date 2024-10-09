@@ -16,10 +16,4 @@ typedef struct parser_desc {
     error_reporter_t* er;
 } parser_desc_t;
 
-typedef enum parse_result {
-    PRES_OK,
-    PRES_UNEXP,
-    PRES_EEXPR,
-} parse_result_t;
-
 node_ref_t parse(parser_desc_t* desc, ast_t* ast);

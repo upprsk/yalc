@@ -8,9 +8,11 @@
 #include "ast.h"
 #include "errors.h"
 #include "parser.h"
+#include "sema.h"
 #include "slice/slice.h"
 #include "span.h"
 #include "tokenizer.h"
+#include "tstore.h"
 #include "utils/fs.h"
 
 static char const* make_sanitized_name(allocator_t alloc, char const* name) {
@@ -94,6 +96,24 @@ int main(int argc, char* argv[]) {
     if (args.show_ast) {
         string_t s = ast_dump(&ast, ast_root, temp_alloc);
         printf("ast:\n%s\n", s.items);
+    }
+
+    if (errs != er.error_count) return EXIT_FAILURE;
+
+    arena_clear_all(&temp_arena);
+
+    tstore_t ts;
+    tstore_init(&ts, main_alloc);
+
+    sema_pass(&(sema_desc_t){.alloc = main_alloc,
+                             .temp_alloc = temp_alloc,
+                             .ts = &ts,
+                             .er = &er},
+              &ast, ast_root);
+
+    if (args.show_typed_ast) {
+        string_t s = ast_dump_with_types(&ast, &ts, ast_root, temp_alloc);
+        printf("typed ast:\n%s\n", s.items);
     }
 
     if (errs != er.error_count) return EXIT_FAILURE;

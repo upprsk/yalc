@@ -1,13 +1,18 @@
 add_library(yal
   ast.c
   ast.h
+  common.h
   errors.c
   errors.h
   parser.c
   parser.h
+  sema.c
+  sema.h
   span.h
   tokenizer.c
   tokenizer.h
+  tstore.c
+  tstore.h
 )
 
 target_include_directories(yal PUBLIC .)

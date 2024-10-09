@@ -25,3 +25,4 @@ void test_lib_lst_add_tests(ctx_t* ctx);
 void test_lib_map_add_tests(ctx_t* ctx);
 void test_tokenizer_add_tests(ctx_t* ctx);
 void test_parser_add_tests(ctx_t* ctx);
+void test_tstore_add_tests(ctx_t* ctx);

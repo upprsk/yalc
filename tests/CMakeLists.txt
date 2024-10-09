@@ -7,6 +7,7 @@ add_executable(tests
   test_main.c
   test_parser.c
   test_tokenizer.c
+  test_tstore.c
 )
 
 target_link_libraries(tests PRIVATE lib yal)

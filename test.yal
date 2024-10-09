@@ -1,49 +1,9 @@
-export "main" main := .() -> i32 {
-    f := fopen("test.yal", "rb");
-    if f == nil {
-        printf("failed to open\n");
-        return 1;
-    }
-    f := f.*;
-
-    defer fclose(f);
-
-    SEEK_SET := 0;
-    SEEK_END := 2;
-    fseek(f, 0, SEEK_END);
-    size := ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    data := malloc((size + 1) as _);
-    defer free(data);
-
-    read := fread(data, 1, size as _, f);
-    if read as i64 != size {
-        printf("failed to read (%d != %d) (%d,%d)\n", read, size, ferror(f), feof(f));
-        return 1;
-    }
-
-    data[size] = 0;
-
-    printf("%s\n", data);
-
-    return 0;
+f :: .(x: i32) i32 {
+    return x;
 };
 
-FILE := opaque record {};
-extern "stdout"  stdout: *FILE;
-extern "stderr"  stderr: *FILE;
+main :: .() i32 {
+    r :: f(0);
 
-extern "fopen"   fopen:   .(path: [*:0]i8, mode: [*:0]i8) -> ?*FILE;
-extern "fclose"  fclose:  .(file: *FILE) -> void;
-extern "fseek"   fseek:   .(file: *FILE, off: i64, whence: i32) -> void;
-extern "ftell"   ftell:   .(file: *FILE) -> i64;
-extern "fread"   fread:   .(ptr: [*]i8, size: u64, nmemb: u64, file: *FILE) -> u64;
-extern "fprintf" fprintf: .(file: *FILE, fmt: [*:0]i8, ...) -> void;
-extern "fflush"  fflush:  .(file: *FILE) -> void;
-extern "feof"    feof:    .(file: *FILE) -> i32;
-extern "ferror"  ferror:  .(file: *FILE) -> i32;
-extern "malloc"  malloc:  .(size: u64) -> [*]i8;
-extern "free"    free:    .(ptr: [*]i8) -> void;
-extern "printf"  printf:  .(fmt: [*:0]i8, ...) -> void;
-extern "scanf"   scanf:   .(fmt: [*:0]i8, ...) -> i32;
+    return r;
+};

@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
 
     test_tokenizer_add_tests(&ctx);
     test_parser_add_tests(&ctx);
+    test_tstore_add_tests(&ctx);
 
     ctx_add_test(&ctx, &(MunitTest){});
 
