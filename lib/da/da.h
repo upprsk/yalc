@@ -61,6 +61,18 @@ typedef enum da_sts {
         (_da).items[idx];                  \
     })
 
+/// Index into the dynamic array and get a poiter to the element, but first do a
+/// bounds check.
+///
+/// `_idx` is only used once in the macro, so it may include side effects.
+#define da_ptr_at(_da, _idx)               \
+    ({                                     \
+        typeof((_da).size) idx = _idx;     \
+        assert_not_null((_da).items);      \
+        assert_uint32(idx, <, (_da).size); \
+        &(_da).items[idx];                 \
+    })
+
 /// Same as `da_reserve_opt`, but asserts that the allocation was succesful.
 #define da_reserve(_da, _cap) assert_int(da_reserve_opt(_da, _cap), ==, DA_OK)
 
