@@ -7,6 +7,7 @@
 #include "args.h"
 #include "ast.h"
 #include "errors.h"
+#include "irgen.h"
 #include "parser.h"
 #include "sema.h"
 #include "slice/slice.h"
@@ -115,6 +116,14 @@ int main(int argc, char* argv[]) {
         string_t s = ast_dump_with_types(&ast, &ts, ast_root, temp_alloc);
         printf("typed ast:\n%s\n", s.items);
     }
+
+    if (errs != er.error_count) return EXIT_FAILURE;
+
+    irgen_pass(&(irgen_desc_t){.alloc = main_alloc,
+                               .temp_alloc = temp_alloc,
+                               .ts = &ts,
+                               .er = &er},
+               &ast, ast_root);
 
     if (errs != er.error_count) return EXIT_FAILURE;
 

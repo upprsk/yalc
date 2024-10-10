@@ -4,6 +4,10 @@ add_library(yal
   common.h
   errors.c
   errors.h
+  ir.c
+  ir.h
+  irgen.c
+  irgen.h
   parser.c
   parser.h
   sema.c

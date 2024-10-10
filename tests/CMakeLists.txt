@@ -1,5 +1,6 @@
 add_executable(tests
   test.h
+  test_ir.c
   test_lib_allocator.c
   test_lib_da.c
   test_lib_lst.c

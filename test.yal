@@ -1,9 +1,16 @@
+zero :: .() i32 { return 0; };
+
 f :: .(x: i32) i32 {
     return x;
 };
 
+g :: .(x: i32, y: i32, z: i32) i32 {
+    return x + y - (z * f(2));
+};
+
 main :: .() i32 {
-    r :: f(0);
+    z := zero();
+    r := g(z, 22 - 2, 69);
 
     return r;
 };

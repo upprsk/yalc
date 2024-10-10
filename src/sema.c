@@ -17,7 +17,6 @@ typedef struct sema {
 
     ast_t*    ast;
     tstore_t* ts;
-    str_t     source;
 
     error_reporter_t* er;
 } sema_t;
@@ -82,6 +81,8 @@ static inline void mark_proc_unreachable_reported(ctx_t* c) {
     c->proc->flags |= PROC_UNREACHABLE_REPORTED;
 }
 
+static inline bool in_proc(ctx_t* c) { return c->proc != NULL; }
+
 static void decl_val(sema_t* s, ctx_t* c, str_t name, decl_val_t val) {
     debug_printf("declaring '%s'\n", name.ptr);
 
@@ -142,8 +143,10 @@ static type_ref_t sema_node_mod(sema_t* s, ctx_t* ctx, inf_t pinf,
     slice_node_ref_t children = ast_get_arr(s->ast, mod->children);
 
     slice_foreach(children, i) {
-        type_ref_t ty = sema_node_ref(s, ctx, inf, slice_at(children, i));
-        if (!tstore_type_is_void(s->ts, ty)) {
+        node_ref_t child = slice_at(children, i);
+        type_ref_t ty = sema_node_ref(s, ctx, inf, child);
+        if (!tstore_type_is_void(s->ts, ty) &&
+            ast_get(s->ast, child)->kind != NODE_DECL) {
             report_warn(
                 s->er, ast_get_span(s->ast, slice_at(children, i)),
                 "INTERNAL: expected to get void in mod node, but got %s",
@@ -173,12 +176,31 @@ static type_ref_t sema_node_decl(sema_t* s, ctx_t* ctx, inf_t pinf,
         init_expr = sema_node_ref(s, ctx, inf, decl->init);
     }
 
+    bool decl_is_proc = false;
+    if (type_ref_valid(type_expr))
+        decl_is_proc = tstore_type_is_proc(s->ts, type_expr);
+    else if (type_ref_valid(init_expr))
+        decl_is_proc = tstore_type_is_proc(s->ts, init_expr);
+
+    // TODO: comptime
+    if (!decl_is_var(decl->flags) && !decl_is_proc) {
+        report_error(s->er, node->span,
+                     "comptime for things other than procedures has not been "
+                     "implemented");
+    }
+
+    if (decl_is_var(decl->flags) && !in_proc(ctx)) {
+        report_error(s->er, node->span,
+                     "global variables have not been implemented");
+    }
+
     // FIXME: chech if the types match or can be converted/auto-casted
 
     decl_val(s, ctx, decl->name,
              (decl_val_t){.where = node->span, .type = init_expr});
 
-    return s->ts->builtins.void_;
+    // FIXME: use the actual correct type for the decl
+    return init_expr;
 }
 
 static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
@@ -250,7 +272,8 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
             !proc_has_returned(&body_ctx)) {
             report_error(
                 s->er, node->span,
-                "procedure with non-void return type %s, returns implicitly",
+                "procedure with non-void return type %s, returns "
+                "implicitly",
                 tstore_type_ref_str(s->ts, type_ret, s->temp_alloc).items);
             report_note(s->er, span_ret, "return type declared here");
         }
@@ -282,8 +305,10 @@ static type_ref_t sema_node_blk(sema_t* s, ctx_t* pctx, inf_t pinf,
                         "unreachable code");
         }
 
-        type_ref_t ty = sema_node_ref(s, &ctx, inf, slice_at(children, i));
-        if (!tstore_type_is_void(s->ts, ty)) {
+        node_ref_t child = slice_at(children, i);
+        type_ref_t ty = sema_node_ref(s, &ctx, inf, child);
+        if (!tstore_type_is_void(s->ts, ty) &&
+            ast_get(s->ast, child)->kind != NODE_DECL) {
             report_warn(
                 s->er, ast_get_span(s->ast, slice_at(children, i)),
                 "INTERNAL: expected to get void in blk node, but got %s",

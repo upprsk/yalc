@@ -117,7 +117,7 @@ void report_warn(error_reporter_t* er, span_t span, char const* format, ...) {
 void vreport_warn(error_reporter_t* er, span_t span, char const* format,
                   va_list va) {
     assert_not_null(er);
-    er->error_count++;
+    // er->error_count++;
 
     uint32_t line = count_lines(er->source.ptr, span);
     uint32_t line_start = find_line_start(er->source.ptr, span);

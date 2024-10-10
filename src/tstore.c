@@ -139,7 +139,7 @@ string_t tstore_type_str(tstore_t const* ts, type_t const* type,
             slice_foreach(args, i) {
                 string_t c =
                     tstore_type_ref_str(ts, slice_at(args, i).type, alloc);
-                string_t tmp = da_sprintf(alloc, "%s_: %s, ", a.items, c.items);
+                string_t tmp = da_sprintf(alloc, "%s%zu: %s, ", a.items, i, c.items);
 
                 da_free(&a);
                 da_free(&c);
