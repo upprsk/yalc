@@ -4,7 +4,7 @@
 <decl>     ::= [ "extern" [ <string> ] ] <blk_decl> ;
 <blk_decl> ::= <ident> ":" [ <expr> ] [ ( ":" | "=" ) <expr> ] ";" ;
 
-<expr>   ::= <prefix> | <infix>;
+<expr>   ::= "(" <expr> ")" | <prefix> | <infix>;
 <prefix> ::= <unary>
            | <proc>
            | <ptr>

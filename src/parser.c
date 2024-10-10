@@ -259,6 +259,13 @@ static node_ref_t parse_prefix(parser_t* p) {
         case TT_LBRACKET: return parse_ptr(p);
         case TT_INT: return parse_int(p);
         case TT_IDENT: return parse_ident(p);
+        case TT_LPAREN: {
+            try_consume(p, TT_LPAREN);
+            node_ref_t n = parse_expr(p, 0);
+            try_consume(p, TT_RPAREN);
+
+            return n;
+        }
         default: break;
     }
 
