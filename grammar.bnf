@@ -49,4 +49,4 @@
 <stmt_ret>  ::= "return" [ <expr> ] ";" ;
 <stmt_expr> ::= <expr> ";" ;
 <stmt_if>   ::= "if" <expr> <blk> [ "else" <blk> ] ;
-<stmt_if>   ::= "while" <expr> <blk> ;
+<stmt_while>   ::= "while" <expr> <blk> ;
