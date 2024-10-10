@@ -323,7 +323,7 @@ static MunitResult test_da_sprintf(MunitParameter const params[],
     string_t s = da_sprintf(alloc, "Hello %s!", "world");
 
     assert_string_equal(s.items, "Hello world!");
-    assert_uint32(s.size, ==, 13);
+    assert_uint32(s.size, ==, 12);
     assert_uint32(s.capacity, ==, 13);
 
     da_free(&s);
