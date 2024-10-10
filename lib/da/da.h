@@ -238,6 +238,9 @@ typedef da_t(uint64_t) da_u64_t;
 
 typedef da_t(char) string_t;
 
+#define string_from_lit(...) \
+    (string_t) { .items = __VA_ARGS__, .size = sizeof(__VA_ARGS__) - 1 }
+
 /// Print into a dynamically allocated string. The string will be allocated with
 /// exactly the needed size. The string needs to be deallocated with either
 /// `da_free` or `string_free` In case allocation fails, an empty string is
@@ -246,3 +249,21 @@ typedef da_t(char) string_t;
 __attribute__((format(printf, 2, 3))) string_t da_sprintf(allocator_t alloc,
                                                           char const* fmt, ...);
 string_t da_vsprintf(allocator_t alloc, char const* fmt, va_list args);
+
+__attribute__((format(printf, 2, 3))) void da_catfmt(string_t*   s,
+                                                         char const* fmt, ...);
+void da_vcatfmt(string_t* s, char const* fmt, va_list args);
+
+/// Append the second string to the first string. The resulting string (lhs) is
+/// null-terminated.
+void da_strcat(string_t* lhs, string_t const* rhs);
+
+/// Append the second string to the first string and free the second string.
+void da_strcat_and_free(string_t* lhs, string_t* rhs);
+
+/// Append the second string to the first string with the given separator.
+void da_strjoin(string_t* lhs, string_t const* rhs, string_t const* sep);
+
+/// Append the second string to the first string with the given separator and
+/// free the second string and separator.
+void da_strjoin_and_free(string_t* lhs, string_t* rhs, string_t* sep);

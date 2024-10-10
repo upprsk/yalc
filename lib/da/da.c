@@ -115,7 +115,57 @@ string_t da_vsprintf(allocator_t alloc, char const* fmt, va_list args) {
 
     vsnprintf(s.items, s.size, fmt, cpy);
 
+    // remove the null terminator from the size
+    da_pop(&s);
+
     va_end(cpy);
 
     return s;
+}
+
+__attribute__((format(printf, 2, 3))) void da_catfmt(string_t*   s,
+                                                         char const* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    da_vcatfmt(s, fmt, args);
+
+    va_end(args);
+}
+
+void da_vcatfmt(string_t* s, char const* fmt, va_list args) {
+    va_list cpy;
+    va_copy(cpy, args);
+
+    int len = vsnprintf(NULL, 0, fmt, args);
+    da_reserve(s, s->size + len + 1);
+
+    vsnprintf(s->items + s->size, len + 1, fmt, cpy);
+    s->size += len;  // manually increment the size
+
+    va_end(cpy);
+}
+
+void da_strcat(string_t* lhs, string_t const* rhs) {
+    da_append(lhs, rhs->size, rhs->items);
+
+    // add null terminator, but not include it in the size
+    da_push_back(lhs, 0);
+    da_pop(lhs);
+}
+
+void da_strcat_and_free(string_t* lhs, string_t* rhs) {
+    da_strcat(lhs, rhs);
+    da_free(rhs);
+}
+
+void da_strjoin(string_t* lhs, string_t const* rhs, string_t const* sep) {
+    da_strcat(lhs, sep);
+    da_strcat(lhs, rhs);
+}
+
+void da_strjoin_and_free(string_t* lhs, string_t* rhs, string_t* sep) {
+    da_strjoin(lhs, rhs, sep);
+    da_free(rhs);
+    da_free(sep);
 }
