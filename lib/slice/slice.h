@@ -67,6 +67,16 @@
 /// Helper for iterating slices
 #define slice_foreach(_s, _i) for (size_t _i = 0; _i < (_s).len; (_i)++)
 
+#define slice_alloc(_alloc, T, _size)                            \
+    ({                                                           \
+        T               out = {};                                \
+        typeof(out.ptr) t =                                      \
+            allocator_alloc(_alloc, sizeof(*out.ptr) * (_size)); \
+        out.ptr = t;                                             \
+        out.len = (_size);                                       \
+        out;                                                     \
+    })
+
 /// In case the slice was dinamically allocated, use this to free it. The fields
 /// will also be reset to an empty slice.
 #define slice_free(_alloc, _s)                    \
