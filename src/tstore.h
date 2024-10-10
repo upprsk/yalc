@@ -21,6 +21,7 @@ typedef enum type_kind {
     TYPE_TYPE,
     TYPE_VOID,
     TYPE_INT,
+    TYPE_BOOL,
     TYPE_PTR,
     TYPE_PROC,
 } type_kind_t;
@@ -30,8 +31,9 @@ static inline char const* type_kind_str(type_kind_t tk) {
         case TYPE_INVAL: return "TYPE_INVAL";
         case TYPE_TYPE: return "TYPE_TYPE";
         case TYPE_VOID: return "TYPE_VOID";
-        case TYPE_PTR: return "TYPE_PTR";
         case TYPE_INT: return "TYPE_INT";
+        case TYPE_BOOL: return "TYPE_BOOL";
+        case TYPE_PTR: return "TYPE_PTR";
         case TYPE_PROC: return "TYPE_PROC";
     }
 
@@ -88,6 +90,7 @@ typedef struct tstore_builtins {
     type_ref_t u32;
     type_ref_t i64;
     type_ref_t u64;
+    type_ref_t bool_;
 } tstore_builtins_t;
 
 typedef struct tstore {
@@ -166,6 +169,10 @@ bool tstore_type_eq(tstore_t const* t, type_t const* lhs, type_t const* rhs);
 
 static inline bool tstore_type_is_void(tstore_t const* t, type_ref_t type) {
     return type_ref_eq(t->builtins.void_, type);
+}
+
+static inline bool tstore_type_is_bool(tstore_t const* t, type_ref_t type) {
+    return type_ref_eq(t->builtins.bool_, type);
 }
 
 static inline bool tstore_type_is_proc(tstore_t const* t, type_ref_t type) {

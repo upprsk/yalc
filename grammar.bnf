@@ -42,7 +42,11 @@
 
 <stmt> ::= <stmt_ret>
          | <stmt_expr>
+         | <stmt_if>
+         | <stmt_while>
          ;
 
-<stmt_ret> ::= "return" [ <expr> ] ";" ;
+<stmt_ret>  ::= "return" [ <expr> ] ";" ;
 <stmt_expr> ::= <expr> ";" ;
+<stmt_if>   ::= "if" <expr> <blk> [ "else" <blk> ] ;
+<stmt_if>   ::= "while" <expr> <blk> ;

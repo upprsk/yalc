@@ -12,5 +12,12 @@ main :: .() i32 {
     z := zero();
     r := g(z, 22 - 2, 69);
 
+    while true {
+        t := 12;
+        if false {
+            t := 44;
+        }
+    }
+
     return r;
 };

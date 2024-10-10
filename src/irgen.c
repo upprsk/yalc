@@ -14,6 +14,7 @@
 #include "map/map.h"
 #include "slice/slice.h"
 #include "tstore.h"
+#include "utils/string.h"
 
 typedef struct reg {
     uint32_t num;
@@ -52,7 +53,8 @@ typedef struct curr_proc {
 
     map_str_local_t* locals;
 
-    reg_t next_reg;
+    reg_t       next_reg;
+    label_ref_t next_label;
 } curr_proc_t;
 
 typedef struct curr_obj {
@@ -191,6 +193,26 @@ static inline reg_t alloc_reg(ctx_t* ctx) {
     return r;
 }
 
+static label_ref_t gen_label(ctx_t* ctx) {
+    assert_not_null(ctx);
+    assert_not_null(ctx->proc);
+
+    label_ref_t l = ctx->proc->next_label;
+    ctx->proc->next_label.id++;
+
+    da_push_back(&ctx->proc->labels, (label_t){});
+
+    return l;
+}
+
+static void patch_label(ctx_t* ctx, label_ref_t l) {
+    assert_not_null(ctx);
+    assert_not_null(ctx->proc);
+    assert_size(l.id, <, ctx->proc->labels.size);
+
+    ctx->proc->labels.items[l.id] = (label_t){ctx->proc->insts.size};
+}
+
 static uint32_t add_inst(ctx_t* ctx, inst_t inst) {
     assert_not_null(ctx);
     assert_not_null(ctx->proc);
@@ -233,7 +255,28 @@ static reg_t gen_ident(irgen_t* g, ctx_t* ctx, node_t const* node,
 
     local_t* l = find_local(ctx, ident->ident);
     if (!l) {
-        // the name does not refer to a local, search for a global
+        // the name does not refer to a local, search for a global or builtin
+
+        if (tstore_type_is_bool(g->ts, type)) {
+            reg_t rd = alloc_reg(ctx);
+
+            uint64_t v = 0;
+            if (slice_eq(ident->ident, str_from_lit("true"))) {
+                v = 1;
+            } else if (slice_eq(ident->ident, str_from_lit("false"))) {
+                v = 0;
+            } else {
+                report_error(g->er, node->span,
+                             "INTERNAL: got invalid bool identifier, expected "
+                             "'true' or 'false', got '%s'",
+                             ident->ident.ptr);
+            }
+
+            add_inst(ctx, inst_copy(IRT_U8, rd.num, v));
+
+            return rd;
+        }
+
         if (tstore_type_is_proc(g->ts, type)) {
             // the thing is a procedure, let's try to find it in the list of
             // procedures.
@@ -293,8 +336,6 @@ static reg_t gen_call(irgen_t* g, ctx_t* ctx, node_t const* node,
     type_ref_t         type = ast_get_type(g->ast, ref);
     slice_node_ref_t   args = ast_get_arr(g->ast, call->args);
 
-    report_success(g->er, node->span, "got call!");
-
     irtype_t ty = type_to_irtype(g, node->span, type);
     reg_t    cr = gen_expr(g, ctx, call->callee);
 
@@ -339,6 +380,7 @@ static reg_t gen_call(irgen_t* g, ctx_t* ctx, node_t const* node,
 // ----------------------------------------------------------------------------
 
 static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref);
+static void gen_blk(irgen_t* g, ctx_t* ctx, node_ref_t ref);
 
 static void gen_ret(irgen_t* g, ctx_t* ctx, node_t const* node,
                     node_ref_t ref) {
@@ -360,6 +402,57 @@ static void gen_decl(irgen_t* g, ctx_t* ctx, node_t const* node,
     add_local(g, ctx, decl->name, ty, init);
 }
 
+static void gen_if(irgen_t* g, ctx_t* ctx, node_t const* node, node_ref_t ref) {
+    (void)ref;
+
+    node_ternary_t const* if_ = node_as_if(node);
+
+    reg_t       cond = gen_expr(g, ctx, if_->cond);
+    label_ref_t wfalse = gen_label(ctx);
+    label_ref_t end = {};
+
+    if (node_ref_valid(if_->wfalse)) {
+        end = gen_label(ctx);
+    }
+
+    // jump to wfalse when the condition is false
+    add_inst(ctx, inst_bz(IRT_U8, cond.num, wfalse.id));
+    gen_blk(g, ctx, if_->wtrue);
+
+    if (node_ref_valid(if_->wfalse)) {
+        // when there is an else, we need to jump over it when the condition was
+        // true
+        add_inst(ctx, inst_b(IRT_VOID, end.id));
+    }
+
+    // this is where we want to jump to if the condition was false
+    patch_label(ctx, wfalse);
+
+    if (node_ref_valid(if_->wfalse)) {
+        gen_blk(g, ctx, if_->wfalse);
+
+        // this is where we want to jump to if the condition was true
+        patch_label(ctx, end);
+    }
+}
+
+static void gen_while(irgen_t* g, ctx_t* ctx, node_t const* node,
+                      node_ref_t ref) {
+    (void)ref;
+
+    node_ternary_t const* while_ = node_as_while(node);
+
+    reg_t       cond = gen_expr(g, ctx, while_->cond);
+    label_ref_t end = gen_label(ctx);
+
+    // jump to wfalse when the condition is false
+    add_inst(ctx, inst_bz(IRT_U8, cond.num, end.id));
+    gen_blk(g, ctx, while_->wtrue);
+
+    // this is where we want to jump to if the condition was false
+    patch_label(ctx, end);
+}
+
 // ----------------------------------------------------------------------------
 
 static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
@@ -368,6 +461,8 @@ static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
     switch (node->kind) {
         case NODE_RET: gen_ret(g, ctx, node, ref); break;
         case NODE_DECL: gen_decl(g, ctx, node, ref); break;
+        case NODE_IF: gen_if(g, ctx, node, ref); break;
+        case NODE_WHILE: gen_while(g, ctx, node, ref); break;
         default:
             report_error(g->er, node->span, "stmt %s not implemented",
                          node_kind_str(node->kind));
@@ -441,6 +536,7 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, str_t name, node_ref_t ref) {
 
     gen_blk(g, &ctx, node_proc->body);
 
+#if 0   // debug thing start
     fprintf(stderr, "\nproc: %s\n",
             tstore_type_str(g->ts, raw_type, g->temp_alloc).items);
 
@@ -458,6 +554,7 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, str_t name, node_ref_t ref) {
         string_t s = inst_str(da_at(proc.insts, i), g->temp_alloc);
         fprintf(stderr, "[%04x] %s\n", i, s.items);
     }
+#endif  // debug thing end
 
     proc_t actual_proc = {
         .args = proc.args,
@@ -525,9 +622,11 @@ void irgen_pass(irgen_desc_t* desc, ast_t* ast, node_ref_t root) {
 
     obj_t u = {.procs = procs};
 
+#if 1  // debug thing start
     slice_foreach(u.procs, i) {
         string_t s = proc_dump(&u.procs.ptr[i], g.temp_alloc);
 
         fprintf(stderr, "====\n%s\n", s.items);
     }
+#endif  // debug thing end
 }

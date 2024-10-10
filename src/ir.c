@@ -49,10 +49,11 @@ string_t inst_str(inst_t inst, allocator_t alloc) {
 string_t proc_dump(proc_t const* p, allocator_t alloc) {
     assert_not_null(p);
 
-    string_t s = da_sprintf(alloc, "proc \"%s\":", p->link_name.ptr);
+    string_t s =
+        da_sprintf(alloc, "proc %d \"%s\":", p->ref.id, p->link_name.ptr);
 
     if (p->cprocs.len) {
-        da_strcat(&s, &string_from_lit("\n["));
+        da_strcat(&s, &string_from_lit("\ncprocs: ["));
 
         slice_foreach(p->cprocs, i) {
             string_t c =
@@ -63,8 +64,26 @@ string_t proc_dump(proc_t const* p, allocator_t alloc) {
         da_strcat(&s, &string_from_lit(" ]"));
     }
 
+    if (p->labels.len) {
+        da_strcat(&s, &string_from_lit("\nlabels: ["));
+
+        slice_foreach(p->labels, i) {
+            string_t c =
+                da_sprintf(alloc, "%zu: %d", i, slice_at(p->labels, i).off);
+            da_strjoin_and_free(&s, &c, &string_from_lit(" "));
+        }
+
+        da_strcat(&s, &string_from_lit(" ]"));
+    }
+
     slice_foreach(p->insts, i) {
         string_t c = inst_str(slice_at(p->insts, i), alloc);
+
+#if 1  // start expensive label
+        slice_foreach(p->labels, j) {
+            if (i == slice_at(p->labels, j).off) da_catfmt(&s, "\n@%zu", j);
+        }
+#endif  // end expensive label
 
         da_catfmt(&s, "\n[%04zu] %s", i, c.items);
         da_free(&c);

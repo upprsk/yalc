@@ -41,6 +41,7 @@ void tstore_init(tstore_t* ts, allocator_t alloc) {
     ts->builtins.u32 = tstore_add_int(ts, false, 32);
     ts->builtins.i64 = tstore_add_int(ts, true, 64);
     ts->builtins.u64 = tstore_add_int(ts, false, 64);
+    ts->builtins.bool_ = tstore_add(ts, &(type_t){.kind = TYPE_BOOL});
 }
 
 type_ref_t tstore_find(tstore_t const* ts, type_t const* t) {
@@ -76,6 +77,7 @@ bool tstore_type_eq(tstore_t const* t, type_t const* lhs, type_t const* rhs) {
         case TYPE_INT:
             return lhs->as.int_.bits == rhs->as.int_.bits &&
                    rhs->as.int_.is_signed == lhs->as.int_.is_signed;
+        case TYPE_BOOL: return true;
         case TYPE_PTR:
             return lhs->as.ptr.flags == rhs->as.ptr.flags &&
                    type_ref_eq(lhs->as.ptr.child, rhs->as.ptr.child);
@@ -104,6 +106,7 @@ string_t tstore_type_str(tstore_t const* ts, type_t const* type,
             return da_sprintf(alloc, "%c%d",
                               type->as.int_.is_signed ? 'i' : 'u',
                               type->as.int_.bits);
+        case TYPE_BOOL: return da_sprintf(alloc, "bool");
         case TYPE_PTR: {
             string_t c = tstore_type_ref_str(ts, type->as.ptr.child, alloc);
 
@@ -139,7 +142,8 @@ string_t tstore_type_str(tstore_t const* ts, type_t const* type,
             slice_foreach(args, i) {
                 string_t c =
                     tstore_type_ref_str(ts, slice_at(args, i).type, alloc);
-                string_t tmp = da_sprintf(alloc, "%s%zu: %s, ", a.items, i, c.items);
+                string_t tmp =
+                    da_sprintf(alloc, "%s%zu: %s, ", a.items, i, c.items);
 
                 da_free(&a);
                 da_free(&c);

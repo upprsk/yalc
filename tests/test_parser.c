@@ -325,6 +325,79 @@ static MunitResult test_parser_extern_printf(MunitParameter const params[],
     return MUNIT_OK;
 }
 
+static MunitResult test_parser_if(MunitParameter const params[],
+                                  void*                user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    char const source[] =
+        "main :: .() {\n"
+        "    if true {\n"
+        "    }\n"
+        "\n"
+        "    if false {\n"
+        "    } else {\n"
+        "    }\n"
+        "};\n"
+        //
+        ;
+    uint32_t source_len = sizeof(source) - 1;
+
+    arena_allocator_t arena = {0};
+    allocator_t       alloc = arena_allocator(&arena);
+
+    ast_t      ast = {0};
+    node_ref_t ast_root =
+        tokenize_and_parse(alloc, &ast, (str_t){source, source_len});
+
+    string_t s = ast_dump(&ast, ast_root, alloc);
+    assert_string_equal(s.items,
+                        "(mod"
+                        " (decl \"main\" nil (proc nil (blk"
+                        " (if true (blk))"
+                        " (if false (blk) (blk))"
+                        ")))"
+                        ")");
+
+    arena_clear_all(&arena);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_parser_while(MunitParameter const params[],
+                                     void* user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    char const source[] =
+        "main :: .() {\n"
+        "    while true {\n"
+        "    }\n"
+        "};\n"
+        //
+        ;
+    uint32_t source_len = sizeof(source) - 1;
+
+    arena_allocator_t arena = {0};
+    allocator_t       alloc = arena_allocator(&arena);
+
+    ast_t      ast = {0};
+    node_ref_t ast_root =
+        tokenize_and_parse(alloc, &ast, (str_t){source, source_len});
+
+    string_t s = ast_dump(&ast, ast_root, alloc);
+    assert_string_equal(s.items,
+                        "(mod"
+                        " (decl \"main\" nil (proc nil (blk"
+                        " (while true (blk))"
+                        ")))"
+                        ")");
+
+    arena_clear_all(&arena);
+
+    return MUNIT_OK;
+}
+
 void test_parser_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/ast/ast-kind-to-str",
@@ -383,6 +456,24 @@ void test_parser_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/parser/ptrs",
                           test_parser_ptrs,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/parser/while",
+                          test_parser_while,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/parser/if",
+                          test_parser_if,
                           NULL,
                           NULL,
                           MUNIT_TEST_OPTION_NONE,

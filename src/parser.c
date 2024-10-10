@@ -156,6 +156,8 @@ static node_ref_t parse_blk_item(parser_t* p);
 static node_ref_t parse_stmt(parser_t* p);
 static node_ref_t parse_stmt_ret(parser_t* p);
 static node_ref_t parse_stmt_expr(parser_t* p);
+static node_ref_t parse_stmt_if(parser_t* p);
+static node_ref_t parse_stmt_while(parser_t* p);
 
 // ----------------------------------------------------------------------------
 
@@ -605,11 +607,15 @@ static node_ref_t parse_blk_item(parser_t* p) {
 
 // <stmt> ::= <stmt_ret>
 //          | <stmt_expr>
+//          | <stmt_if>
+//          | <stmt_while>
 //          ;
 static node_ref_t parse_stmt(parser_t* p) {
     token_t t = peek(p);
 
     if (t.type == TT_RETURN) return parse_stmt_ret(p);
+    if (t.type == TT_IF) return parse_stmt_if(p);
+    if (t.type == TT_WHILE) return parse_stmt_while(p);
 
     return parse_stmt_expr(p);
 }
@@ -642,6 +648,43 @@ static node_ref_t parse_stmt_expr(parser_t* p) {
     try_consume(p, TT_SEMICOLON);
 
     node_init_ret(ast_get(p->ast, node_ref), span_between(start, end), child);
+
+    return node_ref;
+}
+
+// <stmt_if>   ::= "if" <expr> <blk> [ "else" <blk> ] ;
+static node_ref_t parse_stmt_if(parser_t* p) {
+    span_t start = peek(p).span;
+    try_consume(p, TT_IF);
+
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
+    node_ref_t cond = parse_expr(p, 0);
+    node_ref_t wtrue = parse_blk(p);
+    node_ref_t wfalse = {};
+
+    if (match(p, TT_ELSE)) wfalse = parse_blk(p);
+
+    node_init_if(ast_get(p->ast, node_ref),
+                 span_between(start, ast_get_span(p->ast, node_ref_valid(wfalse)
+                                                              ? wfalse
+                                                              : wtrue)),
+                 cond, wtrue, wfalse);
+
+    return node_ref;
+}
+
+// <stmt_if>   ::= "while" <expr> <blk> ;
+static node_ref_t parse_stmt_while(parser_t* p) {
+    span_t start = peek(p).span;
+    try_consume(p, TT_WHILE);
+
+    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
+    node_ref_t cond = parse_expr(p, 0);
+    node_ref_t body = parse_blk(p);
+
+    node_init_while(ast_get(p->ast, node_ref),
+                    span_between(start, ast_get_span(p->ast, body)), cond,
+                    body);
 
     return node_ref;
 }

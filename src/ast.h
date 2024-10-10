@@ -31,6 +31,9 @@ typedef enum node_kind : uint8_t {
     NODE_CALL,  // call
     NODE_BLK,   // w_children
 
+    NODE_IF,     // ternary
+    NODE_WHILE,  // ternary
+
     NODE_ARG,  // arg
 
     NODE_ADD,  // binary
@@ -55,6 +58,8 @@ static inline char const* node_kind_str(node_kind_t nk) {
         case NODE_PROC: return "NODE_PROC";
         case NODE_CALL: return "NODE_CALL";
         case NODE_BLK: return "NODE_BLK";
+        case NODE_IF: return "NODE_IF";
+        case NODE_WHILE: return "NODE_WHILE";
         case NODE_ADD: return "NODE_ADD";
         case NODE_ARG: return "NODE_ARG";
         case NODE_SUB: return "NODE_SUB";
@@ -88,6 +93,12 @@ typedef struct node_binary {
     node_ref_t left;
     node_ref_t right;
 } node_binary_t;
+
+typedef struct node_ternary {
+    node_ref_t cond;
+    node_ref_t wtrue;
+    node_ref_t wfalse;
+} node_ternary_t;
 
 typedef enum node_decl_flags {
     DECL_EXTERN = 1 << 0,
@@ -143,6 +154,7 @@ typedef struct node {
         node_w_children_t w_children;
         node_arg_t        arg;
         node_binary_t     binary;
+        node_ternary_t    ternary;
 
         node_decl_t decl;
         node_proc_t proc;
@@ -292,6 +304,24 @@ static inline void node_init_binary(node_t* n, span_t span, node_kind_t kind,
     };
 }
 
+static inline void node_init_if(node_t* n, span_t span, node_ref_t cond,
+                                node_ref_t wtrue, node_ref_t wfalse) {
+    *n = (node_t){
+        .kind = NODE_IF,
+        .span = span,
+        .as.ternary = {.cond = cond, .wtrue = wtrue, .wfalse = wfalse}
+    };
+}
+
+static inline void node_init_while(node_t* n, span_t span, node_ref_t cond,
+                                   node_ref_t body) {
+    *n = (node_t){
+        .kind = NODE_WHILE,
+        .span = span,
+        .as.ternary = {.cond = cond, .wtrue = body}
+    };
+}
+
 static inline void node_init_unary(node_t* n, span_t span, node_kind_t kind,
                                    node_ref_t child) {
     *n = (node_t){.kind = kind, .span = span, .as.w_child = {.child = child}};
@@ -359,6 +389,16 @@ static inline node_binary_t const* node_as_binary(node_t const* n) {
     assert(n->kind == NODE_ADD || n->kind == NODE_SUB || n->kind == NODE_MUL ||
            n->kind == NODE_DIV);
     return &n->as.binary;
+}
+
+static inline node_ternary_t const* node_as_if(node_t const* n) {
+    assert_int(n->kind, ==, NODE_IF);
+    return &n->as.ternary;
+}
+
+static inline node_ternary_t const* node_as_while(node_t const* n) {
+    assert_int(n->kind, ==, NODE_WHILE);
+    return &n->as.ternary;
 }
 
 static inline node_w_child_t const* node_as_unary(node_t const* n) {

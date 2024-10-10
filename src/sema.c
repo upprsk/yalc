@@ -71,6 +71,11 @@ static inline bool proc_unreachable_reported(ctx_t const* c) {
     return c->proc->flags & PROC_UNREACHABLE_REPORTED;
 }
 
+static inline void clear_proc_returned(ctx_t* c) {
+    assert_not_null(c->proc);
+    c->proc->flags &= ~PROC_HAS_RETURNED;
+}
+
 static inline void mark_proc_returned(ctx_t* c) {
     assert_not_null(c->proc);
     c->proc->flags |= PROC_HAS_RETURNED;
@@ -458,6 +463,84 @@ static type_ref_t sema_node_binary(sema_t* s, ctx_t* ctx, inf_t pinf,
     return res;
 }
 
+static type_ref_t sema_node_if(sema_t* s, ctx_t* ctx, inf_t pinf,
+                               node_t const* node, node_ternary_t const* ter) {
+    (void)pinf;
+    (void)node;
+
+    inf_t inf = {.exp = s->ts->builtins.bool_};
+
+    type_ref_t cond = sema_node_ref(s, ctx, inf, ter->cond);
+    if (!tstore_type_is_bool(s->ts, cond)) {
+        report_error(s->er, ast_get_span(s->ast, ter->cond),
+                     "conditions expects boolean, found %s",
+                     tstore_type_ref_str(s->ts, cond, s->temp_alloc).items);
+    }
+
+    inf = (inf_t){};
+
+    clear_proc_returned(ctx);
+
+    type_ref_t wtrue = sema_node_ref(s, ctx, inf, ter->wtrue);
+    if (!tstore_type_is_void(s->ts, wtrue)) {
+        report_warn(s->er, ast_get_span(s->ast, ter->wtrue),
+                    "INTERNAL: expected to get void in node of body of "
+                    "if node, but got %s",
+                    tstore_type_ref_str(s->ts, wtrue, s->temp_alloc).items);
+    }
+
+    bool true_returned = proc_has_returned(ctx);
+    clear_proc_returned(ctx);
+
+    if (node_ref_valid(ter->wfalse)) {
+        type_ref_t wfalse = sema_node_ref(s, ctx, inf, ter->wfalse);
+        if (!tstore_type_is_void(s->ts, wfalse)) {
+            report_warn(
+                s->er, ast_get_span(s->ast, ter->wfalse),
+                "INTERNAL: expected to get void in node of body of "
+                "if node, but got %s",
+                tstore_type_ref_str(s->ts, wfalse, s->temp_alloc).items);
+        }
+    }
+
+    bool false_returned = proc_has_returned(ctx);
+    clear_proc_returned(ctx);
+
+    if (true_returned && false_returned) {
+        mark_proc_returned(ctx);
+    }
+
+    return s->ts->builtins.void_;
+}
+
+static type_ref_t sema_node_while(sema_t* s, ctx_t* ctx, inf_t pinf,
+                                  node_t const*         node,
+                                  node_ternary_t const* ter) {
+    (void)pinf;
+    (void)node;
+
+    inf_t inf = {.exp = s->ts->builtins.bool_};
+
+    type_ref_t cond = sema_node_ref(s, ctx, inf, ter->cond);
+    if (!tstore_type_is_bool(s->ts, cond)) {
+        report_error(s->er, ast_get_span(s->ast, ter->cond),
+                     "conditions expects boolean, found %s",
+                     tstore_type_ref_str(s->ts, cond, s->temp_alloc).items);
+    }
+
+    inf = (inf_t){};
+
+    type_ref_t wtrue = sema_node_ref(s, ctx, inf, ter->wtrue);
+    if (!tstore_type_is_void(s->ts, wtrue)) {
+        report_warn(s->er, ast_get_span(s->ast, ter->wtrue),
+                    "INTERNAL: expected to get void in node of body of "
+                    "while node, but got %s",
+                    tstore_type_ref_str(s->ts, wtrue, s->temp_alloc).items);
+    }
+
+    return s->ts->builtins.void_;
+}
+
 static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
                             node_t const* node) {
     assert_not_null(node);
@@ -476,6 +559,9 @@ static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
             return sema_node_call(s, ctx, inf, node, node_as_call(node));
         case NODE_BLK:
             return sema_node_blk(s, ctx, inf, node, node_as_blk(node));
+        case NODE_IF: return sema_node_if(s, ctx, inf, node, node_as_if(node));
+        case NODE_WHILE:
+            return sema_node_while(s, ctx, inf, node, node_as_while(node));
         case NODE_ARG: break;
         case NODE_ADD:
         case NODE_SUB:
@@ -520,6 +606,11 @@ void sema_pass(sema_desc_t* desc, ast_t* ast, node_ref_t root) {
 
     ctx_t root_ctx = {};
     inf_t inf = {};
+
+    decl_val(&s, &root_ctx, str_from_lit("true"),
+             (decl_val_t){.type = s.ts->builtins.bool_});
+    decl_val(&s, &root_ctx, str_from_lit("false"),
+             (decl_val_t){.type = s.ts->builtins.bool_});
 
     sema_node_ref(&s, &root_ctx, inf, root);
 }
