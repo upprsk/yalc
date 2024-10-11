@@ -13,6 +13,7 @@ static MunitResult test_ast_kind_to_str(MunitParameter const params[],
     (void)params;
     (void)user_data_or_fixture;
 
+    // FIXME: add the missing nodes
     assert_string_equal(node_kind_str(NODE_INVAL), "NODE_INVAL");
     assert_string_equal(node_kind_str(NODE_MOD), "NODE_MOD");
     assert_string_equal(node_kind_str(NODE_DECL), "NODE_DECL");
@@ -398,6 +399,44 @@ static MunitResult test_parser_while(MunitParameter const params[],
     return MUNIT_OK;
 }
 
+static MunitResult test_parser_assign(MunitParameter const params[],
+                                      void* user_data_or_fixture) {
+    (void)params;
+    (void)user_data_or_fixture;
+
+    char const source[] =
+        "main :: .() {\n"
+        "    i := 0;\n"
+        "    while true {\n"
+        "        i = i + 1;\n"
+        "    }\n"
+        "};\n"
+        //
+        ;
+    uint32_t source_len = sizeof(source) - 1;
+
+    arena_allocator_t arena = {0};
+    allocator_t       alloc = arena_allocator(&arena);
+
+    ast_t      ast = {0};
+    node_ref_t ast_root =
+        tokenize_and_parse(alloc, &ast, (str_t){source, source_len});
+
+    string_t s = ast_dump(&ast, ast_root, alloc);
+    assert_string_equal(s.items,
+                        "(mod"
+                        " (decl \"main\" nil (proc nil (blk"
+                        " (decl var \"i\" nil 0)"
+                        " (while true (blk"
+                        " (assign i (add i 1))))"
+                        ")))"
+                        ")");
+
+    arena_clear_all(&arena);
+
+    return MUNIT_OK;
+}
+
 void test_parser_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/ast/ast-kind-to-str",
@@ -474,6 +513,15 @@ void test_parser_add_tests(ctx_t* ctx) {
     ctx_add_test(ctx, &(MunitTest){
                           "/parser/if",
                           test_parser_if,
+                          NULL,
+                          NULL,
+                          MUNIT_TEST_OPTION_NONE,
+                          NULL,
+                      });
+
+    ctx_add_test(ctx, &(MunitTest){
+                          "/parser/assign",
+                          test_parser_assign,
                           NULL,
                           NULL,
                           MUNIT_TEST_OPTION_NONE,

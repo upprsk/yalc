@@ -110,6 +110,14 @@ static decl_val_t* find_val(ctx_t* c, str_t name) {
     return &elem->value;
 }
 
+static bool node_is_lvalue(sema_t* s, node_ref_t ref) {
+    node_t const* node = ast_get(s->ast, ref);
+    switch (node->kind) {
+        case NODE_IDENT: return true;
+        default: return false;
+    }
+}
+
 // FIXME: this will be part of the compile-time eval system, so it should be
 // moved out of here eventually.
 static type_ref_t sema_node_to_type(sema_t* s, ctx_t* c, inf_t inf,
@@ -559,6 +567,41 @@ static type_ref_t sema_node_stmt_expr(sema_t* s, ctx_t* ctx, inf_t pinf,
     return s->ts->builtins.void_;
 }
 
+static type_ref_t sema_node_assign(sema_t* s, ctx_t* ctx, inf_t pinf,
+                                   node_t const*        node,
+                                   node_binary_t const* assign) {
+    (void)pinf;
+    (void)node;
+
+    inf_t      inf = {};
+    type_ref_t left = sema_node_ref(s, ctx, inf, assign->left);
+
+    inf = (inf_t){.exp = left};
+    type_ref_t right = sema_node_ref(s, ctx, inf, assign->right);
+
+    if (!node_is_lvalue(s, assign->left)) {
+        report_error(s->er, ast_get_span(s->ast, assign->left),
+                     "can't assign to rvalue");
+    }
+
+    // FIXME: handle constants
+    // FIXME: perform any need implicit conversions
+    if (!type_ref_eq(left, right)) {
+        report_error(s->er, node->span,
+                     "incompatible types in assignment, expected %s but got %s",
+                     tstore_type_ref_str(s->ts, left, s->temp_alloc).items,
+                     tstore_type_ref_str(s->ts, right, s->temp_alloc).items);
+        report_note(s->er, ast_get_span(s->ast, assign->left),
+                    "receiver has type %s",
+                    tstore_type_ref_str(s->ts, left, s->temp_alloc).items);
+        report_note(s->er, ast_get_span(s->ast, assign->right),
+                    "value has type %s",
+                    tstore_type_ref_str(s->ts, right, s->temp_alloc).items);
+    }
+
+    return s->ts->builtins.void_;
+}
+
 static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
                             node_t const* node) {
     assert_not_null(node);
@@ -583,6 +626,8 @@ static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
         case NODE_STMT_EXPR:
             return sema_node_stmt_expr(s, ctx, inf, node,
                                        node_as_stmt_expr(node));
+        case NODE_ASSIGN:
+            return sema_node_assign(s, ctx, inf, node, node_as_assign(node));
         case NODE_ARG: break;
         case NODE_ADD:
         case NODE_SUB:

@@ -124,6 +124,22 @@ static irtype_t type_to_irtype(irgen_t* g, span_t span, type_ref_t ref) {
     }
 }
 
+static bool type_is_primitive(irgen_t* g, span_t span, type_ref_t ref) {
+    type_t const* type = tstore_get(g->ts, ref);
+    switch (type->kind) {
+        case TYPE_VOID:
+        case TYPE_PROC: return false;
+        case TYPE_INT:
+        case TYPE_BOOL:
+        case TYPE_PTR:
+        case TYPE_TYPE: return true;
+        case TYPE_INVAL:
+        default:
+            report_error(g->er, span, "invalid type found during irgen");
+            assert(false);
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static void add_proc(irgen_t* g, ctx_t* ctx, str_t name, proc_t proc) {
@@ -463,6 +479,25 @@ static void gen_stmt_expr(irgen_t* g, ctx_t* ctx, node_t const* node,
     gen_expr(g, ctx, child->child);
 }
 
+static void gen_assign(irgen_t* g, ctx_t* ctx, node_t const* node,
+                       node_ref_t ref) {
+    (void)ref;
+
+    node_binary_t const* assign = node_as_assign(node);
+    type_ref_t           type = ast_get_type(g->ast, assign->left);
+
+    reg_t left = gen_expr(g, ctx, assign->left);
+    reg_t right = gen_expr(g, ctx, assign->right);
+
+    if (type_is_primitive(g, node->span, type)) {
+        irtype_t ty = type_to_irtype(g, node->span, type);
+        add_inst(ctx, inst_move(ty, left.num, right.num));
+        return;
+    }
+
+    report_error(g->er, node->span, "non-primitives have not been implemented");
+}
+
 // ----------------------------------------------------------------------------
 
 static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
@@ -474,6 +509,7 @@ static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
         case NODE_IF: gen_if(g, ctx, node, ref); break;
         case NODE_WHILE: gen_while(g, ctx, node, ref); break;
         case NODE_STMT_EXPR: gen_stmt_expr(g, ctx, node, ref); break;
+        case NODE_ASSIGN: gen_assign(g, ctx, node, ref); break;
         default:
             report_error(g->er, node->span, "stmt %s not implemented",
                          node_kind_str(node->kind));
@@ -546,6 +582,8 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, str_t name, node_ref_t ref) {
     }
 
     gen_blk(g, &ctx, node_proc->body);
+
+    // FIXME: add return for procedures that return implicitly
 
 #if 0   // debug thing start
     fprintf(stderr, "\nproc: %s\n",

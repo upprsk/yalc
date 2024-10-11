@@ -158,6 +158,8 @@ static node_ref_t parse_stmt_ret(parser_t* p);
 static node_ref_t parse_stmt_expr(parser_t* p);
 static node_ref_t parse_stmt_if(parser_t* p);
 static node_ref_t parse_stmt_while(parser_t* p);
+static node_ref_t parse_stmt_assign(parser_t* p, node_ref_t node_ref,
+                                    node_ref_t left);
 
 // ----------------------------------------------------------------------------
 
@@ -613,6 +615,7 @@ static node_ref_t parse_blk_item(parser_t* p) {
 //          | <stmt_expr>
 //          | <stmt_if>
 //          | <stmt_while>
+//          | <assign>
 //          ;
 static node_ref_t parse_stmt(parser_t* p) {
     token_t t = peek(p);
@@ -649,6 +652,10 @@ static node_ref_t parse_stmt_expr(parser_t* p) {
     node_ref_t child = parse_expr(p, 0);
 
     span_t end = peek(p).span;
+
+    // handle assignment
+    if (match(p, TT_EQUAL)) return parse_stmt_assign(p, node_ref, child);
+
     try_consume(p, TT_SEMICOLON);
 
     node_init_stmt_expr(ast_get(p->ast, node_ref), span_between(start, end),
@@ -678,7 +685,7 @@ static node_ref_t parse_stmt_if(parser_t* p) {
     return node_ref;
 }
 
-// <stmt_if>   ::= "while" <expr> <blk> ;
+// <stmt_while>   ::= "while" <expr> <blk> ;
 static node_ref_t parse_stmt_while(parser_t* p) {
     span_t start = peek(p).span;
     try_consume(p, TT_WHILE);
@@ -690,6 +697,21 @@ static node_ref_t parse_stmt_while(parser_t* p) {
     node_init_while(ast_get(p->ast, node_ref),
                     span_between(start, ast_get_span(p->ast, body)), cond,
                     body);
+
+    return node_ref;
+}
+
+// <assign> ::= <expr> "=" <expr> ";" ;
+static node_ref_t parse_stmt_assign(parser_t* p, node_ref_t node_ref,
+                                    node_ref_t left) {
+    node_ref_t right = parse_expr(p, 0);
+
+    span_t end = peek(p).span;
+    try_consume(p, TT_SEMICOLON);
+
+    node_init_assign(ast_get(p->ast, node_ref),
+                     span_between(ast_get_span(p->ast, left), end), left,
+                     right);
 
     return node_ref;
 }
