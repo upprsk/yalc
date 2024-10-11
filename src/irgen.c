@@ -453,6 +453,16 @@ static void gen_while(irgen_t* g, ctx_t* ctx, node_t const* node,
     patch_label(ctx, end);
 }
 
+static void gen_stmt_expr(irgen_t* g, ctx_t* ctx, node_t const* node,
+                          node_ref_t ref) {
+    (void)ref;
+
+    node_w_child_t const* child = node_as_stmt_expr(node);
+
+    // simply ignore the result (as there is none)
+    gen_expr(g, ctx, child->child);
+}
+
 // ----------------------------------------------------------------------------
 
 static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
@@ -463,6 +473,7 @@ static void gen_stmt(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
         case NODE_DECL: gen_decl(g, ctx, node, ref); break;
         case NODE_IF: gen_if(g, ctx, node, ref); break;
         case NODE_WHILE: gen_while(g, ctx, node, ref); break;
+        case NODE_STMT_EXPR: gen_stmt_expr(g, ctx, node, ref); break;
         default:
             report_error(g->er, node->span, "stmt %s not implemented",
                          node_kind_str(node->kind));

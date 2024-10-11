@@ -541,6 +541,24 @@ static type_ref_t sema_node_while(sema_t* s, ctx_t* ctx, inf_t pinf,
     return s->ts->builtins.void_;
 }
 
+static type_ref_t sema_node_stmt_expr(sema_t* s, ctx_t* ctx, inf_t pinf,
+                                      node_t const*         node,
+                                      node_w_child_t const* stmtexpr) {
+    (void)pinf;
+    (void)node;
+
+    inf_t inf = {};
+
+    type_ref_t child = sema_node_ref(s, ctx, inf, stmtexpr->child);
+    if (!tstore_type_is_void(s->ts, child)) {
+        report_error(s->er, ast_get_span(s->ast, stmtexpr->child),
+                     "expression result of type %s is ignored",
+                     tstore_type_ref_str(s->ts, child, s->temp_alloc).items);
+    }
+
+    return s->ts->builtins.void_;
+}
+
 static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
                             node_t const* node) {
     assert_not_null(node);
@@ -562,6 +580,9 @@ static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
         case NODE_IF: return sema_node_if(s, ctx, inf, node, node_as_if(node));
         case NODE_WHILE:
             return sema_node_while(s, ctx, inf, node, node_as_while(node));
+        case NODE_STMT_EXPR:
+            return sema_node_stmt_expr(s, ctx, inf, node,
+                                       node_as_stmt_expr(node));
         case NODE_ARG: break;
         case NODE_ADD:
         case NODE_SUB:
