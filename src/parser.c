@@ -344,13 +344,13 @@ static node_ref_t parse_proc(parser_t* p) {
 
     if (has_vararg) flags |= PROC_HAS_VARARG;
 
-    if (peek_tt(p) != TT_LBRACE && peek_tt(p) != TT_DOT_DOT_DOT) {
+    if (peek_tt(p) != TT_LBRACE && peek_tt(p) != TT_3MINUS) {
         ret = parse_expr(p, 0);
     }
 
     node_ref_t body = {};
     span_t     end = peek(p).span;
-    if (!match(p, TT_DOT_DOT_DOT)) {
+    if (!match(p, TT_3MINUS)) {
         body = parse_blk(p);
         end = ast_get_span(p->ast, body);
     }

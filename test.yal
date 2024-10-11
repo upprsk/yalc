@@ -1,6 +1,6 @@
-extern "putchar" c_putchar: .(c: i32) ... ;
+extern "putchar" c_putchar: .(c: i32) --- ;
 
-log_char: .(_: i32) ... : .(c) {
+log_char: .(_: i32) --- : .(c) {
     c_putchar(c);
 };
 

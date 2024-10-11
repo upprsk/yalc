@@ -196,7 +196,12 @@ static void tokenize_one(tokenizer_t* t) {
         case '-':
             if (match(t, '>'))
                 append_token(t, TT_ARROW);
-            else
+            else if (match(t, '-')) {
+                if (match(t, '-'))
+                    append_token(t, TT_3MINUS);
+                else
+                    append_token(t, TT_MINUS_MINUS);
+            } else
                 append_token(t, TT_MINUS);
             break;
         case '*': append_token(t, TT_STAR); break;

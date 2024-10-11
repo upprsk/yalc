@@ -49,6 +49,8 @@ typedef enum token_type : uint8_t {
     TT_DOT_STAR,     // .*
     TT_DOT_DOT,      // ..
     TT_DOT_DOT_DOT,  // ...
+    TT_MINUS_MINUS,  // --
+    TT_3MINUS,       // ---
     TT_ARROW,        // ->
 
     TT_CONST,   // const
@@ -106,6 +108,8 @@ static inline char const* token_to_str(token_type_t tt) {
         case TT_DOT_STAR: return "TT_DOT_STAR";
         case TT_DOT_DOT: return "TT_DOT_DOT";
         case TT_DOT_DOT_DOT: return "TT_DOT_DOT_DOT";
+        case TT_MINUS_MINUS: return "TT_MINUS_MINUS";
+        case TT_3MINUS: return "TT_3MINUS";
         case TT_ARROW: return "TT_ARROW";
         case TT_CONST: return "TT_CONST";
         case TT_RETURN: return "TT_RETURN";

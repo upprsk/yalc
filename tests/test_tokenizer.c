@@ -46,6 +46,8 @@ static MunitResult test_token_token_to_str(MunitParameter const params[],
     assert_string_equal("TT_DOT_STAR", token_to_str(TT_DOT_STAR));
     assert_string_equal("TT_DOT_DOT", token_to_str(TT_DOT_DOT));
     assert_string_equal("TT_DOT_DOT_DOT", token_to_str(TT_DOT_DOT_DOT));
+    assert_string_equal("TT_MINUS_MINUS", token_to_str(TT_MINUS_MINUS));
+    assert_string_equal("TT_3MINUS", token_to_str(TT_3MINUS));
     assert_string_equal("TT_ARROW", token_to_str(TT_ARROW));
     assert_string_equal("TT_CONST", token_to_str(TT_CONST));
     assert_string_equal("TT_RETURN", token_to_str(TT_RETURN));
@@ -209,7 +211,8 @@ static MunitResult test_tokenize_symbols(MunitParameter const params[],
     (void)user_data_or_fixture;
 
     char const source[] =
-        ". , : ; = & ! ? + - * / < > <= >= == != () [] {} .( .{ .* .. ... ->";
+        ". , : ; = & ! ? + - * / < > <= >= == != () [] {} .( .{ .* .. ... -- "
+        "--- ->";
     uint32_t source_len = sizeof(source) - 1;
 
     allocator_t alloc = c_allocator();
@@ -223,21 +226,19 @@ static MunitResult test_tokenize_symbols(MunitParameter const params[],
     assert_not_null(tokens.ptr);
 
     token_type_t expected_types[] = {
-        TT_DOT,          TT_COMMA,       TT_COLON,
-        TT_SEMICOLON,    TT_EQUAL,       TT_AMPERSAND,
-        TT_BANG,         TT_QUESTION,    TT_PLUS,
-        TT_MINUS,        TT_STAR,        TT_SLASH,
-        TT_SMALLER,      TT_LARGER,      TT_SMALLER_EQUAL,
-        TT_LARGER_EQUAL, TT_EQUAL_EQUAL, TT_BANG_EQUAL,
-        TT_LPAREN,       TT_RPAREN,      TT_LBRACKET,
-        TT_RBRACKET,     TT_LBRACE,      TT_RBRACE,
-        TT_DOT_LPAREN,   TT_DOT_LBRACE,  TT_DOT_STAR,
-        TT_DOT_DOT,      TT_DOT_DOT_DOT, TT_ARROW,
+        TT_DOT,         TT_COMMA,       TT_COLON,         TT_SEMICOLON,
+        TT_EQUAL,       TT_AMPERSAND,   TT_BANG,          TT_QUESTION,
+        TT_PLUS,        TT_MINUS,       TT_STAR,          TT_SLASH,
+        TT_SMALLER,     TT_LARGER,      TT_SMALLER_EQUAL, TT_LARGER_EQUAL,
+        TT_EQUAL_EQUAL, TT_BANG_EQUAL,  TT_LPAREN,        TT_RPAREN,
+        TT_LBRACKET,    TT_RBRACKET,    TT_LBRACE,        TT_RBRACE,
+        TT_DOT_LPAREN,  TT_DOT_LBRACE,  TT_DOT_STAR,      TT_DOT_DOT,
+        TT_DOT_DOT_DOT, TT_MINUS_MINUS, TT_3MINUS,        TT_ARROW,
         TT_EOF};
     char const* expected_strs[] = {
-        ".", ",", ":",  ";",  "=",  "&",  "!",   "?",  "+", "-", "*",
-        "/", "<", ">",  "<=", ">=", "==", "!=",  "(",  ")", "[", "]",
-        "{", "}", ".(", ".{", ".*", "..", "...", "->", ""};
+        ".", ",", ":",  ";",  "=",  "&",  "!",   "?",  "+",   "-",  "*",
+        "/", "<", ">",  "<=", ">=", "==", "!=",  "(",  ")",   "[",  "]",
+        "{", "}", ".(", ".{", ".*", "..", "...", "--", "---", "->", ""};
     assert_size(sizeof(expected_types) / sizeof(expected_types[0]), ==,
                 sizeof(expected_strs) / sizeof(expected_strs[0]));
 
