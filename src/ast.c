@@ -85,7 +85,7 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
                 s = ss;
             }
 
-            if (node->is_vararg) {
+            if (proc_has_vararg(node->flags)) {
                 string_t ss = da_sprintf(alloc, "%s ...", s.items);
                 da_free(&s);
                 s = ss;
@@ -395,7 +395,7 @@ string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
                 s = ss;
             }
 
-            if (node->is_vararg) {
+            if (proc_has_vararg(node->flags)) {
                 string_t ss = da_sprintf(alloc, "%s ...", s.items);
                 da_free(&s);
                 s = ss;

@@ -329,14 +329,18 @@ static node_ref_t parse_unary(parser_t* p) {
 
 // <proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] <blk> ;
 static node_ref_t parse_proc(parser_t* p) {
-    token_t    start = peek(p);
-    node_ref_t node_ref = ast_alloc_node(p->ast, NULL);
-    node_ref_t ret = {};
-    bool       is_varargs = false;
+    token_t           start = peek(p);
+    node_ref_t        node_ref = ast_alloc_node(p->ast, NULL);
+    node_ref_t        ret = {};
+    node_proc_flags_t flags = 0;
+
+    bool has_vararg = false;
 
     try_consume(p, TT_DOT_LPAREN);
-    da_node_ref_t args_arr = parse_proc_args(p, &is_varargs);
+    da_node_ref_t args_arr = parse_proc_args(p, &has_vararg);
     try_consume(p, TT_RPAREN);
+
+    if (has_vararg) flags |= PROC_HAS_VARARG;
 
     if (peek_tt(p) != TT_LBRACE) {
         ret = parse_expr(p, 0);
@@ -353,7 +357,7 @@ static node_ref_t parse_proc(parser_t* p) {
         args_arr.size ? ast_add_refs(p->ast, args_arr) : (node_arr_t){};
 
     node_init_proc(ast_get(p->ast, node_ref), span_between(start.span, end),
-                   is_varargs, args, ret, body);
+                   flags, args, ret, body);
 
     return node_ref;
 }

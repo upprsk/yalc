@@ -121,11 +121,19 @@ typedef struct node_decl {
     node_decl_flags_t flags;
 } node_decl_t;
 
+typedef enum node_proc_flags {
+    PROC_HAS_VARARG = 1 << 0,
+} node_proc_flags_t;
+
+static inline bool proc_has_vararg(node_proc_flags_t f) {
+    return f & PROC_HAS_VARARG;
+}
+
 typedef struct node_proc {
-    bool       is_vararg;
-    node_arr_t args;
-    node_ref_t ret;
-    node_ref_t body;
+    node_proc_flags_t flags;
+    node_arr_t        args;
+    node_ref_t        ret;
+    node_ref_t        body;
 } node_proc_t;
 
 typedef struct node_call {
@@ -264,14 +272,13 @@ static inline void node_init_decl(node_t* n, span_t span,
     };
 }
 
-static inline void node_init_proc(node_t* n, span_t span, bool is_vararg,
-                                  node_arr_t args, node_ref_t ret,
-                                  node_ref_t body) {
+static inline void node_init_proc(node_t* n, span_t span,
+                                  node_proc_flags_t flags, node_arr_t args,
+                                  node_ref_t ret, node_ref_t body) {
     *n = (node_t){
         .kind = NODE_PROC,
         .span = span,
-        .as.proc = {
-                    .args = args, .ret = ret, .body = body, .is_vararg = is_vararg}
+        .as.proc = {.args = args, .ret = ret, .body = body, .flags = flags}
     };
 }
 

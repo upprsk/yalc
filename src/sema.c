@@ -256,7 +256,7 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
     }
 
     type_ref_t type = tstore_add_proc(s->ts, tstore_add_args(s->ts, type_args),
-                                      type_ret, proc->is_vararg);
+                                      type_ret, proc_has_vararg(proc->flags));
 
     if (node_ref_valid(proc->body)) {
         proc_ctx_t proc_ctx;
