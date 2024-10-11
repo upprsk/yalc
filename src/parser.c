@@ -106,6 +106,8 @@ static inline int get_precedence(token_type_t tt) {
         case TT_MINUS: return 10;
         case TT_STAR:
         case TT_SLASH: return 20;
+        case TT_AMPERSAND:
+        case TT_DOT_STAR:
         case TT_LPAREN: return 70;
         default: return 0;
     }
@@ -144,6 +146,8 @@ static node_ref_t parse_ident(parser_t* p);
 static node_ref_t parse_additive(parser_t* p, node_ref_t left);
 static node_ref_t parse_multiplicative(parser_t* p, node_ref_t left);
 static node_ref_t parse_call(parser_t* p, node_ref_t left);
+static node_ref_t parse_ref(parser_t* p, node_ref_t left);
+static node_ref_t parse_deref(parser_t* p, node_ref_t left);
 
 static da_node_ref_t parse_call_args(parser_t* p);
 
@@ -283,6 +287,8 @@ static node_ref_t parse_prefix(parser_t* p) {
 // <infix>  ::= <additive>
 //            | <multiplicative>
 //            | <call>
+//            | <ref>
+//            | <deref>
 //            ;
 static node_ref_t parse_infix(parser_t* p, node_ref_t left) {
     token_t tok = peek(p);
@@ -293,6 +299,8 @@ static node_ref_t parse_infix(parser_t* p, node_ref_t left) {
         case TT_STAR:
         case TT_SLASH: return parse_multiplicative(p, left);
         case TT_LPAREN: return parse_call(p, left);
+        case TT_AMPERSAND: return parse_ref(p, left);
+        case TT_DOT_STAR: return parse_deref(p, left);
         default: break;
     }
 
@@ -521,6 +529,28 @@ static node_ref_t parse_call(parser_t* p, node_ref_t left) {
                    ast_add_refs(p->ast, args));
 
     return node_ref;
+}
+
+static node_ref_t parse_ref(parser_t* p, node_ref_t left) {
+    span_t end = peek(p).span;
+    try_consume(p, TT_AMPERSAND);
+
+    node_t*    n = NULL;
+    node_ref_t ref = ast_alloc_node(p->ast, &n);
+    node_init_ref(n, span_between(ast_get_span(p->ast, left), end), left);
+
+    return ref;
+}
+
+static node_ref_t parse_deref(parser_t* p, node_ref_t left) {
+    span_t end = peek(p).span;
+    try_consume(p, TT_DOT_STAR);
+
+    node_t*    n = NULL;
+    node_ref_t ref = ast_alloc_node(p->ast, &n);
+    node_init_deref(n, span_between(ast_get_span(p->ast, left), end), left);
+
+    return ref;
 }
 
 // <call_args> ::= <expr> { "," <expr> } [ "," ] ;

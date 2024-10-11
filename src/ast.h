@@ -38,13 +38,15 @@ typedef enum node_kind : uint8_t {
 
     NODE_ARG,  // arg
 
-    NODE_ADD,  // binary
-    NODE_SUB,  // binary
-    NODE_MUL,  // binary
-    NODE_DIV,  // binary
-    NODE_NEG,  // w_child
-    NODE_NOT,  // w_child
-    NODE_RET,  // w_child
+    NODE_ADD,    // binary
+    NODE_SUB,    // binary
+    NODE_MUL,    // binary
+    NODE_DIV,    // binary
+    NODE_NEG,    // w_child
+    NODE_NOT,    // w_child
+    NODE_RET,    // w_child
+    NODE_REF,    // w_child
+    NODE_DEREF,  // w_child
 
     NODE_PTR,  // ptr
 
@@ -72,6 +74,8 @@ static inline char const* node_kind_str(node_kind_t nk) {
         case NODE_NEG: return "NODE_NEG";
         case NODE_NOT: return "NODE_NOT";
         case NODE_RET: return "NODE_RET";
+        case NODE_REF: return "NODE_REF";
+        case NODE_DEREF: return "NODE_DEREF";
         case NODE_PTR: return "NODE_PTR";
         case NODE_IDENT: return "NODE_IDENT";
         case NODE_INT: return "NODE_INT";
@@ -358,6 +362,16 @@ static inline void node_init_ret(node_t* n, span_t span, node_ref_t child) {
         .kind = NODE_RET, .span = span, .as.w_child = {.child = child}};
 }
 
+static inline void node_init_ref(node_t* n, span_t span, node_ref_t child) {
+    *n = (node_t){
+        .kind = NODE_REF, .span = span, .as.w_child = {.child = child}};
+}
+
+static inline void node_init_deref(node_t* n, span_t span, node_ref_t child) {
+    *n = (node_t){
+        .kind = NODE_DEREF, .span = span, .as.w_child = {.child = child}};
+}
+
 static inline void node_init_ident(node_t* n, span_t span, str_t ident) {
     *n = (node_t){
         .kind = NODE_IDENT, .span = span, .as.ident = {.ident = ident}};
@@ -444,6 +458,16 @@ static inline node_w_child_t const* node_as_unary(node_t const* n) {
 
 static inline node_w_child_t const* node_as_ret(node_t const* n) {
     assert_int(n->kind, ==, NODE_RET);
+    return &n->as.w_child;
+}
+
+static inline node_w_child_t const* node_as_ref(node_t const* n) {
+    assert_int(n->kind, ==, NODE_REF);
+    return &n->as.w_child;
+}
+
+static inline node_w_child_t const* node_as_deref(node_t const* n) {
+    assert_int(n->kind, ==, NODE_DEREF);
     return &n->as.w_child;
 }
 

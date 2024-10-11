@@ -14,6 +14,8 @@
 <infix>  ::= <additive>
            | <multiplicative>
            | <call>
+           | <ref>
+           | <deref>
            ;
 
 <unary>    ::= ( "-" | "!" ) <expr> ;
@@ -27,6 +29,8 @@
 <additive>       ::= <expr> ( "+" | "-" ) <expr> ;
 <multiplicative> ::= <expr> ( "*" | "/" ) <expr> ;
 <call>           ::= <expr> "(" [ <call_args> ] ")" ;
+<ref>            ::= <expr> "&" ;
+<deref>          ::= <expr> ".*" ;
 
 <proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," [ "..." [ "," ] ] ] ;
 <proc_arg>  ::= <ident> [ ":" <expr> ] ;

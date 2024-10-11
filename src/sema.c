@@ -24,6 +24,7 @@ typedef struct sema {
 typedef struct decl_val {
     span_t     where;
     type_ref_t type;
+    bool       address_taken;
 } decl_val_t;
 
 typedef map_str_t(decl_val_t) map_str_decl_val_t;
@@ -120,6 +121,7 @@ static decl_val_t* find_val(ctx_t* c, str_t name) {
     return &elem->value;
 }
 
+// If an ast node is one that describes a value that can be assigned to.
 static bool node_is_lvalue(sema_t* s, node_ref_t ref) {
     node_t const* node = ast_get(s->ast, ref);
     switch (node->kind) {
@@ -128,8 +130,17 @@ static bool node_is_lvalue(sema_t* s, node_ref_t ref) {
     }
 }
 
-static type_ref_t sema_node_ref(sema_t* s, ctx_t* ctx, inf_t inf,
-                                node_ref_t ref);
+// If an ast node is one that describes a value that can be referenced via a
+// pointer.
+static bool node_is_addressable(sema_t* s, node_ref_t ref) {
+    node_t const* node = ast_get(s->ast, ref);
+    switch (node->kind) {
+        case NODE_IDENT: return true;
+        default: return false;
+    }
+}
+
+static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf, node_ref_t ref);
 
 // FIXME: this will be part of the compile-time eval system, so it should be
 // moved out of here eventually.
@@ -137,7 +148,7 @@ static type_ref_t sema_node_to_type(sema_t* s, ctx_t* c, inf_t inf,
                                     node_ref_t ref) {
     // TODO: should sema the expression before trying to convert it to a type
 
-    // type_ref_t ty = sema_node_ref(s, c, inf, ref);
+    // type_ref_t ty = sema_node(s, c, inf, ref);
     // if (!tstore_type_is_type(s->ts, ty)) {
     //     report_error(s->er, ast_get_span(s->ast, ref),
     //                  "can't evaluate expression to type, it has type %s",
@@ -164,7 +175,7 @@ static type_ref_t sema_node_to_type(sema_t* s, ctx_t* c, inf_t inf,
 
     if (node->kind == NODE_PROC) {
         // FIXME: this should be done for all nodes (see todo above)
-        type_ref_t ty = sema_node_ref(s, &ctx, inf, ref);
+        type_ref_t ty = sema_node(s, &ctx, inf, ref);
         if (!tstore_type_is_proc(s->ts, ty)) {
             report_error(s->er, ast_get_span(s->ast, ref),
                          "can't evaluate expression to type, it has type %s",
@@ -199,7 +210,7 @@ static type_ref_t sema_node_mod(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     slice_foreach(children, i) {
         node_ref_t child = slice_at(children, i);
-        type_ref_t ty = sema_node_ref(s, ctx, inf, child);
+        type_ref_t ty = sema_node(s, ctx, inf, child);
         if (!tstore_type_is_void(s->ts, ty) &&
             ast_get(s->ast, child)->kind != NODE_DECL) {
             report_warn(
@@ -230,7 +241,7 @@ static type_ref_t sema_node_decl(sema_t* s, ctx_t* ctx, inf_t pinf,
     }
 
     if (node_ref_valid(decl->init)) {
-        init_expr = sema_node_ref(s, ctx, inf, decl->init);
+        init_expr = sema_node(s, ctx, inf, decl->init);
     }
 
     bool decl_is_proc = false;
@@ -344,7 +355,7 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
         ctx_t body_ctx;
         ctx_init(&body_ctx, &head_ctx, &proc_ctx);
 
-        type_ref_t ty = sema_node_ref(s, &body_ctx, inf, proc->body);
+        type_ref_t ty = sema_node(s, &body_ctx, inf, proc->body);
         if (!tstore_type_is_void(s->ts, ty)) {
             report_warn(s->er, ast_get_span(s->ast, proc->body),
                         "INTERNAL: expected to get void in node of body of "
@@ -390,7 +401,7 @@ static type_ref_t sema_node_blk(sema_t* s, ctx_t* pctx, inf_t pinf,
         }
 
         node_ref_t child = slice_at(children, i);
-        type_ref_t ty = sema_node_ref(s, &ctx, inf, child);
+        type_ref_t ty = sema_node(s, &ctx, inf, child);
         if (!tstore_type_is_void(s->ts, ty) &&
             ast_get(s->ast, child)->kind != NODE_DECL) {
             report_warn(
@@ -407,7 +418,7 @@ static type_ref_t sema_node_call(sema_t* s, ctx_t* ctx, inf_t pinf,
                                  node_t const* node, node_call_t const* call) {
     inf_t inf = pinf;
 
-    type_ref_t callee_type = sema_node_ref(s, ctx, inf, call->callee);
+    type_ref_t callee_type = sema_node(s, ctx, inf, call->callee);
     if (!tstore_type_is_proc(s->ts, callee_type)) {
         if (type_ref_valid(callee_type)) {
             report_error(
@@ -437,7 +448,7 @@ static type_ref_t sema_node_call(sema_t* s, ctx_t* ctx, inf_t pinf,
             ainf.exp = slice_at(callee_proc_args, i).type;
         }
 
-        type_ref_t arg = sema_node_ref(s, ctx, ainf, slice_at(args, i));
+        type_ref_t arg = sema_node(s, ctx, ainf, slice_at(args, i));
         if (type_ref_valid(ainf.exp) && !type_ref_eq(ainf.exp, arg)) {
             string_t expected =
                 tstore_type_ref_str(s->ts, ainf.exp, s->temp_alloc);
@@ -463,7 +474,7 @@ static type_ref_t sema_node_ret(sema_t* s, ctx_t* ctx, inf_t pinf,
     inf_t inf = {.exp = tstore_get_ret(s->ts, ctx->proc->type)};
 
     if (node_ref_valid(ret->child)) {
-        child = sema_node_ref(s, ctx, inf, ret->child);
+        child = sema_node(s, ctx, inf, ret->child);
     }
 
     // FIXME: perform any needed conversions/auto-casts here
@@ -477,6 +488,38 @@ static type_ref_t sema_node_ret(sema_t* s, ctx_t* ctx, inf_t pinf,
     mark_proc_returned(ctx);
 
     return s->ts->builtins.void_;
+}
+
+static type_ref_t sema_node_ref(sema_t* s, ctx_t* ctx, inf_t inf,
+                                node_t const* node, node_w_child_t const* ref) {
+    (void)node;
+
+    if (!node_is_addressable(s, ref->child)) {
+        report_error(s->er, ast_get_span(s->ast, ref->child),
+                     "can't take address of temporary");
+    }
+
+    type_ref_t child = sema_node(s, ctx, inf, ref->child);
+
+    // TODO: handle const
+    type_ref_t cp = tstore_add_ptr(s->ts, 0, child, 0);
+
+    return cp;
+}
+
+static type_ref_t sema_node_deref(sema_t* s, ctx_t* ctx, inf_t inf,
+                                  node_t const*         node,
+                                  node_w_child_t const* ref) {
+    type_ref_t    child = sema_node(s, ctx, inf, ref->child);
+    type_t const* type = tstore_get(s->ts, child);
+    if (type->kind != TYPE_PTR) {
+        report_error(s->er, node->span,
+                     "can't dereference non-pointer value of type %s",
+                     tstore_type_str(s->ts, type, s->temp_alloc).items);
+        return (type_ref_t){};
+    }
+
+    return type->as.ptr.child;
 }
 
 static type_ref_t sema_node_int(sema_t* s, ctx_t* ctx, inf_t inf,
@@ -510,8 +553,8 @@ static type_ref_t sema_node_binary(sema_t* s, ctx_t* ctx, inf_t pinf,
                                    node_binary_t const* bin) {
     inf_t inf = pinf;
 
-    type_ref_t lhs = sema_node_ref(s, ctx, inf, bin->left);
-    type_ref_t rhs = sema_node_ref(s, ctx, inf, bin->right);
+    type_ref_t lhs = sema_node(s, ctx, inf, bin->left);
+    type_ref_t rhs = sema_node(s, ctx, inf, bin->right);
 
     if (!type_ref_eq(lhs, rhs)) {
         char const* opname = "<internal error>";
@@ -551,7 +594,7 @@ static type_ref_t sema_node_if(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     inf_t inf = {.exp = s->ts->builtins.bool_};
 
-    type_ref_t cond = sema_node_ref(s, ctx, inf, ter->cond);
+    type_ref_t cond = sema_node(s, ctx, inf, ter->cond);
     if (!tstore_type_is_bool(s->ts, cond)) {
         report_error(s->er, ast_get_span(s->ast, ter->cond),
                      "conditions expects boolean, found %s",
@@ -562,7 +605,7 @@ static type_ref_t sema_node_if(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     clear_proc_returned(ctx);
 
-    type_ref_t wtrue = sema_node_ref(s, ctx, inf, ter->wtrue);
+    type_ref_t wtrue = sema_node(s, ctx, inf, ter->wtrue);
     if (!tstore_type_is_void(s->ts, wtrue)) {
         report_warn(s->er, ast_get_span(s->ast, ter->wtrue),
                     "INTERNAL: expected to get void in node of body of "
@@ -574,7 +617,7 @@ static type_ref_t sema_node_if(sema_t* s, ctx_t* ctx, inf_t pinf,
     clear_proc_returned(ctx);
 
     if (node_ref_valid(ter->wfalse)) {
-        type_ref_t wfalse = sema_node_ref(s, ctx, inf, ter->wfalse);
+        type_ref_t wfalse = sema_node(s, ctx, inf, ter->wfalse);
         if (!tstore_type_is_void(s->ts, wfalse)) {
             report_warn(
                 s->er, ast_get_span(s->ast, ter->wfalse),
@@ -602,7 +645,7 @@ static type_ref_t sema_node_while(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     inf_t inf = {.exp = s->ts->builtins.bool_};
 
-    type_ref_t cond = sema_node_ref(s, ctx, inf, ter->cond);
+    type_ref_t cond = sema_node(s, ctx, inf, ter->cond);
     if (!tstore_type_is_bool(s->ts, cond)) {
         report_error(s->er, ast_get_span(s->ast, ter->cond),
                      "conditions expects boolean, found %s",
@@ -611,7 +654,7 @@ static type_ref_t sema_node_while(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     inf = (inf_t){};
 
-    type_ref_t wtrue = sema_node_ref(s, ctx, inf, ter->wtrue);
+    type_ref_t wtrue = sema_node(s, ctx, inf, ter->wtrue);
     if (!tstore_type_is_void(s->ts, wtrue)) {
         report_warn(s->er, ast_get_span(s->ast, ter->wtrue),
                     "INTERNAL: expected to get void in node of body of "
@@ -630,7 +673,7 @@ static type_ref_t sema_node_stmt_expr(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     inf_t inf = {};
 
-    type_ref_t child = sema_node_ref(s, ctx, inf, stmtexpr->child);
+    type_ref_t child = sema_node(s, ctx, inf, stmtexpr->child);
     if (!tstore_type_is_void(s->ts, child) && type_ref_valid(child)) {
         report_error(s->er, ast_get_span(s->ast, stmtexpr->child),
                      "expression result of type %s is ignored",
@@ -647,10 +690,10 @@ static type_ref_t sema_node_assign(sema_t* s, ctx_t* ctx, inf_t pinf,
     (void)node;
 
     inf_t      inf = {};
-    type_ref_t left = sema_node_ref(s, ctx, inf, assign->left);
+    type_ref_t left = sema_node(s, ctx, inf, assign->left);
 
     inf = (inf_t){.exp = left};
-    type_ref_t right = sema_node_ref(s, ctx, inf, assign->right);
+    type_ref_t right = sema_node(s, ctx, inf, assign->right);
 
     if (!node_is_lvalue(s, assign->left)) {
         report_error(s->er, ast_get_span(s->ast, assign->left),
@@ -675,8 +718,8 @@ static type_ref_t sema_node_assign(sema_t* s, ctx_t* ctx, inf_t pinf,
     return s->ts->builtins.void_;
 }
 
-static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
-                            node_t const* node) {
+static type_ref_t sema_node_impl(sema_t* s, ctx_t* ctx, inf_t inf,
+                                 node_t const* node) {
     assert_not_null(node);
 
     switch (node->kind) {
@@ -711,6 +754,10 @@ static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
         case NODE_NOT: break;
         case NODE_RET:
             return sema_node_ret(s, ctx, inf, node, node_as_ret(node));
+        case NODE_REF:
+            return sema_node_ref(s, ctx, inf, node, node_as_ref(node));
+        case NODE_DEREF:
+            return sema_node_deref(s, ctx, inf, node, node_as_deref(node));
         case NODE_PTR: break;
         case NODE_IDENT:
             return sema_node_ident(s, ctx, inf, node, node_as_ident(node));
@@ -718,14 +765,13 @@ static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf,
             return sema_node_int(s, ctx, inf, node, node_as_int(node));
     }
 
-    report_error(s->er, node->span, "node was not implemented: %s",
+    report_error(s->er, node->span, "sema: node was not implemented: %s",
                  node_kind_str(node->kind));
     assert(false);
 }
 
-static type_ref_t sema_node_ref(sema_t* s, ctx_t* ctx, inf_t inf,
-                                node_ref_t ref) {
-    type_ref_t type = sema_node(s, ctx, inf, ast_get(s->ast, ref));
+static type_ref_t sema_node(sema_t* s, ctx_t* ctx, inf_t inf, node_ref_t ref) {
+    type_ref_t type = sema_node_impl(s, ctx, inf, ast_get(s->ast, ref));
     ast_set_type(s->ast, ref, type);
 
     return type;
@@ -751,5 +797,5 @@ void sema_pass(sema_desc_t* desc, ast_t* ast, node_ref_t root) {
     decl_val(&s, &root_ctx, str_from_lit("false"),
              (decl_val_t){.type = s.ts->builtins.bool_});
 
-    sema_node_ref(&s, &root_ctx, inf, root);
+    sema_node(&s, &root_ctx, inf, root);
 }

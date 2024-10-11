@@ -286,6 +286,22 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
 
             return da_sprintf(alloc, "(return)");
         }
+        case NODE_REF: {
+            node_w_child_t const* node = node_as_ref(n);
+            string_t              c = ast_dump(a, node->child, alloc);
+            string_t              s = da_sprintf(alloc, "(ref %s)", c.items);
+
+            da_free(&c);
+            return s;
+        }
+        case NODE_DEREF: {
+            node_w_child_t const* node = node_as_deref(n);
+            string_t              c = ast_dump(a, node->child, alloc);
+            string_t              s = da_sprintf(alloc, "(deref %s)", c.items);
+
+            da_free(&c);
+            return s;
+        }
         case NODE_PTR: {
             node_ptr_t const* node = node_as_ptr(n);
 
@@ -632,6 +648,25 @@ string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
 
             string_t s = da_sprintf(alloc, "(<%s> return)", ty.items);
 
+            da_free(&ty);
+            return s;
+        }
+        case NODE_REF: {
+            node_w_child_t const* node = node_as_ref(n);
+            string_t              c = ast_dump(a, node->child, alloc);
+            string_t s = da_sprintf(alloc, "(<%s> ref %s)", ty.items, c.items);
+
+            da_free(&c);
+            da_free(&ty);
+            return s;
+        }
+        case NODE_DEREF: {
+            node_w_child_t const* node = node_as_deref(n);
+            string_t              c = ast_dump(a, node->child, alloc);
+            string_t              s =
+                da_sprintf(alloc, "(<%s> deref %s)", ty.items, c.items);
+
+            da_free(&c);
             da_free(&ty);
             return s;
         }
