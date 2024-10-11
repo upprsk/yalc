@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "alloc/allocator.h"
@@ -231,6 +232,15 @@ typedef struct label {
 typedef da_t(label_t) da_label_t;
 typedef slice_t(label_t) slice_label_t;
 
+/// Flags for a procedure
+typedef enum proc_flags {
+    PFLAG_EXTERN = 1 << 0,
+} proc_flags_t;
+
+static inline bool proc_is_extern(proc_flags_t flags) {
+    return flags & PFLAG_EXTERN;
+}
+
 /// Represent a procedure, fully converted to the ir. It contains a list of
 /// instructions, the types of it's arguments (IR types, not language types),
 /// all the other procedures it calls, stack allocation information and some
@@ -240,6 +250,8 @@ typedef slice_t(label_t) slice_label_t;
 typedef struct proc {
     slice_irtype_t args;
     irtype_t       ret;
+
+    proc_flags_t flags;
 
     slice_proc_ref_t cprocs;     // called procs
     slice_label_t    labels;     // used labels

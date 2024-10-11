@@ -329,7 +329,7 @@ static node_ref_t parse_unary(parser_t* p) {
     return node_ref;
 }
 
-// <proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] <blk> ;
+// <proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] ( <blk> | "..." ) ;
 static node_ref_t parse_proc(parser_t* p) {
     token_t           start = peek(p);
     node_ref_t        node_ref = ast_alloc_node(p->ast, NULL);
@@ -344,7 +344,7 @@ static node_ref_t parse_proc(parser_t* p) {
 
     if (has_vararg) flags |= PROC_HAS_VARARG;
 
-    if (peek_tt(p) != TT_LBRACE) {
+    if (peek_tt(p) != TT_LBRACE && peek_tt(p) != TT_DOT_DOT_DOT) {
         ret = parse_expr(p, 0);
     }
 

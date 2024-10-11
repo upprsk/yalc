@@ -171,12 +171,16 @@ static inline bool tstore_type_is_void(tstore_t const* t, type_ref_t type) {
     return type_ref_eq(t->builtins.void_, type);
 }
 
+static inline bool tstore_type_is_type(tstore_t const* t, type_ref_t type) {
+    return type_ref_eq(t->builtins.type, type);
+}
+
 static inline bool tstore_type_is_bool(tstore_t const* t, type_ref_t type) {
     return type_ref_eq(t->builtins.bool_, type);
 }
 
 static inline bool tstore_type_is_proc(tstore_t const* t, type_ref_t type) {
-    return tstore_get(t, type)->kind == TYPE_PROC;
+    return type_ref_valid(type) && tstore_get(t, type)->kind == TYPE_PROC;
 }
 
 static inline type_ref_t tstore_get_ret(tstore_t const* ts, type_ref_t type) {

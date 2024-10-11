@@ -49,8 +49,10 @@ string_t inst_str(inst_t inst, allocator_t alloc) {
 string_t proc_dump(proc_t const* p, allocator_t alloc) {
     assert_not_null(p);
 
+    char const* ex = proc_is_extern(p->flags) ? " extern" : "";
+
     string_t s =
-        da_sprintf(alloc, "proc %d \"%s\":", p->ref.id, p->link_name.ptr);
+        da_sprintf(alloc, "proc%s %d \"%s\":", ex, p->ref.id, p->link_name.ptr);
 
     if (p->cprocs.len) {
         da_strcat(&s, &string_from_lit("\ncprocs: ["));

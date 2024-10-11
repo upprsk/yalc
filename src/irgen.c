@@ -543,7 +543,12 @@ static void gen_blk(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
     slice_foreach(children, i) { gen_stmt(g, ctx, slice_at(children, i)); }
 }
 
-static void gen_proc(irgen_t* g, ctx_t* pctx, str_t name, node_ref_t ref) {
+static void gen_proc(irgen_t* g, ctx_t* pctx, node_decl_t const* decl,
+                     node_ref_t ref) {
+    // FIXME: in case the proc is used not as the direct child of a declaration,
+    // we need to generate names and etc for it on demand
+    assert_not_null(decl);
+
     node_t const*      node = ast_get(g->ast, ref);
     node_proc_t const* node_proc = node_as_proc(node);
     type_ref_t         type = ast_get_type(g->ast, ref);
@@ -581,9 +586,9 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, str_t name, node_ref_t ref) {
         add_local(g, &ctx, arg->name, slice_at(args, i), alloc_reg(&ctx));
     }
 
-    gen_blk(g, &ctx, node_proc->body);
-
-    // FIXME: add return for procedures that return implicitly
+    if (!decl_is_extern(decl->flags)) {
+        gen_blk(g, &ctx, node_proc->body);
+    }
 
 #if 0   // debug thing start
     fprintf(stderr, "\nproc: %s\n",
@@ -605,17 +610,21 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, str_t name, node_ref_t ref) {
     }
 #endif  // debug thing end
 
+    proc_flags_t flags = 0;
+    if (decl_is_extern(decl->flags)) flags |= PFLAG_EXTERN;
+
     proc_t actual_proc = {
         .args = proc.args,
         .ret = proc.ret,
+        .flags = flags,
         .cprocs = da_to_slice(proc.cprocs),
         .labels = da_to_slice(proc.labels),
-        .link_name = name,  // FIXME: extern
+        .link_name = decl->extern_name.ptr ? decl->extern_name : decl->name,
         .ref = {map_len(ctx.obj->procs)},
         .insts = da_to_slice(proc.insts),
     };
 
-    add_proc(g, pctx, name, actual_proc);
+    add_proc(g, pctx, decl->name, actual_proc);
 }
 
 static void gen_mod_decl(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
@@ -623,11 +632,12 @@ static void gen_mod_decl(irgen_t* g, ctx_t* ctx, node_ref_t ref) {
     node_decl_t const* decl = node_as_decl(node);
 
     // get the type of the init
-    type_ref_t type = ast_get_type(g->ast, decl->init);
+    type_ref_t type = ast_get_type(g->ast, ref);
     assert(type_ref_valid(type));
 
     if (tstore_type_is_proc(g->ts, type)) {
-        gen_proc(g, ctx, decl->name, decl->init);
+        gen_proc(g, ctx, decl,
+                 decl_is_extern(decl->flags) ? decl->type : decl->init);
         return;
     }
 

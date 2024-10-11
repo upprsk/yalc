@@ -1,10 +1,14 @@
-log :: .() {};
+extern "putchar" c_putchar: .(c: i32) ... ;
+
+log_char: .(_: i32) ... : .(c) {
+    c_putchar(c);
+};
 
 main :: .() i32 {
     i := 0;
     while true {
         i = i + 1;
-        log();
+        log_char(10);
     }
 
     return 0;

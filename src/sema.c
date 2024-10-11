@@ -42,6 +42,7 @@ typedef struct proc_ctx {
 typedef struct ctx {
     map_str_decl_val_t* decls;
     proc_ctx_t*         proc;
+    bool                in_type_eval;
 } ctx_t;
 
 /// Store needed data to perform type inference.
@@ -54,11 +55,20 @@ static inline void proc_ctx_init(proc_ctx_t* c, type_ref_t curr_proc_type) {
 }
 
 static inline void ctx_init(ctx_t* c, ctx_t* parent, proc_ctx_t* pc) {
-    *c = (ctx_t){.decls = parent->decls, .proc = pc};
+    *c = (ctx_t){.decls = parent->decls,
+                 .proc = pc,
+                 .in_type_eval = parent->in_type_eval};
 }
 
 static inline void ctx_init_scope(ctx_t* c, ctx_t* parent) {
-    *c = (ctx_t){.decls = parent->decls, .proc = parent->proc};
+    *c = (ctx_t){.decls = parent->decls,
+                 .proc = parent->proc,
+                 .in_type_eval = parent->in_type_eval};
+}
+
+static inline void ctx_init_type_scope(ctx_t* c, ctx_t* parent) {
+    *c = (ctx_t){
+        .decls = parent->decls, .proc = parent->proc, .in_type_eval = true};
 }
 
 static inline bool proc_has_returned(ctx_t const* c) {
@@ -118,33 +128,65 @@ static bool node_is_lvalue(sema_t* s, node_ref_t ref) {
     }
 }
 
+static type_ref_t sema_node_ref(sema_t* s, ctx_t* ctx, inf_t inf,
+                                node_ref_t ref);
+
 // FIXME: this will be part of the compile-time eval system, so it should be
 // moved out of here eventually.
 static type_ref_t sema_node_to_type(sema_t* s, ctx_t* c, inf_t inf,
                                     node_ref_t ref) {
-    (void)c;
-    (void)inf;
+    // TODO: should sema the expression before trying to convert it to a type
+
+    // type_ref_t ty = sema_node_ref(s, c, inf, ref);
+    // if (!tstore_type_is_type(s->ts, ty)) {
+    //     report_error(s->er, ast_get_span(s->ast, ref),
+    //                  "can't evaluate expression to type, it has type %s",
+    //                  tstore_type_ref_str(s->ts, ty, s->temp_alloc).items);
+    //
+    //     return (type_ref_t){};
+    // }
+
+    ctx_t ctx;
+    ctx_init_type_scope(&ctx, c);
 
     node_t const* node = ast_get(s->ast, ref);
-    if (node->kind != NODE_IDENT) {
+    if (node->kind == NODE_IDENT) {
+        node_ident_t const* ident = node_as_ident(node);
+
+        if (slice_eq(str_from_lit("i32"), ident->ident))
+            return s->ts->builtins.i32;
+
         report_error(s->er, ast_get_span(s->ast, ref),
                      "can't evaluate expression to type");
 
         return (type_ref_t){};
     }
 
-    node_ident_t const* ident = node_as_ident(node);
+    if (node->kind == NODE_PROC) {
+        // FIXME: this should be done for all nodes (see todo above)
+        type_ref_t ty = sema_node_ref(s, &ctx, inf, ref);
+        if (!tstore_type_is_proc(s->ts, ty)) {
+            report_error(s->er, ast_get_span(s->ast, ref),
+                         "can't evaluate expression to type, it has type %s",
+                         tstore_type_ref_str(s->ts, ty, s->temp_alloc).items);
 
-    if (slice_eq(str_from_lit("i32"), ident->ident)) return s->ts->builtins.i32;
+            return (type_ref_t){};
+        }
+
+        node_proc_t const* proc = node_as_proc(node);
+        if (node_ref_valid(proc->body)) {
+            report_error(s->er, ast_get_span(s->ast, ref),
+                         "can't use procedure as type");
+        }
+
+        return ty;
+    }
 
     report_error(s->er, ast_get_span(s->ast, ref),
                  "can't evaluate expression to type");
 
     return (type_ref_t){};
 }
-
-static type_ref_t sema_node_ref(sema_t* s, ctx_t* ctx, inf_t inf,
-                                node_ref_t ref);
 
 static type_ref_t sema_node_mod(sema_t* s, ctx_t* ctx, inf_t pinf,
                                 node_t const*            node,
@@ -173,7 +215,9 @@ static type_ref_t sema_node_mod(sema_t* s, ctx_t* ctx, inf_t pinf,
 static type_ref_t sema_node_decl(sema_t* s, ctx_t* ctx, inf_t pinf,
                                  node_t const* node, node_decl_t const* decl) {
     (void)pinf;
-    (void)node;
+
+    // FIXME: when a node is const, we need to try to comptime it, and that's
+    // where the procedures should come from
 
     type_ref_t type_expr = {};
     type_ref_t init_expr = {};
@@ -200,6 +244,10 @@ static type_ref_t sema_node_decl(sema_t* s, ctx_t* ctx, inf_t pinf,
         report_error(s->er, node->span,
                      "comptime for things other than procedures has not been "
                      "implemented");
+        report_note(s->er, node->span, "type_expr has type: %s",
+                    tstore_type_ref_str(s->ts, type_expr, s->temp_alloc).items);
+        report_note(s->er, node->span, "init_expr has type: %s",
+                    tstore_type_ref_str(s->ts, init_expr, s->temp_alloc).items);
     }
 
     if (decl_is_var(decl->flags) && !in_proc(ctx)) {
@@ -208,11 +256,20 @@ static type_ref_t sema_node_decl(sema_t* s, ctx_t* ctx, inf_t pinf,
     }
 
     // FIXME: chech if the types match or can be converted/auto-casted
+    if (type_ref_valid(type_expr) && type_ref_valid(init_expr) &&
+        !type_ref_eq(type_expr, init_expr)) {
+        report_error(s->er, node->span, "incompatible types in declaration");
+        report_note(s->er, node->span, "expected type: %s",
+                    tstore_type_ref_str(s->ts, type_expr, s->temp_alloc).items);
+        report_note(s->er, node->span, "received type: %s",
+                    tstore_type_ref_str(s->ts, init_expr, s->temp_alloc).items);
+    }
+
+    if (type_ref_valid(type_expr)) init_expr = type_expr;
 
     decl_val(s, ctx, decl->name,
              (decl_val_t){.where = node->span, .type = init_expr});
 
-    // FIXME: use the actual correct type for the decl
     return init_expr;
 }
 
@@ -229,7 +286,15 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
     ctx_t head_ctx;
     ctx_init_scope(&head_ctx, pctx);
 
-    inf_t inf = {};
+    inf_t        inf = {};
+    slice_args_t inf_type_args = {};
+
+    if (type_ref_valid(pinf.exp)) {
+        type_t const* ty = tstore_get(s->ts, pinf.exp);
+        if (ty->kind == TYPE_PROC) {
+            inf_type_args = tstore_get_args(s->ts, ty->as.proc.args);
+        }
+    }
 
     slice_foreach(args, i) {
         node_ref_t node_ref = slice_at(args, i);
@@ -242,8 +307,9 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
         if (node_ref_valid(arg->type)) {
             ty = sema_node_to_type(s, &head_ctx, inf, arg->type);
             ast_set_type(s->ast, arg->type, s->ts->builtins.type);
+        } else if (i < inf_type_args.len) {
+            ty = slice_at(inf_type_args, i).type;
         } else {
-            // TODO: infer from pinf if possible
             report_error(s->er, node->span,
                          "missing type in procedure argument '%s'",
                          arg->name.ptr);
@@ -259,6 +325,11 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
         ast_set_type(s->ast, proc->ret, s->ts->builtins.type);
 
         span_ret = ast_get_span(s->ast, proc->ret);
+    } else if (type_ref_valid(pinf.exp)) {
+        type_t const* ty = tstore_get(s->ts, pinf.exp);
+        if (ty->kind == TYPE_PROC) {
+            type_ret = ty->as.proc.ret;
+        }
     } else {
         type_ret = s->ts->builtins.void_;
     }
@@ -290,7 +361,7 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
                 tstore_type_ref_str(s->ts, type_ret, s->temp_alloc).items);
             report_note(s->er, span_ret, "return type declared here");
         }
-    } else {
+    } else if (!pctx->in_type_eval) {
         // in case there is no body, then this is a procedure type.
         type = s->ts->builtins.type;
     }
@@ -338,10 +409,12 @@ static type_ref_t sema_node_call(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     type_ref_t callee_type = sema_node_ref(s, ctx, inf, call->callee);
     if (!tstore_type_is_proc(s->ts, callee_type)) {
-        report_error(
-            s->er, ast_get_span(s->ast, call->callee),
-            "can't call non-procedure of type %s",
-            tstore_type_ref_str(s->ts, callee_type, s->temp_alloc).items);
+        if (type_ref_valid(callee_type)) {
+            report_error(
+                s->er, ast_get_span(s->ast, call->callee),
+                "can't call non-procedure of type %s",
+                tstore_type_ref_str(s->ts, callee_type, s->temp_alloc).items);
+        }
 
         return inf.exp;
     }
@@ -558,7 +631,7 @@ static type_ref_t sema_node_stmt_expr(sema_t* s, ctx_t* ctx, inf_t pinf,
     inf_t inf = {};
 
     type_ref_t child = sema_node_ref(s, ctx, inf, stmtexpr->child);
-    if (!tstore_type_is_void(s->ts, child)) {
+    if (!tstore_type_is_void(s->ts, child) && type_ref_valid(child)) {
         report_error(s->er, ast_get_span(s->ast, stmtexpr->child),
                      "expression result of type %s is ignored",
                      tstore_type_ref_str(s->ts, child, s->temp_alloc).items);

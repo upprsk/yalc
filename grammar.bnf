@@ -17,7 +17,7 @@
            ;
 
 <unary>    ::= ( "-" | "!" ) <expr> ;
-<proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] <blk> ;
+<proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] ( <blk> | "..." ) ;
 <ptr>      ::= "*" [ "const" ] <expr>
              | "[" [ <ptr_arr> ] "]" [ "const" ] <expr>
              ;
