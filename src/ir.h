@@ -125,11 +125,9 @@ typedef enum irop : uint8_t {
     //  rd = call<T> pid[count] $cs
     IR_CALL,
 
-    /// return from a procedure. There may only ever be one of these per
-    /// procedure. Procedures that don't return anything still need to call ret
-    /// (then any register can be given, as it will be ignored by the caller).
-    /// This does not have a type because it uses the return type of the current
-    /// procedure.
+    /// return from a procedure. Procedures that don't return anything do not
+    /// need to call ret, as falling of the end of the procedure automatically
+    /// returns.
     ///
     ///  ret rd
     IR_RET,
