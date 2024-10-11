@@ -112,6 +112,23 @@ typedef enum irop : uint8_t {
     //  b @label
     IR_B,
 
+    // load or store bytes from the location pointed by the given register. The
+    // type determines if the value is zero- or sign-extended. A constant offset
+    // (in bytes) from the pointer can be given in `off`.
+    //
+    //  rd = load<T> rs, off
+    //  stor<T> rd, rs, off
+    //
+    // rd is the address int the stack, rs is the value to load/store.
+    IR_LOAD,
+    IR_STOR,
+
+    // allocate space in the stack for `imm` items with the given size. this
+    // instruction returns a pointer to the allocated memory.
+    //
+    //  rd = alloca<T> imm
+    IR_ALLOCA,
+
     /// call another procedure `pid`. The return value will be interpreted
     /// as T (should match the return type of the called procedure). To keep the
     /// IR simple, there is no way to represent a variable number of arguments,
@@ -152,6 +169,9 @@ static inline char const* irop_str(irop_t op) {
         case IR_BZ: return "bz";
         case IR_BNZ: return "bnz";
         case IR_B: return "b";
+        case IR_LOAD: return "load";
+        case IR_STOR: return "stor";
+        case IR_ALLOCA: return "alloca";
         case IR_CALL: return "call";
         case IR_RET: return "ret";
     }
@@ -176,7 +196,10 @@ typedef struct inst {
         uint8_t  imm_bytes[8];
         struct {
             uint32_t rs;
-            uint32_t rt;
+            union {
+                uint32_t rt;
+                uint32_t off;
+            };
         };
         struct {
             uint32_t label;
@@ -345,6 +368,20 @@ static inline inst_t inst_bnz(irtype_t t, uint32_t rd, uint32_t label) {
 
 static inline inst_t inst_b(irtype_t t, uint32_t label) {
     return (inst_t){.op = IR_B, .type = t, .label = label};
+}
+
+static inline inst_t inst_load(irtype_t t, uint32_t rd, uint32_t rs,
+                               uint32_t off) {
+    return (inst_t){.op = IR_LOAD, .type = t, .rd = rd, .rs = rs, .off = off};
+}
+
+static inline inst_t inst_stor(irtype_t t, uint32_t rd, uint32_t rs,
+                               uint32_t off) {
+    return (inst_t){.op = IR_STOR, .type = t, .rd = rd, .rs = rs, .off = off};
+}
+
+static inline inst_t inst_alloca(irtype_t t, uint32_t rd, uint64_t imm) {
+    return (inst_t){.op = IR_ALLOCA, .type = t, .rd = rd, .imm = imm};
 }
 
 static inline inst_t inst_call(irtype_t t, uint32_t rd, uint16_t pid,

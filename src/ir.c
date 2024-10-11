@@ -36,6 +36,18 @@ string_t inst_str(inst_t inst, allocator_t alloc) {
                               inst.label);
         case IR_B:
             return da_sprintf(alloc, "%s @%d", irop_str(inst.op), inst.label);
+        case IR_LOAD:
+            return da_sprintf(alloc, "$%d = %s<%s> $%d, %d", inst.rd,
+                              irop_str(inst.op), irtype_str(inst.type), inst.rs,
+                              inst.off);
+        case IR_STOR:
+            return da_sprintf(alloc, "%s<%s> $%d, $%d, %d", irop_str(inst.op),
+                              irtype_str(inst.type), inst.rd, inst.rs,
+                              inst.off);
+        case IR_ALLOCA:
+            return da_sprintf(alloc, "$%d = %s<%s> %lu", inst.rd,
+                              irop_str(inst.op), irtype_str(inst.type),
+                              inst.imm);
         case IR_CALL:
             return da_sprintf(alloc, "$%d = %s<%s> %d[%d], $%d", inst.rd,
                               irop_str(inst.op), irtype_str(inst.type),
