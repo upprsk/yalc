@@ -232,6 +232,17 @@ string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc) {
             da_catfmt(&s, ")");
             return s;
         }
+        case NODE_STMT_EXPR: {
+            node_w_child_t const* node = node_as_stmt_expr(n);
+
+            string_t s = da_sprintf(alloc, "(stmt-expr");
+
+            string_t c = ast_dump(a, node->child, alloc);
+            da_strjoin_and_free(&s, &c, &string_from_lit(" "));
+
+            da_catfmt(&s, ")");
+            return s;
+        }
         case NODE_NEG:
         case NODE_NOT: {
             node_w_child_t const* node = node_as_unary(n);
@@ -536,6 +547,17 @@ string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
             da_strjoin_and_free(&s, &c, &string_from_lit(" "));
 
             c = ast_dump(a, node->wtrue, alloc);
+            da_strjoin_and_free(&s, &c, &string_from_lit(" "));
+
+            da_catfmt(&s, ")");
+            return s;
+        }
+        case NODE_STMT_EXPR: {
+            node_w_child_t const* node = node_as_stmt_expr(n);
+
+            string_t s = da_sprintf(alloc, "(stmt-expr <%s>", ty.items);
+
+            string_t c = ast_dump(a, node->child, alloc);
             da_strjoin_and_free(&s, &c, &string_from_lit(" "));
 
             da_catfmt(&s, ")");

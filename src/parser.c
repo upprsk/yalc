@@ -648,6 +648,8 @@ static node_ref_t parse_stmt_expr(parser_t* p) {
     try_consume(p, TT_SEMICOLON);
 
     node_init_ret(ast_get(p->ast, node_ref), span_between(start, end), child);
+    node_init_stmt_expr(ast_get(p->ast, node_ref), span_between(start, end),
+                        child);
 
     return node_ref;
 }

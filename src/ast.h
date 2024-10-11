@@ -31,8 +31,9 @@ typedef enum node_kind : uint8_t {
     NODE_CALL,  // call
     NODE_BLK,   // w_children
 
-    NODE_IF,     // ternary
-    NODE_WHILE,  // ternary
+    NODE_IF,         // ternary
+    NODE_WHILE,      // ternary
+    NODE_STMT_EXPR,  // w_child
 
     NODE_ARG,  // arg
 
@@ -60,6 +61,7 @@ static inline char const* node_kind_str(node_kind_t nk) {
         case NODE_BLK: return "NODE_BLK";
         case NODE_IF: return "NODE_IF";
         case NODE_WHILE: return "NODE_WHILE";
+        case NODE_STMT_EXPR: return "NODE_STMT_EXPR";
         case NODE_ADD: return "NODE_ADD";
         case NODE_ARG: return "NODE_ARG";
         case NODE_SUB: return "NODE_SUB";
@@ -322,6 +324,12 @@ static inline void node_init_while(node_t* n, span_t span, node_ref_t cond,
     };
 }
 
+static inline void node_init_stmt_expr(node_t* n, span_t span,
+                                       node_ref_t child) {
+    *n = (node_t){
+        .kind = NODE_STMT_EXPR, .span = span, .as.w_child = {.child = child}};
+}
+
 static inline void node_init_unary(node_t* n, span_t span, node_kind_t kind,
                                    node_ref_t child) {
     *n = (node_t){.kind = kind, .span = span, .as.w_child = {.child = child}};
@@ -399,6 +407,11 @@ static inline node_ternary_t const* node_as_if(node_t const* n) {
 static inline node_ternary_t const* node_as_while(node_t const* n) {
     assert_int(n->kind, ==, NODE_WHILE);
     return &n->as.ternary;
+}
+
+static inline node_w_child_t const* node_as_stmt_expr(node_t const* n) {
+    assert_int(n->kind, ==, NODE_STMT_EXPR);
+    return &n->as.w_child;
 }
 
 static inline node_w_child_t const* node_as_unary(node_t const* n) {
