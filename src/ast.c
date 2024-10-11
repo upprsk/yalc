@@ -536,6 +536,8 @@ string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
             }
 
             da_catfmt(&s, ")");
+
+            da_free(&ty);
             return s;
         }
         case NODE_WHILE: {
@@ -550,6 +552,8 @@ string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
             da_strjoin_and_free(&s, &c, &string_from_lit(" "));
 
             da_catfmt(&s, ")");
+
+            da_free(&ty);
             return s;
         }
         case NODE_STMT_EXPR: {
@@ -561,6 +565,8 @@ string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
             da_strjoin_and_free(&s, &c, &string_from_lit(" "));
 
             da_catfmt(&s, ")");
+
+            da_free(&ty);
             return s;
         }
         case NODE_NEG:
