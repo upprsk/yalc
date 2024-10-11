@@ -210,7 +210,8 @@ static node_ref_t parse_decl(parser_t* p) {
 
 // <blk_decl> ::= <ident> ":" [ <expr> ] [ ( ":" | "=" ) <expr> ] ";" ;
 static node_ref_t parse_blk_decl(parser_t* p, span_t start,
-                                 node_decl_flags_t flags, str_t extern_name) {
+                                 node_decl_flags_t flags,
+                                 str_t             raw_extern_name) {
     token_t name_tok = peek(p);
     try_consume(p, TT_IDENT);
     try_consume(p, TT_COLON);
@@ -234,9 +235,11 @@ static node_ref_t parse_blk_decl(parser_t* p, span_t start,
     span_t end = peek(p).span;
     try_consume(p, TT_SEMICOLON);
 
-    str_t name = str_dupe(p->alloc, span_to_slice(name_tok.span, p->source));
+    node_str_t name =
+        ast_add_str(p->ast, span_to_slice(name_tok.span, p->source));
+    node_str_t ename = ast_add_str(p->ast, raw_extern_name);
     node_init_decl(ast_get(p->ast, node_ref), span_between(start, end), flags,
-                   extern_name, name, type, init);
+                   ename, name, type, init);
 
     return node_ref;
 }
@@ -457,11 +460,12 @@ static node_ref_t parse_ident(parser_t* p) {
     token_t t = peek(p);
     advance(p);
 
-    str_t s = span_to_slice(t.span, p->source);
+    str_t      s = span_to_slice(t.span, p->source);
+    node_str_t ident = ast_add_str(p->ast, s);
 
     node_t*    n = NULL;
     node_ref_t ref = ast_alloc_node(p->ast, &n);
-    node_init_ident(n, t.span, str_dupe(p->alloc, s));
+    node_init_ident(n, t.span, ident);
 
     return ref;
 }
@@ -602,9 +606,9 @@ static node_ref_t parse_proc_arg(parser_t* p) {
         span = span_between(span, ast_get_span(p->ast, type));
     }
 
-    node_init_arg(ast_get(p->ast, node_ref), span,
-                  str_dupe(p->alloc, span_to_slice(name_tok.span, p->source)),
-                  type);
+    node_str_t name =
+        ast_add_str(p->ast, span_to_slice(name_tok.span, p->source));
+    node_init_arg(ast_get(p->ast, node_ref), span, name, type);
 
     return node_ref;
 }

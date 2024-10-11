@@ -11,17 +11,31 @@
 #include "span.h"
 #include "tstore.h"
 
+/// Reference a note (a stable pointer that is also half the size (on 64 bits).
+/// id 0 is reserved as invalid and checked on access.
 typedef struct node_ref {
     uint32_t id;
 } node_ref_t;
 
+/// If the ref points to a valid node.
 #define node_ref_valid(_ref) (!!(_ref).id)
 
+/// Arrays are stored in the main ast (in one single big array of `node_ref_t`)
+/// this denotes a slice of that array.
 typedef struct node_arr {
     uint32_t start;
     uint32_t len;
 } node_arr_t;
 
+/// Strings are also stored in the main ast in one single big array. This is a
+/// slice into that string.
+typedef struct node_str {
+    uint32_t start;
+    uint32_t len;
+} node_str_t;
+
+/// All of the kinds of AST nodes. This is used to select what item to use in
+/// the node union.
 typedef enum node_kind : uint8_t {
     NODE_INVAL,
 
@@ -84,57 +98,69 @@ static inline char const* node_kind_str(node_kind_t nk) {
     return "?";
 }
 
+/// Used for nodes that have a single child.
 typedef struct node_w_child {
     node_ref_t child;
 } node_w_child_t;
 
+/// Used for nodes that have a list of children.
 typedef struct node_w_children {
     node_arr_t children;
 } node_w_children_t;
 
+/// Used for the arg node (represents a procedure argument).
 typedef struct node_arg {
-    str_t      name;
+    node_str_t name;
     node_ref_t type;
 } node_arg_t;
 
+/// Used for nodes that have two children.
 typedef struct node_binary {
     node_ref_t left;
     node_ref_t right;
 } node_binary_t;
 
+/// Used for nodes that have three children.
 typedef struct node_ternary {
     node_ref_t cond;
     node_ref_t wtrue;
     node_ref_t wfalse;
 } node_ternary_t;
 
+/// Boolean flags for declaration nodes.
 typedef enum node_decl_flags {
     DECL_EXTERN = 1 << 0,
     DECL_VAR = 1 << 1,
 } node_decl_flags_t;
 
+/// If the declaration is marked as extern.
 static inline bool decl_is_extern(node_decl_flags_t f) {
     return f & DECL_EXTERN;
 }
 
+/// If the declaration is marked as a variable and not a compile-time constant.
 static inline bool decl_is_var(node_decl_flags_t f) { return f & DECL_VAR; }
 
+/// Used for declarations.
 typedef struct node_decl {
-    str_t             extern_name;
-    str_t             name;
+    node_str_t        extern_name;
+    node_str_t        name;
     node_ref_t        type;
     node_ref_t        init;
     node_decl_flags_t flags;
 } node_decl_t;
 
+/// Boolean flags for procedures.
 typedef enum node_proc_flags {
     PROC_HAS_VARARG = 1 << 0,
 } node_proc_flags_t;
 
+/// If the procedure has c-style variable length arguments.
 static inline bool proc_has_vararg(node_proc_flags_t f) {
     return f & PROC_HAS_VARARG;
 }
 
+/// Used for procedures and procedure types. Types dont have a body.
 typedef struct node_proc {
     node_proc_flags_t flags;
     node_arr_t        args;
@@ -142,25 +168,31 @@ typedef struct node_proc {
     node_ref_t        body;
 } node_proc_t;
 
+/// Used for calls.
 typedef struct node_call {
     node_ref_t callee;
     node_arr_t args;
 } node_call_t;
 
+/// Used for creating a pointer.
 typedef struct node_ptr {
     node_ref_t       term;
     node_ref_t       child;
     node_ptr_flags_t flags;
 } node_ptr_t;
 
+/// Used for identifiers.
 typedef struct node_ident {
-    str_t ident;
+    node_str_t ident;
 } node_ident_t;
 
+/// Used for integers.
 typedef struct node_int {
     uint64_t value;
 } node_int_t;
 
+/// The full node. The `as` union is discriminated by the `kind` field. The node
+/// also stores its span in the source.
 typedef struct node {
     span_t      span;
     node_kind_t kind;
@@ -187,19 +219,22 @@ typedef da_t(node_ref_t) da_node_ref_t;
 typedef da_t(type_ref_t) da_type_ref_t;
 typedef slice_t(node_ref_t) slice_node_ref_t;
 
+/// Centralized storage and interface for all of the AST operations.
 typedef struct ast {
     da_node_t     nodes;
     da_node_ref_t refs;
     da_type_ref_t types;
-    // allocator_t   alloc;
+    string_t      strs;
 } ast_t;
 
+/// Initialize the ast structure.
 static inline void ast_init(ast_t* a, allocator_t alloc) {
     assert_not_null(a);
 
     *a = (ast_t){.nodes = da_init(alloc),
                  .refs = da_init(alloc),
-                 .types = da_init(alloc)};
+                 .types = da_init(alloc),
+                 .strs = da_init(alloc)};
 
     // push a dummy node to occupy index zero
     da_push_back(&a->nodes, (node_t){});
@@ -238,11 +273,24 @@ static inline slice_node_ref_t ast_get_arr(ast_t const* a, node_arr_t arr) {
     return slice_s(s, arr.start, arr.start + arr.len);
 }
 
+static inline str_t ast_get_str(ast_t const* a, node_str_t arr) {
+    str_t s = da_to_slice(a->strs);
+    return slice_s(s, arr.start, arr.start + arr.len);
+}
+
 static inline node_arr_t ast_add_refs(ast_t* a, da_node_ref_t refs) {
     uint32_t idx = a->refs.size;
     da_append(&a->refs, refs.size, refs.items);
 
     return (node_arr_t){idx, refs.size};
+}
+
+static inline node_str_t ast_add_str(ast_t* a, str_t s) {
+    uint32_t idx = a->refs.size;
+    da_append(&a->strs, s.len, s.ptr);
+    da_push_back(&a->strs, 0);
+
+    return (node_str_t){idx, s.len};
 }
 
 static inline void ast_set_type(ast_t* a, node_ref_t ref, type_ref_t type) {
@@ -253,7 +301,7 @@ static inline void ast_set_type(ast_t* a, node_ref_t ref, type_ref_t type) {
     a->types.items[ref.id] = type;
 }
 
-string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc);
+// string_t ast_dump(ast_t const* a, node_ref_t node, allocator_t alloc);
 string_t ast_dump_with_types(ast_t const* a, tstore_t* ts, node_ref_t node,
                              allocator_t alloc);
 
@@ -264,9 +312,9 @@ static inline void node_init_mod(node_t* n, span_t span, node_arr_t children) {
 }
 
 static inline void node_init_decl(node_t* n, span_t span,
-                                  node_decl_flags_t flags, str_t extern_name,
-                                  str_t name, node_ref_t type,
-                                  node_ref_t init) {
+                                  node_decl_flags_t flags,
+                                  node_str_t extern_name, node_str_t name,
+                                  node_ref_t type, node_ref_t init) {
     *n = (node_t){
         .kind = NODE_DECL,
         .span = span,
@@ -297,7 +345,7 @@ static inline void node_init_call(node_t* n, span_t span, node_ref_t callee,
     };
 }
 
-static inline void node_init_arg(node_t* n, span_t span, str_t name,
+static inline void node_init_arg(node_t* n, span_t span, node_str_t name,
                                  node_ref_t type) {
     *n = (node_t){
         .kind = NODE_ARG, .span = span, .as.arg = {.name = name, .type = type}
@@ -372,7 +420,7 @@ static inline void node_init_deref(node_t* n, span_t span, node_ref_t child) {
         .kind = NODE_DEREF, .span = span, .as.w_child = {.child = child}};
 }
 
-static inline void node_init_ident(node_t* n, span_t span, str_t ident) {
+static inline void node_init_ident(node_t* n, span_t span, node_str_t ident) {
     *n = (node_t){
         .kind = NODE_IDENT, .span = span, .as.ident = {.ident = ident}};
 }

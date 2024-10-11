@@ -14,7 +14,6 @@
 #include "map/map.h"
 #include "slice/slice.h"
 #include "tstore.h"
-#include "utils/string.h"
 
 typedef struct reg {
     uint32_t num;
@@ -268,8 +267,9 @@ static reg_t gen_ident(irgen_t* g, ctx_t* ctx, node_t const* node,
                        node_ref_t ref) {
     node_ident_t const* ident = node_as_ident(node);
     type_ref_t          type = ast_get_type(g->ast, ref);
+    str_t               is = ast_get_str(g->ast, ident->ident);
 
-    local_t* l = find_local(ctx, ident->ident);
+    local_t* l = find_local(ctx, is);
     if (!l) {
         // the name does not refer to a local, search for a global or builtin
 
@@ -277,15 +277,15 @@ static reg_t gen_ident(irgen_t* g, ctx_t* ctx, node_t const* node,
             reg_t rd = alloc_reg(ctx);
 
             uint64_t v = 0;
-            if (slice_eq(ident->ident, str_from_lit("true"))) {
+            if (slice_eq(is, str_from_lit("true"))) {
                 v = 1;
-            } else if (slice_eq(ident->ident, str_from_lit("false"))) {
+            } else if (slice_eq(is, str_from_lit("false"))) {
                 v = 0;
             } else {
                 report_error(g->er, node->span,
                              "INTERNAL: got invalid bool identifier, expected "
                              "'true' or 'false', got '%s'",
-                             ident->ident.ptr);
+                             is.ptr);
             }
 
             add_inst(ctx, inst_copy(IRT_U8, rd.num, v));
@@ -296,7 +296,7 @@ static reg_t gen_ident(irgen_t* g, ctx_t* ctx, node_t const* node,
         if (tstore_type_is_proc(g->ts, type)) {
             // the thing is a procedure, let's try to find it in the list of
             // procedures.
-            proc_t* p = find_proc(ctx, ident->ident);
+            proc_t* p = find_proc(ctx, is);
             assert_not_null(p);
 
             lproc_ref_t proc = add_proc_to_call_table(ctx, p);
@@ -412,10 +412,11 @@ static void gen_ret(irgen_t* g, ctx_t* ctx, node_t const* node,
 static void gen_decl(irgen_t* g, ctx_t* ctx, node_t const* node,
                      node_ref_t ref) {
     node_decl_t const* decl = node_as_decl(node);
+    str_t              name = ast_get_str(g->ast, decl->name);
     irtype_t ty = type_to_irtype(g, node->span, ast_get_type(g->ast, ref));
 
     reg_t init = gen_expr(g, ctx, decl->init);
-    add_local(g, ctx, decl->name, ty, init);
+    add_local(g, ctx, name, ty, init);
 }
 
 static void gen_if(irgen_t* g, ctx_t* ctx, node_t const* node, node_ref_t ref) {
@@ -582,8 +583,9 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, node_decl_t const* decl,
         node_ref_t        node_ref = slice_at(node_args, i);
         node_t const*     node = ast_get(g->ast, node_ref);
         node_arg_t const* arg = node_as_arg(node);
+        str_t             name = ast_get_str(g->ast, arg->name);
 
-        add_local(g, &ctx, arg->name, slice_at(args, i), alloc_reg(&ctx));
+        add_local(g, &ctx, name, slice_at(args, i), alloc_reg(&ctx));
     }
 
     if (!decl_is_extern(decl->flags)) {
@@ -613,18 +615,24 @@ static void gen_proc(irgen_t* g, ctx_t* pctx, node_decl_t const* decl,
     proc_flags_t flags = 0;
     if (decl_is_extern(decl->flags)) flags |= PFLAG_EXTERN;
 
+    str_t name = ast_get_str(g->ast, decl->name);
+    str_t link_name = ast_get_str(g->ast, decl->extern_name);
+    if (!link_name.len) {
+        link_name = name;
+    }
+
     proc_t actual_proc = {
         .args = proc.args,
         .ret = proc.ret,
         .flags = flags,
         .cprocs = da_to_slice(proc.cprocs),
         .labels = da_to_slice(proc.labels),
-        .link_name = decl->extern_name.ptr ? decl->extern_name : decl->name,
+        .link_name = link_name,
         .ref = {map_len(ctx.obj->procs)},
         .insts = da_to_slice(proc.insts),
     };
 
-    add_proc(g, pctx, decl->name, actual_proc);
+    add_proc(g, pctx, name, actual_proc);
 }
 
 static void gen_mod_decl(irgen_t* g, ctx_t* ctx, node_ref_t ref) {

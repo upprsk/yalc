@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
                                 &ast);
 
     if (args.show_ast) {
-        string_t s = ast_dump(&ast, ast_root, temp_alloc);
+        string_t s = ast_dump_with_types(&ast, NULL, ast_root, temp_alloc);
         printf("ast:\n%s\n", s.items);
     }
 
@@ -119,13 +119,13 @@ int main(int argc, char* argv[]) {
 
     if (errs != er.error_count) return EXIT_FAILURE;
 
-    irgen_pass(&(irgen_desc_t){.alloc = main_alloc,
-                               .temp_alloc = temp_alloc,
-                               .ts = &ts,
-                               .er = &er},
-               &ast, ast_root);
-
-    if (errs != er.error_count) return EXIT_FAILURE;
+    // irgen_pass(&(irgen_desc_t){.alloc = main_alloc,
+    //                            .temp_alloc = temp_alloc,
+    //                            .ts = &ts,
+    //                            .er = &er},
+    //            &ast, ast_root);
+    //
+    // if (errs != er.error_count) return EXIT_FAILURE;
 
     arena_clear_all(&main_arena);
     arena_clear_all(&temp_arena);

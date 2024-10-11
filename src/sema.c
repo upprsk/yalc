@@ -164,8 +164,8 @@ static type_ref_t sema_node_to_type(sema_t* s, ctx_t* c, inf_t inf,
     if (node->kind == NODE_IDENT) {
         node_ident_t const* ident = node_as_ident(node);
 
-        if (slice_eq(str_from_lit("i32"), ident->ident))
-            return s->ts->builtins.i32;
+        str_t is = ast_get_str(s->ast, ident->ident);
+        if (slice_eq(str_from_lit("i32"), is)) return s->ts->builtins.i32;
 
         report_error(s->er, ast_get_span(s->ast, ref),
                      "can't evaluate expression to type");
@@ -278,7 +278,8 @@ static type_ref_t sema_node_decl(sema_t* s, ctx_t* ctx, inf_t pinf,
 
     if (type_ref_valid(type_expr)) init_expr = type_expr;
 
-    decl_val(s, ctx, decl->name,
+    str_t name = ast_get_str(s->ast, decl->name);
+    decl_val(s, ctx, name,
              (decl_val_t){.where = node->span, .type = init_expr});
 
     return init_expr;
@@ -315,6 +316,8 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
         node_arg_t const* arg = node_as_arg(node);
         type_ref_t        ty = {};
 
+        str_t name = ast_get_str(s->ast, arg->name);
+
         if (node_ref_valid(arg->type)) {
             ty = sema_node_to_type(s, &head_ctx, inf, arg->type);
             ast_set_type(s->ast, arg->type, s->ts->builtins.type);
@@ -322,12 +325,11 @@ static type_ref_t sema_node_proc(sema_t* s, ctx_t* pctx, inf_t pinf,
             ty = slice_at(inf_type_args, i).type;
         } else {
             report_error(s->er, node->span,
-                         "missing type in procedure argument '%s'",
-                         arg->name.ptr);
+                         "missing type in procedure argument '%s'", name.ptr);
         }
 
         da_push_back(&type_args, (type_proc_arg_t){.type = ty});
-        decl_val(s, &head_ctx, arg->name,
+        decl_val(s, &head_ctx, name,
                  (decl_val_t){.where = node->span, .type = ty});
     }
 
@@ -537,10 +539,10 @@ static type_ref_t sema_node_ident(sema_t* s, ctx_t* ctx, inf_t inf,
                                   node_ident_t const* ident) {
     (void)inf;
 
-    decl_val_t* val = find_val(ctx, ident->ident);
+    str_t       name = ast_get_str(s->ast, ident->ident);
+    decl_val_t* val = find_val(ctx, name);
     if (!val) {
-        report_error(s->er, node->span, "undefined identifier '%s'",
-                     ident->ident.ptr);
+        report_error(s->er, node->span, "undefined identifier '%s'", name.ptr);
 
         return (type_ref_t){};
     }
