@@ -1,58 +1,111 @@
-<file> ::= <mod> EOF ;
-<mod>  ::= { <decl> } ;
-
-<decl>     ::= [ "extern" [ <string> ] ] <blk_decl> ;
-<blk_decl> ::= <ident> ":" [ <expr> ] [ ( ":" | "=" ) <expr> ] ";" ;
-
-<expr>   ::= "(" <expr> ")" | <prefix> | <infix>;
-<prefix> ::= <unary>
-           | <proc>
-           | <ptr>
-           | <int>
-           | <ident>
-           ;
-<infix>  ::= <additive>
-           | <multiplicative>
-           | <call>
-           | <ref>
-           | <deref>
+file     ::= { top_stmt } ;
+top_stmt ::= func
+           | def_decl
+           | var_decl
+           | import
            ;
 
-<unary>    ::= ( "-" | "!" ) <expr> ;
-<proc>     ::= ".(" [ <proc_args> ] ")" [ <expr> ] ( <blk> | "..." ) ;
-<ptr>      ::= "*" [ "const" ] <expr>
-             | "[" [ <ptr_arr> ] "]" [ "const" ] <expr>
-             ;
-<int>      ::= INTEGER ;
-<ident>    ::= IDENT ;
+func         ::= "func" { ID "." } ID [ "[" generic_args "]" ] "(" func_args ")" [ expr ] block ;
+generic_args ::= generic_arg { "," generic_arg } ; (* FIXME: allow trailing commans *)
+generic_arg  ::= ID [ ":" expr ] ;
+func_args    ::= func_arg { "," func_args } ; (* FIXME: allow trailing commans *)
+func_arg     ::= ID ":" expr ;
 
-<additive>       ::= <expr> ( "+" | "-" ) <expr> ;
-<multiplicative> ::= <expr> ( "*" | "/" ) <expr> ;
-<call>           ::= <expr> "(" [ <call_args> ] ")" ;
-<ref>            ::= <expr> "&" ;
-<deref>          ::= <expr> ".*" ;
+import ::= "import" STR [ "as" ID ];
 
-<proc_args> ::= <proc_arg> { "," <proc_arg> } [ "," [ "..." [ "," ] ] ] ;
-<proc_arg>  ::= <ident> [ ":" <expr> ] ;
+(* Statements *)
 
-<ptr_arr> ::= "*" [ ":" <expr> "]"
-            | <expr>
-            ;
+stmt ::= expr ";"
+       | return_stmt
+       | if_stmt
+       | while_stmt
+       | block
+       | def_decl
+       | var_decl
+       | assign
+       ;
 
-<call_args> ::= <expr> { "," <expr> } [ "," ] ;
+return_stmt ::= "return" [ open_expr_pack ] ";" ;
+if_stmt     ::= "if" expr block [ "else" expr ] ;
+while_stmt  ::= "while" expr block
+              | "while" decl expr block
+              ;
 
-<blk>      ::= "{" { <blk_item> } "}" ;
-<blk_item> ::= <blk_decl> | <stmt> ;
+block ::= "{" { stmt } "}" ;
 
-<stmt> ::= <stmt_ret>
-         | <stmt_expr>
-         | <stmt_if>
-         | <stmt_while>
-         | <assign>
-         ;
+def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";"
+           | "def" id_pack ":" expr [ "=" expr ] ";"
+           ;
 
-<stmt_ret>  ::= "return" [ <expr> ] ";" ;
-<stmt_expr> ::= <expr> ";" ;
-<stmt_if>   ::= "if" <expr> <blk> [ "else" <blk> ] ;
-<stmt_while>   ::= "while" <expr> <blk> ;
-<assign> ::= <expr> "=" <expr> ";" ;
+var_decl ::= "var" id_pack [ ":" expr ] "=" expr ";"
+           | "var" id_pack ":" expr [ "=" expr ] ";"
+           ;
+
+id_pack ::= ID { "," ID } ;
+
+(* not all expressions are valid in the lhs, but we don't check for this during
+   parsing *)
+assign ::= expr ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "&=" | "^=" | "<<=" | ">>=") expr ";" ;
+
+(* Expressions *)
+
+expr           ::= logic_or ;
+open_expr_pack ::= expr { "," expr } ;      (* NOTE: no trailing commas here *)
+expr_pack      ::= "(" open_expr_pack ")" ; (* FIXME: allow trailing commas *)
+
+logic_or  ::= logic_and { "||" logic_and } ;
+logic_and ::= bin_or { "&&" bin_or } ;
+
+bin_or  ::= bin_xor { "|" bin_xor } ;
+bin_xor ::= bin_and { "^" bin_and } ;
+bin_and ::= equality { "&" equality } ;
+
+equality   ::= comparison { ( "!=" | "==" ) comparison } ;
+comparison ::= shift { ( ">" | "=>" | "<=" | "<" ) shift } ;
+shift      ::= term { ( "<<" | ">>" ) term } ;
+term       ::= factor { ( "+" | "-" ) factor } ;
+factor     ::= cast { ( "*" | "/" | "%" ) cast } ;
+
+cast  ::= unary { "as" unary } ;
+unary ::= ( "!" | "+" | "-" | "~" | "&" | "?" ) unary
+        | deref
+        ;
+
+deref ::= call { ".*" call } ;
+
+call           ::= primary { "(" call_args ")" }      (* func call *)
+                 | primary { "[" slice_or_index "]" } (* index/slicing *)
+                 | primary { "." primary }            (* field *)
+                 ;
+call_args      ::= expr { "," expr }; (* FIXME: allow trailing commas *)
+slice_or_index ::= expr
+                 | [ expr ] ":" [ expr ]
+                 ;
+
+primary ::= "(" expr ")"
+          | "." ID
+          | expr_pack
+          | array
+          | pointer_type
+          | struct_type
+          | enum_type
+          | number
+          | STR
+          | ID
+          ;
+
+array ::= "[" ( expr | "_" ) "]" expr "{" array_items "}" ;
+array_items ::= expr { "," expr } ; (* FIXME: allow trailing commas *)
+
+(* slices are treated as pointers *)
+pointer_type ::= "[" [ "*" ] "]" [ "const" ] unary
+               | "*" [ "const" ] unary
+               ;
+
+struct_type  ::= "struct" "{" [ struct_field { "," struct_field } ] "}" ;
+struct_field ::= ID ":" expr [ "=" expr ] ;
+
+enum_type  ::= "enum" [ "of" expr ] "{" [ enum_field { "," enum_field } ] "}" ;
+enum_field ::= ID [ "=" expr ] ;
+
+number  ::= INT | HEX | OCT | BIN | FLOAT ;

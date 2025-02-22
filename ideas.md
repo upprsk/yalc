@@ -78,11 +78,11 @@ is the receiver. This just allows the use dot-syntax for accessing the function
 like a method. Bound functions can be added to any type, even primitives.
 
 ```yal
-func (c: i32) is_zero() bool {
+func i32.is_zero(c: i32) bool {
     return c == 0;
 }
 
-func (c: *i32) inc() {
+func i32.inc(c: *i32) {
     c.* += 1;
 }
 
@@ -94,6 +94,22 @@ func main() {
     }
 
     printf("i=%d\n", i);
+}
+```
+
+It would be possible to define a type `Self` when in a bound function that is
+set to the type it is bound to. This would reduce duplication:
+
+```yal
+func u32.is_zero(v: Self) -> bool { return v == 0; }
+```
+
+This technique could be used to override operators for non-integer values.
+
+```yal
+def S = struct { a: i32 };
+func S.__eq(s: S, o: S) bool {
+    return s.a == o.a;
 }
 ```
 
@@ -118,6 +134,10 @@ func main() i32 {
     return 0;
 }
 ```
+
+> A generic call looks exactly the same as indexing. This can't be solved at
+> the parser level! The typing pass will determine that this is the case when
+> it detects that a function is being indexed.
 
 ## Multiple returns
 
@@ -184,7 +204,7 @@ def Counter = struct {
     total: usize,
 };
 
-func (c: *Counter) next() ?usize {
+func Counter.next(c: *Counter) ?usize {
     var v = c.count;
     if v == c.total { return nil; }
 
