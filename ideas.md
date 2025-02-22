@@ -373,6 +373,7 @@ func a() bool {
     return true;
 }
 ```
+
 ## Error handling (or_return and or_else)
 
 `or_return` allows for early returns by simply using the last value as a check.
@@ -410,4 +411,3 @@ func check_configuration() (err: ParseError) {
     // ...
 }
 ```
-
