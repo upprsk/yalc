@@ -34,7 +34,23 @@ def WORD: u32 = 0xFFF_FFFF;
 // type aliasing
 def Int = i32;
 def IpAddress4 = [4]u8;
+
+// a global variable initialized with the zero-value for integers
+var zero_global: i32;
 ```
+
+### Zero values
+
+All values are always initialized to know defaults. This removes bugs with
+using uninitialized values.
+
+- Integers and floats: the zero-value is `0`
+- `bool`: the zero-value is `false`
+- Enumerations: the first field
+- Structs: the zero-value of every field
+- Pointers: There are two variants
+  - non-nil pointers: no zero value, can't be left uninitialized
+  - optional pointers: `nil`
 
 ## Functions
 
@@ -103,6 +119,60 @@ func main() i32 {
 }
 ```
 
+## Multiple returns
+
+Functions can return many values.
+
+```yal
+func get_data(v: i32) (i32, i32) {
+    return v + 1, v + 2;
+}
+
+func main() {
+    var a, b = get_data(12);
+    printf("%d, %d\n", a, b); // 13, 14
+}
+```
+
+Multiple return values is the main mechanism for error handling:
+
+```yal
+func try_get(n: i32) (i32, bool) {
+    if n < 18 { return 0, false; }
+
+    return n, true;
+}
+
+func main() i32 {
+    var v, ok = try_get(12);
+    if !ok {
+        printf("failed to get\n");
+        return 1;
+    }
+
+    printf("got: %d\n", v);
+
+    return 0;
+}
+```
+
+## Named return values
+
+Named return values are a delicate feature. First tried it in [Odin](https://odin-lang.org/)
+with a lot of skepticism, but the feature has a lot of value when used
+correctly.
+
+```yal
+func try_get_next(n: i32) (v: i32, ok: bool) {
+    if n < 10 { return; } // returns default values for i32 and bool (0, false)
+
+    // v and ok can be assigned to in the function
+    n += 1;
+
+    return n, true; // both can be passed as well
+}
+```
+
 ## Structs
 
 Structs are just data. There are no classes. There is no inheritance. We do have
@@ -129,6 +199,22 @@ func main() i32 {
     }
 
     return 0;
+}
+```
+
+## Enumerations
+
+```yal
+def Color = enum {
+    Red,
+    Blue,
+    Green,
+    Yellow,
+};
+
+def main() {
+    var color = Color.Green;
+    color = .Yellow; // infers enum type from lhs
 }
 ```
 
@@ -240,8 +326,10 @@ func main() {
 }
 ```
 
-For loops are for natively iterable things, like arrays and slices. Multi-item
+For loops are for natively iterable things like arrays and slices. Multi-item
 pointers can not be iterated this way because they don't have a defined length.
+Multi item pointers can be sliced to give them length and safe access and
+iteration.
 
 ```yal
 func main() {
@@ -252,3 +340,74 @@ func main() {
     }
 }
 ```
+
+## Defer
+
+`defer` is a mechanism to run a function on scope exit. This is meant to move
+resource deallocation be placed closer to the allocation, so that a path is
+not forgotten.
+
+```yal
+func a() bool {
+    var buffer: [*]u8 = malloc(1024);
+    var buffer = buffer[:1024]; // make it a slice
+
+    if !load_from_db(buffer) { return false; } // leak!
+
+    print_stats(buffer);
+    free(buffer.ptr);
+
+    return true;
+}
+
+func a() bool {
+    var buffer: [*]u8 = malloc(1024);
+    defer free(buffer);
+
+    var buffer = buffer[:1024]; // make it a slice
+
+    if !load_from_db(buffer) { return false; } // no leak!
+
+    print_stats(buffer);
+
+    return true;
+}
+```
+## Error handling (or_return and or_else)
+
+`or_return` allows for early returns by simply using the last value as a check.
+If it is a boolean, a false value indicates error. If it is an enum, a non-zero
+variant indicates error.
+
+```yal
+func read_configuration_file() ([]u8, bool) {
+    // ...
+}
+
+def ParseError = enum {
+    Ok,          // the zero value
+    NoError = 0, // two variants can have the same backing value
+    InvalidSintax,
+    DuplicateKey,
+    WrongData,
+    Err,
+};
+
+func parse_configuration(data: []const u8) (Conf, ParseError) {
+    // ...
+}
+
+func check_configuration() (err: ParseError) {
+    // run the code after `or_else` in case the last return value is false
+    var data = read_configuration_file() or_else return .Err;
+    defer if err != .Ok {
+        free(data.ptr);
+    }
+
+    // return the `err` value in case it is non-zero
+    var conf = parse_configuration(data) or_return;
+
+    // ...
+}
+```
+
