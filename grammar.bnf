@@ -50,6 +50,8 @@ assign ::= expr ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "&=" | "^=" | 
 (* Expressions *)
 
 expr           ::= logic_or ;
+
+(* some languages call this tuples, but we don't have tuples, this is used for multiple returns/decls *)
 open_expr_pack ::= expr { "," expr } ;      (* NOTE: no trailing commas here *)
 expr_pack      ::= "(" open_expr_pack ")" ; (* FIXME: allow trailing commas *)
 
