@@ -157,6 +157,26 @@ func main() i32 {
 > the parser level! The typing pass will determine that this is the case when
 > it detects that a function is being indexed.
 
+#### Generic constraints
+
+Generic parameters can have constrains to not only document what the parameter
+expects, but to also create better error messages.
+
+```yal
+// this function receives a type and returns if it is one of i32 or u32.
+func is_int32(T: typeid) bool {
+    // a switch over a type
+    switch T {
+    case i32: return true;
+    case u32: return true;
+    default: return false;
+    }
+}
+
+// any function that receives a type and returns bool can be used as a constraint
+func add[T: is_int32](a: T, b: T) i32 { return a + b; }
+```
+
 ### Multiple returns
 
 Functions can return many values.
