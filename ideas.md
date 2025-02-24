@@ -52,6 +52,10 @@ using uninitialized values.
   - non-nil pointers: no zero value, can't be left uninitialized
   - optional pointers: `nil`
 
+There is one thing that leaves values uninitialized: `malloc`. The memory
+returned by `malloc` (and friends) is not initialized, or initialized to
+literal zeros.
+
 ## Functions
 
 ```yal
