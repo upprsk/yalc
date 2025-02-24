@@ -177,6 +177,8 @@ func is_int32(T: typeid) bool {
 func add[T: is_int32](a: T, b: T) i32 { return a + b; }
 ```
 
+> Interfaces should also be usable as constrains.
+
 ### Multiple returns
 
 Functions can return many values.
@@ -333,6 +335,10 @@ func print_maybe_int(v: ?i32) {
     }
 }
 
+func get_maybe() ?i32 {
+    return 12;
+}
+
 func main() {
     var maybe_int: ?i32 = 12;
     print_maybe_int(maybe_int); // got int: 12
@@ -342,6 +348,10 @@ func main() {
 
     print_maybe_int(42);  // got int: 42
     print_maybe_int(nil); // no int
+
+    if var v = get_maybe(); v != nil {
+        printf("v=%d\n", v.*);
+    }
 }
 ```
 
