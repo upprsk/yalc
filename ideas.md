@@ -47,7 +47,9 @@ using uninitialized values.
 - Integers and floats: the zero-value is `0`
 - `bool`: the zero-value is `false`
 - Enumerations: the first field
-- Structs: the zero-value of every field
+- Structs: the zero-value of every field. When the struct is given an initializer
+  it must not be partial, so either no field is passed and all are defaults, or
+  all required fields are passed.
 - Pointers: There are two variants
   - non-nil pointers: no zero value, can't be left uninitialized
   - optional pointers: `nil`
@@ -77,9 +79,9 @@ func main() i32 {
 
 ### Bound functions
 
-Go-style "methods". These are just normal functions where the first parameter
-is the receiver. This just allows the use dot-syntax for accessing the function
-like a method. Bound functions can be added to any type, even primitives.
+These are just normal functions where the first parameter is the receiver. This
+just allows the use dot-syntax for accessing the function like a method. Bound
+functions can be added to any type, even primitives.
 
 ```yal
 func i32.is_zero(c: i32) bool {
@@ -106,6 +108,18 @@ set to the type it is bound to. This would reduce duplication:
 
 ```yal
 func u32.is_zero(v: Self) -> bool { return v == 0; }
+```
+
+These bound functions are just namespaced on the type and can be called
+normally:
+
+```yal
+func i32.next(i: i32) -> i32 { return i + 1; }
+
+func main() {
+    var a = i32.next(12);
+    var b = a.next();
+}
 ```
 
 This technique could be used to override operators for non-integer values.
@@ -143,7 +157,7 @@ func main() i32 {
 > the parser level! The typing pass will determine that this is the case when
 > it detects that a function is being indexed.
 
-## Multiple returns
+### Multiple returns
 
 Functions can return many values.
 
@@ -180,7 +194,7 @@ func main() i32 {
 }
 ```
 
-## Named return values
+### Named return values
 
 Named return values are a delicate feature. First tried it in [Odin](https://odin-lang.org/)
 with a lot of skepticism, but the feature has a lot of value when used
@@ -217,6 +231,7 @@ func Counter.next(c: *Counter) ?usize {
 }
 
 func main() i32 {
+    // all fields without default values need to passed to initializer.
     var cnt: Counter = .{ .total = 10 };
     while var i = cnt.next(); i != nil {
         printf("i=%zu\n", i.*);
@@ -433,5 +448,70 @@ func check_configuration() (err: ParseError) {
     var conf = parse_configuration(data) or_return;
 
     // ...
+}
+```
+
+## Interfaces
+
+Interfaces offer virtual dispatch using fat-pointers (vtable+data).
+
+```yal
+def Printer = interface {
+    // The first parameter must always have the type of the interface.
+    // Implementations must match the kind (value, pointer, const pointer).
+    func print(self: Printer),
+};
+
+// implementations can receive by value or by pointer.
+func i32.print(self: i32) {
+    printf("i32: %d\n", self.*);
+}
+
+def Person = struct { age: i32 };
+
+// The name of parameters does not need to match, just the type.
+func Person.print(p: Person) {
+    printf("Person{age: %d}\n", p.age);
+}
+
+func main() {
+    var zero = 0;
+    var young: Person = .{ .age = 16 };
+    var old: Person   = .{ .age = 81 };
+
+    // in order to coerce to an interface, we need a pointer.
+    var printables = [_]Person{ &zero, &young, &old };
+    for p in printables {
+        p.print();
+        // Printer.print(p); // also works
+    }
+}
+```
+
+### RTTI
+
+RunTime Type Information allows for tagged use of runtime known values
+(effectively become dynamically typed on demand). RTTI can be added to
+interfaces:
+
+```yal
+// adds type tags to the interface
+def any = interface(tagged) {};
+
+def print_info(v: any) {
+    var info = type_info(any);
+    printf("type=%s, size=%zu\n", info.name, info.size);
+}
+
+def main() {
+    var a: u8 = 0;
+    var b: u16 = 0;
+    var c: u32 = 0;
+    var d: u64 = 0;
+
+    print_info(&a); // type=u8, size=1
+    print_info(&b); // type=u16, size=2
+    print_info(&c); // type=u32, size=4
+    print_info(&d); // type=u64, size=8
 }
 ```
