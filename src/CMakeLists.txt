@@ -1,4 +1,6 @@
 add_library(yal
+    ast.cpp
+    ast.hpp
     error_reporter.cpp
     error_reporter.hpp
     span.cpp

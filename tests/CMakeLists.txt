@@ -1,4 +1,7 @@
-set(TEST_FILES tokenizer.cpp)
+set(TEST_FILES
+  tokenizer.cpp
+  ast.cpp
+)
 
 add_executable(tests ${TEST_FILES})
 target_link_libraries(tests yal Catch2::Catch2WithMain)
