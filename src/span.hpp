@@ -1,0 +1,41 @@
+#pragma once
+
+#include <cstdint>
+#include <string_view>
+
+#include "fmt/base.h"
+
+namespace yal {
+
+struct Span {
+    uint32_t begin;
+    uint32_t end;
+
+    [[nodiscard]] constexpr auto size() const -> uint32_t {
+        return end - begin;
+    }
+
+    [[nodiscard]] constexpr auto str(std::string_view source) const
+        -> std::string_view {
+        return source.substr(begin, size());
+    }
+
+    [[nodiscard]] constexpr auto extend(Span o) const -> Span {
+        return {.begin = begin, .end = o.end};
+    }
+
+    constexpr auto operator==(Span const& o) const -> bool = default;
+};
+
+}  // namespace yal
+
+template <>
+struct fmt::formatter<yal::Span> {
+    constexpr auto parse(format_parse_context& ctx)
+        -> format_parse_context::iterator {
+        return ctx.begin();
+    }
+
+    auto format(yal::Span s, format_context& ctx) const
+        -> format_context::iterator;
+};
