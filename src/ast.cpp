@@ -27,6 +27,7 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
     switch (n) {
         case yal::NodeKind::Err: name = "Err"; break;
         case yal::NodeKind::Nil: name = "Nil"; break;
+        case yal::NodeKind::File: name = "File"; break;
     }
 
     return formatter<string_view>::format(name, ctx);

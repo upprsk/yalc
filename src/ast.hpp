@@ -15,6 +15,10 @@ namespace yal {
 // points to an array.
 struct NodeHandle {
     constexpr NodeHandle(uint32_t idx = 0xFFFF'FFFF) : idx{idx} {}
+    constexpr auto operator=(NodeHandle const&) -> NodeHandle& = default;
+    constexpr auto operator=(NodeHandle&&) -> NodeHandle& = default;
+    constexpr NodeHandle(NodeHandle&& o) = default;
+    constexpr NodeHandle(NodeHandle const& o) = default;
 
     static constexpr auto from_idx(size_t idx) -> NodeHandle {
         return {static_cast<uint32_t>(idx)};
@@ -22,6 +26,10 @@ struct NodeHandle {
 
     [[nodiscard]] constexpr auto as_idx() const -> uint32_t {
         return idx & 0x3FFF'FFFF;
+    }
+
+    [[nodiscard]] constexpr auto as_count() const -> uint32_t {
+        return as_idx();
     }
 
     // check that this handle has not been invalidated
@@ -53,13 +61,22 @@ private:
 enum class NodeKind : uint16_t {
     Err,
     Nil,
+    File,
 };
 
 struct Node {
-    NodeKind   kind = NodeKind::Err;
-    uint16_t   free_space;
+    NodeKind kind = NodeKind::Err;
+    // uint16_t   free_space;
     NodeHandle first;
     NodeHandle second;
+
+    [[nodiscard]] constexpr auto children() const -> NodeHandle {
+        return first;
+    }
+
+    [[nodiscard]] constexpr auto count() const -> uint32_t {
+        return second.as_count();
+    }
 };
 
 struct Ast {
@@ -69,6 +86,12 @@ struct Ast {
 
     [[nodiscard]] auto new_node_nil() -> NodeHandle {
         return new_node(NodeKind::Nil).second;
+    }
+
+    [[nodiscard]] auto new_node_file(std::span<NodeHandle const> children)
+        -> NodeHandle {
+        return new_node(NodeKind::File, new_array(children), children.size())
+            .second;
     }
 
     [[nodiscard]] auto new_node(auto&&... args)
@@ -86,6 +109,21 @@ struct Ast {
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
 
         return NodeHandle::from_idx(sz).to_array();
+    }
+
+    [[nodiscard]] constexpr auto get_children(NodeHandle h) const
+        -> std::span<NodeHandle const> {
+        return get_children(get(h));
+    }
+
+    [[nodiscard]] constexpr auto get_children(Node const* h) const
+        -> std::span<NodeHandle const> {
+        return get_children(*h);
+    }
+
+    [[nodiscard]] constexpr auto get_children(Node const& h) const
+        -> std::span<NodeHandle const> {
+        return get_array(h.children(), h.count());
     }
 
     // Get a reference to a node from it's handle. The pointer is invalid after
