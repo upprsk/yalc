@@ -26,13 +26,16 @@ include(FetchContent)
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        11.1.3)
+  GIT_TAG        11.1.3
+  GIT_SHALLOW    Yes
+)
 FetchContent_MakeAvailable(fmt)
 
 FetchContent_Declare(
   cpptrace
   GIT_REPOSITORY https://github.com/jeremy-rifkin/cpptrace.git
   GIT_TAG        v0.7.5
+  GIT_SHALLOW    Yes
 )
 FetchContent_MakeAvailable(cpptrace)
 
@@ -40,6 +43,7 @@ FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
   GIT_TAG        v3.4.0 # or a later release
+  GIT_SHALLOW    Yes
 )
 FetchContent_MakeAvailable(Catch2)
 

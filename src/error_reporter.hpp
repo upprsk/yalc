@@ -27,13 +27,21 @@ public:
 
     template <typename... T>
     void report_error(Span s, fmt::format_string<T...> fmt, T&&... args) {
+        vreport_error(s, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_error(Span s, fmt::string_view fmt, fmt::format_args args) {
         error_count++;
-        report(s, "error", error_style, fmt, fmt::make_format_args(args...));
+        report(s, "error", error_style, fmt, args);
     }
 
     template <typename... T>
     void report_note(Span s, fmt::format_string<T...> fmt, T&&... args) {
-        report(s, "note", note_style, fmt, fmt::make_format_args(args...));
+        vreport_note(s, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_note(Span s, fmt::string_view fmt, fmt::format_args args) {
+        report(s, "note", note_style, fmt, args);
     }
 
     template <typename... T>

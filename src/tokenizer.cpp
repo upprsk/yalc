@@ -99,6 +99,9 @@ struct Tokenizer {
             case '!':
                 if (match('=')) return mkt(TokenType::BangEqual);
                 return mkt(TokenType::Bang);
+            case '%':
+                if (match('=')) return mkt(TokenType::PercentEqual);
+                return mkt(TokenType::Percent);
             case '&':
                 if (match('=')) return mkt(TokenType::AmpersandEqual);
                 return mkt(TokenType::Ampersand);
@@ -119,6 +122,7 @@ struct Tokenizer {
                 if (match('=')) return mkt(TokenType::DotEqual);
                 if (match('*')) return mkt(TokenType::DotStar);
                 return mkt(TokenType::Dot);
+            case '?': return mkt(TokenType::Question);
             case '(': return mkt(TokenType::Lparen);
             case ')': return mkt(TokenType::Rparen);
             case '{': return mkt(TokenType::Lbrace);
@@ -246,6 +250,8 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::SlashEqual: name = "SlashEqual"; break;
         case yal::TokenType::Bang: name = "Bang"; break;
         case yal::TokenType::BangEqual: name = "BangEqual"; break;
+        case yal::TokenType::Percent: name = "Percent"; break;
+        case yal::TokenType::PercentEqual: name = "PercentEqual"; break;
         case yal::TokenType::Ampersand: name = "Ampersand"; break;
         case yal::TokenType::AmpersandEqual: name = "AmpersandEqual"; break;
         case yal::TokenType::Pipe: name = "Pipe"; break;
@@ -261,6 +267,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::DotDot: name = "DotDot"; break;
         case yal::TokenType::DotStar: name = "DotStar"; break;
         case yal::TokenType::DotEqual: name = "DotEqual"; break;
+        case yal::TokenType::Question: name = "Question"; break;
         case yal::TokenType::Lparen: name = "Lparen"; break;
         case yal::TokenType::Rparen: name = "Rparen"; break;
         case yal::TokenType::Lbrace: name = "Lbrace"; break;

@@ -3,6 +3,8 @@
 
 #include "error_reporter.hpp"
 #include "fmt/base.h"
+#include "fmt/ranges.h"
+#include "parser.hpp"
 #include "tokenizer.hpp"
 
 auto read_entire_file(std::string const& path) -> std::optional<std::string> {
@@ -36,7 +38,13 @@ auto main(int argc, char** argv) -> int {
         return 1;
     }
 
-    fmt::println("{}", *contents);
+    auto er = yal::ErrorReporter{*contents, argv[1]};
+    auto tokens = yal::tokenize(*contents, er);
+    fmt::println("{}", tokens);
+
+    auto [ast, root] = yal::parse(tokens, *contents, er);
+
+    fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
 
     return 0;
 }

@@ -71,15 +71,15 @@ expr           ::= logic_or ;
 open_expr_pack ::= expr { "," expr } ;      (* NOTE: no trailing commas here *)
 expr_pack      ::= "(" open_expr_pack ")" ; (* FIXME: allow trailing commas *)
 
-logic_or  ::= logic_and { "||" logic_and } ;
-logic_and ::= bin_or { "&&" bin_or } ;
+logic_or  ::= logic_and { "or" logic_and } ;
+logic_and ::= bin_or { "and" bin_or } ;
 
 bin_or  ::= bin_xor { "|" bin_xor } ;
 bin_xor ::= bin_and { "^" bin_and } ;
 bin_and ::= equality { "&" equality } ;
 
 equality   ::= comparison { ( "!=" | "==" ) comparison } ;
-comparison ::= shift { ( ">" | "=>" | "<=" | "<" ) shift } ;
+comparison ::= shift { ( ">" | ">=" | "<=" | "<" ) shift } ;
 shift      ::= term { ( "<<" | ">>" ) term } ;
 term       ::= factor { ( "+" | "-" ) factor } ;
 factor     ::= cast { ( "*" | "/" | "%" ) cast } ;
@@ -129,4 +129,4 @@ struct_field ::= ID ":" expr [ "=" expr ] ;
 enum_type  ::= "enum" [ "of" expr ] "{" [ enum_field { "," enum_field } ] "}" ;
 enum_field ::= ID [ "=" expr ] ;
 
-number  ::= INT | HEX | OCT | BIN | FLOAT ;
+number ::= INT | HEX | OCT | BIN | FLOAT ;

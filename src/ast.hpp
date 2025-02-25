@@ -60,19 +60,46 @@ private:
     uint32_t idx;
 };
 
+// "!" | "+" | "-" | "~" | "&" | "?"
 enum class NodeKind : uint16_t {
     Err,
     Nil,
     File,
+    LogicOr,
+    LogicAnd,
+    BinOr,
+    BinXor,
+    BinAnd,
+    Equal,
+    NotEqual,
+    Greater,
+    GreaterEqual,
+    Smaller,
+    SmallerEqual,
+    ShftLeft,
+    ShftRight,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    AddrOf,
+    LogicNot,
+    BinNot,
+    Plus,
+    Neg,
+    Optional,
+    Deref,
     Int,
+    Id,
 };
 
 struct Node {
-    NodeKind                               kind = NodeKind::Err;
-    std::variant<std::monostate, uint64_t> value;
-    Span                                   span;
-    NodeHandle                             first;
-    NodeHandle                             second;
+    NodeKind                                            kind = NodeKind::Err;
+    Span                                                span;
+    NodeHandle                                          first;
+    NodeHandle                                          second;
+    std::variant<std::monostate, std::string, uint64_t> value;
 
     [[nodiscard]] constexpr auto children() const -> NodeHandle {
         return first;
@@ -81,27 +108,68 @@ struct Node {
     [[nodiscard]] constexpr auto count() const -> uint32_t {
         return second.as_count();
     }
+
+    [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
+        return std::get<uint64_t>(value);
+    }
+
+    [[nodiscard]] constexpr auto value_string() const -> std::string const& {
+        return std::get<std::string>(value);
+    }
+};
+
+struct Ast;
+
+struct FatNodeHandle {
+    Ast const* ast;
+    NodeHandle node;
 };
 
 struct Ast {
     [[nodiscard]] auto new_node_err(Span span) -> NodeHandle {
-        return new_node(NodeKind::Err, std::monostate{}, span).second;
+        return new_node(NodeKind::Err, span).second;
     }
 
     [[nodiscard]] auto new_node_nil(Span span) -> NodeHandle {
-        return new_node(NodeKind::Nil, std::monostate{}, span).second;
-    }
-
-    [[nodiscard]] auto new_node_int(Span span, uint64_t v) -> NodeHandle {
-        return new_node(NodeKind::Nil, v, span).second;
+        return new_node(NodeKind::Nil, span).second;
     }
 
     [[nodiscard]] auto new_node_file(Span const&                 span,
                                      std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::File, std::monostate{}, span,
-                        new_array(children), children.size())
+        return new_node(NodeKind::File, span, new_array(children),
+                        children.size())
             .second;
+    }
+
+    [[nodiscard]] auto new_node_logic_or(Span span, NodeHandle lhs,
+                                         NodeHandle rhs) -> NodeHandle {
+        return new_node_binary(NodeKind::LogicOr, span, lhs, rhs);
+    }
+
+    [[nodiscard]] auto new_node_logic_and(Span span, NodeHandle lhs,
+                                          NodeHandle rhs) -> NodeHandle {
+        return new_node_binary(NodeKind::LogicAnd, span, lhs, rhs);
+    }
+
+    [[nodiscard]] auto new_node_int(Span span, uint64_t v) -> NodeHandle {
+        return new_node(NodeKind::Int, span, NodeHandle{}, NodeHandle{}, v)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_id(Span span, std::string v) -> NodeHandle {
+        return new_node(NodeKind::Id, span, NodeHandle{}, NodeHandle{}, v)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_binary(NodeKind kind, Span span, NodeHandle lhs,
+                                       NodeHandle rhs) -> NodeHandle {
+        return new_node(kind, span, lhs, rhs).second;
+    }
+
+    [[nodiscard]] auto new_node_unary(NodeKind kind, Span span, NodeHandle lhs)
+        -> NodeHandle {
+        return new_node(kind, span, lhs).second;
     }
 
     [[nodiscard]] auto new_node(auto&&... args)
@@ -162,6 +230,10 @@ struct Ast {
         return s.subspan(h.as_idx(), count);
     }
 
+    [[nodiscard]] constexpr auto fatten(NodeHandle h) const -> FatNodeHandle {
+        return {.ast = this, .node = h};
+    }
+
     // get the total number of nodes
     [[nodiscard]] constexpr auto size() const -> size_t { return nodes.size(); }
 
@@ -169,6 +241,9 @@ struct Ast {
     [[nodiscard]] constexpr auto refs_size() const -> size_t {
         return node_refs.size();
     }
+
+    auto dump(fmt::format_context& ctx, NodeHandle n) const
+        -> fmt::format_context::iterator;
 
 private:
     std::vector<Node>       nodes;
@@ -202,5 +277,16 @@ struct fmt::formatter<yal::Node> {
     }
 
     auto format(yal::Node n, format_context& ctx) const
+        -> format_context::iterator;
+};
+
+template <>
+struct fmt::formatter<yal::FatNodeHandle> {
+    constexpr auto parse(format_parse_context& ctx)
+        -> format_parse_context::iterator {
+        return ctx.begin();
+    }
+
+    auto format(yal::FatNodeHandle n, format_context& ctx) const
         -> format_context::iterator;
 };

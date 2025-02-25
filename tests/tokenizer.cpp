@@ -241,7 +241,7 @@ TEST_CASE("symbols", "[tokenizer]") {
     }
 
     SECTION("assignment") {
-        auto source = R"~~( = += -= *= /= >>= <<= &= |= ^= ~= )~~";
+        auto source = R"~~( = += -= *= /= >>= <<= &= |= ^= ~= %= )~~";
         auto path = ":memory:";
 
         auto er = ErrorReporter{source, path, devnull};
@@ -259,7 +259,8 @@ TEST_CASE("symbols", "[tokenizer]") {
             {          TokenType::PipeEqual, {26, 28}},
             {        TokenType::CarrotEqual, {29, 31}},
             {         TokenType::TildeEqual, {32, 34}},
-            {                TokenType::Eof, {35, 35}}
+            {       TokenType::PercentEqual, {35, 37}},
+            {                TokenType::Eof, {38, 38}}
         };
 
         CHECK_FALSE(er.had_error());
@@ -267,7 +268,7 @@ TEST_CASE("symbols", "[tokenizer]") {
     }
 
     SECTION("arithmetic and bitwise") {
-        auto source = R"~~( + ++ - -- * ** / & | ^ ~ << >> )~~";
+        auto source = R"~~( + ++ - -- * ** / % & | ^ ~ << >> )~~";
         auto path = ":memory:";
 
         auto er = ErrorReporter{source, path, devnull};
@@ -281,13 +282,14 @@ TEST_CASE("symbols", "[tokenizer]") {
             {          TokenType::Star, {11, 12}},
             {      TokenType::StarStar, {13, 15}},
             {         TokenType::Slash, {16, 17}},
-            {     TokenType::Ampersand, {18, 19}},
-            {          TokenType::Pipe, {20, 21}},
-            {        TokenType::Carrot, {22, 23}},
-            {         TokenType::Tilde, {24, 25}},
-            {      TokenType::LessLess, {26, 28}},
-            {TokenType::GreaterGreater, {29, 31}},
-            {           TokenType::Eof, {32, 32}}
+            {       TokenType::Percent, {18, 19}},
+            {     TokenType::Ampersand, {20, 21}},
+            {          TokenType::Pipe, {22, 23}},
+            {        TokenType::Carrot, {24, 25}},
+            {         TokenType::Tilde, {26, 27}},
+            {      TokenType::LessLess, {28, 30}},
+            {TokenType::GreaterGreater, {31, 33}},
+            {           TokenType::Eof, {34, 34}}
         };
 
         CHECK_FALSE(er.had_error());
@@ -365,6 +367,7 @@ TEST_CASE("print array", "[tokenizer]") {
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
 
+    // FIXME: missing % and %=
     auto source =
         R"~~(= == => < << <<= <= > >> >= >>= + ++ += - -- -= * ** *= / /= ! != & &= | |= ^ ^= ~ ~= ; : , . .. .* .= (){}[] id 12345_67890 0xDEAD_BEEF_0000_EEEF "a string the contains $" // commenting!)~~";
     auto path = ":memory:";

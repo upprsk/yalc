@@ -34,6 +34,8 @@ enum class TokenType : uint8_t {
     SlashEqual,
     Bang,
     BangEqual,
+    Percent,
+    PercentEqual,
     Ampersand,
     AmpersandEqual,
     Pipe,
@@ -49,6 +51,7 @@ enum class TokenType : uint8_t {
     DotDot,
     DotStar,
     DotEqual,
+    Question,
     Lparen,
     Rparen,
     Lbrace,
@@ -73,6 +76,23 @@ struct Token {
 
     [[nodiscard]] constexpr auto is_int() const -> bool {
         return type == TokenType::Int;
+    }
+
+    [[nodiscard]] constexpr auto is_hex() const -> bool {
+        return type == TokenType::Hex;
+    }
+
+    [[nodiscard]] constexpr auto is_comment() const -> bool {
+        return type == TokenType::Comment;
+    }
+
+    [[nodiscard]] constexpr auto is_id() const -> bool {
+        return type == TokenType::Id;
+    }
+
+    [[nodiscard]] constexpr auto is_kw(std::string_view src,
+                                       std::string_view kw) const -> bool {
+        return is_id() && span.str(src) == kw;
     }
 
     constexpr auto operator==(Token const& o) const -> bool = default;
