@@ -66,7 +66,7 @@ TEST_CASE("creating nodes", "[ast]") {
     }
 
     SECTION("create err node") {
-        auto hdl = ast.new_node_err();
+        auto hdl = ast.new_node_err({});
         REQUIRE(hdl.is_valid());
         REQUIRE(hdl.value() == 0);
         REQUIRE_FALSE(hdl.is_array());
@@ -77,7 +77,7 @@ TEST_CASE("creating nodes", "[ast]") {
     }
 
     SECTION("create nil node") {
-        auto hdl = ast.new_node_nil();
+        auto hdl = ast.new_node_nil({});
         REQUIRE(hdl.is_valid());
         REQUIRE(hdl.value() == 0);
         REQUIRE_FALSE(hdl.is_array());
@@ -89,7 +89,7 @@ TEST_CASE("creating nodes", "[ast]") {
 
     SECTION("create file node") {
         SECTION("empty file node") {
-            auto hdl = ast.new_node_file({});
+            auto hdl = ast.new_node_file({}, {});
             REQUIRE(hdl.is_valid());
             REQUIRE(hdl.value() == 0);
             REQUIRE_FALSE(hdl.is_array());
@@ -107,8 +107,8 @@ TEST_CASE("creating nodes", "[ast]") {
         }
 
         SECTION("file node with single nil child") {
-            std::array top_children{ast.new_node_nil()};
-            auto       hdl = ast.new_node_file(top_children);
+            std::array top_children{ast.new_node_nil({})};
+            auto       hdl = ast.new_node_file({}, top_children);
             REQUIRE(hdl.is_valid());
             REQUIRE(hdl.value() == 1);
             REQUIRE_FALSE(hdl.is_array());
@@ -129,8 +129,8 @@ TEST_CASE("creating nodes", "[ast]") {
         }
 
         SECTION("access file node not as array") {
-            std::array top_children{ast.new_node_nil()};
-            auto       hdl = ast.new_node_file(top_children);
+            std::array top_children{ast.new_node_nil({})};
+            auto       hdl = ast.new_node_file({}, top_children);
             REQUIRE(hdl.is_valid());
             REQUIRE(hdl.value() == 1);
             REQUIRE_FALSE(hdl.is_array());

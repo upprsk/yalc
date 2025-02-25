@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <span>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "fmt/format.h"
+#include "span.hpp"
 
 namespace yal {
 
@@ -62,13 +64,15 @@ enum class NodeKind : uint16_t {
     Err,
     Nil,
     File,
+    Int,
 };
 
 struct Node {
-    NodeKind kind = NodeKind::Err;
-    // uint16_t   free_space;
-    NodeHandle first;
-    NodeHandle second;
+    NodeKind                               kind = NodeKind::Err;
+    std::variant<std::monostate, uint64_t> value;
+    Span                                   span;
+    NodeHandle                             first;
+    NodeHandle                             second;
 
     [[nodiscard]] constexpr auto children() const -> NodeHandle {
         return first;
@@ -80,17 +84,23 @@ struct Node {
 };
 
 struct Ast {
-    [[nodiscard]] auto new_node_err() -> NodeHandle {
-        return new_node(NodeKind::Err).second;
+    [[nodiscard]] auto new_node_err(Span span) -> NodeHandle {
+        return new_node(NodeKind::Err, std::monostate{}, span).second;
     }
 
-    [[nodiscard]] auto new_node_nil() -> NodeHandle {
-        return new_node(NodeKind::Nil).second;
+    [[nodiscard]] auto new_node_nil(Span span) -> NodeHandle {
+        return new_node(NodeKind::Nil, std::monostate{}, span).second;
     }
 
-    [[nodiscard]] auto new_node_file(std::span<NodeHandle const> children)
+    [[nodiscard]] auto new_node_int(Span span, uint64_t v) -> NodeHandle {
+        return new_node(NodeKind::Nil, v, span).second;
+    }
+
+    [[nodiscard]] auto new_node_file(Span const&                 span,
+                                     std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::File, new_array(children), children.size())
+        return new_node(NodeKind::File, std::monostate{}, span,
+                        new_array(children), children.size())
             .second;
     }
 

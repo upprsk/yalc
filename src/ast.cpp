@@ -35,6 +35,6 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
 
 auto fmt::formatter<yal::Node>::format(yal::Node n, format_context& ctx) const
     -> format_context::iterator {
-    return fmt::format_to(ctx.out(), "{{{}, {}, {}}}", n.kind, n.first,
+    return fmt::format_to(ctx.out(), "{{{}, {}, {}}}", n.kind, n.span, n.first,
                           n.second);
 }

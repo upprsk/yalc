@@ -71,6 +71,10 @@ struct Token {
         return type == TokenType::Eof;
     }
 
+    [[nodiscard]] constexpr auto is_int() const -> bool {
+        return type == TokenType::Int;
+    }
+
     constexpr auto operator==(Token const& o) const -> bool = default;
 };
 
