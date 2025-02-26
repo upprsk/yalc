@@ -76,6 +76,16 @@ struct Parser {
         return false;
     }
 
+    [[nodiscard]] constexpr auto consume_kw(std::string_view tt) -> bool {
+        if (match_kw(tt)) return true;
+
+        er->report_error(span(), "expected '{}', but got '{}'", tt,
+                         span().str(source));
+        advance();
+
+        return false;
+    }
+
     [[nodiscard]] constexpr auto consume_impl(TokenType        tt,
                                               fmt::string_view fmt,
                                               fmt::format_args args) -> bool {
@@ -179,16 +189,6 @@ struct Parser {
                                  body);
     }
 
-    auto parse_def_decl() -> NodeHandle {
-        er->report_bug(span(), "def_decl not implemented");
-        return ast.new_node_err(span());
-    }
-
-    auto parse_var_decl() -> NodeHandle {
-        er->report_bug(span(), "var_decl not implemented");
-        return ast.new_node_err(span());
-    }
-
     auto parse_import() -> NodeHandle {
         er->report_bug(span(), "import not implemented");
         return ast.new_node_err(span());
@@ -210,13 +210,66 @@ struct Parser {
     //        | defer
     //        ;
     auto parse_stmt() -> NodeHandle {
-        // TODO: other cases
+        if (check_kw("return")) return parse_return_stmt();
+        if (check_kw("if")) return parse_if_stmt();
+        if (match_kw("var")) return parse_var_decl();
+        if (match_kw("def")) return parse_def_decl();
 
         auto expr = parse_expr();
         try(consume(TokenType::Semi));
 
         return ast.new_node_unary(
             NodeKind::ExprStmt, ast.get(expr)->span.extend(prev_span()), expr);
+    }
+
+    // return_stmt ::= "return" [ open_expr_pack ] ";" ;
+    auto parse_return_stmt() -> NodeHandle {
+        auto s = span();
+        try(consume_kw("return"));
+
+        auto expr = ast.new_node_nil(prev_span());
+        if (!check(TokenType::Semi)) expr = parse_open_expr_pack();
+
+        try(consume(TokenType::Semi));
+
+        return ast.new_node_unary(NodeKind::ReturnStmt,
+                                  s.extend(ast.get(expr)->span), expr);
+    }
+
+    // if_stmt ::= "if" expr block [ "else" expr ]
+    //           | "if" var_decl expr block
+    //           ;
+    auto parse_if_stmt() -> NodeHandle {
+        auto s = span();
+        try(consume_kw("if"));
+
+        if (match_kw("var")) {
+            auto decl = parse_var_decl();
+            auto cond = parse_expr();
+            auto wt = parse_block();
+
+            if (match_kw("else")) {
+                auto wf = parse_block();
+
+                return ast.new_node_if_with_decl_and_else(
+                    s.extend(ast.get(wf)->span), decl, cond, wt, wf);
+            }
+
+            return ast.new_node_if_with_decl(s.extend(ast.get(wt)->span), decl,
+                                             cond, wt);
+        }
+
+        auto cond = parse_expr();
+        auto wt = parse_block();
+
+        if (match_kw("else")) {
+            auto wf = parse_block();
+
+            return ast.new_node_if_with_else(s.extend(ast.get(wf)->span), cond,
+                                             wt, wf);
+        }
+
+        return ast.new_node_if(s.extend(ast.get(wt)->span), cond, wt);
     }
 
     // block ::= "{" { stmt } "}" ;
@@ -234,6 +287,61 @@ struct Parser {
         try(consume(TokenType::Rbrace));
 
         return ast.new_node_block(s.extend(prev_span()), children);
+    }
+
+    // var_decl ::= "var" id_pack [ ":" expr ] "=" expr ";"
+    //            | "var" id_pack ":" expr [ "=" expr ] ";"
+    //            ;
+    auto parse_var_decl() -> NodeHandle {
+        auto s = prev_span();
+        auto ids = parse_id_pack();
+
+        if (match(TokenType::Colon)) {
+            // has type annotation
+            auto type = parse_expr();
+
+            auto init = ast.new_node_nil(span());
+            if (match(TokenType::Equal)) init = parse_expr();
+
+            try(consume(TokenType::Semi));
+
+            auto span = s.extend(prev_span());
+            return ast.new_node_var_decl(span, ids, type, init);
+        }
+
+        try(consume(TokenType::Equal));
+        auto init = parse_expr();
+
+        try(consume(TokenType::Semi));
+
+        auto span = s.extend(prev_span());
+        return ast.new_node_var_decl(span, ids, ast.new_node_nil(prev_span()),
+                                     init);
+    }
+
+    // def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";"
+    //            | "def" id_pack ":" expr [ "=" expr ] ";"
+    //            ;
+    auto parse_def_decl() -> NodeHandle {
+        throw std::runtime_error{"not implemented"};
+    }
+
+    auto parse_id_pack() -> NodeHandle {
+        std::vector<NodeHandle> ids;
+
+        do {
+            try(consume(TokenType::Id));
+            auto id = ast.new_node_id(prev_span(),
+                                      std::string{prev_span().str(source)});
+            ids.push_back(id);
+        } while (match(TokenType::Comma));
+
+        auto end = ast.get(ids.at(ids.size() - 1))->span;
+        auto span = ast.get(ids.at(0))->span.extend(end);
+
+        if (ids.size() == 1) return ids.at(0);
+
+        return ast.new_node_expr_pack(span, ids);
     }
 
     // ------------------------------------------------------------------------
@@ -649,6 +757,20 @@ struct Parser {
 
         er->report_error(t.span, "expected number, got {}", t.type);
         return ast.new_node_err(t.span);
+    }
+
+    auto parse_open_expr_pack() -> NodeHandle {
+        std::vector<NodeHandle> items;
+
+        do {
+            items.push_back(parse_expr());
+        } while (match(TokenType::Comma));
+
+        // items can not be empty because of do-while
+        auto end = ast.get(items.at(items.size() - 1))->span;
+        auto span = ast.get(items.at(0))->span.extend(end);
+
+        return ast.new_node_expr_pack(span, items);
     }
 
     // ------------------------------------------------------------------------

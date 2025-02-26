@@ -66,7 +66,15 @@ enum class NodeKind : uint16_t {
     File,
     Func,
     Block,
+    VarDecl,
+    DefDecl,
     ExprStmt,
+    ReturnStmt,
+    IfStmt,
+    IfStmtWithElse,
+    IfStmtWithDecl,
+    IfStmtWithDeclAndElse,
+    WhileStmt,
     LogicOr,
     LogicAnd,
     BinOr,
@@ -103,6 +111,8 @@ enum class NodeKind : uint16_t {
     Id,
 };
 
+struct Ast;
+
 struct Node {
     NodeKind                                            kind = NodeKind::Err;
     Span                                                span;
@@ -125,9 +135,38 @@ struct Node {
     [[nodiscard]] constexpr auto value_string() const -> std::string const& {
         return std::get<std::string>(value);
     }
-};
 
-struct Ast;
+    struct NodeFunc {
+        NodeHandle                  name;
+        NodeHandle                  ret;
+        NodeHandle                  body;
+        std::span<NodeHandle const> args;
+    };
+
+    struct NodeCall {
+        NodeHandle                  callee;
+        std::span<NodeHandle const> args;
+    };
+
+    struct NodeIfStmt {
+        NodeHandle decl;
+        NodeHandle cond;
+        NodeHandle when_true;
+        NodeHandle when_false;
+    };
+
+    struct NodeVarDecl {
+        NodeHandle ids;
+        NodeHandle type;
+        NodeHandle init;
+    };
+
+    [[nodiscard]] constexpr auto as_func(Ast const& ast) const -> NodeFunc;
+    [[nodiscard]] constexpr auto as_call(Ast const& ast) const -> NodeCall;
+    [[nodiscard]] constexpr auto as_ifstmt(Ast const& ast) const -> NodeIfStmt;
+    [[nodiscard]] constexpr auto as_var_decl(Ast const& ast) const
+        -> NodeVarDecl;
+};
 
 struct FatNodeHandle {
     Ast const* ast;
@@ -207,6 +246,35 @@ struct Ast {
             .second;
     }
 
+    [[nodiscard]] auto new_node_if(Span span, NodeHandle cond, NodeHandle wt)
+        -> NodeHandle {
+        return new_node(NodeKind::IfStmt, span, cond, wt).second;
+    }
+
+    [[nodiscard]] auto new_node_if_with_else(Span span, NodeHandle cond,
+                                             NodeHandle wt, NodeHandle wf)
+        -> NodeHandle {
+        return new_node(NodeKind::IfStmtWithElse, span, cond,
+                        new_array_of_two(wt, wf))
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_if_with_decl(Span span, NodeHandle decl,
+                                             NodeHandle cond, NodeHandle wt)
+        -> NodeHandle {
+        return new_node(NodeKind::IfStmtWithDecl, span, cond,
+                        new_array_of_two(decl, wt))
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_if_with_decl_and_else(
+        Span span, NodeHandle decl, NodeHandle cond, NodeHandle wt,
+        NodeHandle wf) -> NodeHandle {
+        return new_node(NodeKind::IfStmtWithDeclAndElse, span, cond,
+                        new_array_of_three(decl, wt, wf))
+            .second;
+    }
+
     [[nodiscard]] auto new_node_binary(NodeKind kind, Span span, NodeHandle lhs,
                                        NodeHandle rhs) -> NodeHandle {
         return new_node(kind, span, lhs, rhs).second;
@@ -215,6 +283,24 @@ struct Ast {
     [[nodiscard]] auto new_node_unary(NodeKind kind, Span span, NodeHandle lhs)
         -> NodeHandle {
         return new_node(kind, span, lhs).second;
+    }
+
+    [[nodiscard]] auto new_node_var_decl(Span span, NodeHandle ids,
+                                         NodeHandle type, NodeHandle init)
+        -> NodeHandle {
+        return new_node_decl(NodeKind::VarDecl, span, ids, type, init);
+    }
+
+    [[nodiscard]] auto new_node_def_decl(Span span, NodeHandle ids,
+                                         NodeHandle type, NodeHandle init)
+        -> NodeHandle {
+        return new_node_decl(NodeKind::DefDecl, span, ids, type, init);
+    }
+
+    [[nodiscard]] auto new_node_decl(NodeKind kind, Span span, NodeHandle ids,
+                                     NodeHandle type, NodeHandle init)
+        -> NodeHandle {
+        return new_node(kind, span, ids, new_array_of_two(type, init)).second;
     }
 
     [[nodiscard]] auto new_node(auto&&... args)
@@ -240,6 +326,25 @@ struct Ast {
         auto sz = node_refs.size();
         node_refs.push_back(first);
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
+
+        return NodeHandle::from_idx(sz).to_array();
+    }
+
+    [[nodiscard]] auto new_array_of_two(NodeHandle first, NodeHandle second)
+        -> NodeHandle {
+        auto sz = node_refs.size();
+        node_refs.push_back(first);
+        node_refs.push_back(second);
+
+        return NodeHandle::from_idx(sz).to_array();
+    }
+
+    [[nodiscard]] auto new_array_of_three(NodeHandle first, NodeHandle second,
+                                          NodeHandle third) -> NodeHandle {
+        auto sz = node_refs.size();
+        node_refs.push_back(first);
+        node_refs.push_back(second);
+        node_refs.push_back(third);
 
         return NodeHandle::from_idx(sz).to_array();
     }
@@ -358,3 +463,99 @@ struct fmt::formatter<yal::FatNodeHandle> {
     auto format(yal::FatNodeHandle n, format_context& ctx) const
         -> format_context::iterator;
 };
+
+namespace yal {
+
+constexpr auto Node::as_func(Ast const& ast) const -> NodeFunc {
+    if (kind != NodeKind::Func)
+        throw fmt::system_error(6, "invalid node kind for `as_func`: {}", kind);
+
+    auto children = ast.get_children(this);
+    if (children.size() < 3)
+        throw fmt::system_error(
+            6, "invalid number of children for func: {} < 3", children.size());
+
+    return {
+        .name = children[0],
+        .ret = children[1],
+        .body = children[2],
+        .args = children.subspan(3),
+    };
+}
+
+constexpr auto Node::as_call(Ast const& ast) const -> NodeCall {
+    if (kind != NodeKind::Call)
+        throw fmt::system_error(6, "invalid node kind for `as_call`: {}", kind);
+
+    auto children = ast.get_children(this);
+    if (children.size() < 1)
+        throw fmt::system_error(
+            6, "invalid number of children for call: {} < 1", children.size());
+
+    return {
+        .callee = children[0],
+        .args = children.subspan(1),
+    };
+}
+
+constexpr auto Node::as_ifstmt(Ast const& ast) const -> NodeIfStmt {
+    if (kind == NodeKind::IfStmt) {
+        return {
+            .decl = {},
+            .cond = first,
+            .when_true = second,
+            .when_false = {},
+        };
+    }
+
+    if (kind == NodeKind::IfStmtWithElse) {
+        auto children = ast.get_array(second, 2);
+
+        return {
+            .decl = {},
+            .cond = first,
+            .when_true = children[0],
+            .when_false = children[1],
+        };
+    }
+
+    if (kind == NodeKind::IfStmtWithDecl) {
+        auto children = ast.get_array(second, 2);
+
+        return {
+            .decl = children[0],
+            .cond = first,
+            .when_true = children[1],
+            .when_false = {},
+        };
+    }
+
+    if (kind == NodeKind::IfStmtWithDeclAndElse) {
+        auto children = ast.get_array(second, 3);
+
+        return {
+            .decl = children[0],
+            .cond = first,
+            .when_true = children[1],
+            .when_false = children[2],
+        };
+    }
+
+    throw fmt::system_error(6, "invalid node kind for `as_ifstmt`: {}", kind);
+}
+
+constexpr auto Node::as_var_decl(Ast const& ast) const -> NodeVarDecl {
+    if (kind != NodeKind::VarDecl && kind != NodeKind::DefDecl)
+        throw fmt::system_error(6, "invalid node kind for `as_var_decl`: {}",
+                                kind);
+
+    auto children = ast.get_array(second, 2);
+
+    return {
+        .ids = first,
+        .type = children[0],
+        .init = children[1],
+    };
+}
+
+}  // namespace yal

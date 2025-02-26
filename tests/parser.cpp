@@ -53,6 +53,60 @@ TEST_CASE("just comments", "[ast]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "File([])");
 }
 
+TEST_CASE("global variable", "[ast][var]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("without annotation") {
+        auto source = R"~~(var ZERO = 0;)~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([VarDecl(Id(ZERO), Nil, Int(0))])");
+    }
+
+    SECTION("with annotation") {
+        auto source = R"~~(var ZERO: u64 = 0;)~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([VarDecl(Id(ZERO), Id(u64), Int(0))])");
+    }
+
+    SECTION("with annotation but no init") {
+        auto source = R"~~(var ZERO: u64;)~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([VarDecl(Id(ZERO), Id(u64), Nil)])");
+    }
+}
+
 TEST_CASE("one function with nothing", "[ast][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
@@ -93,6 +147,48 @@ TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
             "File([Func(Id(main), Id(i32), [], Block([])])])");
 }
 
+TEST_CASE("one function with return", "[ast][func][stmt]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func main() i32 { return 0; })~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), Id(i32), [], "
+            "Block([ReturnStmt(ExprPack([Int(0)]))])])])");
+}
+
+TEST_CASE("one function with multiple return values", "[ast][func][stmt]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func main() (i32, u64) { return 0, 0xFFFF_FFFF; })~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), ExprPack([Id(i32), Id(u64)]), [], "
+            "Block([ReturnStmt(ExprPack([Int(0), Int(0)]))])])])");
+}
+
 TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
@@ -117,6 +213,172 @@ TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
             "ExprStmt(Add(Int(1), Int(2))), "
             "ExprStmt(Call(Id(some_function), []))"
             "])])])");
+}
+
+TEST_CASE("if statement", "[ast][func][stmt]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("minimal") {
+        auto source = R"~~(func main() {
+        if 1 < abc() {
+            print_something();
+        }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], Block([IfStmt(Smaller(Int(1), "
+                "Call(Id(abc), [])), Block([ExprStmt(Call(Id(print_something), "
+                "[]))]))])])])");
+    }
+
+    SECTION("with else") {
+        auto source = R"~~(func main() {
+        if 1 < abc() {
+            print_something();
+        } else {
+            return;
+        }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], Block(["
+                "IfStmt(Smaller(Int(1), Call(Id(abc), [])), Block(["
+                "ExprStmt(Call(Id(print_something), []))]),"
+                " Block([ReturnStmt(Nil)]))])])])");
+    }
+
+    SECTION("with decl") {
+        auto source = R"~~(func main() {
+        if var a = check(); 1 < a {
+            print_something();
+        }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], Block([IfStmt(VarDecl(Id(a), "
+                "Nil, Call(Id(check), [])), Smaller(Int(1), Id(a)), "
+                "Block([ExprStmt(Call(Id(print_something), []))]))])])])");
+    }
+
+    SECTION("with multiple decls") {
+        auto source = R"~~(func main() {
+        if var a, b, ok = check(); ok {
+            print_something();
+        }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], "
+                "Block([IfStmt(VarDecl(ExprPack([Id(a), Id(b), Id(ok)]), Nil, "
+                "Call(Id(check), [])), Id(ok), "
+                "Block([ExprStmt(Call(Id(print_something), []))]))])])])");
+    }
+
+    SECTION("with decl and else") {
+        auto source = R"~~(func main() {
+        if var a = check(); 1 < a {
+            print_something();
+        } else {
+            return;
+        }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], Block([IfStmt(VarDecl(Id(a), "
+                "Nil, Call(Id(check), [])), Smaller(Int(1), Id(a)), "
+                "Block([ExprStmt(Call(Id(print_something), []))]), "
+                "Block([ReturnStmt(Nil)]))])])])");
+    }
+}
+
+TEST_CASE("locals", "[ast][func][var]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("local var") {
+        auto source = R"~~(func main() {
+             var i = 0;
+             var j = 0;
+        })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], Block([VarDecl(Id(i), Nil, "
+                "Int(0)), VarDecl(Id(j), Nil, Int(0))])])])");
+    }
+
+    SECTION("var with multiple") {
+        auto source = R"~~(func main() {
+             var a, b = get_ab();
+        })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), Nil, [], Block([VarDecl(ExprPack([Id(a), "
+                "Id(b)]), Nil, Call(Id(get_ab), []))])])])");
+    }
 }
 
 TEST_CASE("integer expresions", "[ast][expr]") {

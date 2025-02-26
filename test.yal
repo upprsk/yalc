@@ -1,1 +1,15 @@
-1 + 2 * (10 - 2)
+func main() {
+    var n, ok = check(12);
+    if !ok {
+        println("failed to check");
+        return;
+    }
+
+    println("ok");
+}
+
+func check(n: i32) (i32, bool) {
+    if n < 18 { return 0, false; }
+
+    return n, true;
+}

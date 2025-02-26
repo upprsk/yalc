@@ -6,84 +6,132 @@ namespace yal {
 
 auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
     -> fmt::format_context::iterator {
+    using fmt::format_to;
+
     auto node = get(n);
     switch (node->kind) {
-        case NodeKind::Err:
-            return fmt::format_to(ctx.out(), "Err({})", node->span);
-        case NodeKind::Nil: return fmt::format_to(ctx.out(), "Nil");
+        case NodeKind::Err: return format_to(ctx.out(), "Err({})", node->span);
+        case NodeKind::Nil: return format_to(ctx.out(), "Nil");
 
         case NodeKind::Int:
-            return fmt::format_to(ctx.out(), "Int({})", node->value_uint64());
+            return format_to(ctx.out(), "Int({})", node->value_uint64());
         case NodeKind::Id:
-            return fmt::format_to(ctx.out(), "Id({})", node->value_string());
+            return format_to(ctx.out(), "Id({})", node->value_string());
         case NodeKind::EnumLit:
-            return fmt::format_to(ctx.out(), "EnumLit(.{})",
-                                  node->value_string());
+            return format_to(ctx.out(), "EnumLit(.{})", node->value_string());
 
         case NodeKind::Field:
-            fmt::format_to(ctx.out(), "Field(");
+            format_to(ctx.out(), "Field(");
             dump(ctx, node->first);
-            return fmt::format_to(ctx.out(), ", {})", node->value_string());
+            return format_to(ctx.out(), ", {})", node->value_string());
 
         case NodeKind::File:
         case NodeKind::ExprPack:
         case NodeKind::Block: {
-            fmt::format_to(ctx.out(), "{}([", node->kind);
+            format_to(ctx.out(), "{}([", node->kind);
 
             size_t i{};
             for (auto const& chld : get_children(n)) {
-                if (i++ != 0) fmt::format_to(ctx.out(), ", ");
+                if (i++ != 0) format_to(ctx.out(), ", ");
                 dump(ctx, chld);
             }
 
-            return fmt::format_to(ctx.out(), "])");
+            return format_to(ctx.out(), "])");
         }
 
         case NodeKind::Func: {
-            fmt::format_to(ctx.out(), "{}(", node->kind);
+            auto f = node->as_func(*this);
+            format_to(ctx.out(), "Func(");
 
-            auto children = get_children(n);
-            if (children.size() < 3)
-                throw fmt::system_error(
-                    6, "invalid number of children for call: {} < 3",
-                    children.size());
-
-            dump(ctx, children[0]);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, children[1]);
-            fmt::format_to(ctx.out(), ", [");
+            dump(ctx, f.name);
+            format_to(ctx.out(), ", ");
+            dump(ctx, f.ret);
+            format_to(ctx.out(), ", [");
 
             size_t i{};
-            for (auto const& chld : children.subspan(3)) {
-                if (i++ != 0) fmt::format_to(ctx.out(), ", ");
+            for (auto const& chld : f.args) {
+                if (i++ != 0) format_to(ctx.out(), ", ");
                 dump(ctx, chld);
             }
 
-            fmt::format_to(ctx.out(), "], ");
-            dump(ctx, children[2]);
+            format_to(ctx.out(), "], ");
+            dump(ctx, f.body);
 
-            return fmt::format_to(ctx.out(), "])");
+            return format_to(ctx.out(), "])");
+        }
+
+        case NodeKind::VarDecl:
+        case NodeKind::DefDecl: {
+            auto d = node->as_var_decl(*this);
+            format_to(ctx.out(), "{}(", node->kind);
+
+            dump(ctx, d.ids);
+            format_to(ctx.out(), ", ");
+            dump(ctx, d.type);
+            format_to(ctx.out(), ", ");
+            dump(ctx, d.init);
+
+            return format_to(ctx.out(), ")");
         }
 
         case NodeKind::Call: {
-            fmt::format_to(ctx.out(), "{}(", node->kind);
+            auto c = node->as_call(*this);
+            format_to(ctx.out(), "Call(");
 
-            auto children = get_children(n);
-            if (children.size() < 1)
-                throw fmt::system_error(
-                    6, "invalid number of children for call: {} < 1",
-                    children.size());
-
-            dump(ctx, children[0]);
-            fmt::format_to(ctx.out(), ", [");
+            dump(ctx, c.callee);
+            format_to(ctx.out(), ", [");
 
             size_t i{};
-            for (auto const& chld : children.subspan(1)) {
-                if (i++ != 0) fmt::format_to(ctx.out(), ", ");
+            for (auto const& chld : c.args) {
+                if (i++ != 0) format_to(ctx.out(), ", ");
                 dump(ctx, chld);
             }
 
-            return fmt::format_to(ctx.out(), "])");
+            return format_to(ctx.out(), "])");
+        }
+
+        case NodeKind::IfStmt: {
+            auto i = node->as_ifstmt(*this);
+            format_to(ctx.out(), "IfStmt(");
+            dump(ctx, i.cond);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.when_true);
+            return format_to(ctx.out(), ")");
+        }
+
+        case NodeKind::IfStmtWithElse: {
+            auto i = node->as_ifstmt(*this);
+            format_to(ctx.out(), "IfStmt(");
+            dump(ctx, i.cond);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.when_true);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.when_false);
+            return format_to(ctx.out(), ")");
+        }
+
+        case NodeKind::IfStmtWithDecl: {
+            auto i = node->as_ifstmt(*this);
+            format_to(ctx.out(), "IfStmt(");
+            dump(ctx, i.decl);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.cond);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.when_true);
+            return format_to(ctx.out(), ")");
+        }
+
+        case NodeKind::IfStmtWithDeclAndElse: {
+            auto i = node->as_ifstmt(*this);
+            format_to(ctx.out(), "IfStmt(");
+            dump(ctx, i.decl);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.cond);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.when_true);
+            format_to(ctx.out(), ", ");
+            dump(ctx, i.when_false);
+            return format_to(ctx.out(), ")");
         }
 
         // unops
@@ -96,9 +144,10 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::Deref:
         case NodeKind::OrReturn:
         case NodeKind::ExprStmt:
-            fmt::format_to(ctx.out(), "{}(", node->kind);
+        case NodeKind::ReturnStmt:
+            format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
-            return fmt::format_to(ctx.out(), ")");
+            return format_to(ctx.out(), ")");
 
         // binops
         case NodeKind::LogicOr:
@@ -121,14 +170,15 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::Mod:
         case NodeKind::Cast:
         case NodeKind::OrElse:
-            fmt::format_to(ctx.out(), "{}(", node->kind);
+        case NodeKind::WhileStmt:
+            format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
-            fmt::format_to(ctx.out(), ", ");
+            format_to(ctx.out(), ", ");
             dump(ctx, node->second);
-            return fmt::format_to(ctx.out(), ")");
+            return format_to(ctx.out(), ")");
     }
 
-    return fmt::format_to(ctx.out(), "unknown");
+    return format_to(ctx.out(), "unknown");
 }
 
 }  // namespace yal
@@ -161,7 +211,17 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::File: name = "File"; break;
         case yal::NodeKind::Func: name = "Func"; break;
         case yal::NodeKind::Block: name = "Block"; break;
+        case yal::NodeKind::VarDecl: name = "VarDecl"; break;
+        case yal::NodeKind::DefDecl: name = "DefDecl"; break;
         case yal::NodeKind::ExprStmt: name = "ExprStmt"; break;
+        case yal::NodeKind::ReturnStmt: name = "ReturnStmt"; break;
+        case yal::NodeKind::IfStmt: name = "IfStmt"; break;
+        case yal::NodeKind::IfStmtWithElse: name = "IfStmtWithElse"; break;
+        case yal::NodeKind::IfStmtWithDecl: name = "IfStmtWithDecl"; break;
+        case yal::NodeKind::IfStmtWithDeclAndElse:
+            name = "IfStmtWithDeclAndElse";
+            break;
+        case yal::NodeKind::WhileStmt: name = "WhileStmt"; break;
         case yal::NodeKind::LogicOr: name = "LogicOr"; break;
         case yal::NodeKind::LogicAnd: name = "LogicAnd"; break;
         case yal::NodeKind::BinOr: name = "BinOr"; break;
