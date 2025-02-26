@@ -92,6 +92,9 @@ enum class NodeKind : uint16_t {
     Neg,
     Optional,
     Deref,
+    Call,
+    ExprPack,
+    EnumLit,
     Int,
     Id,
 };
@@ -144,14 +147,20 @@ struct Ast {
             .second;
     }
 
-    [[nodiscard]] auto new_node_logic_or(Span span, NodeHandle lhs,
-                                         NodeHandle rhs) -> NodeHandle {
-        return new_node_binary(NodeKind::LogicOr, span, lhs, rhs);
+    [[nodiscard]] auto new_node_expr_pack(Span const&                 span,
+                                          std::span<NodeHandle const> children)
+        -> NodeHandle {
+        return new_node(NodeKind::ExprPack, span, new_array(children),
+                        children.size())
+            .second;
     }
 
-    [[nodiscard]] auto new_node_logic_and(Span span, NodeHandle lhs,
-                                          NodeHandle rhs) -> NodeHandle {
-        return new_node_binary(NodeKind::LogicAnd, span, lhs, rhs);
+    [[nodiscard]] auto new_node_call(Span const& span, NodeHandle callee,
+                                     std::span<NodeHandle const> parts)
+        -> NodeHandle {
+        return new_node(NodeKind::Call, span, new_array_plus_one(callee, parts),
+                        parts.size() + 1)
+            .second;
     }
 
     [[nodiscard]] auto new_node_int(Span span, uint64_t v) -> NodeHandle {
@@ -161,6 +170,12 @@ struct Ast {
 
     [[nodiscard]] auto new_node_id(Span span, std::string v) -> NodeHandle {
         return new_node(NodeKind::Id, span, NodeHandle{}, NodeHandle{}, v)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_enumlit(Span span, std::string v)
+        -> NodeHandle {
+        return new_node(NodeKind::EnumLit, span, NodeHandle{}, NodeHandle{}, v)
             .second;
     }
 
@@ -186,6 +201,16 @@ struct Ast {
     [[nodiscard]] auto new_array(std::span<NodeHandle const> handles)
         -> NodeHandle {
         auto sz = node_refs.size();
+        node_refs.insert(node_refs.end(), handles.begin(), handles.end());
+
+        return NodeHandle::from_idx(sz).to_array();
+    }
+
+    [[nodiscard]] auto new_array_plus_one(NodeHandle                  first,
+                                          std::span<NodeHandle const> handles)
+        -> NodeHandle {
+        auto sz = node_refs.size();
+        node_refs.push_back(first);
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
 
         return NodeHandle::from_idx(sz).to_array();

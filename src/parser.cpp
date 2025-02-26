@@ -183,7 +183,7 @@ struct Parser {
             auto rhs = parse_logic_and();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_logic_or(span, lhs, rhs);
+            lhs = ast.new_node_binary(NodeKind::LogicOr, span, lhs, rhs);
         }
 
         return lhs;
@@ -197,7 +197,7 @@ struct Parser {
             auto rhs = parse_bin_or();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_logic_and(span, lhs, rhs);
+            lhs = ast.new_node_binary(NodeKind::LogicAnd, span, lhs, rhs);
         }
 
         return lhs;
@@ -454,14 +454,21 @@ struct Parser {
 
     // call ::= primary { "(" call_args ")" }      (* func call *)
     //        | primary { "[" slice_or_index "]" } (* index/slicing *)
-    //        | primary { "." primary }            (* field *)
+    //        | primary { "." ID }                 (* field *)
     //        ;
     auto parse_call() -> NodeHandle {
         auto lhs = parse_primary();
 
-        // TODO: primary { "(" call_args ")" }      (* func call *)
+        if (match(TokenType::Lparen)) {
+            auto args = parse_call_args();
+            try(consume(TokenType::Rparen));
+
+            return ast.new_node_call(ast.get(0)->span.extend(prev_span()), lhs,
+                                     args);
+        }
+
         // TODO: primary { "[" slice_or_index "]" } (* index/slicing *)
-        // TODO: primary { "." primary }            (* field *)
+        // TODO: primary { "." ID }                 (* field *)
 
         return lhs;
     }
@@ -478,11 +485,32 @@ struct Parser {
     //           | ID
     //           ;
     auto parse_primary() -> NodeHandle {
+        // "(" expr ")" and expr_pack are together here
         if (match(TokenType::Lparen)) {
             auto child = parse_expr();
-            try(consume(TokenType::Rparen));
 
+            if (check(TokenType::Comma)) {
+                std::vector items{child};
+
+                while (match(TokenType::Comma)) {
+                    items.push_back(parse_expr());
+                }
+
+                auto end = ast.get(items.at(items.size() - 1))->span;
+                auto span = ast.get(items.at(0))->span.extend(end);
+                child = ast.new_node_expr_pack(span, items);
+            }
+
+            try(consume(TokenType::Rparen));
             return child;
+        }
+
+        if (match(TokenType::Dot)) {
+            auto s = prev_span();
+            auto t = peek_and_advance();
+
+            return ast.new_node_enumlit(s.extend(t.span),
+                                        std::string{t.span.str(source)});
         }
 
         if (match(TokenType::Id)) {
@@ -539,6 +567,20 @@ struct Parser {
 
         er->report_error(t.span, "expected number, got {}", t.type);
         return ast.new_node_err(t.span);
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_call_args() -> std::vector<NodeHandle> {
+        std::vector<NodeHandle> args;
+
+        do {
+            if (check(TokenType::Rparen)) break;
+
+            args.push_back(parse_expr());
+        } while (match(TokenType::Comma));
+
+        return args;
     }
 
     // ------------------------------------------------------------------------

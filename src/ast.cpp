@@ -1,5 +1,7 @@
 #include "ast.hpp"
 
+#include "fmt/format.h"
+
 namespace yal {
 
 auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
@@ -14,12 +16,37 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             return fmt::format_to(ctx.out(), "Int({})", node->value_uint64());
         case NodeKind::Id:
             return fmt::format_to(ctx.out(), "Id({})", node->value_string());
+        case NodeKind::EnumLit:
+            return fmt::format_to(ctx.out(), "EnumLit(.{})",
+                                  node->value_string());
 
-        case NodeKind::File: {
-            fmt::format_to(ctx.out(), "File([");
+        case NodeKind::File:
+        case NodeKind::ExprPack: {
+            fmt::format_to(ctx.out(), "{}([", node->kind);
 
             size_t i{};
             for (auto const& chld : get_children(n)) {
+                if (i++ != 0) fmt::format_to(ctx.out(), ", ");
+                dump(ctx, chld);
+            }
+
+            return fmt::format_to(ctx.out(), "])");
+        }
+
+        case NodeKind::Call: {
+            fmt::format_to(ctx.out(), "{}(", node->kind);
+
+            auto children = get_children(n);
+            if (children.size() < 1)
+                throw fmt::system_error(
+                    6, "invalid number of children for call: {} < 1",
+                    children.size());
+
+            dump(ctx, children[0]);
+            fmt::format_to(ctx.out(), ", [");
+
+            size_t i{};
+            for (auto const& chld : children.subspan(1)) {
                 if (i++ != 0) fmt::format_to(ctx.out(), ", ");
                 dump(ctx, chld);
             }
@@ -127,6 +154,9 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::Neg: name = "Neg"; break;
         case yal::NodeKind::Optional: name = "Optional"; break;
         case yal::NodeKind::Deref: name = "Deref"; break;
+        case yal::NodeKind::Call: name = "Call"; break;
+        case yal::NodeKind::ExprPack: name = "ExprPack"; break;
+        case yal::NodeKind::EnumLit: name = "EnumLit"; break;
         case yal::NodeKind::Int: name = "Int"; break;
         case yal::NodeKind::Id: name = "Id";
     }
