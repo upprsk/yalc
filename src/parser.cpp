@@ -545,6 +545,7 @@ struct Parser {
             // a character
             std::string s{t.span.str(source)};
             if (s.contains('_')) {
+                // NOLINTNEXTLINE(modernize-use-ranges)
                 s.erase(std::remove(s.begin(), s.end(), '_'), s.end());
             }
 
@@ -565,6 +566,7 @@ struct Parser {
             // a character
             std::string s{t.span.str(source)};
             if (s.contains('_')) {
+                // NOLINTNEXTLINE(modernize-use-ranges)
                 s.erase(std::remove(s.begin(), s.end(), '_'), s.end());
             }
 
