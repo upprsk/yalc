@@ -52,9 +52,7 @@ switch_stmt ::= "case" expr ":" { stmt }
 
 block ::= "{" { stmt } "}" ;
 
-def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";"
-           | "def" id_pack ":" expr [ "=" expr ] ";"
-           ;
+def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";" ;
 
 var_decl ::= "var" id_pack [ ":" expr ] "=" expr ";"
            | "var" id_pack ":" expr [ "=" expr ] ";"

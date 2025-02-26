@@ -53,6 +53,44 @@ TEST_CASE("just comments", "[ast]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "File([])");
 }
 
+TEST_CASE("global constant", "[ast][var]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("without annotation") {
+        auto source = R"~~(def ZERO = 0;)~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([DefDecl(Id(ZERO), Nil, Int(0))])");
+    }
+
+    SECTION("with annotation") {
+        auto source = R"~~(def ZERO: u64 = 0;)~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([DefDecl(Id(ZERO), Id(u64), Int(0))])");
+    }
+}
+
 TEST_CASE("global variable", "[ast][var]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,

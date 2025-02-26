@@ -324,11 +324,24 @@ struct Parser {
                                      init);
     }
 
-    // def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";"
-    //            | "def" id_pack ":" expr [ "=" expr ] ";"
-    //            ;
+    // def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";" ;
     auto parse_def_decl() -> NodeHandle {
-        throw std::runtime_error{"not implemented"};
+        auto s = prev_span();
+        auto ids = parse_id_pack();
+
+        NodeHandle type;
+        if (match(TokenType::Colon))
+            type = parse_expr();
+        else
+            type = ast.new_node_nil(prev_span());
+
+        try(consume(TokenType::Equal));
+        auto init = parse_expr();
+
+        try(consume(TokenType::Semi));
+
+        auto span = s.extend(prev_span());
+        return ast.new_node_def_decl(span, ids, type, init);
     }
 
     auto parse_id_pack() -> NodeHandle {
