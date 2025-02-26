@@ -1,6 +1,7 @@
 #include <memory>
 #include <optional>
 
+#include "cpptrace/from_current.hpp"
 #include "error_reporter.hpp"
 #include "fmt/base.h"
 #include "fmt/ranges.h"
@@ -27,24 +28,28 @@ auto read_entire_file(std::string const& path) -> std::optional<std::string> {
 }
 
 auto main(int argc, char** argv) -> int {
-    if (argc < 2) {
-        fmt::println(stderr, "usage: {} <program>", argv[0]);
-        return 1;
+    CPPTRACE_TRY {
+        if (argc < 2) {
+            fmt::println(stderr, "usage: {} <program>", argv[0]);
+            return 1;
+        }
+
+        auto contents = read_entire_file(argv[1]);
+        if (!contents) {
+            fmt::println(stderr, "failed to read file: {}", argv[1]);
+            return 1;
+        }
+
+        auto er = yal::ErrorReporter{*contents, argv[1]};
+        auto tokens = yal::tokenize(*contents, er);
+        auto [ast, root] = yal::parse(tokens, *contents, er);
+
+        fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
+
+        return 0;
     }
-
-    auto contents = read_entire_file(argv[1]);
-    if (!contents) {
-        fmt::println(stderr, "failed to read file: {}", argv[1]);
-        return 1;
+    CPPTRACE_CATCH(std::exception const& ex) {
+        fmt::println(stderr, "exception: {}", ex.what());
+        cpptrace::from_current_exception().print();
     }
-
-    auto er = yal::ErrorReporter{*contents, argv[1]};
-    auto tokens = yal::tokenize(*contents, er);
-    fmt::println("{}", tokens);
-
-    auto [ast, root] = yal::parse(tokens, *contents, er);
-
-    fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
-
-    return 0;
 }
