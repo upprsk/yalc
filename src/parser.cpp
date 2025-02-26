@@ -341,7 +341,7 @@ struct Parser {
 
         if (ids.size() == 1) return ids.at(0);
 
-        return ast.new_node_expr_pack(span, ids);
+        return ast.new_node_id_pack(span, ids);
     }
 
     // ------------------------------------------------------------------------

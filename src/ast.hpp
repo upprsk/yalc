@@ -107,6 +107,7 @@ enum class NodeKind : uint16_t {
     Field,
     ExprPack,
     EnumLit,
+    IdPack,
     Int,
     Id,
 };
@@ -212,6 +213,14 @@ struct Ast {
                                           std::span<NodeHandle const> children)
         -> NodeHandle {
         return new_node(NodeKind::ExprPack, span, new_array(children),
+                        children.size())
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_id_pack(Span const&                 span,
+                                        std::span<NodeHandle const> children)
+        -> NodeHandle {
+        return new_node(NodeKind::IdPack, span, new_array(children),
                         children.size())
             .second;
     }

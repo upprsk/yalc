@@ -307,7 +307,7 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
                 "File([Func(Id(main), Nil, [], "
-                "Block([IfStmt(VarDecl(ExprPack([Id(a), Id(b), Id(ok)]), Nil, "
+                "Block([IfStmt(VarDecl(IdPack([Id(a), Id(b), Id(ok)]), Nil, "
                 "Call(Id(check), [])), Id(ok), "
                 "Block([ExprStmt(Call(Id(print_something), []))]))])])])");
     }
@@ -376,7 +376,7 @@ TEST_CASE("locals", "[ast][func][var]") {
         auto [ast, root] = parse(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block([VarDecl(ExprPack([Id(a), "
+                "File([Func(Id(main), Nil, [], Block([VarDecl(IdPack([Id(a), "
                 "Id(b)]), Nil, Call(Id(get_ab), []))])])])");
     }
 }
