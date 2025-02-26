@@ -6,9 +6,9 @@ top_stmt ::= func
            ;
 
 func         ::= "func" { ID "." } ID [ "[" generic_args "]" ] "(" func_args ")" [ expr ] block ;
-generic_args ::= generic_arg { "," generic_arg } ; (* FIXME: allow trailing commans *)
+generic_args ::= generic_arg { "," generic_arg } [ "," ] ;
 generic_arg  ::= ID [ ":" expr ] ;
-func_args    ::= func_arg { "," func_args } ; (* FIXME: allow trailing commans *)
+func_args    ::= func_arg { "," func_args } [ "," ] ;
 func_arg     ::= ID ":" expr ;
 
 import ::= "import" STR [ "as" ID ];
@@ -68,8 +68,8 @@ defer ::= "defer" stmt ;
 expr           ::= logic_or ;
 
 (* some languages call this tuples, but we don't have tuples, this is used for multiple returns/decls *)
-open_expr_pack ::= expr { "," expr } ;      (* NOTE: no trailing commas here *)
-expr_pack      ::= "(" open_expr_pack ")" ; (* FIXME: allow trailing commas *)
+open_expr_pack ::= expr { "," expr } ; (* NOTE: no trailing commas here *)
+expr_pack      ::= "(" open_expr_pack [ "," ] ")" ;
 
 logic_or  ::= logic_and { "or" logic_and } ;
 logic_and ::= bin_or { "and" bin_or } ;
