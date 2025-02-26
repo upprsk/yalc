@@ -96,7 +96,7 @@ deref ::= call { ".*" call } ;
 
 call           ::= primary { "(" call_args ")" }      (* func call *)
                  | primary { "[" slice_or_index "]" } (* index/slicing *)
-                 | primary { "." primary }            (* field *)
+                 | primary { "." ID }                 (* field *)
                  ;
 call_args      ::= expr { "," expr }; (* FIXME: allow trailing commas *)
 slice_or_index ::= expr
