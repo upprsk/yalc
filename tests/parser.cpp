@@ -12,6 +12,7 @@ using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::Equals;
 
 // NOLINTBEGIN(readability-function-cognitive-complexity)
+// NOLINTBEGIN(readability-function-size)
 // NOLINTBEGIN(modernize-use-designated-initializers)
 
 TEST_CASE("empty source", "[ast]") {
@@ -189,6 +190,115 @@ TEST_CASE("expressions", "[ast]") {
             REQUIRE_FALSE(er.had_error());
             REQUIRE(fmt::to_string(ast.fatten(root)) ==
                     "AddrOf(Deref(Id(something)))");
+        }
+
+        SECTION("deref 2") {
+            auto source = "&abc";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) == "AddrOf(Id(abc))");
+        }
+    }
+
+    SECTION("cast") {
+        SECTION("cast to i32") {
+            auto source = "1 + 2 as i32";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                    "Add(Int(1), Cast(Int(2), Id(i32)))");
+        }
+
+        SECTION("cast to call") {
+            SKIP("call not implemented");
+
+            auto source = "42 as abc(12)";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                    "Add(Int(1), Cast(Int(2), Id(i32)))");
+        }
+
+        SECTION("or_else") {
+            auto source = "124 or_else abc + 1";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                    "OrElse(Int(124), Add(Id(abc), Int(1)))");
+        }
+
+        SECTION("or_else 2") {
+            SKIP("calls not implemented");
+
+            auto source = "(call_to_thing() or_else 1) + 2";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) == "");
+        }
+
+        SECTION("or_return") {
+            auto source = "abc or_return";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) == "OrReturn(Id(abc))");
+        }
+
+        SECTION("or_return 2") {
+            SKIP("calls not implemented");
+
+            auto source = "some_call() or_return";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse_expr(tokens, source, er);
+            REQUIRE_FALSE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) == "OrReturn(Id(abc))");
         }
     }
 
@@ -388,4 +498,5 @@ TEST_CASE("expressions", "[ast]") {
 }
 
 // NOLINTEND(modernize-use-designated-initializers)
+// NOLINTEND(readability-function-size)
 // NOLINTEND(readability-function-cognitive-complexity)

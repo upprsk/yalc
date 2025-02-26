@@ -60,7 +60,6 @@ private:
     uint32_t idx;
 };
 
-// "!" | "+" | "-" | "~" | "&" | "?"
 enum class NodeKind : uint16_t {
     Err,
     Nil,
@@ -83,6 +82,9 @@ enum class NodeKind : uint16_t {
     Mul,
     Div,
     Mod,
+    Cast,
+    OrElse,
+    OrReturn,
     AddrOf,
     LogicNot,
     BinNot,

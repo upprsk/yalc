@@ -35,6 +35,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::Neg:
         case NodeKind::Optional:
         case NodeKind::Deref:
+        case NodeKind::OrReturn:
             fmt::format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
             return fmt::format_to(ctx.out(), ")");
@@ -58,6 +59,8 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::Mul:
         case NodeKind::Div:
         case NodeKind::Mod:
+        case NodeKind::Cast:
+        case NodeKind::OrElse:
             fmt::format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
             fmt::format_to(ctx.out(), ", ");
@@ -114,6 +117,9 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::Mul: name = "Mul"; break;
         case yal::NodeKind::Div: name = "Div"; break;
         case yal::NodeKind::Mod: name = "Mod"; break;
+        case yal::NodeKind::Cast: name = "Cast"; break;
+        case yal::NodeKind::OrElse: name = "OrElse"; break;
+        case yal::NodeKind::OrReturn: name = "OrReturn"; break;
         case yal::NodeKind::AddrOf: name = "AddrOf"; break;
         case yal::NodeKind::LogicNot: name = "LogicNot"; break;
         case yal::NodeKind::BinNot: name = "BinNot"; break;

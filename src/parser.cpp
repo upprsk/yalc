@@ -369,7 +369,31 @@ struct Parser {
         // TODO: unary "or_else" expr
         // TODO: unary "or_return"
 
-        return parse_unary();
+        auto lhs = parse_unary();
+
+        if (match_kw("or_else")) {
+            auto rhs = parse_expr();
+
+            return ast.new_node_binary(
+                NodeKind::OrElse, ast.get(lhs)->span.extend(ast.get(rhs)->span),
+                lhs, rhs);
+        }
+
+        if (match_kw("or_return")) {
+            return ast.new_node_unary(NodeKind::OrReturn,
+                                      ast.get(lhs)->span.extend(prev_span()),
+                                      lhs);
+        }
+
+        while (match_kw("as")) {
+            auto rhs = parse_unary();
+
+            lhs = ast.new_node_binary(
+                NodeKind::Cast, ast.get(lhs)->span.extend(ast.get(rhs)->span),
+                lhs, rhs);
+        }
+
+        return lhs;
     }
 
     // unary ::= ( "!" | "+" | "-" | "~" | "&" | "?" ) unary
@@ -526,6 +550,8 @@ struct Parser {
     Ast    ast{};
     size_t current{};
 };
+
+#undef try
 
 auto parse_expr(std::span<Token const> tokens, std::string_view source,
                 ErrorReporter& er) -> std::pair<Ast, NodeHandle> {
