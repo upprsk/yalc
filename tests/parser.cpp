@@ -127,6 +127,26 @@ TEST_CASE("one function with nothing", "[ast][func]") {
             "File([Func(Id(main), [], Nil, Block([]))])");
 }
 
+TEST_CASE("one bound function", "[ast][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func Iterator.next() {})~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Field(Id(Iterator), next), [], Nil, Block([]))])");
+}
+
 TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
@@ -267,7 +287,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Id(i32))], Nil, Block([]))])");
+                "File([Func(Id(f), [FuncArg(x, Id(i32))], Nil, Block([]))])");
     }
 
     SECTION("one without type and trailing comma") {
@@ -325,8 +345,82 @@ TEST_CASE("one function with multiple return values", "[ast][func][stmt]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), [], ExprPack([Id(i32), Id(u64)]), "
+            "File([Func(Id(main), [], FuncRetPack([Id(i32), Id(u64)]), "
             "Block([ReturnStmt(ExprPack([Int(0), Int(0)]))]))])");
+}
+
+TEST_CASE("with various return values", "[ast][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("one named") {
+        auto source = R"~~(func is_check() (ok: bool) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(is_check), [], FuncRetPack([FuncArg(ok, "
+                "Id(bool))]), Block([]))])");
+    }
+
+    SECTION("two named") {
+        auto source = R"~~(func validate() (v: i32, ok: bool) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(validate), [], FuncRetPack([FuncArg(v, "
+                "Id(i32)), FuncArg(ok, Id(bool))]), Block([]))])");
+    }
+
+    SECTION("none named") {
+        auto source = R"~~(func validate() (i32, bool) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(validate), [], FuncRetPack([Id(i32), "
+                "Id(bool)]), Block([]))])");
+    }
+
+    SECTION("one named and one unnamed") {
+        auto source = R"~~(func validate() (i32, ok: bool) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(validate), [], FuncRetPack([Id(i32), "
+                "FuncArg(ok, Id(bool))]), Block([]))])");
+    }
 }
 
 TEST_CASE("one function with expression statements", "[ast][func][stmt]") {

@@ -33,6 +33,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::File:
         case NodeKind::ExprPack:
         case NodeKind::IdPack:
+        case NodeKind::FuncRetPack:
         case NodeKind::Block: {
             format_to(ctx.out(), "{}([", node->kind);
 
@@ -217,6 +218,7 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::File: name = "File"; break;
         case yal::NodeKind::Func: name = "Func"; break;
         case yal::NodeKind::FuncArg: name = "FuncArg"; break;
+        case yal::NodeKind::FuncRetPack: name = "FuncRetPack"; break;
         case yal::NodeKind::Block: name = "Block"; break;
         case yal::NodeKind::VarDecl: name = "VarDecl"; break;
         case yal::NodeKind::DefDecl: name = "DefDecl"; break;

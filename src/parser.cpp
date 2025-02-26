@@ -38,6 +38,12 @@ struct Parser {
         return peek().is_kw(source, kw);
     }
 
+    [[nodiscard]] constexpr auto check_next(TokenType tt) const -> bool {
+        if (is_at_end()) return false;
+
+        return tokens[current + 1].type == tt;
+    }
+
     [[nodiscard]] constexpr auto match(TokenType tt) -> bool {
         if (!check(tt)) return false;
 
@@ -166,7 +172,8 @@ struct Parser {
         try(consume(TokenType::Id));
         auto name = ast.new_node_id(s.extend(prev_span()),
                                     std::string{prev_span().str(source)});
-        while (match(TokenType::Id)) {
+        while (match(TokenType::Dot)) {
+            try(consume(TokenType::Id));
             name = ast.new_node_field(ast.get(name)->span, name,
                                       std::string{prev_span().str(source)});
         }
@@ -178,7 +185,7 @@ struct Parser {
         auto ret = ast.new_node_nil(prev_span());
         if (!check(TokenType::Lbrace)) {
             // TODO: handle multiple returns and named returns
-            ret = parse_expr();
+            ret = parse_func_ret();
         }
 
         auto body = parse_block();
@@ -795,6 +802,39 @@ struct Parser {
         } while (match(TokenType::Comma));
 
         return items;
+    }
+
+    auto parse_func_ret() -> NodeHandle {
+        if (match(TokenType::Lparen)) {
+            auto s = prev_span();
+
+            std::vector<NodeHandle> children;
+            do {
+                children.push_back(parse_func_ret_part());
+            } while (match(TokenType::Comma));
+
+            try(consume(TokenType::Rparen));
+
+            return ast.new_node_func_ret_pack(s.extend(prev_span()), children);
+        }
+
+        return parse_expr();
+    }
+
+    auto parse_func_ret_part() -> NodeHandle {
+        if (check_next(TokenType::Colon)) {
+            try(consume(TokenType::Id));
+            auto name = prev_span();
+
+            try(consume(TokenType::Colon));
+
+            auto e = parse_expr();
+
+            return ast.new_node_func_arg(name.extend(ast.get(e)->span),
+                                         std::string{name.str(source)}, e);
+        }
+
+        return parse_expr();
     }
 
     auto parse_call_args() -> std::vector<NodeHandle> {

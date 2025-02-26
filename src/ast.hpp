@@ -66,6 +66,7 @@ enum class NodeKind : uint16_t {
     File,
     Func,
     FuncArg,
+    FuncRetPack,
     Block,
     VarDecl,
     DefDecl,
@@ -228,6 +229,13 @@ struct Ast {
                                         std::span<NodeHandle const> children)
         -> NodeHandle {
         return new_node(NodeKind::IdPack, span, new_array(children),
+                        children.size())
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_func_ret_pack(
+        Span const& span, std::span<NodeHandle const> children) -> NodeHandle {
+        return new_node(NodeKind::FuncRetPack, span, new_array(children),
                         children.size())
             .second;
     }
