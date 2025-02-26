@@ -500,18 +500,36 @@ TEST_CASE("arithmetic expresions", "[ast][expr]") {
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
 
-    auto source = "1 + 1 * (2 - 4 / param)";
-    auto path = ":memory:";
+    SECTION("all") {
+        auto source = "1 + 1 * (2 - 4 / param)";
+        auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
-    auto tokens = tokenize(source, er);
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
 
-    REQUIRE_FALSE(er.had_error());
+        REQUIRE_FALSE(er.had_error());
 
-    auto [ast, root] = parse_expr(tokens, source, er);
-    REQUIRE_FALSE(er.had_error());
-    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(
+            fmt::to_string(ast.fatten(root)) ==
             "Add(Int(1), Mul(Int(1), Sub(Int(2), Div(Int(4), Id(param)))))");
+    }
+
+    SECTION("chain") {
+        auto source = "1 + 1 + 1";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "Add(Add(Int(1), Int(1)), Int(1))");
+    }
 }
 
 TEST_CASE("logic expresions", "[ast][expr]") {
