@@ -36,6 +36,13 @@ TEST_CASE("invalid handles", "[ast]") {
                                 "node handle is an array: {:x}", 0x40000000)));
     }
 
+    SECTION("invalid handle in array") {
+        REQUIRE_THROWS_WITH(
+            ast.get_array(NodeHandle::from_idx(0).to_invalid(), 1),
+            ContainsSubstring(
+                fmt::format("invalid node handle: {:x}", 0x80000000)));
+    }
+
     SECTION("normal handle in array") {
         REQUIRE_THROWS_WITH(ast.get_array(NodeHandle::from_idx(0), 1),
                             ContainsSubstring(fmt::format(
