@@ -20,6 +20,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             return fmt::format_to(ctx.out(), "EnumLit(.{})",
                                   node->value_string());
 
+        case NodeKind::Field:
+            fmt::format_to(ctx.out(), "Field(");
+            dump(ctx, node->first);
+            return fmt::format_to(ctx.out(), ", {})", node->value_string());
+
         case NodeKind::File:
         case NodeKind::ExprPack: {
             fmt::format_to(ctx.out(), "{}([", node->kind);
@@ -155,6 +160,7 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::Optional: name = "Optional"; break;
         case yal::NodeKind::Deref: name = "Deref"; break;
         case yal::NodeKind::Call: name = "Call"; break;
+        case yal::NodeKind::Field: name = "Field"; break;
         case yal::NodeKind::ExprPack: name = "ExprPack"; break;
         case yal::NodeKind::EnumLit: name = "EnumLit"; break;
         case yal::NodeKind::Int: name = "Int"; break;

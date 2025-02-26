@@ -162,6 +162,72 @@ TEST_CASE("enum literals", "[ast][expr]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "EnumLit(.test)");
 }
 
+TEST_CASE("fields", "[ast][expr]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("one field") {
+        auto source = "abc.test";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "Field(Id(abc), test)");
+    }
+
+    SECTION("two fields") {
+        auto source = "abc.test.value";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "Field(Field(Id(abc), test), value)");
+    }
+
+    SECTION("bound function") {
+        auto source = "v.next()";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "Call(Field(Id(v), next), [])");
+    }
+
+    SECTION("bound function 2") {
+        auto source = "1 + 12.next(&some_data) - -56";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "Sub(Add(Int(1), Call(Field(Int(12), next), "
+                "[AddrOf(Id(some_data))])), Neg(Int(56)))");
+    }
+}
+
 TEST_CASE("unary expresions", "[ast][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,

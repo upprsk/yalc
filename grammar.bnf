@@ -94,10 +94,10 @@ unary ::= ( "!" | "+" | "-" | "~" | "&" | "?" ) unary
 
 deref ::= call { ".*" call } ;
 
-call           ::= primary { "(" call_args ")" }      (* func call *)
-                 | primary { "[" slice_or_index "]" } (* index/slicing *)
-                 | primary { "." ID }                 (* field *)
+call           ::= call { "(" call_args ")" }      (* func call *)
+                 | call { "[" slice_or_index "]" } (* index/slicing *)
                  ;
+field          ::= primary { "." ID }
 call_args      ::= expr { "," expr }; (* FIXME: allow trailing commas *)
 slice_or_index ::= expr
                  | [ expr ] ":" [ expr ]

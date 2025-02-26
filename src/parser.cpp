@@ -452,12 +452,11 @@ struct Parser {
         return lhs;
     }
 
-    // call ::= primary { "(" call_args ")" }      (* func call *)
-    //        | primary { "[" slice_or_index "]" } (* index/slicing *)
-    //        | primary { "." ID }                 (* field *)
+    // call ::= field { "(" call_args ")" }      (* func call *)
+    //        | field { "[" slice_or_index "]" } (* index/slicing *)
     //        ;
     auto parse_call() -> NodeHandle {
-        auto lhs = parse_primary();
+        auto lhs = parse_field();
 
         if (match(TokenType::Lparen)) {
             auto args = parse_call_args();
@@ -468,7 +467,21 @@ struct Parser {
         }
 
         // TODO: primary { "[" slice_or_index "]" } (* index/slicing *)
-        // TODO: primary { "." ID }                 (* field *)
+
+        return lhs;
+    }
+
+    // field ::= primary { "." ID }
+    auto parse_field() -> NodeHandle {
+        auto lhs = parse_primary();
+
+        while (match(TokenType::Dot)) {
+            auto t = peek();
+            try(consume(TokenType::Id));
+
+            lhs = ast.new_node_field(ast.get(lhs)->span.extend(t.span), lhs,
+                                     std::string{t.span.str(source)});
+        }
 
         return lhs;
     }
@@ -507,7 +520,8 @@ struct Parser {
 
         if (match(TokenType::Dot)) {
             auto s = prev_span();
-            auto t = peek_and_advance();
+            auto t = peek();
+            try(consume(TokenType::Id));
 
             return ast.new_node_enumlit(s.extend(t.span),
                                         std::string{t.span.str(source)});

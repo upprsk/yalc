@@ -93,6 +93,7 @@ enum class NodeKind : uint16_t {
     Optional,
     Deref,
     Call,
+    Field,
     ExprPack,
     EnumLit,
     Int,
@@ -176,6 +177,12 @@ struct Ast {
     [[nodiscard]] auto new_node_enumlit(Span span, std::string v)
         -> NodeHandle {
         return new_node(NodeKind::EnumLit, span, NodeHandle{}, NodeHandle{}, v)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_field(Span span, NodeHandle recv,
+                                      std::string field) -> NodeHandle {
+        return new_node(NodeKind::Field, span, recv, NodeHandle{}, field)
             .second;
     }
 
