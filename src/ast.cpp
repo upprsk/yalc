@@ -1,5 +1,6 @@
 #include "ast.hpp"
 
+#include "fmt/base.h"
 #include "fmt/format.h"
 
 namespace yal {
@@ -22,6 +23,55 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             return format_to(ctx.out(), "Str({:?})", node->value_string());
         case NodeKind::EnumLit:
             return format_to(ctx.out(), "EnumLit(.{})", node->value_string());
+
+        case NodeKind::Ptr:
+        case NodeKind::MultiPtr:
+        case NodeKind::SlicePtr:
+            format_to(ctx.out(), "{}(", node->kind);
+            if (node->has_flag_ptr_is_const()) format_to(ctx.out(), "const ");
+            dump(ctx, node->first);
+            return format_to(ctx.out(), ")");
+
+        case NodeKind::Array: {
+            auto a = node->as_array(*this);
+            format_to(ctx.out(), "Array(");
+            dump(ctx, a.size);
+            format_to(ctx.out(), ", ");
+            dump(ctx, a.type);
+            format_to(ctx.out(), ", [");
+
+            size_t i{};
+            for (auto const& chld : a.items) {
+                if (i++ != 0) format_to(ctx.out(), ", ");
+                dump(ctx, chld);
+            }
+
+            return format_to(ctx.out(), "])");
+        }
+
+        case NodeKind::ArrayType: {
+            auto a = node->as_array(*this);
+            format_to(ctx.out(), "ArrayType(");
+            dump(ctx, a.size);
+            format_to(ctx.out(), ", ");
+            dump(ctx, a.type);
+            return format_to(ctx.out(), ")");
+        }
+
+        case NodeKind::ArrayAutoLen: {
+            auto a = node->as_array(*this);
+            format_to(ctx.out(), "ArrayAutoLen(");
+            dump(ctx, a.type);
+            format_to(ctx.out(), ", [");
+
+            size_t i{};
+            for (auto const& chld : a.items) {
+                if (i++ != 0) format_to(ctx.out(), ", ");
+                dump(ctx, chld);
+            }
+
+            return format_to(ctx.out(), "])");
+        }
 
         case NodeKind::Field:
             format_to(ctx.out(), "Field(");
@@ -266,6 +316,12 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::Plus: name = "Plus"; break;
         case yal::NodeKind::Neg: name = "Neg"; break;
         case yal::NodeKind::Optional: name = "Optional"; break;
+        case yal::NodeKind::Ptr: name = "Ptr"; break;
+        case yal::NodeKind::MultiPtr: name = "MultiPtr"; break;
+        case yal::NodeKind::SlicePtr: name = "SlicePtr"; break;
+        case yal::NodeKind::Array: name = "Array"; break;
+        case yal::NodeKind::ArrayType: name = "ArrayType"; break;
+        case yal::NodeKind::ArrayAutoLen: name = "ArrayAutoLen"; break;
         case yal::NodeKind::Deref: name = "Deref"; break;
         case yal::NodeKind::Call: name = "Call"; break;
         case yal::NodeKind::Field: name = "Field"; break;

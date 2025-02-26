@@ -107,6 +107,12 @@ enum class NodeKind : uint16_t {
     Plus,
     Neg,
     Optional,
+    Ptr,
+    MultiPtr,
+    SlicePtr,
+    Array,
+    ArrayType,
+    ArrayAutoLen,
     Deref,
     Call,
     Field,
@@ -120,8 +126,14 @@ enum class NodeKind : uint16_t {
 
 struct Ast;
 
+enum class NodeFlags : uint16_t {
+    None = 0,
+    PtrIsConst = (1 << 0),
+};
+
 struct Node {
     NodeKind                                            kind = NodeKind::Err;
+    NodeFlags                                           flags = NodeFlags::None;
     Span                                                span;
     NodeHandle                                          first;
     NodeHandle                                          second;
@@ -146,6 +158,10 @@ struct Node {
     [[nodiscard]] constexpr auto is_lvalue() const -> bool {
         return kind == NodeKind::Deref || kind == NodeKind::Field ||
                kind == NodeKind::Id;
+    }
+
+    [[nodiscard]] constexpr auto has_flag_ptr_is_const() const -> bool {
+        return fmt::underlying(flags) & fmt::underlying(NodeFlags::PtrIsConst);
     }
 
     struct NodeFunc {
@@ -173,11 +189,18 @@ struct Node {
         NodeHandle init;
     };
 
+    struct NodeArray {
+        NodeHandle                  type;
+        NodeHandle                  size;
+        std::span<NodeHandle const> items;
+    };
+
     [[nodiscard]] constexpr auto as_func(Ast const& ast) const -> NodeFunc;
     [[nodiscard]] constexpr auto as_call(Ast const& ast) const -> NodeCall;
     [[nodiscard]] constexpr auto as_ifstmt(Ast const& ast) const -> NodeIfStmt;
     [[nodiscard]] constexpr auto as_var_decl(Ast const& ast) const
         -> NodeVarDecl;
+    [[nodiscard]] constexpr auto as_array(Ast const& ast) const -> NodeArray;
 };
 
 struct FatNodeHandle {
@@ -187,18 +210,18 @@ struct FatNodeHandle {
 
 struct Ast {
     [[nodiscard]] auto new_node_err(Span span) -> NodeHandle {
-        return new_node(NodeKind::Err, span).second;
+        return new_node(NodeKind::Err, NodeFlags::None, span).second;
     }
 
     [[nodiscard]] auto new_node_nil(Span span) -> NodeHandle {
-        return new_node(NodeKind::Nil, span).second;
+        return new_node(NodeKind::Nil, NodeFlags::None, span).second;
     }
 
     [[nodiscard]] auto new_node_file(Span const&                 span,
                                      std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::File, span, new_array(children),
-                        children.size())
+        return new_node(NodeKind::File, NodeFlags::None, span,
+                        new_array(children), children.size())
             .second;
     }
 
@@ -206,7 +229,7 @@ struct Ast {
                                      std::span<NodeHandle const> args,
                                      NodeHandle ret, NodeHandle body)
         -> NodeHandle {
-        return new_node(NodeKind::Func, span,
+        return new_node(NodeKind::Func, NodeFlags::None, span,
                         new_array_plus_three(name, ret, body, args),
                         args.size() + 3)
             .second;
@@ -214,85 +237,115 @@ struct Ast {
 
     [[nodiscard]] auto new_node_func_arg(Span const& span, std::string name,
                                          NodeHandle type) -> NodeHandle {
-        return new_node(NodeKind::FuncArg, span, type, NodeHandle{}, name)
+        return new_node(NodeKind::FuncArg, NodeFlags::None, span, type,
+                        NodeHandle{}, name)
             .second;
     }
 
     [[nodiscard]] auto new_node_block(Span const&                 span,
                                       std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::Block, span, new_array(children),
-                        children.size())
+        return new_node(NodeKind::Block, NodeFlags::None, span,
+                        new_array(children), children.size())
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_array_auto_len(
+        Span const& span, NodeHandle type, std::span<NodeHandle const> items)
+        -> NodeHandle {
+        return new_node(NodeKind::ArrayAutoLen, NodeFlags::None, span,
+                        new_array_plus_one(type, items), items.size() + 1)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_array(Span const& span, NodeHandle size,
+                                      NodeHandle                  type,
+                                      std::span<NodeHandle const> items)
+        -> NodeHandle {
+        return new_node(NodeKind::Array, NodeFlags::None, span,
+                        new_array_plus_two(size, type, items), items.size() + 2)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_array_type(Span const& span, NodeHandle size,
+                                           NodeHandle type) -> NodeHandle {
+        return new_node(NodeKind::ArrayType, NodeFlags::None, span, size, type)
             .second;
     }
 
     [[nodiscard]] auto new_node_expr_pack(Span const&                 span,
                                           std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::ExprPack, span, new_array(children),
-                        children.size())
+        return new_node(NodeKind::ExprPack, NodeFlags::None, span,
+                        new_array(children), children.size())
             .second;
     }
 
     [[nodiscard]] auto new_node_id_pack(Span const&                 span,
                                         std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::IdPack, span, new_array(children),
-                        children.size())
+        return new_node(NodeKind::IdPack, NodeFlags::None, span,
+                        new_array(children), children.size())
             .second;
     }
 
     [[nodiscard]] auto new_node_func_ret_pack(
         Span const& span, std::span<NodeHandle const> children) -> NodeHandle {
-        return new_node(NodeKind::FuncRetPack, span, new_array(children),
-                        children.size())
+        return new_node(NodeKind::FuncRetPack, NodeFlags::None, span,
+                        new_array(children), children.size())
             .second;
     }
 
     [[nodiscard]] auto new_node_call(Span const& span, NodeHandle callee,
                                      std::span<NodeHandle const> parts)
         -> NodeHandle {
-        return new_node(NodeKind::Call, span, new_array_plus_one(callee, parts),
-                        parts.size() + 1)
+        return new_node(NodeKind::Call, NodeFlags::None, span,
+                        new_array_plus_one(callee, parts), parts.size() + 1)
             .second;
     }
 
     [[nodiscard]] auto new_node_int(Span span, uint64_t v) -> NodeHandle {
-        return new_node(NodeKind::Int, span, NodeHandle{}, NodeHandle{}, v)
+        return new_node(NodeKind::Int, NodeFlags::None, span, NodeHandle{},
+                        NodeHandle{}, v)
             .second;
     }
 
     [[nodiscard]] auto new_node_id(Span span, std::string v) -> NodeHandle {
-        return new_node(NodeKind::Id, span, NodeHandle{}, NodeHandle{}, v)
+        return new_node(NodeKind::Id, NodeFlags::None, span, NodeHandle{},
+                        NodeHandle{}, v)
             .second;
     }
 
     [[nodiscard]] auto new_node_str(Span span, std::string v) -> NodeHandle {
-        return new_node(NodeKind::Str, span, NodeHandle{}, NodeHandle{}, v)
+        return new_node(NodeKind::Str, NodeFlags::None, span, NodeHandle{},
+                        NodeHandle{}, v)
             .second;
     }
 
     [[nodiscard]] auto new_node_enumlit(Span span, std::string v)
         -> NodeHandle {
-        return new_node(NodeKind::EnumLit, span, NodeHandle{}, NodeHandle{}, v)
+        return new_node(NodeKind::EnumLit, NodeFlags::None, span, NodeHandle{},
+                        NodeHandle{}, v)
             .second;
     }
 
     [[nodiscard]] auto new_node_field(Span span, NodeHandle recv,
                                       std::string field) -> NodeHandle {
-        return new_node(NodeKind::Field, span, recv, NodeHandle{}, field)
+        return new_node(NodeKind::Field, NodeFlags::None, span, recv,
+                        NodeHandle{}, field)
             .second;
     }
 
     [[nodiscard]] auto new_node_if(Span span, NodeHandle cond, NodeHandle wt)
         -> NodeHandle {
-        return new_node(NodeKind::IfStmt, span, cond, wt).second;
+        return new_node(NodeKind::IfStmt, NodeFlags::None, span, cond, wt)
+            .second;
     }
 
     [[nodiscard]] auto new_node_if_with_else(Span span, NodeHandle cond,
                                              NodeHandle wt, NodeHandle wf)
         -> NodeHandle {
-        return new_node(NodeKind::IfStmtWithElse, span, cond,
+        return new_node(NodeKind::IfStmtWithElse, NodeFlags::None, span, cond,
                         new_array_of_two(wt, wf))
             .second;
     }
@@ -300,7 +353,7 @@ struct Ast {
     [[nodiscard]] auto new_node_if_with_decl(Span span, NodeHandle decl,
                                              NodeHandle cond, NodeHandle wt)
         -> NodeHandle {
-        return new_node(NodeKind::IfStmtWithDecl, span, cond,
+        return new_node(NodeKind::IfStmtWithDecl, NodeFlags::None, span, cond,
                         new_array_of_two(decl, wt))
             .second;
     }
@@ -308,19 +361,43 @@ struct Ast {
     [[nodiscard]] auto new_node_if_with_decl_and_else(
         Span span, NodeHandle decl, NodeHandle cond, NodeHandle wt,
         NodeHandle wf) -> NodeHandle {
-        return new_node(NodeKind::IfStmtWithDeclAndElse, span, cond,
-                        new_array_of_three(decl, wt, wf))
+        return new_node(NodeKind::IfStmtWithDeclAndElse, NodeFlags::None, span,
+                        cond, new_array_of_three(decl, wt, wf))
             .second;
     }
 
     [[nodiscard]] auto new_node_binary(NodeKind kind, Span span, NodeHandle lhs,
                                        NodeHandle rhs) -> NodeHandle {
-        return new_node(kind, span, lhs, rhs).second;
+        return new_node(kind, NodeFlags::None, span, lhs, rhs).second;
     }
 
     [[nodiscard]] auto new_node_unary(NodeKind kind, Span span, NodeHandle lhs)
         -> NodeHandle {
-        return new_node(kind, span, lhs).second;
+        return new_node(kind, NodeFlags::None, span, lhs).second;
+    }
+
+    [[nodiscard]] auto new_node_ptr(Span span, bool is_const, NodeHandle lhs)
+        -> NodeHandle {
+        return new_node(NodeKind::Ptr,
+                        is_const ? NodeFlags::PtrIsConst : NodeFlags::None,
+                        span, lhs)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_multiptr(Span span, bool is_const,
+                                         NodeHandle lhs) -> NodeHandle {
+        return new_node(NodeKind::MultiPtr,
+                        is_const ? NodeFlags::PtrIsConst : NodeFlags::None,
+                        span, lhs)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_sliceptr(Span span, bool is_const,
+                                         NodeHandle lhs) -> NodeHandle {
+        return new_node(NodeKind::SlicePtr,
+                        is_const ? NodeFlags::PtrIsConst : NodeFlags::None,
+                        span, lhs)
+            .second;
     }
 
     [[nodiscard]] auto new_node_var_decl(Span span, NodeHandle ids,
@@ -338,7 +415,9 @@ struct Ast {
     [[nodiscard]] auto new_node_decl(NodeKind kind, Span span, NodeHandle ids,
                                      NodeHandle type, NodeHandle init)
         -> NodeHandle {
-        return new_node(kind, span, ids, new_array_of_two(type, init)).second;
+        return new_node(kind, NodeFlags::None, span, ids,
+                        new_array_of_two(type, init))
+            .second;
     }
 
     [[nodiscard]] auto new_node(auto&&... args)
@@ -363,6 +442,17 @@ struct Ast {
         -> NodeHandle {
         auto sz = node_refs.size();
         node_refs.push_back(first);
+        node_refs.insert(node_refs.end(), handles.begin(), handles.end());
+
+        return NodeHandle::from_idx(sz).to_array();
+    }
+
+    [[nodiscard]] auto new_array_plus_two(NodeHandle first, NodeHandle second,
+                                          std::span<NodeHandle const> handles)
+        -> NodeHandle {
+        auto sz = node_refs.size();
+        node_refs.push_back(first);
+        node_refs.push_back(second);
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
 
         return NodeHandle::from_idx(sz).to_array();
@@ -594,6 +684,48 @@ constexpr auto Node::as_var_decl(Ast const& ast) const -> NodeVarDecl {
         .type = children[0],
         .init = children[1],
     };
+}
+
+constexpr auto Node::as_array(Ast const& ast) const -> NodeArray {
+    if (kind == NodeKind::Array) {
+        auto children = ast.get_children(this);
+
+        if (children.size() < 2)
+            throw fmt::system_error(
+                6, "invalid number of children for array: {} < 2",
+                children.size());
+
+        return {
+            .type = children[1],
+            .size = children[0],
+            .items = children.subspan(2),
+        };
+    }
+
+    if (kind == NodeKind::ArrayAutoLen) {
+        auto children = ast.get_children(this);
+
+        if (children.size() < 1)
+            throw fmt::system_error(
+                6, "invalid number of children for array: {} < 1",
+                children.size());
+
+        return {
+            .type = children[0],
+            .size = {},
+            .items = children.subspan(1),
+        };
+    }
+
+    if (kind == NodeKind::ArrayType) {
+        return {
+            .type = second,
+            .size = first,
+            .items = {},
+        };
+    }
+
+    throw fmt::system_error(6, "invalid node kind for `as_array`: {}", kind);
 }
 
 }  // namespace yal

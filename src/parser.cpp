@@ -728,6 +728,9 @@ struct Parser {
                                         std::string{t.span.str(source)});
         }
 
+        if (check(TokenType::Star) || check(TokenType::Lbracket))
+            return parse_pointer_type_or_array();
+
         if (match(TokenType::Id)) {
             return ast.new_node_id(prev_span(),
                                    std::string{prev_span().str(source)});
@@ -742,6 +745,80 @@ struct Parser {
         }
 
         return parse_number();
+    }
+
+    // pointer_type ::= "[" [ "*" ] "]" [ "const" ] unary
+    //                | "*" [ "const" ] unary
+    //                ;
+    //
+    // array ::= "[" ( expr | "_" ) "]" expr "{" array_items "}" ;
+    auto parse_pointer_type_or_array() -> NodeHandle {
+        auto s = prev_span();
+
+        if (match(TokenType::Star)) {
+            auto is_const = false;
+            if (match_kw("const")) is_const = true;
+
+            auto inner = parse_unary();
+            return ast.new_node_ptr(s.extend(ast.get(inner)->span), is_const,
+                                    inner);
+        }
+
+        if (check(TokenType::Lbracket) && check_next(TokenType::Star)) {
+            try(consume(TokenType::Lbracket));
+            try(consume(TokenType::Star));
+            try(consume(TokenType::Rbracket));
+
+            auto is_const = false;
+            if (match_kw("const")) is_const = true;
+
+            auto inner = parse_unary();
+            return ast.new_node_multiptr(s.extend(ast.get(inner)->span),
+                                         is_const, inner);
+        }
+
+        if (check(TokenType::Lbracket) && check_next(TokenType::Rbracket)) {
+            try(consume(TokenType::Lbracket));
+            try(consume(TokenType::Rbracket));
+
+            auto is_const = false;
+            if (match_kw("const")) is_const = true;
+
+            auto inner = parse_unary();
+            return ast.new_node_sliceptr(s.extend(ast.get(inner)->span),
+                                         is_const, inner);
+        }
+
+        try(consume(TokenType::Lbracket));
+
+        if (match_kw("_")) {
+            try(consume(TokenType::Rbracket));
+
+            auto type = parse_expr();
+
+            try(consume(TokenType::Lbrace));
+            auto items = parse_array_items();
+            try(consume(TokenType::Rbrace));
+
+            return ast.new_node_array_auto_len(s.extend(prev_span()), type,
+                                               items);
+        }
+
+        auto size = parse_expr();
+
+        try(consume(TokenType::Rbracket));
+
+        auto type = parse_expr();
+
+        if (!check(TokenType::Lbrace)) {
+            return ast.new_node_array_type(s.extend(prev_span()), size, type);
+        }
+
+        try(consume(TokenType::Lbrace));
+        auto items = parse_array_items();
+        try(consume(TokenType::Rbrace));
+
+        return ast.new_node_array(s.extend(prev_span()), size, type, items);
     }
 
     // number ::= INT | HEX | OCT | BIN | FLOAT ;
@@ -877,6 +954,18 @@ struct Parser {
         } while (match(TokenType::Comma));
 
         return args;
+    }
+
+    auto parse_array_items() -> std::vector<NodeHandle> {
+        std::vector<NodeHandle> items;
+
+        do {
+            if (check(TokenType::Rbrace)) break;
+
+            items.push_back(parse_expr());
+        } while (match(TokenType::Comma));
+
+        return items;
     }
 
     // ------------------------------------------------------------------------

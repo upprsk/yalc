@@ -864,6 +864,26 @@ TEST_CASE("enum literals", "[ast][expr]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "EnumLit(.test)");
 }
 
+TEST_CASE("pointer types", "[ast][expr]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("just a simple pointer") {
+        auto source = "*abc";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "Ptr(Id(abc))");
+    }
+}
+
 TEST_CASE("fields", "[ast][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
@@ -1366,6 +1386,162 @@ TEST_CASE("logic expresions", "[ast][expr]") {
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
                 "LogicAnd(LogicNot(Id(test)), AddrOf(Int(12)))");
+    }
+}
+
+TEST_CASE("pointers", "[ast][expr]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("simple pointer") {
+        auto source = "*u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "Ptr(Id(u8))");
+    }
+
+    SECTION("constant pointer") {
+        auto source = "*const u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "Ptr(const Id(u8))");
+    }
+
+    SECTION("multi pointer") {
+        auto source = "[*]u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "MultiPtr(Id(u8))");
+    }
+
+    SECTION("constant multi pointer") {
+        auto source = "[*]const u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "MultiPtr(const Id(u8))");
+    }
+
+    SECTION("slice") {
+        auto source = "[]u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "SlicePtr(Id(u8))");
+    }
+
+    SECTION("constant slice") {
+        auto source = "[]const u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "SlicePtr(const Id(u8))");
+    }
+}
+
+TEST_CASE("arrays", "[ast][expr]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("array type") {
+        auto source = "[1]u8";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "ArrayType(Int(1), Id(u8))");
+    }
+
+    SECTION("array with size") {
+        auto source = "[3]u8{1, 2, 3}";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "Array(Int(3), Id(u8), [Int(1), Int(2), Int(3)])");
+    }
+
+    SECTION("array with inferred size") {
+        auto source = "[_]u8{1, 2, 3}";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "ArrayAutoLen(Id(u8), [Int(1), Int(2), Int(3)])");
+    }
+
+    SECTION("array with inferred size and trailing comma") {
+        auto source = "[_]u8{1, 2, 3,}";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "ArrayAutoLen(Id(u8), [Int(1), Int(2), Int(3)])");
     }
 }
 
