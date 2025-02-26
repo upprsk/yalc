@@ -30,8 +30,8 @@ stmt ::= expr ";"
        ;
 
 return_stmt ::= "return" [ open_expr_pack ] ";" ;
-if_stmt     ::= "if" expr block [ "else" expr ]
-              | "if" var_decl expr block
+if_stmt     ::= "if" expr block [ "else" block ]
+              | "if" var_decl expr block [ "else" block ]
               ;
 while_stmt  ::= "while" expr block
               | "while" var_decl expr block
