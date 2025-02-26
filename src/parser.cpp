@@ -139,9 +139,6 @@ struct Parser {
         if (match_kw("var")) return parse_var_decl();
         if (match_kw("import")) return parse_import();
 
-        // FIXME: this is just for testing
-        return parse_expr();
-
         auto t = peek_and_advance();
         er->report_error(t.span,
                          "expected one of 'func', 'def', 'var' or 'import' at "
