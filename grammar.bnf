@@ -102,7 +102,7 @@ call           ::= call { "(" call_args ")" }      (* func call *)
                  | call { "[" slice_or_index "]" } (* index/slicing *)
                  ;
 field          ::= primary { "." ID }
-call_args      ::= expr { "," expr }; (* FIXME: allow trailing commas *)
+call_args      ::= expr { "," expr } [ "," ] ;
 slice_or_index ::= expr
                  | [ expr ] ":" [ expr ]
                  ;
@@ -120,7 +120,7 @@ primary ::= "(" expr ")"
           ;
 
 array ::= "[" ( expr | "_" ) "]" expr "{" array_items "}" ;
-array_items ::= expr { "," expr } ; (* FIXME: allow trailing commas *)
+array_items ::= expr { "," expr } [ "," ] ;
 
 (* slices are treated as pointers *)
 pointer_type ::= "[" [ "*" ] "]" [ "const" ] unary
