@@ -26,7 +26,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             return format_to(ctx.out(), ", {})", node->value_string());
 
         case NodeKind::FuncArg:
-            format_to(ctx.out(), "Field({}, ", node->value_string());
+            format_to(ctx.out(), "FuncArg({}, ", node->value_string());
             dump(ctx, node->first);
             return format_to(ctx.out(), ")");
 

@@ -165,7 +165,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Id(i32))], Nil, Block([]))])");
+                "File([Func(Id(f), [FuncArg(x, Id(i32))], Nil, Block([]))])");
     }
 
     SECTION("one without type") {
@@ -181,7 +181,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Nil)], Nil, Block([]))])");
+                "File([Func(Id(f), [FuncArg(x, Nil)], Nil, Block([]))])");
     }
 
     SECTION("two with type") {
@@ -197,7 +197,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Id(i32)), Field(y, "
+                "File([Func(Id(f), [FuncArg(x, Id(i32)), FuncArg(y, "
                 "Id(string_view))], Nil, Block([]))])");
     }
 
@@ -214,7 +214,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Nil), Field(y, Nil)], Nil, "
+                "File([Func(Id(f), [FuncArg(x, Nil), FuncArg(y, Nil)], Nil, "
                 "Block([]))])");
     }
 
@@ -230,9 +230,10 @@ TEST_CASE("one function arguments", "[ast][func]") {
         auto [ast, root] = parse(tokens, source, er);
 
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Id(i32)), Field(y, Nil)], Nil, "
-                "Block([]))])");
+        REQUIRE(
+            fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(f), [FuncArg(x, Id(i32)), FuncArg(y, Nil)], Nil, "
+            "Block([]))])");
     }
 
     SECTION("one with type and one without 2") {
@@ -247,10 +248,10 @@ TEST_CASE("one function arguments", "[ast][func]") {
         auto [ast, root] = parse(tokens, source, er);
 
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Nil), Field(y, Id(string_view))], "
-                "Nil, "
-                "Block([]))])");
+        REQUIRE(
+            fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(f), [FuncArg(x, Nil), FuncArg(y, Id(string_view))], "
+            "Nil, Block([]))])");
     }
 
     SECTION("one with type and trailing comma") {
@@ -282,7 +283,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(f), [Field(x, Nil)], Nil, Block([]))])");
+                "File([Func(Id(f), [FuncArg(x, Nil)], Nil, Block([]))])");
     }
 }
 
