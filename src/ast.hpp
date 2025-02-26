@@ -65,6 +65,7 @@ enum class NodeKind : uint16_t {
     Nil,
     File,
     Func,
+    FuncArg,
     Block,
     VarDecl,
     DefDecl,
@@ -198,6 +199,12 @@ struct Ast {
         return new_node(NodeKind::Func, span,
                         new_array_plus_three(name, ret, body, args),
                         args.size() + 3)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_func_arg(Span const& span, std::string name,
+                                         NodeHandle type) -> NodeHandle {
+        return new_node(NodeKind::FuncArg, span, type, NodeHandle{}, name)
             .second;
     }
 

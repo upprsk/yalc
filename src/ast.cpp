@@ -25,6 +25,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             dump(ctx, node->first);
             return format_to(ctx.out(), ", {})", node->value_string());
 
+        case NodeKind::FuncArg:
+            format_to(ctx.out(), "Field({}, ", node->value_string());
+            dump(ctx, node->first);
+            return format_to(ctx.out(), ")");
+
         case NodeKind::File:
         case NodeKind::ExprPack:
         case NodeKind::IdPack:
@@ -45,8 +50,6 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             format_to(ctx.out(), "Func(");
 
             dump(ctx, f.name);
-            format_to(ctx.out(), ", ");
-            dump(ctx, f.ret);
             format_to(ctx.out(), ", [");
 
             size_t i{};
@@ -56,9 +59,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             }
 
             format_to(ctx.out(), "], ");
+            dump(ctx, f.ret);
+            format_to(ctx.out(), ", ");
             dump(ctx, f.body);
 
-            return format_to(ctx.out(), "])");
+            return format_to(ctx.out(), ")");
         }
 
         case NodeKind::VarDecl:
@@ -211,6 +216,7 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::Nil: name = "Nil"; break;
         case yal::NodeKind::File: name = "File"; break;
         case yal::NodeKind::Func: name = "Func"; break;
+        case yal::NodeKind::FuncArg: name = "FuncArg"; break;
         case yal::NodeKind::Block: name = "Block"; break;
         case yal::NodeKind::VarDecl: name = "VarDecl"; break;
         case yal::NodeKind::DefDecl: name = "DefDecl"; break;

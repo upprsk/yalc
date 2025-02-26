@@ -124,7 +124,7 @@ TEST_CASE("one function with nothing", "[ast][func]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), Nil, [], Block([])])])");
+            "File([Func(Id(main), [], Nil, Block([]))])");
 }
 
 TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
@@ -144,7 +144,146 @@ TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), Id(i32), [], Block([])])])");
+            "File([Func(Id(main), [], Id(i32), Block([]))])");
+}
+
+TEST_CASE("one function arguments", "[ast][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("one with type") {
+        auto source = R"~~(func f(x: i32) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Id(i32))], Nil, Block([]))])");
+    }
+
+    SECTION("one without type") {
+        auto source = R"~~(func f(x) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Nil)], Nil, Block([]))])");
+    }
+
+    SECTION("two with type") {
+        auto source = R"~~(func f(x: i32, y: string_view) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Id(i32)), Field(y, "
+                "Id(string_view))], Nil, Block([]))])");
+    }
+
+    SECTION("two without type") {
+        auto source = R"~~(func f(x, y) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Nil), Field(y, Nil)], Nil, "
+                "Block([]))])");
+    }
+
+    SECTION("one with type and one without") {
+        auto source = R"~~(func f(x : i32, y) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Id(i32)), Field(y, Nil)], Nil, "
+                "Block([]))])");
+    }
+
+    SECTION("one with type and one without 2") {
+        auto source = R"~~(func f(x, y: string_view) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Nil), Field(y, Id(string_view))], "
+                "Nil, "
+                "Block([]))])");
+    }
+
+    SECTION("one with type and trailing comma") {
+        auto source = R"~~(func f(x: i32,) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Id(i32))], Nil, Block([]))])");
+    }
+
+    SECTION("one without type and trailing comma") {
+        auto source = R"~~(func f(x,) {})~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(f), [Field(x, Nil)], Nil, Block([]))])");
+    }
 }
 
 TEST_CASE("one function with return", "[ast][func][stmt]") {
@@ -164,8 +303,8 @@ TEST_CASE("one function with return", "[ast][func][stmt]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), Id(i32), [], "
-            "Block([ReturnStmt(ExprPack([Int(0)]))])])])");
+            "File([Func(Id(main), [], Id(i32), "
+            "Block([ReturnStmt(ExprPack([Int(0)]))]))])");
 }
 
 TEST_CASE("one function with multiple return values", "[ast][func][stmt]") {
@@ -185,8 +324,8 @@ TEST_CASE("one function with multiple return values", "[ast][func][stmt]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), ExprPack([Id(i32), Id(u64)]), [], "
-            "Block([ReturnStmt(ExprPack([Int(0), Int(0)]))])])])");
+            "File([Func(Id(main), [], ExprPack([Id(i32), Id(u64)]), "
+            "Block([ReturnStmt(ExprPack([Int(0), Int(0)]))]))])");
 }
 
 TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
@@ -209,10 +348,10 @@ TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), Nil, [], Block(["
+            "File([Func(Id(main), [], Nil, Block(["
             "ExprStmt(Add(Int(1), Int(2))), "
             "ExprStmt(Call(Id(some_function), []))"
-            "])])])");
+            "]))])");
 }
 
 TEST_CASE("if statement", "[ast][func][stmt]") {
@@ -237,9 +376,9 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block([IfStmt(Smaller(Int(1), "
+                "File([Func(Id(main), [], Nil, Block([IfStmt(Smaller(Int(1), "
                 "Call(Id(abc), [])), Block([ExprStmt(Call(Id(print_something), "
-                "[]))]))])])])");
+                "[]))]))]))])");
     }
 
     SECTION("with else") {
@@ -261,10 +400,10 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block(["
+                "File([Func(Id(main), [], Nil, Block(["
                 "IfStmt(Smaller(Int(1), Call(Id(abc), [])), Block(["
                 "ExprStmt(Call(Id(print_something), []))]),"
-                " Block([ReturnStmt(Nil)]))])])])");
+                " Block([ReturnStmt(Nil)]))]))])");
     }
 
     SECTION("with decl") {
@@ -284,9 +423,9 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block([IfStmt(VarDecl(Id(a), "
+                "File([Func(Id(main), [], Nil, Block([IfStmt(VarDecl(Id(a), "
                 "Nil, Call(Id(check), [])), Smaller(Int(1), Id(a)), "
-                "Block([ExprStmt(Call(Id(print_something), []))]))])])])");
+                "Block([ExprStmt(Call(Id(print_something), []))]))]))])");
     }
 
     SECTION("with multiple decls") {
@@ -306,10 +445,10 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], "
+                "File([Func(Id(main), [], Nil, "
                 "Block([IfStmt(VarDecl(IdPack([Id(a), Id(b), Id(ok)]), Nil, "
                 "Call(Id(check), [])), Id(ok), "
-                "Block([ExprStmt(Call(Id(print_something), []))]))])])])");
+                "Block([ExprStmt(Call(Id(print_something), []))]))]))])");
     }
 
     SECTION("with decl and else") {
@@ -331,10 +470,10 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block([IfStmt(VarDecl(Id(a), "
+                "File([Func(Id(main), [], Nil, Block([IfStmt(VarDecl(Id(a), "
                 "Nil, Call(Id(check), [])), Smaller(Int(1), Id(a)), "
                 "Block([ExprStmt(Call(Id(print_something), []))]), "
-                "Block([ReturnStmt(Nil)]))])])])");
+                "Block([ReturnStmt(Nil)]))]))])");
     }
 }
 
@@ -358,8 +497,8 @@ TEST_CASE("locals", "[ast][func][var]") {
         auto [ast, root] = parse(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block([VarDecl(Id(i), Nil, "
-                "Int(0)), VarDecl(Id(j), Nil, Int(0))])])])");
+                "File([Func(Id(main), [], Nil, Block([VarDecl(Id(i), Nil, "
+                "Int(0)), VarDecl(Id(j), Nil, Int(0))]))])");
     }
 
     SECTION("var with multiple") {
@@ -376,8 +515,8 @@ TEST_CASE("locals", "[ast][func][var]") {
         auto [ast, root] = parse(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), Nil, [], Block([VarDecl(IdPack([Id(a), "
-                "Id(b)]), Nil, Call(Id(get_ab), []))])])])");
+                "File([Func(Id(main), [], Nil, Block([VarDecl(IdPack([Id(a), "
+                "Id(b)]), Nil, Call(Id(get_ab), []))]))])");
     }
 }
 

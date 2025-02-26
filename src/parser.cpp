@@ -172,14 +172,12 @@ struct Parser {
         }
 
         try(consume(TokenType::Lparen));
-
-        // TODO: args
-        std::vector<NodeHandle> args;
-
+        auto args = parse_func_args();
         try(consume(TokenType::Rparen));
 
         auto ret = ast.new_node_nil(prev_span());
         if (!check(TokenType::Lbrace)) {
+            // TODO: handle multiple returns and named returns
             ret = parse_expr();
         }
 
@@ -774,6 +772,30 @@ struct Parser {
     }
 
     // ------------------------------------------------------------------------
+
+    auto parse_func_args() -> std::vector<NodeHandle> {
+        std::vector<NodeHandle> items;
+
+        do {
+            if (check(TokenType::Rparen)) break;
+
+            if (!consume(TokenType::Id)) continue;
+            auto s = prev_span();
+            auto id = s.str(source);
+
+            NodeHandle hdl;
+            if (match(TokenType::Colon)) {
+                hdl = parse_expr();
+            } else {
+                hdl = ast.new_node_nil(prev_span());
+            }
+
+            items.push_back(ast.new_node_func_arg(s.extend(ast.get(hdl)->span),
+                                                  std::string{id}, hdl));
+        } while (match(TokenType::Comma));
+
+        return items;
+    }
 
     auto parse_call_args() -> std::vector<NodeHandle> {
         std::vector<NodeHandle> args;
