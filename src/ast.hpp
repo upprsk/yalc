@@ -77,6 +77,9 @@ enum class NodeKind : uint16_t {
     IfStmtWithDecl,
     IfStmtWithDeclAndElse,
     WhileStmt,
+    Assign,
+    Break,
+    Defer,
     LogicOr,
     LogicAnd,
     BinOr,
@@ -138,6 +141,11 @@ struct Node {
 
     [[nodiscard]] constexpr auto value_string() const -> std::string const& {
         return std::get<std::string>(value);
+    }
+
+    [[nodiscard]] constexpr auto is_lvalue() const -> bool {
+        return kind == NodeKind::Deref || kind == NodeKind::Field ||
+               kind == NodeKind::Id;
     }
 
     struct NodeFunc {

@@ -221,6 +221,15 @@ struct Parser {
         if (match_kw("def")) return parse_def_decl();
 
         auto expr = parse_expr();
+        if (ast.get(expr)->is_lvalue() && match(TokenType::Equal)) {
+            auto rhs = parse_expr();
+            try(consume(TokenType::Semi));
+
+            return ast.new_node_binary(NodeKind::Assign,
+                                       ast.get(expr)->span.extend(prev_span()),
+                                       expr, rhs);
+        }
+
         try(consume(TokenType::Semi));
 
         return ast.new_node_unary(

@@ -487,6 +487,108 @@ TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
             "]))])");
 }
 
+TEST_CASE("assignments", "[ast][func][stmt]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("id to id") {
+        auto source = R"~~(func main() {
+            a = b;
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(
+            fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), [], Nil, Block([Assign(Id(a), Id(b))]))])");
+    }
+
+    SECTION("id to expr") {
+        auto source = R"~~(func main() {
+            a = 1 >> 2 + 4;
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), [], Nil, Block([Assign(Id(a), "
+                "ShftRight(Int(1), Add(Int(2), Int(4))))]))])");
+    }
+
+    SECTION("deref to int") {
+        auto source = R"~~(func main() {
+            a.* = 134;
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), [], Nil, Block([Assign(Deref(Id(a)), "
+                "Int(134))]))])");
+    }
+
+    SECTION("field to expr") {
+        auto source = R"~~(func main() {
+            a.field = 134+ 40;
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), [], Nil, Block([Assign(Field(Id(a), "
+                "field), Add(Int(134), Int(40)))]))])");
+    }
+
+    SECTION("call deref to expr") {
+        auto source = R"~~(func main() {
+            get_ptr().* = 134+ 40;
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "File([Func(Id(main), [], Nil, "
+                "Block([Assign(Deref(Call(Id(get_ptr), [])), Add(Int(134), "
+                "Int(40)))]))])");
+    }
+}
+
 TEST_CASE("if statement", "[ast][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,

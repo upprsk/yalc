@@ -12,6 +12,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
     switch (node->kind) {
         case NodeKind::Err: return format_to(ctx.out(), "Err({})", node->span);
         case NodeKind::Nil: return format_to(ctx.out(), "Nil");
+        case NodeKind::Break: return format_to(ctx.out(), "Break");
 
         case NodeKind::Int:
             return format_to(ctx.out(), "Int({})", node->value_uint64());
@@ -154,6 +155,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::OrReturn:
         case NodeKind::ExprStmt:
         case NodeKind::ReturnStmt:
+        case NodeKind::Defer:
             format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
             return format_to(ctx.out(), ")");
@@ -180,6 +182,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::Cast:
         case NodeKind::OrElse:
         case NodeKind::WhileStmt:
+        case NodeKind::Assign:
             format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
             format_to(ctx.out(), ", ");
@@ -233,6 +236,9 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
             name = "IfStmtWithDeclAndElse";
             break;
         case yal::NodeKind::WhileStmt: name = "WhileStmt"; break;
+        case yal::NodeKind::Assign: name = "Assign"; break;
+        case yal::NodeKind::Break: name = "Break"; break;
+        case yal::NodeKind::Defer: name = "Defer"; break;
         case yal::NodeKind::LogicOr: name = "LogicOr"; break;
         case yal::NodeKind::LogicAnd: name = "LogicAnd"; break;
         case yal::NodeKind::BinOr: name = "BinOr"; break;
