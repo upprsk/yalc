@@ -112,6 +112,7 @@ enum class NodeKind : uint16_t {
     IdPack,
     Int,
     Id,
+    Str,
 };
 
 struct Ast;
@@ -255,6 +256,11 @@ struct Ast {
 
     [[nodiscard]] auto new_node_id(Span span, std::string v) -> NodeHandle {
         return new_node(NodeKind::Id, span, NodeHandle{}, NodeHandle{}, v)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_str(Span span, std::string v) -> NodeHandle {
+        return new_node(NodeKind::Str, span, NodeHandle{}, NodeHandle{}, v)
             .second;
     }
 

@@ -1236,7 +1236,7 @@ TEST_CASE("logic expresions", "[ast][expr]") {
     }
 
     SECTION("logic with call") {
-        auto source = "test1() and test2()";
+        auto source = R"~~(test1("this is test") and test2())~~";
         auto path = ":memory:";
 
         auto er = ErrorReporter{source, path, devnull};
@@ -1246,8 +1246,9 @@ TEST_CASE("logic expresions", "[ast][expr]") {
 
         auto [ast, root] = parse_expr(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "LogicAnd(Call(Id(test1), []), Call(Id(test2), []))");
+        REQUIRE(
+            fmt::to_string(ast.fatten(root)) ==
+            R"~~(LogicAnd(Call(Id(test1), [Str("this is test")]), Call(Id(test2), [])))~~");
     }
 
     SECTION("logic with unary") {

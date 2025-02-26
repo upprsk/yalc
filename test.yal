@@ -1,1 +1,18 @@
-func Iterator.next() {}
+func i32.is_zero(c: i32) bool {
+    return c == 0;
+}
+
+func i32.inc(c: i32) {
+    c.* = c.* + 1;
+}
+
+func main() {
+    var i = 0;
+    if i.is_zero() {
+        printf("is zero!\n");
+        i.inc();
+    }
+
+    printf("i=%d\n", i);
+}
+

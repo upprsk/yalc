@@ -17,6 +17,8 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             return format_to(ctx.out(), "Int({})", node->value_uint64());
         case NodeKind::Id:
             return format_to(ctx.out(), "Id({})", node->value_string());
+        case NodeKind::Str:
+            return format_to(ctx.out(), "Str({:?})", node->value_string());
         case NodeKind::EnumLit:
             return format_to(ctx.out(), "EnumLit(.{})", node->value_string());
 
@@ -265,7 +267,8 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::EnumLit: name = "EnumLit"; break;
         case yal::NodeKind::IdPack: name = "IdPack"; break;
         case yal::NodeKind::Int: name = "Int"; break;
-        case yal::NodeKind::Id: name = "Id";
+        case yal::NodeKind::Id: name = "Id"; break;
+        case yal::NodeKind::Str: name = "Str"; break;
     }
 
     return formatter<string_view>::format(name, ctx);

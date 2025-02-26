@@ -724,6 +724,14 @@ struct Parser {
                                    std::string{prev_span().str(source)});
         }
 
+        if (match(TokenType::Str)) {
+            // FIXME: escape strings
+            auto s = prev_span().str(source);
+
+            return ast.new_node_str(prev_span(),
+                                    std::string{s.substr(1, s.size() - 2)});
+        }
+
         return parse_number();
     }
 
