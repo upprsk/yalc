@@ -151,9 +151,35 @@ struct Parser {
         return ast.new_node_err(t.span);
     }
 
+    // func ::= "func" { ID "." } ID [ "[" generic_args "]" ] "(" func_args ")"
+    // [ expr ] block ;
     auto parse_func() -> NodeHandle {
-        er->report_bug(span(), "func not implemented");
-        return ast.new_node_err(span());
+        auto s = prev_span();
+
+        try(consume(TokenType::Id));
+        auto name = ast.new_node_id(s.extend(prev_span()),
+                                    std::string{prev_span().str(source)});
+        while (match(TokenType::Id)) {
+            name = ast.new_node_field(ast.get(name)->span, name,
+                                      std::string{prev_span().str(source)});
+        }
+
+        try(consume(TokenType::Lparen));
+
+        // TODO: args
+        std::vector<NodeHandle> args;
+
+        try(consume(TokenType::Rparen));
+
+        auto ret = ast.new_node_nil(prev_span());
+        if (!check(TokenType::Lbrace)) {
+            ret = parse_expr();
+        }
+
+        auto body = parse_block();
+
+        return ast.new_node_func(s.extend(ast.get(body)->span), name, args, ret,
+                                 body);
     }
 
     auto parse_def_decl() -> NodeHandle {
@@ -173,6 +199,49 @@ struct Parser {
 
     // ------------------------------------------------------------------------
 
+    // stmt ::= expr ";"
+    //        | return_stmt
+    //        | if_stmt
+    //        | while_stmt
+    //        | for_stmt
+    //        | switch_stmt
+    //        | block
+    //        | def_decl
+    //        | var_decl
+    //        | assign
+    //        | break
+    //        | defer
+    //        ;
+    auto parse_stmt() -> NodeHandle {
+        // TODO: other cases
+
+        auto expr = parse_expr();
+        try(consume(TokenType::Semi));
+
+        return ast.new_node_unary(
+            NodeKind::ExprStmt, ast.get(expr)->span.extend(prev_span()), expr);
+    }
+
+    // block ::= "{" { stmt } "}" ;
+    auto parse_block() -> NodeHandle {
+        auto s = span();
+
+        std::vector<NodeHandle> children;
+
+        try(consume(TokenType::Lbrace));
+
+        while (!is_at_end() && !check(TokenType::Rbrace)) {
+            children.push_back(parse_stmt());
+        }
+
+        try(consume(TokenType::Rbrace));
+
+        return ast.new_node_block(s.extend(prev_span()), children);
+    }
+
+    // ------------------------------------------------------------------------
+
+    // expr ::= logic_or ;
     auto parse_expr() -> NodeHandle { return parse_logic_or(); }
 
     // logic_or  ::= logic_and { "or" logic_and } ;

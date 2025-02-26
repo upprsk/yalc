@@ -64,6 +64,9 @@ enum class NodeKind : uint16_t {
     Err,
     Nil,
     File,
+    Func,
+    Block,
+    ExprStmt,
     LogicOr,
     LogicAnd,
     BinOr,
@@ -148,6 +151,24 @@ struct Ast {
             .second;
     }
 
+    [[nodiscard]] auto new_node_func(Span const& span, NodeHandle name,
+                                     std::span<NodeHandle const> args,
+                                     NodeHandle ret, NodeHandle body)
+        -> NodeHandle {
+        return new_node(NodeKind::Func, span,
+                        new_array_plus_three(name, ret, body, args),
+                        args.size() + 3)
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_block(Span const&                 span,
+                                      std::span<NodeHandle const> children)
+        -> NodeHandle {
+        return new_node(NodeKind::Block, span, new_array(children),
+                        children.size())
+            .second;
+    }
+
     [[nodiscard]] auto new_node_expr_pack(Span const&                 span,
                                           std::span<NodeHandle const> children)
         -> NodeHandle {
@@ -218,6 +239,19 @@ struct Ast {
         -> NodeHandle {
         auto sz = node_refs.size();
         node_refs.push_back(first);
+        node_refs.insert(node_refs.end(), handles.begin(), handles.end());
+
+        return NodeHandle::from_idx(sz).to_array();
+    }
+
+    [[nodiscard]] auto new_array_plus_three(NodeHandle first, NodeHandle second,
+                                            NodeHandle                  third,
+                                            std::span<NodeHandle const> handles)
+        -> NodeHandle {
+        auto sz = node_refs.size();
+        node_refs.push_back(first);
+        node_refs.push_back(second);
+        node_refs.push_back(third);
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
 
         return NodeHandle::from_idx(sz).to_array();

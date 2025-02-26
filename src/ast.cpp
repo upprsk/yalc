@@ -26,7 +26,8 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             return fmt::format_to(ctx.out(), ", {})", node->value_string());
 
         case NodeKind::File:
-        case NodeKind::ExprPack: {
+        case NodeKind::ExprPack:
+        case NodeKind::Block: {
             fmt::format_to(ctx.out(), "{}([", node->kind);
 
             size_t i{};
@@ -34,6 +35,32 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
                 if (i++ != 0) fmt::format_to(ctx.out(), ", ");
                 dump(ctx, chld);
             }
+
+            return fmt::format_to(ctx.out(), "])");
+        }
+
+        case NodeKind::Func: {
+            fmt::format_to(ctx.out(), "{}(", node->kind);
+
+            auto children = get_children(n);
+            if (children.size() < 3)
+                throw fmt::system_error(
+                    6, "invalid number of children for call: {} < 3",
+                    children.size());
+
+            dump(ctx, children[0]);
+            fmt::format_to(ctx.out(), ", ");
+            dump(ctx, children[1]);
+            fmt::format_to(ctx.out(), ", [");
+
+            size_t i{};
+            for (auto const& chld : children.subspan(3)) {
+                if (i++ != 0) fmt::format_to(ctx.out(), ", ");
+                dump(ctx, chld);
+            }
+
+            fmt::format_to(ctx.out(), "], ");
+            dump(ctx, children[2]);
 
             return fmt::format_to(ctx.out(), "])");
         }
@@ -68,6 +95,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
         case NodeKind::Optional:
         case NodeKind::Deref:
         case NodeKind::OrReturn:
+        case NodeKind::ExprStmt:
             fmt::format_to(ctx.out(), "{}(", node->kind);
             dump(ctx, node->first);
             return fmt::format_to(ctx.out(), ")");
@@ -131,6 +159,9 @@ auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
         case yal::NodeKind::Err: name = "Err"; break;
         case yal::NodeKind::Nil: name = "Nil"; break;
         case yal::NodeKind::File: name = "File"; break;
+        case yal::NodeKind::Func: name = "Func"; break;
+        case yal::NodeKind::Block: name = "Block"; break;
+        case yal::NodeKind::ExprStmt: name = "ExprStmt"; break;
         case yal::NodeKind::LogicOr: name = "LogicOr"; break;
         case yal::NodeKind::LogicAnd: name = "LogicAnd"; break;
         case yal::NodeKind::BinOr: name = "BinOr"; break;

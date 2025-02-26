@@ -53,6 +53,72 @@ TEST_CASE("just comments", "[ast]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "File([])");
 }
 
+TEST_CASE("one function with nothing", "[ast][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func main() {})~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), Nil, [], Block([])])])");
+}
+
+TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func main() i32 {})~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), Id(i32), [], Block([])])])");
+}
+
+TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func main() {
+        1 + 2;
+        some_function();
+    })~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), Nil, [], Block(["
+            "ExprStmt(Add(Int(1), Int(2))), "
+            "ExprStmt(Call(Id(some_function), []))"
+            "])])])");
+}
+
 TEST_CASE("integer expresions", "[ast][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
