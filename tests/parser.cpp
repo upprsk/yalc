@@ -750,6 +750,77 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
     }
 }
 
+TEST_CASE("while statement", "[parser][func][stmt]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("infinite") {
+        SKIP("while not implemented");
+
+        auto source = R"~~(func main() {
+            while true {
+            }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "");
+    }
+
+    SECTION("with break") {
+        SKIP("while not implemented");
+
+        auto source = R"~~(func main() {
+            while true {
+                break;
+            }
+    })~~";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "");
+    }
+}
+
+TEST_CASE("break statement", "[parser][func][stmt]") {
+    SKIP("break not implemented");
+
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func main() {
+        break;
+    })~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(Id(main), [], Nil, Block([BreakStmt]))])");
+}
+
 TEST_CASE("locals", "[parser][func][var]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
@@ -1319,15 +1390,9 @@ TEST_CASE("comparison expresions", "[parser][expr]") {
                 "LogicOr(Equal(Id(a), ShftRight(Id(b), Int(1))), "
                 "NotEqual(Id(a), Int(0)))");
     }
-}
 
-TEST_CASE("arithmetic expresions", "[parser][expr]") {
-    auto                                   devnull = fopen("/dev/null", "w+");
-    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
-                                             [](auto f) { fclose(f); }};
-
-    SECTION("all") {
-        auto source = "1 + 1 * (2 - 4 / param)";
+    SECTION("comparisons 4") {
+        auto source = "a <= b and z.* > 0";
         auto path = ":memory:";
 
         auto er = ErrorReporter{source, path, devnull};
@@ -1337,9 +1402,31 @@ TEST_CASE("arithmetic expresions", "[parser][expr]") {
 
         auto [ast, root] = parse_expr(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(
-            fmt::to_string(ast.fatten(root)) ==
-            "Add(Int(1), Mul(Int(1), Sub(Int(2), Div(Int(4), Id(param)))))");
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "LogicAnd(SmallerEqual(Id(a), Id(b)), Greater(Deref(Id(z)), "
+                "Int(0)))");
+    }
+}
+
+TEST_CASE("arithmetic expresions", "[parser][expr]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("all") {
+        auto source = "1 + 1 * (2 - 4 / param) + 42 % 2";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse_expr(tokens, source, er);
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                "Add(Add(Int(1), Mul(Int(1), Sub(Int(2), Div(Int(4), "
+                "Id(param))))), Mod(Int(42), Int(2)))");
     }
 
     SECTION("chain") {
