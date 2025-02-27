@@ -367,9 +367,8 @@ TEST_CASE("print array", "[tokenizer]") {
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
 
-    // FIXME: missing % and %=
     auto source =
-        R"~~(= == => < << <<= <= > >> >= >>= + ++ += - -- -= * ** *= / /= ! != & &= | |= ^ ^= ~ ~= ; : , . .. .* .= (){}[] id 12345_67890 0xDEAD_BEEF_0000_EEEF "a string the contains $" // commenting!)~~";
+        R"~~(= == => < << <<= <= > >> >= >>= + ++ += - -- -= * ** *= / /= ! != % %= & &= | |= ^ ^= ~ ~= ; : , . .. .* .= ? (){}[] id 12345_67890 0xDEAD_BEEF_0000_EEEF "a string the contains $" // commenting!)~~";
     auto path = ":memory:";
 
     auto er = ErrorReporter{source, path, devnull};
@@ -400,33 +399,36 @@ TEST_CASE("print array", "[tokenizer]") {
         {         TokenType::SlashEqual,   {58, 60}},
         {               TokenType::Bang,   {61, 62}},
         {          TokenType::BangEqual,   {63, 65}},
-        {          TokenType::Ampersand,   {66, 67}},
-        {     TokenType::AmpersandEqual,   {68, 70}},
-        {               TokenType::Pipe,   {71, 72}},
-        {          TokenType::PipeEqual,   {73, 75}},
-        {             TokenType::Carrot,   {76, 77}},
-        {        TokenType::CarrotEqual,   {78, 80}},
-        {              TokenType::Tilde,   {81, 82}},
-        {         TokenType::TildeEqual,   {83, 85}},
-        {               TokenType::Semi,   {86, 87}},
-        {              TokenType::Colon,   {88, 89}},
-        {              TokenType::Comma,   {90, 91}},
-        {                TokenType::Dot,   {92, 93}},
-        {             TokenType::DotDot,   {94, 96}},
-        {            TokenType::DotStar,   {97, 99}},
-        {           TokenType::DotEqual, {100, 102}},
-        {             TokenType::Lparen, {103, 104}},
-        {             TokenType::Rparen, {104, 105}},
-        {             TokenType::Lbrace, {105, 106}},
-        {             TokenType::Rbrace, {106, 107}},
-        {           TokenType::Lbracket, {107, 108}},
-        {           TokenType::Rbracket, {108, 109}},
-        {                 TokenType::Id, {110, 112}},
-        {                TokenType::Int, {113, 124}},
-        {                TokenType::Hex, {125, 146}},
-        {                TokenType::Str, {147, 172}},
-        {            TokenType::Comment, {173, 187}},
-        {                TokenType::Eof, {187, 187}}
+        {            TokenType::Percent,   {66, 67}},
+        {       TokenType::PercentEqual,   {68, 70}},
+        {          TokenType::Ampersand,   {71, 72}},
+        {     TokenType::AmpersandEqual,   {73, 75}},
+        {               TokenType::Pipe,   {76, 77}},
+        {          TokenType::PipeEqual,   {78, 80}},
+        {             TokenType::Carrot,   {81, 82}},
+        {        TokenType::CarrotEqual,   {83, 85}},
+        {              TokenType::Tilde,   {86, 87}},
+        {         TokenType::TildeEqual,   {88, 90}},
+        {               TokenType::Semi,   {91, 92}},
+        {              TokenType::Colon,   {93, 94}},
+        {              TokenType::Comma,   {95, 96}},
+        {                TokenType::Dot,   {97, 98}},
+        {             TokenType::DotDot,  {99, 101}},
+        {            TokenType::DotStar, {102, 104}},
+        {           TokenType::DotEqual, {105, 107}},
+        {           TokenType::Question, {108, 109}},
+        {             TokenType::Lparen, {110, 111}},
+        {             TokenType::Rparen, {111, 112}},
+        {             TokenType::Lbrace, {112, 113}},
+        {             TokenType::Rbrace, {113, 114}},
+        {           TokenType::Lbracket, {114, 115}},
+        {           TokenType::Rbracket, {115, 116}},
+        {                 TokenType::Id, {117, 119}},
+        {                TokenType::Int, {120, 131}},
+        {                TokenType::Hex, {132, 153}},
+        {                TokenType::Str, {154, 179}},
+        {            TokenType::Comment, {180, 194}},
+        {                TokenType::Eof, {194, 194}}
     };
 
     CHECK_FALSE(er.had_error());
@@ -441,15 +443,16 @@ TEST_CASE("print array", "[tokenizer]") {
         "{Minus, {40, 41}}, {MinusMinus, {42, 44}}, {MinusEqual, {45, 47}}, "
         "{Star, {48, 49}}, {StarStar, {50, 52}}, {StarEqual, {53, 55}}, "
         "{Slash, {56, 57}}, {SlashEqual, {58, 60}}, {Bang, {61, 62}}, "
-        "{BangEqual, {63, 65}}, {Ampersand, {66, 67}}, {AmpersandEqual, {68, "
-        "70}}, {Pipe, {71, 72}}, {PipeEqual, {73, 75}}, {Carrot, {76, 77}}, "
-        "{CarrotEqual, {78, 80}}, {Tilde, {81, 82}}, {TildeEqual, {83, 85}}, "
-        "{Semi, {86, 87}}, {Colon, {88, 89}}, {Comma, {90, 91}}, {Dot, {92, "
-        "93}}, {DotDot, {94, 96}}, {DotStar, {97, 99}}, {DotEqual, {100, "
-        "102}}, {Lparen, {103, 104}}, {Rparen, {104, 105}}, {Lbrace, {105, "
-        "106}}, {Rbrace, {106, 107}}, {Lbracket, {107, 108}}, {Rbracket, {108, "
-        "109}}, {Id, {110, 112}}, {Int, {113, 124}}, {Hex, {125, 146}}, {Str, "
-        "{147, 172}}, {Comment, {173, 187}}, {Eof, {187, 187}}]");
+        "{BangEqual, {63, 65}}, {Percent, {66, 67}}, {PercentEqual, {68, 70}}, "
+        "{Ampersand, {71, 72}}, {AmpersandEqual, {73, 75}}, {Pipe, {76, 77}}, "
+        "{PipeEqual, {78, 80}}, {Carrot, {81, 82}}, {CarrotEqual, {83, 85}}, "
+        "{Tilde, {86, 87}}, {TildeEqual, {88, 90}}, {Semi, {91, 92}}, {Colon, "
+        "{93, 94}}, {Comma, {95, 96}}, {Dot, {97, 98}}, {DotDot, {99, 101}}, "
+        "{DotStar, {102, 104}}, {DotEqual, {105, 107}}, {Question, {108, "
+        "109}}, {Lparen, {110, 111}}, {Rparen, {111, 112}}, {Lbrace, {112, "
+        "113}}, {Rbrace, {113, 114}}, {Lbracket, {114, 115}}, {Rbracket, {115, "
+        "116}}, {Id, {117, 119}}, {Int, {120, 131}}, {Hex, {132, 153}}, {Str, "
+        "{154, 179}}, {Comment, {180, 194}}, {Eof, {194, 194}}]");
 }
 
 TEST_CASE("invalid character", "[tokenizer]") {
