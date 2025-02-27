@@ -663,8 +663,8 @@ struct Parser {
             auto args = parse_call_args();
             try(consume(TokenType::Rparen));
 
-            return ast.new_node_call(ast.get(0)->span.extend(prev_span()), lhs,
-                                     args);
+            return ast.new_node_call(ast.get(lhs)->span.extend(prev_span()),
+                                     lhs, args);
         }
 
         // TODO: primary { "[" slice_or_index "]" } (* index/slicing *)
