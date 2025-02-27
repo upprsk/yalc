@@ -53,6 +53,25 @@ TEST_CASE("just comments", "[parser]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "File([])");
 }
 
+TEST_CASE("extra data", "[parser]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = ";";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) == "File([Err({0, 1})])");
+}
+
 TEST_CASE("global constant", "[parser][var]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
