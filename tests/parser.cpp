@@ -15,7 +15,7 @@ using Catch::Matchers::Equals;
 // NOLINTBEGIN(readability-function-size)
 // NOLINTBEGIN(modernize-use-designated-initializers)
 
-TEST_CASE("empty source", "[ast]") {
+TEST_CASE("empty source", "[parser]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -34,7 +34,7 @@ TEST_CASE("empty source", "[ast]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "File([])");
 }
 
-TEST_CASE("just comments", "[ast]") {
+TEST_CASE("just comments", "[parser]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -53,7 +53,7 @@ TEST_CASE("just comments", "[ast]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "File([])");
 }
 
-TEST_CASE("global constant", "[ast][var]") {
+TEST_CASE("global constant", "[parser][var]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -89,9 +89,28 @@ TEST_CASE("global constant", "[ast][var]") {
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
                 "File([DefDecl(Id(ZERO), Id(u64), Int(0))])");
     }
+
+    SECTION("unterminated def") {
+        SECTION("missing semicolon") {
+            auto source = R"~~(def ZERO = 0)~~";
+            auto path = ":memory:";
+
+            auto er = ErrorReporter{source, path, devnull};
+            auto tokens = tokenize(source, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse(tokens, source, er);
+
+            // TODO: improve this error
+            REQUIRE(er.had_error());
+            REQUIRE(fmt::to_string(ast.fatten(root)) ==
+                    "File([Err({11, 12})])");
+        }
+    }
 }
 
-TEST_CASE("global variable", "[ast][var]") {
+TEST_CASE("global variable", "[parser][var]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -145,7 +164,7 @@ TEST_CASE("global variable", "[ast][var]") {
     }
 }
 
-TEST_CASE("one function with nothing", "[ast][func]") {
+TEST_CASE("one function with nothing", "[parser][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -165,7 +184,7 @@ TEST_CASE("one function with nothing", "[ast][func]") {
             "File([Func(Id(main), [], Nil, Block([]))])");
 }
 
-TEST_CASE("one bound function", "[ast][func]") {
+TEST_CASE("one bound function", "[parser][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -185,7 +204,7 @@ TEST_CASE("one bound function", "[ast][func]") {
             "File([Func(Field(Id(Iterator), next), [], Nil, Block([]))])");
 }
 
-TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
+TEST_CASE("one function with nothing but returns i32", "[parser][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -205,7 +224,7 @@ TEST_CASE("one function with nothing but returns i32", "[ast][func]") {
             "File([Func(Id(main), [], Id(i32), Block([]))])");
 }
 
-TEST_CASE("one function arguments", "[ast][func]") {
+TEST_CASE("one function arguments", "[parser][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -345,7 +364,7 @@ TEST_CASE("one function arguments", "[ast][func]") {
     }
 }
 
-TEST_CASE("one function with return", "[ast][func][stmt]") {
+TEST_CASE("one function with return", "[parser][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -366,7 +385,7 @@ TEST_CASE("one function with return", "[ast][func][stmt]") {
             "Block([ReturnStmt(ExprPack([Int(0)]))]))])");
 }
 
-TEST_CASE("one function with multiple return values", "[ast][func][stmt]") {
+TEST_CASE("one function with multiple return values", "[parser][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -387,7 +406,7 @@ TEST_CASE("one function with multiple return values", "[ast][func][stmt]") {
             "Block([ReturnStmt(ExprPack([Int(0), Int(0)]))]))])");
 }
 
-TEST_CASE("with various return values", "[ast][func]") {
+TEST_CASE("with various return values", "[parser][func]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -461,7 +480,7 @@ TEST_CASE("with various return values", "[ast][func]") {
     }
 }
 
-TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
+TEST_CASE("one function with expression statements", "[parser][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -487,7 +506,7 @@ TEST_CASE("one function with expression statements", "[ast][func][stmt]") {
             "]))])");
 }
 
-TEST_CASE("assignments", "[ast][func][stmt]") {
+TEST_CASE("assignments", "[parser][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -589,7 +608,7 @@ TEST_CASE("assignments", "[ast][func][stmt]") {
     }
 }
 
-TEST_CASE("if statement", "[ast][func][stmt]") {
+TEST_CASE("if statement", "[parser][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -712,7 +731,7 @@ TEST_CASE("if statement", "[ast][func][stmt]") {
     }
 }
 
-TEST_CASE("locals", "[ast][func][var]") {
+TEST_CASE("locals", "[parser][func][var]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -755,7 +774,7 @@ TEST_CASE("locals", "[ast][func][var]") {
     }
 }
 
-TEST_CASE("integer expresions", "[ast][expr]") {
+TEST_CASE("integer expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -789,7 +808,7 @@ TEST_CASE("integer expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("id expresions", "[ast][expr]") {
+TEST_CASE("id expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -809,7 +828,7 @@ TEST_CASE("id expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("pack expresions", "[ast][expr]") {
+TEST_CASE("pack expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -846,7 +865,7 @@ TEST_CASE("pack expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("enum literals", "[ast][expr]") {
+TEST_CASE("enum literals", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -864,7 +883,7 @@ TEST_CASE("enum literals", "[ast][expr]") {
     REQUIRE(fmt::to_string(ast.fatten(root)) == "EnumLit(.test)");
 }
 
-TEST_CASE("pointer types", "[ast][expr]") {
+TEST_CASE("pointer types", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -884,7 +903,7 @@ TEST_CASE("pointer types", "[ast][expr]") {
     }
 }
 
-TEST_CASE("fields", "[ast][expr]") {
+TEST_CASE("fields", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -950,7 +969,7 @@ TEST_CASE("fields", "[ast][expr]") {
     }
 }
 
-TEST_CASE("unary expresions", "[ast][expr]") {
+TEST_CASE("unary expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1029,7 +1048,7 @@ TEST_CASE("unary expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("deref expresions", "[ast][expr]") {
+TEST_CASE("deref expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1064,7 +1083,7 @@ TEST_CASE("deref expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("cast expresions", "[ast][expr]") {
+TEST_CASE("cast expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1159,7 +1178,7 @@ TEST_CASE("cast expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("binary expresions", "[ast][expr]") {
+TEST_CASE("binary expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1210,7 +1229,7 @@ TEST_CASE("binary expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("shift expresions", "[ast][expr]") {
+TEST_CASE("shift expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1230,7 +1249,7 @@ TEST_CASE("shift expresions", "[ast][expr]") {
             "ShftRight(Id(b), Id(S))))");
 }
 
-TEST_CASE("comparison expresions", "[ast][expr]") {
+TEST_CASE("comparison expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1283,7 +1302,7 @@ TEST_CASE("comparison expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("arithmetic expresions", "[ast][expr]") {
+TEST_CASE("arithmetic expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1320,7 +1339,7 @@ TEST_CASE("arithmetic expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("logic expresions", "[ast][expr]") {
+TEST_CASE("logic expresions", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1389,7 +1408,7 @@ TEST_CASE("logic expresions", "[ast][expr]") {
     }
 }
 
-TEST_CASE("pointers", "[ast][expr]") {
+TEST_CASE("pointers", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -1479,7 +1498,7 @@ TEST_CASE("pointers", "[ast][expr]") {
     }
 }
 
-TEST_CASE("arrays", "[ast][expr]") {
+TEST_CASE("arrays", "[parser][expr]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
