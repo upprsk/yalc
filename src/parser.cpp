@@ -754,7 +754,7 @@ struct Parser {
     //
     // array ::= "[" ( expr | "_" ) "]" expr "{" array_items "}" ;
     auto parse_pointer_type_or_array() -> NodeHandle {
-        auto s = prev_span();
+        auto s = span();
 
         if (match(TokenType::Star)) {
             auto is_const = false;
