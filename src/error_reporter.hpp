@@ -15,6 +15,8 @@ namespace yal {
 class ErrorReporter {
     static constexpr auto const error_style = fmt::fg(fmt::color::red);
     static constexpr auto const note_style = fmt::fg(fmt::color::cyan);
+    static constexpr auto const debug_style =
+        fmt::fg(fmt::color::medium_purple);
     static constexpr auto const bug_style =
         fmt::fg(fmt::color::crimson) | fmt::emphasis::bold;
 
@@ -42,6 +44,15 @@ public:
 
     void vreport_note(Span s, fmt::string_view fmt, fmt::format_args args) {
         report(s, "note", note_style, fmt, args);
+    }
+
+    template <typename... T>
+    void report_debug(Span s, fmt::format_string<T...> fmt, T&&... args) {
+        vreport_debug(s, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_debug(Span s, fmt::string_view fmt, fmt::format_args args) {
+        report(s, "debug", debug_style, fmt, args);
     }
 
     template <typename... T>

@@ -63,7 +63,7 @@ struct Context {
 struct Typing {
     auto add_types(Context& ctx, NodeHandle n) -> TypeHandle {
         auto node = ast->get_mut(n);
-        er->report_note(node->span, "pass_add_types: {}", node->kind);
+        er->report_debug(node->span, "pass_add_types: {}", node->kind);
 
         switch (node->kind) {
             case NodeKind::Err: return node->set_type(ts->get_type_err());
