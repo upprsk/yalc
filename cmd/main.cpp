@@ -7,6 +7,8 @@
 #include "fmt/ranges.h"
 #include "parser.hpp"
 #include "tokenizer.hpp"
+#include "types.hpp"
+#include "typing.hpp"
 
 auto read_entire_file(std::string const& path) -> std::optional<std::string> {
     std::unique_ptr<FILE, void (*)(FILE*)> f = {fopen(path.c_str(), "rb"),
@@ -45,6 +47,9 @@ auto main(int argc, char** argv) -> int {
         auto [ast, root] = yal::parse(tokens, *contents, er);
 
         fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
+
+        auto ts = yal::TypeStore::new_store();
+        yal::pass_add_types(root, ast, ts, er);
 
         return 0;
     }

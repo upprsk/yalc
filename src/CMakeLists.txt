@@ -9,6 +9,10 @@ add_library(yal
     span.hpp
     tokenizer.cpp
     tokenizer.hpp
+    types.cpp
+    types.hpp
+    typing.cpp
+    typing.hpp
 )
 target_include_directories(yal PUBLIC .)
 target_compile_options(yal PRIVATE -Wall -Wextra)
