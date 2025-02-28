@@ -125,6 +125,14 @@ struct Type {
         return kind == TypeKind::Int32;
     }
 
+    [[nodiscard]] constexpr auto is_ptr() const -> bool {
+        return kind == TypeKind::Ptr;
+    }
+
+    [[nodiscard]] constexpr auto is_void() const -> bool {
+        return kind == TypeKind::Void;
+    }
+
     [[nodiscard]] constexpr auto is_type() const -> bool {
         return kind == TypeKind::Type;
     }
@@ -176,6 +184,16 @@ struct TypeStore {
     [[nodiscard]] auto get_type_void() const -> TypeHandle { return void_type; }
 
     [[nodiscard]] auto get_type_i32() const -> TypeHandle { return i32_type; }
+
+    [[nodiscard]] auto get_type_ptr(TypeHandle child) -> TypeHandle {
+        auto t = find_type(Type{.kind = TypeKind::Ptr,
+                                .flags = TypeFlags::None,
+                                .first = child,
+                                .second = {}});
+        if (t.is_valid()) return t;
+
+        return new_type(TypeKind::Ptr, TypeFlags::None, child);
+    }
 
     [[nodiscard]] auto get_type_fn(std::span<TypeHandle const> args,
                                    TypeHandle ret) -> TypeHandle {
@@ -259,6 +277,17 @@ struct TypeStore {
                     return TypeHandle::from_size(i);
             }
 
+            i++;
+        }
+
+        return TypeHandle{}.to_invalid();
+    }
+
+    [[nodiscard]] auto find_type(Type const& needle) const -> TypeHandle {
+        size_t i{};
+
+        for (auto const& t : types) {
+            if (t == needle) return TypeHandle::from_size(i);
             i++;
         }
 

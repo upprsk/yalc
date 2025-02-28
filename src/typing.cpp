@@ -255,8 +255,17 @@ struct Typing {
                 throw std::runtime_error{"not implemented"};
             }
 
-            case NodeKind::DefDecl:
-            case NodeKind::ExprStmt: break;
+            case NodeKind::DefDecl: break;
+            case NodeKind::ExprStmt: {
+                auto expr = add_types(ctx, node->first);
+                if (!ts->get(expr)->is_void()) {
+                    er->report_error(node->span,
+                                     "discarding expression result of type: {}",
+                                     ts->fatten(expr));
+                }
+
+                return node->set_type(ts->get_type_void());
+            }
 
             case NodeKind::ReturnStmt: {
                 auto type = ts->get_type_void();
@@ -284,8 +293,26 @@ struct Typing {
             case NodeKind::IfStmtWithElse:
             case NodeKind::IfStmtWithDecl:
             case NodeKind::IfStmtWithDeclAndElse:
-            case NodeKind::WhileStmt:
-            case NodeKind::Assign:
+            case NodeKind::WhileStmt: break;
+
+            case NodeKind::Assign: {
+                auto lhs = add_types(ctx, node->first);
+                auto rhs = add_types(ctx, node->second);
+
+                if (!ast->get(node->first)->is_lvalue()) {
+                    er->report_error(node->span, "can't assign of non l-value");
+                }
+
+                if (lhs != rhs) {
+                    er->report_error(node->span,
+                                     "type mismatch, left side of assignment "
+                                     "has type {} but right side has type {}",
+                                     ts->fatten(lhs), ts->fatten(rhs));
+                }
+
+                return node->set_type(ts->get_type_void());
+            }
+
             case NodeKind::Break:
             case NodeKind::Defer:
             case NodeKind::LogicOr:
@@ -328,25 +355,61 @@ struct Typing {
 
             case NodeKind::Cast:
             case NodeKind::OrElse:
-            case NodeKind::OrReturn:
-            case NodeKind::AddrOf:
+            case NodeKind::OrReturn: break;
+
+            case NodeKind::AddrOf: {
+                auto ty = add_types(ctx, node->first);
+                if (!ast->get(node->first)->is_lvalue()) {
+                    er->report_error(node->span,
+                                     "can't take address of non l-value");
+                }
+
+                return node->set_type(ts->get_type_ptr(ty));
+            }
+
             case NodeKind::LogicNot:
             case NodeKind::BinNot:
             case NodeKind::Plus:
             case NodeKind::Neg:
-            case NodeKind::Optional:
-            case NodeKind::Ptr:
+            case NodeKind::Optional: break;
+
+            case NodeKind::Ptr: {
+                auto ty = add_types(ctx, node->first);
+                if (!ts->get(ty)->is_type()) {
+                    er->report_error(
+                        node->span, "can't create pointer type to non-type: {}",
+                        ts->fatten(ty));
+                }
+
+                return node->set_type(ts->get_type_type());
+            }
+
             case NodeKind::MultiPtr:
             case NodeKind::SlicePtr:
             case NodeKind::Array:
             case NodeKind::ArrayType:
-            case NodeKind::ArrayAutoLen:
-            case NodeKind::Deref: break;
+            case NodeKind::ArrayAutoLen: break;
+            case NodeKind::Deref: {
+                auto child = add_types(ctx, node->first);
+
+                // TODO: handle optionals
+                if (!ts->get(child)->is_ptr()) {
+                    er->report_error(node->span,
+                                     "can't dereference non-pointer type: {}",
+                                     ts->fatten(child));
+                    return node->set_type(child);
+                }
+
+                // it is a pointer, so unwrap it
+                return node->set_type(ts->get(child)->first);
+            }
 
             case NodeKind::Call: {
                 auto call = node->as_call(*ast);
 
                 auto callee = add_types(ctx, call.callee);
+
+                // TODO: handle calling function pointers
                 if (!ts->get(callee)->is_func()) {
                     er->report_error(node->span,
                                      "can't call non function of type: {}",
@@ -467,6 +530,11 @@ struct Typing {
                 }
 
                 return ts->get_type_pack(items);
+            }
+
+            case NodeKind::Ptr: {
+                auto child = eval_to_type(ctx, node.first);
+                return ts->get_type_ptr(child);
             }
 
             default:
