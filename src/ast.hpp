@@ -131,6 +131,7 @@ struct Ast;
 enum class NodeFlags : uint16_t {
     None = 0,
     PtrIsConst = (1 << 0),
+    FuncIsExtern = (1 << 1),
 };
 
 struct Node {
@@ -179,6 +180,11 @@ struct Node {
 
     [[nodiscard]] constexpr auto has_flag_ptr_is_const() const -> bool {
         return fmt::underlying(flags) & fmt::underlying(NodeFlags::PtrIsConst);
+    }
+
+    [[nodiscard]] constexpr auto has_flag_func_is_extern() const -> bool {
+        return fmt::underlying(flags) &
+               fmt::underlying(NodeFlags::FuncIsExtern);
     }
 
     struct NodeFunc {
@@ -250,6 +256,16 @@ struct Ast {
         return new_node(NodeKind::Func, NodeFlags::None, span,
                         new_array_plus_three(name, ret, body, args),
                         NodeHandle::from_size(args.size() + 3))
+            .second;
+    }
+
+    [[nodiscard]] auto new_node_extern_func(Span const& span, NodeHandle name,
+                                            std::span<NodeHandle const> args,
+                                            NodeHandle ret) -> NodeHandle {
+        return new_node(
+                   NodeKind::Func, NodeFlags::FuncIsExtern, span,
+                   new_array_plus_three(name, ret, new_node_nil(span), args),
+                   NodeHandle::from_size(args.size() + 3))
             .second;
     }
 

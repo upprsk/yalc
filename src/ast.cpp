@@ -103,6 +103,9 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
             auto f = node->as_func(*this);
             format_to(ctx.out(), "Func(");
 
+            if (node->has_flag_func_is_extern())
+                format_to(ctx.out(), "extern ");
+
             dump(ctx, f.name);
             format_to(ctx.out(), ", [");
 

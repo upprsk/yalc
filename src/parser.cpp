@@ -151,6 +151,7 @@ struct Parser {
 
     auto parse_top_stmt() -> NodeHandle {
         if (match_kw("func")) return parse_func();
+        if (match_kw("extern")) return parse_extern_func();
         if (match_kw("def")) return parse_def_decl();
         if (match_kw("var")) return parse_var_decl();
         if (match_kw("import")) return parse_import();
@@ -192,6 +193,36 @@ struct Parser {
 
         return ast.new_node_func(s.extend(ast.get(body)->span), name, args, ret,
                                  body);
+    }
+
+    // extern_func ::= "extern" "func" { ID "." } ID "(" func_args ")" [
+    // func_ret ] ";" ;
+    auto parse_extern_func() -> NodeHandle {
+        auto s = prev_span();
+
+        try(consume_kw("func"));
+        try(consume(TokenType::Id));
+        auto name = ast.new_node_id(s.extend(prev_span()),
+                                    std::string{prev_span().str(source)});
+        while (match(TokenType::Dot)) {
+            try(consume(TokenType::Id));
+            name = ast.new_node_field(ast.get(name)->span, name,
+                                      std::string{prev_span().str(source)});
+        }
+
+        try(consume(TokenType::Lparen));
+        auto args = parse_func_args();
+        try(consume(TokenType::Rparen));
+
+        auto ret = ast.new_node_nil(prev_span());
+        if (!check(TokenType::Semi)) {
+            // TODO: handle multiple returns and named returns
+            ret = parse_func_ret();
+        }
+
+        try(consume(TokenType::Semi));
+
+        return ast.new_node_extern_func(s.extend(prev_span()), name, args, ret);
     }
 
     auto parse_import() -> NodeHandle {

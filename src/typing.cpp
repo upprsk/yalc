@@ -112,11 +112,14 @@ struct Typing {
                 }
 
                 auto type = ts->get_type_fn(args, ret);
-                auto bc =
-                    c.new_child_for_func({.name = name,
-                                          .type = type,
-                                          .ret_span = ast->get(f.ret)->span});
-                add_types(bc, f.body);
+
+                if (!node->has_flag_func_is_extern()) {
+                    auto bc = c.new_child_for_func(
+                        {.name = name,
+                         .type = type,
+                         .ret_span = ast->get(f.ret)->span});
+                    add_types(bc, f.body);
+                }
 
                 ctx.define({.name = name,
                             .type = type,
