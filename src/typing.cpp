@@ -65,7 +65,7 @@ struct Context {
 struct Typing {
     auto add_types(Context& ctx, NodeHandle n) -> TypeHandle {
         auto node = ast->get_mut(n);
-        er->report_debug(node->span, "pass_add_types: {}", node->kind);
+        // er->report_debug(node->span, "pass_add_types: {}", node->kind);
 
         switch (node->kind) {
             case NodeKind::Err: return node->set_type(ts->get_type_err());
@@ -296,12 +296,25 @@ struct Typing {
             case NodeKind::Smaller:
             case NodeKind::SmallerEqual:
             case NodeKind::ShftLeft:
-            case NodeKind::ShftRight:
+            case NodeKind::ShftRight: break;
+
             case NodeKind::Add:
             case NodeKind::Sub:
             case NodeKind::Mul:
             case NodeKind::Div:
-            case NodeKind::Mod:
+            case NodeKind::Mod: {
+                auto lhs = add_types(ctx, node->first);
+                auto rhs = add_types(ctx, node->second);
+
+                if (lhs != rhs) {
+                    er->report_error(
+                        node->span, "incompatiple values in {}: {} and {}",
+                        node->kind, ts->fatten(lhs), ts->fatten(rhs));
+                }
+
+                return node->set_type(lhs);
+            }
+
             case NodeKind::Cast:
             case NodeKind::OrElse:
             case NodeKind::OrReturn:
