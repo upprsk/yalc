@@ -400,8 +400,7 @@ TEST_CASE("one function with return", "[parser][func][stmt]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), [], Id(i32), "
-            "Block([ReturnStmt(ExprPack([Int(0)]))]))])");
+            "File([Func(Id(main), [], Id(i32), Block([ReturnStmt(Int(0))]))])");
 }
 
 TEST_CASE("one function with multiple return values", "[parser][func][stmt]") {
