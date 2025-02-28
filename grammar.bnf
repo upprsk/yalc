@@ -5,8 +5,9 @@ top_stmt ::= func
            | import
            ;
 
-func          ::= "func" { ID "." } ID [ "[" generic_args "]" ] "(" func_args ")" [ func_ret ] block ;
+func          ::= "func" func_id [ "[" generic_args "]" ] "(" func_args ")" [ func_ret ] block ;
 extern_func   ::= "extern" "func" { ID "." } ID "(" func_args ")" [ func_ret ] ";" ;
+func_id       ::= ID { "." ID } ;
 generic_args  ::= generic_arg { "," generic_arg } [ "," ] ;
 generic_arg   ::= ID [ ":" expr ] ;
 func_args     ::= func_arg { "," func_args } [ "," ] ;

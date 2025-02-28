@@ -170,14 +170,7 @@ struct Parser {
     auto parse_func() -> NodeHandle {
         auto s = prev_span();
 
-        try(consume(TokenType::Id));
-        auto name = ast.new_node_id(s.extend(prev_span()),
-                                    std::string{prev_span().str(source)});
-        while (match(TokenType::Dot)) {
-            try(consume(TokenType::Id));
-            name = ast.new_node_field(ast.get(name)->span, name,
-                                      std::string{prev_span().str(source)});
-        }
+        auto name = parse_func_id();
 
         try(consume(TokenType::Lparen));
         auto args = parse_func_args();
@@ -221,6 +214,29 @@ struct Parser {
         try(consume(TokenType::Semi));
 
         return ast.new_node_extern_func(s.extend(prev_span()), name, args, ret);
+    }
+
+    auto parse_func_id() -> NodeHandle {
+        try(consume(TokenType::Id));
+        auto s = prev_span();
+
+        auto name =
+            ast.new_node_id(prev_span(), std::string{prev_span().str(source)});
+
+        if (check(TokenType::Dot)) {
+            std::vector ids{name};
+            while (match(TokenType::Dot)) {
+                try(consume(TokenType::Id));
+
+                ids.push_back(ast.new_node_id(
+                    prev_span(), std::string{prev_span().str(source)}));
+            }
+
+            auto end = ast.get(ids.at(ids.size() - 1))->span;
+            return ast.new_node_id_pack(s.extend(end), ids);
+        }
+
+        return name;
     }
 
     auto parse_import() -> NodeHandle {

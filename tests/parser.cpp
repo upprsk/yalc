@@ -219,8 +219,9 @@ TEST_CASE("one bound function", "[parser][func]") {
     auto [ast, root] = parse(tokens, source, er);
 
     REQUIRE_FALSE(er.had_error());
-    REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Field(Id(Iterator), next), [], Nil, Block([]))])");
+    REQUIRE(
+        fmt::to_string(ast.fatten(root)) ==
+        "File([Func(IdPack([Id(Iterator), Id(next)]), [], Nil, Block([]))])");
 }
 
 TEST_CASE("one function with nothing but returns i32", "[parser][func]") {
