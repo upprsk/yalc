@@ -5,6 +5,24 @@
 namespace yal {
 using fmt::format_to;
 
+auto TypeStore::new_store() -> TypeStore {
+    auto ts = TypeStore{};
+    ts.err_type = ts.new_type(TypeKind::Err);
+    ts.void_type = ts.new_type(TypeKind::Void);
+    ts.type_type = ts.new_type(TypeKind::Type);
+
+    ts.i32_type = ts.new_type(TypeKind::Int32);
+    ts.u32_type = ts.new_type(TypeKind::Uint32);
+    ts.i16_type = ts.new_type(TypeKind::Int16);
+    ts.u16_type = ts.new_type(TypeKind::Uint16);
+    ts.i8_type = ts.new_type(TypeKind::Int8);
+    ts.u8_type = ts.new_type(TypeKind::Uint8);
+
+    ts.usize_type = ts.new_type(TypeKind::Usize);
+
+    return ts;
+}
+
 auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
     -> fmt::format_context::iterator {
     auto type = get(n);
@@ -25,9 +43,22 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
             return format_to(ctx.out(), ")");
         }
         case TypeKind::Void: return format_to(ctx.out(), "void");
+
         case TypeKind::Int32: return format_to(ctx.out(), "i32");
+        case TypeKind::Uint32: return format_to(ctx.out(), "u32");
+        case TypeKind::Int16: return format_to(ctx.out(), "i16");
+        case TypeKind::Uint16: return format_to(ctx.out(), "u16");
+        case TypeKind::Int8: return format_to(ctx.out(), "i8");
+        case TypeKind::Uint8: return format_to(ctx.out(), "u8");
+        case TypeKind::Usize: return format_to(ctx.out(), "usize");
+
         case TypeKind::Ptr:
             format_to(ctx.out(), "*");
+            if (type->is_const()) format_to(ctx.out(), "const ");
+            return dump(ctx, type->first);
+        case TypeKind::MultiPtr:
+            format_to(ctx.out(), "[*]");
+            if (type->is_const()) format_to(ctx.out(), "const ");
             return dump(ctx, type->first);
         case TypeKind::Func: {
             auto f = type->as_func(*this);
@@ -76,7 +107,14 @@ auto fmt::formatter<yal::TypeKind>::format(yal::TypeKind   n,
         case yal::TypeKind::Type: name = "Type"; break;
         case yal::TypeKind::Void: name = "Void"; break;
         case yal::TypeKind::Int32: name = "Int32"; break;
+        case yal::TypeKind::Uint32: name = "Uint32"; break;
+        case yal::TypeKind::Int16: name = "Int16"; break;
+        case yal::TypeKind::Uint16: name = "Uint16"; break;
+        case yal::TypeKind::Int8: name = "Int8"; break;
+        case yal::TypeKind::Uint8: name = "Uint8"; break;
+        case yal::TypeKind::Usize: name = "Usize"; break;
         case yal::TypeKind::Ptr: name = "Ptr"; break;
+        case yal::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::TypeKind::Func: name = "Func"; break;
         case yal::TypeKind::Pack: name = "Pack"; break;
     }

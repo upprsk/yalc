@@ -313,8 +313,12 @@ struct Typing {
                 return node->set_type(ts->get_type_void());
             }
 
-            case NodeKind::Break:
+            case NodeKind::Break: break;
+
             case NodeKind::Defer:
+                add_types(ctx, node->first);
+                return node->set_type(ts->get_type_void());
+
             case NodeKind::LogicOr:
             case NodeKind::LogicAnd:
             case NodeKind::BinOr:
@@ -364,7 +368,12 @@ struct Typing {
                                      "can't take address of non l-value");
                 }
 
-                return node->set_type(ts->get_type_ptr(ty));
+                auto flags = TypeFlags::None;
+                if (ts->get(ty)->is_const()) {
+                    flags = TypeFlags::IsConst;
+                }
+
+                return node->set_type(ts->get_type_ptr(ty, flags));
             }
 
             case NodeKind::LogicNot:
@@ -384,7 +393,17 @@ struct Typing {
                 return node->set_type(ts->get_type_type());
             }
 
-            case NodeKind::MultiPtr:
+            case NodeKind::MultiPtr: {
+                auto ty = add_types(ctx, node->first);
+                if (!ts->get(ty)->is_type()) {
+                    er->report_error(
+                        node->span, "can't create pointer type to non-type: {}",
+                        ts->fatten(ty));
+                }
+
+                return node->set_type(ts->get_type_type());
+            }
+
             case NodeKind::SlicePtr:
             case NodeKind::Array:
             case NodeKind::ArrayType:
@@ -494,6 +513,7 @@ struct Typing {
                 break;
         }
 
+        er->report_debug(node->span, "not_implemented: {}", node->kind);
         throw std::runtime_error{"not implemented"};
     }
 
@@ -534,7 +554,24 @@ struct Typing {
 
             case NodeKind::Ptr: {
                 auto child = eval_to_type(ctx, node.first);
-                return ts->get_type_ptr(child);
+
+                auto flags = TypeFlags::None;
+                if (node.has_flag_ptr_is_const()) {
+                    flags |= TypeFlags::IsConst;
+                }
+
+                return ts->get_type_ptr(child, flags);
+            }
+
+            case NodeKind::MultiPtr: {
+                auto child = eval_to_type(ctx, node.first);
+
+                auto flags = TypeFlags::None;
+                if (node.has_flag_ptr_is_const()) {
+                    flags |= TypeFlags::IsConst;
+                }
+
+                return ts->get_type_multi_ptr(child, flags);
             }
 
             default:
@@ -557,6 +594,42 @@ auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporter& er)
     ctx.define({.name = "i32",
                 .type = ts.get_type_type(),
                 .inner_type = ts.get_type_i32(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "u32",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_u32(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "i16",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_i16(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "u16",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_u16(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "i8",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_i8(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "u8",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_u8(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "usize",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_usize(),
                 .where = {},
                 .is_const = true});
 

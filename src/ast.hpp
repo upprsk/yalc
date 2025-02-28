@@ -347,6 +347,10 @@ struct Ast {
             .second;
     }
 
+    [[nodiscard]] auto new_node_break(Span span) -> NodeHandle {
+        return new_node(NodeKind::Break, NodeFlags::None, span).second;
+    }
+
     [[nodiscard]] auto new_node_enumlit(Span span, std::string v)
         -> NodeHandle {
         return new_node(NodeKind::EnumLit, NodeFlags::None, span, NodeHandle{},

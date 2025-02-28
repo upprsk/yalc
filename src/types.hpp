@@ -96,14 +96,36 @@ enum class TypeKind : uint16_t {
     Pack,  // ordered type pack, for function returns
     Void,
     Int32,
+    Uint32,
+    Int16,
+    Uint16,
+    Int8,
+    Uint8,
+    Usize,
     Ptr,
+    MultiPtr,
     Func,
 };
 
 enum class TypeFlags : uint16_t {
     None = 0,
-    PtrIsConst = (1 << 0),
+    IsConst = (1 << 0),
 };
+
+constexpr auto operator&(TypeFlags const& lhs, TypeFlags const& rhs)
+    -> TypeFlags {
+    return static_cast<TypeFlags>(fmt::underlying(lhs) & fmt::underlying(rhs));
+}
+
+constexpr auto operator|(TypeFlags const& lhs, TypeFlags const& rhs)
+    -> TypeFlags {
+    return static_cast<TypeFlags>(fmt::underlying(lhs) | fmt::underlying(rhs));
+}
+
+constexpr auto operator|=(TypeFlags& lhs, TypeFlags const& rhs) -> TypeFlags {
+    return lhs = static_cast<TypeFlags>(fmt::underlying(lhs) |
+                                        fmt::underlying(rhs));
+}
 
 struct TypeStore;
 
@@ -122,7 +144,10 @@ struct Type {
     }
 
     [[nodiscard]] constexpr auto is_integral() const -> bool {
-        return kind == TypeKind::Int32;
+        return kind == TypeKind::Int32 || kind == TypeKind::Uint32 ||
+               kind == TypeKind::Int16 || kind == TypeKind::Uint16 ||
+               kind == TypeKind::Int8 || kind == TypeKind::Uint8 ||
+               kind == TypeKind::Usize;
     }
 
     [[nodiscard]] constexpr auto is_ptr() const -> bool {
@@ -147,8 +172,8 @@ struct Type {
 
     [[nodiscard]] constexpr auto size(TypeStore const& ts) const -> size_t;
 
-    [[nodiscard]] constexpr auto has_flag_ptr_is_const() const -> bool {
-        return fmt::underlying(flags) & fmt::underlying(TypeFlags::PtrIsConst);
+    [[nodiscard]] constexpr auto is_const() const -> bool {
+        return (flags & TypeFlags::IsConst) != TypeFlags::None;
     }
 
     constexpr auto operator==(Type const&) const -> bool = default;
@@ -168,31 +193,43 @@ struct FatTypeHandle {
 };
 
 struct TypeStore {
-    static auto new_store() -> TypeStore {
-        auto ts = TypeStore{};
-        ts.err_type = ts.new_type(TypeKind::Err);
-        ts.void_type = ts.new_type(TypeKind::Void);
-        ts.type_type = ts.new_type(TypeKind::Type);
-
-        ts.i32_type = ts.new_type(TypeKind::Int32);
-
-        return ts;
-    }
+    static auto new_store() -> TypeStore;
 
     [[nodiscard]] auto get_type_err() const -> TypeHandle { return err_type; }
     [[nodiscard]] auto get_type_type() const -> TypeHandle { return type_type; }
     [[nodiscard]] auto get_type_void() const -> TypeHandle { return void_type; }
 
     [[nodiscard]] auto get_type_i32() const -> TypeHandle { return i32_type; }
+    [[nodiscard]] auto get_type_u32() const -> TypeHandle { return u32_type; }
+    [[nodiscard]] auto get_type_i16() const -> TypeHandle { return i16_type; }
+    [[nodiscard]] auto get_type_u16() const -> TypeHandle { return u16_type; }
+    [[nodiscard]] auto get_type_i8() const -> TypeHandle { return i8_type; }
+    [[nodiscard]] auto get_type_u8() const -> TypeHandle { return u8_type; }
 
-    [[nodiscard]] auto get_type_ptr(TypeHandle child) -> TypeHandle {
+    [[nodiscard]] auto get_type_usize() const -> TypeHandle {
+        return usize_type;
+    }
+
+    [[nodiscard]] auto get_type_ptr(TypeHandle child, TypeFlags flags)
+        -> TypeHandle {
         auto t = find_type(Type{.kind = TypeKind::Ptr,
-                                .flags = TypeFlags::None,
+                                .flags = flags,
                                 .first = child,
                                 .second = {}});
         if (t.is_valid()) return t;
 
-        return new_type(TypeKind::Ptr, TypeFlags::None, child);
+        return new_type(TypeKind::Ptr, flags, child);
+    }
+
+    [[nodiscard]] auto get_type_multi_ptr(TypeHandle child, TypeFlags flags)
+        -> TypeHandle {
+        auto t = find_type(Type{.kind = TypeKind::MultiPtr,
+                                .flags = flags,
+                                .first = child,
+                                .second = {}});
+        if (t.is_valid()) return t;
+
+        return new_type(TypeKind::MultiPtr, flags, child);
     }
 
     [[nodiscard]] auto get_type_fn(std::span<TypeHandle const> args,
@@ -370,6 +407,12 @@ struct TypeStore {
     TypeHandle type_type;
     TypeHandle err_type;
     TypeHandle i32_type;
+    TypeHandle u32_type;
+    TypeHandle i16_type;
+    TypeHandle u16_type;
+    TypeHandle i8_type;
+    TypeHandle u8_type;
+    TypeHandle usize_type;
 
     std::vector<Type>       types;
     std::vector<TypeHandle> type_refs;
@@ -437,8 +480,17 @@ constexpr auto Type::size(TypeStore const& ts) const -> size_t {
         case TypeKind::Pack:
         case TypeKind::Void:
         case TypeKind::Func: return 0;
-        case TypeKind::Int32: return 4;
-        case TypeKind::Ptr: return ts.ptr_size();
+
+        case TypeKind::Int32:
+        case TypeKind::Uint32: return 4;
+        case TypeKind::Int16:
+        case TypeKind::Uint16: return 2;
+        case TypeKind::Int8:
+        case TypeKind::Uint8: return 1;
+
+        case TypeKind::Usize:
+        case TypeKind::Ptr:
+        case TypeKind::MultiPtr: return ts.ptr_size();
     }
 
     return 0;

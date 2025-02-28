@@ -219,6 +219,8 @@ struct Parser {
         if (check_kw("if")) return parse_if_stmt();
         if (match_kw("var")) return parse_var_decl();
         if (match_kw("def")) return parse_def_decl();
+        if (match_kw("break")) return parse_break();
+        if (match_kw("defer")) return parse_defer();
 
         auto expr = parse_expr();
         if (ast.get(expr)->is_lvalue() && match(TokenType::Equal)) {
@@ -370,6 +372,21 @@ struct Parser {
         if (ids.size() == 1) return ids.at(0);
 
         return ast.new_node_id_pack(span, ids);
+    }
+
+    auto parse_break() -> NodeHandle {
+        auto s = prev_span();
+        try(consume(TokenType::Semi));
+
+        return ast.new_node_break(s.extend(prev_span()));
+    }
+
+    auto parse_defer() -> NodeHandle {
+        auto s = prev_span();
+        auto child = parse_stmt();
+
+        return ast.new_node_unary(NodeKind::Defer, s.extend(prev_span()),
+                                  child);
     }
 
     // ------------------------------------------------------------------------
