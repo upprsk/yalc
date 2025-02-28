@@ -148,6 +148,11 @@ struct Type {
         -> TypeFunc;
 };
 
+struct FatTypeHandle {
+    TypeStore const* ts;
+    TypeHandle       type;
+};
+
 struct TypeStore {
     static auto new_store() -> TypeStore {
         auto ts = TypeStore{};
@@ -181,7 +186,7 @@ struct TypeStore {
         auto t = find_type_pack(items);
         if (t.is_valid()) return t;
 
-        return new_type(TypeKind::Func, TypeFlags::None, new_array(items),
+        return new_type(TypeKind::Pack, TypeFlags::None, new_array(items),
                         TypeHandle::from_size(items.size()));
     }
 
@@ -225,16 +230,17 @@ struct TypeStore {
         size_t i{};
 
         for (auto const& t : types) {
-            i++;
             if (t.is_func()) {
                 auto f = t.as_func(*this);
 
                 if (std::ranges::equal(args, f.args) && f.ret == ret)
                     return TypeHandle::from_size(i);
             }
+
+            i++;
         }
 
-        return {};
+        return TypeHandle{}.to_invalid();
     }
 
     [[nodiscard]] auto find_type_pack(std::span<TypeHandle const> args) const
@@ -242,16 +248,15 @@ struct TypeStore {
         size_t i{};
 
         for (auto const& t : types) {
-            i++;
             if (t.is_pack()) {
-                auto f = t.as_func(*this);
-
-                if (std::ranges::equal(args, f.args))
+                if (std::ranges::equal(args, get_children(t)))
                     return TypeHandle::from_size(i);
             }
+
+            i++;
         }
 
-        return {};
+        return TypeHandle{}.to_invalid();
     }
 
     // Get a reference to a type from it's handle. The pointer is invalid after
@@ -307,6 +312,21 @@ struct TypeStore {
         return get_array(h.children(), h.count());
     }
 
+    [[nodiscard]] constexpr auto fatten(TypeHandle h) const -> FatTypeHandle {
+        return {.ts = this, .type = h};
+    }
+
+    // get the total number of types
+    [[nodiscard]] constexpr auto size() const -> size_t { return types.size(); }
+
+    // get the total number of type references (arrays)
+    [[nodiscard]] constexpr auto refs_size() const -> size_t {
+        return type_refs.size();
+    }
+
+    auto dump(fmt::format_context& ctx, TypeHandle n) const
+        -> fmt::format_context::iterator;
+
     TypeHandle void_type;
     TypeHandle type_type;
     TypeHandle err_type;
@@ -343,6 +363,17 @@ struct fmt::formatter<yal::Type> {
     }
 
     auto format(yal::Type t, format_context& ctx) const
+        -> format_context::iterator;
+};
+
+template <>
+struct fmt::formatter<yal::FatTypeHandle> {
+    constexpr auto parse(format_parse_context& ctx)
+        -> format_parse_context::iterator {
+        return ctx.begin();
+    }
+
+    auto format(yal::FatTypeHandle n, format_context& ctx) const
         -> format_context::iterator;
 };
 

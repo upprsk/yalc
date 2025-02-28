@@ -70,7 +70,14 @@ struct Typing {
 
                 std::vector<TypeHandle> args;
                 for (auto& arg : f.args) args.push_back(add_types(c, arg));
-                auto ret = add_types(c, f.ret);
+
+                TypeHandle ret;
+                if (ast->get(f.ret)->is_nil()) {
+                    ret = ts->get_type_void();
+                } else {
+                    add_types(c, f.ret);
+                    ret = eval_to_type(c, f.ret);
+                }
 
                 add_types(c, f.body);
 
@@ -97,7 +104,16 @@ struct Typing {
                 return node->set_type(real_type);
             }
 
-            case NodeKind::FuncRetPack: break;
+            case NodeKind::FuncRetPack: {
+                auto children = ast->get_children(node);
+
+                std::vector<TypeHandle> types;
+                for (auto& child : children) {
+                    types.push_back(add_types(ctx, child));
+                }
+
+                return node->set_type(ts->get_type_pack(types));
+            }
 
             case NodeKind::Block: {
                 auto c = ctx.new_child();
@@ -115,11 +131,13 @@ struct Typing {
             case NodeKind::ExprStmt: break;
 
             case NodeKind::ReturnStmt: {
-                auto v = add_types(ctx, node->first);
-                er->report_note(
-                    node->span,
-                    "checking the return type has not been implemented ({})",
-                    v);
+                if (!ast->get(node->first)->is_nil()) {
+                    auto v = add_types(ctx, node->first);
+                    er->report_note(node->span,
+                                    "checking the return type has not been "
+                                    "implemented ({})",
+                                    ts->fatten(v));
+                }
 
                 // FIXME: check the return type
 
@@ -231,6 +249,18 @@ struct Typing {
 
                 return v->inner_type;
             }
+
+            case NodeKind::FuncRetPack: {
+                auto children = ast->get_children(node);
+
+                std::vector<TypeHandle> items;
+                for (auto const& item : children) {
+                    items.push_back(eval_to_type(ctx, item));
+                }
+
+                return ts->get_type_pack(items);
+            }
+
             default:
                 er->report_error(node.span, "can't evaluate {} to a type",
                                  node.kind);
@@ -251,6 +281,11 @@ auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporter& er)
     ctx.define({.name = "i32",
                 .type = ts.get_type_type(),
                 .inner_type = ts.get_type_i32(),
+                .where = {}});
+
+    ctx.define({.name = "void",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_void(),
                 .where = {}});
 
     return t.add_types(ctx, n);

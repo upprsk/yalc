@@ -51,6 +51,10 @@ auto main(int argc, char** argv) -> int {
         auto ts = yal::TypeStore::new_store();
         yal::pass_add_types(root, ast, ts, er);
 
+        for (size_t i = 0; i < ts.size(); i++) {
+            fmt::println("{}", ts.fatten(yal::TypeHandle::from_size(i)));
+        }
+
         return 0;
     }
     CPPTRACE_CATCH(std::exception const& ex) {

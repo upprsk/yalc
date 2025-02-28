@@ -169,6 +169,10 @@ struct Node {
         return kind == NodeKind::Id;
     }
 
+    [[nodiscard]] constexpr auto is_nil() const -> bool {
+        return kind == NodeKind::Nil;
+    }
+
     [[nodiscard]] constexpr auto has_flag_ptr_is_const() const -> bool {
         return fmt::underlying(flags) & fmt::underlying(NodeFlags::PtrIsConst);
     }
