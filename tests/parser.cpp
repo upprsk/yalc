@@ -524,6 +524,48 @@ TEST_CASE("one function with expression statements", "[parser][func][stmt]") {
             "]))])");
 }
 
+TEST_CASE("extern function", "[parser][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(extern func malloc(sz: usize) [*]u8;)~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(extern Id(malloc), [FuncArg(sz, Id(usize))], "
+            "MultiPtr(Id(u8)), Nil)])");
+}
+
+TEST_CASE("extern bound function", "[parser][func]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(extern func mem.alloc(sz: usize) [*]u8;)~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(fmt::to_string(ast.fatten(root)) ==
+            "File([Func(extern Field(Id(mem), alloc), [FuncArg(sz, "
+            "Id(usize))], MultiPtr(Id(u8)), Nil)])");
+}
+
 TEST_CASE("assignments", "[parser][func][stmt]") {
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
