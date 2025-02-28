@@ -22,6 +22,7 @@ struct Var {
     TypeHandle  type;
     TypeHandle  inner_type;
     Span        where;
+    bool        is_const;
 };
 
 struct Context {
@@ -120,7 +121,8 @@ struct Typing {
                 ctx.define({.name = name,
                             .type = type,
                             .inner_type = ts->get_type_err(),
-                            .where = node->span});
+                            .where = node->span,
+                            .is_const = true});
 
                 return node->set_type(type);
             }
@@ -140,7 +142,8 @@ struct Typing {
                 ctx.define({.name = name,
                             .type = real_type,
                             .inner_type = ts->get_type_err(),
-                            .where = node->span});
+                            .where = node->span,
+                            .is_const = false});
 
                 return node->set_type(real_type);
             }
@@ -242,7 +245,8 @@ struct Typing {
                         ctx.define({.name = std::string{name},
                                     .type = v,
                                     .inner_type = ts->get_type_err(),
-                                    .where = node->span});
+                                    .where = node->span,
+                                    .is_const = false});
                     }
 
                     return node->set_type(h);
@@ -485,12 +489,14 @@ auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporter& er)
     ctx.define({.name = "i32",
                 .type = ts.get_type_type(),
                 .inner_type = ts.get_type_i32(),
-                .where = {}});
+                .where = {},
+                .is_const = true});
 
     ctx.define({.name = "void",
                 .type = ts.get_type_type(),
                 .inner_type = ts.get_type_void(),
-                .where = {}});
+                .where = {},
+                .is_const = true});
 
     return t.add_types(ctx, n);
 }
