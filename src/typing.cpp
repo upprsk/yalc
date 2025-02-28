@@ -69,11 +69,8 @@ struct Typing {
                 }
 
                 std::vector<TypeHandle> args;
-                for (auto& arg : f.args) {
-                    args.push_back(add_types(c, arg));
-                }
-
-                std::array ret{add_types(c, f.ret)};
+                for (auto& arg : f.args) args.push_back(add_types(c, arg));
+                auto ret = add_types(c, f.ret);
 
                 add_types(c, f.body);
 
@@ -119,6 +116,10 @@ struct Typing {
 
             case NodeKind::ReturnStmt: {
                 auto v = add_types(ctx, node->first);
+                er->report_note(
+                    node->span,
+                    "checking the return type has not been implemented ({})",
+                    v);
 
                 // FIXME: check the return type
 

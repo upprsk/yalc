@@ -139,9 +139,8 @@ struct Type {
 
     constexpr auto operator==(Type const&) const -> bool = default;
 
-    // FIXME: use a pack type for return (and/or args)
     struct TypeFunc {
-        std::span<TypeHandle const> ret;
+        TypeHandle                  ret;
         std::span<TypeHandle const> args;
     };
 
@@ -168,13 +167,13 @@ struct TypeStore {
     [[nodiscard]] auto get_type_i32() const -> TypeHandle { return i32_type; }
 
     [[nodiscard]] auto get_type_fn(std::span<TypeHandle const> args,
-                                   std::span<TypeHandle const> ret)
-        -> TypeHandle {
+                                   TypeHandle ret) -> TypeHandle {
         auto t = find_type_fn(args, ret);
         if (t.is_valid()) return t;
 
-        return new_type(TypeKind::Func, TypeFlags::None, new_array(args, ret),
-                        TypeHandle::from_pair(args.size(), ret.size()));
+        return new_type(TypeKind::Func, TypeFlags::None,
+                        new_array_plus_one(ret, args),
+                        TypeHandle::from_size(args.size() + 1));
     }
 
     [[nodiscard]] auto get_type_pack(std::span<TypeHandle const> items)
@@ -211,9 +210,18 @@ struct TypeStore {
         return TypeHandle::from_size(sz).to_array();
     }
 
-    [[nodiscard]] auto find_type_fn(std::span<TypeHandle const> args,
-                                    std::span<TypeHandle const> ret) const
+    [[nodiscard]] auto new_array_plus_one(TypeHandle                  first,
+                                          std::span<TypeHandle const> handles)
         -> TypeHandle {
+        auto sz = type_refs.size();
+        type_refs.push_back(first);
+        type_refs.insert(type_refs.end(), handles.begin(), handles.end());
+
+        return TypeHandle::from_size(sz).to_array();
+    }
+
+    [[nodiscard]] auto find_type_fn(std::span<TypeHandle const> args,
+                                    TypeHandle ret) const -> TypeHandle {
         size_t i{};
 
         for (auto const& t : types) {
@@ -221,8 +229,7 @@ struct TypeStore {
             if (t.is_func()) {
                 auto f = t.as_func(*this);
 
-                if (std::ranges::equal(args, f.args) &&
-                    std::ranges::equal(ret, f.ret))
+                if (std::ranges::equal(args, f.args) && f.ret == ret)
                     return TypeHandle::from_size(i);
             }
         }
@@ -285,6 +292,21 @@ struct TypeStore {
         return s.subspan(h.as_idx(), count);
     }
 
+    [[nodiscard]] constexpr auto get_children(TypeHandle h) const
+        -> std::span<TypeHandle const> {
+        return get_children(get(h));
+    }
+
+    [[nodiscard]] constexpr auto get_children(Type const* h) const
+        -> std::span<TypeHandle const> {
+        return get_children(*h);
+    }
+
+    [[nodiscard]] constexpr auto get_children(Type const& h) const
+        -> std::span<TypeHandle const> {
+        return get_array(h.children(), h.count());
+    }
+
     TypeHandle void_type;
     TypeHandle type_type;
     TypeHandle err_type;
@@ -330,10 +352,12 @@ constexpr auto Type::as_func(TypeStore const& store) const -> TypeFunc {
     if (kind != TypeKind::Func)
         throw fmt::system_error(6, "invalid type kind for `as_func`: {}", kind);
 
-    auto [retlen, argslen] = second.as_pair();
-    auto items = store.get_array(first, retlen + argslen);
+    auto items = store.get_children(this);
+    if (items.size() < 1)
+        throw fmt::system_error(
+            6, "invalid number of children for func: {} < 1", items.size());
 
-    return {.ret = items.subspan(retlen), .args = items.subspan(0, retlen)};
+    return {.ret = items[0], .args = items.subspan(1)};
 }
 
 }  // namespace yal
