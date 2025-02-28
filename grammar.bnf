@@ -99,8 +99,8 @@ unary ::= ( "!" | "+" | "-" | "~" | "&" | "?" ) unary
 
 deref ::= call { ".*" call } ;
 
-call           ::= call { "(" call_args ")" }      (* func call *)
-                 | call { "[" slice_or_index "]" } (* index/slicing *)
+call           ::= field { "(" call_args ")" }      (* func call *)
+                 | field { "[" slice_or_index "]" } (* index/slicing *)
                  ;
 field          ::= primary { "." ID }
 call_args      ::= expr { "," expr } [ "," ] ;
