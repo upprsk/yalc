@@ -9,6 +9,12 @@
 
 namespace yal {
 
+struct Func {
+    std::string name;
+    TypeHandle  type;
+    Span        ret_span;
+};
+
 struct Var {
     std::string name;
     TypeHandle  type;
@@ -17,7 +23,27 @@ struct Var {
 };
 
 struct Context {
-    auto new_child() -> Context { return {.env = {}, .parent = this}; }
+    auto new_child() -> Context {
+        return {
+            .env = {},
+            .parent = this,
+            ._current_function = _current_function,
+        };
+    }
+
+    auto new_child_for_func(Func const& f) -> Context {
+        return {
+            .env = {},
+            .parent = this,
+            ._current_function = &f,
+        };
+    }
+
+    [[nodiscard]] auto current_func() const -> Func const* {
+        if (!_current_function) throw std::runtime_error{"no current func"};
+
+        return _current_function;
+    }
 
     auto lookup(std::string const& name) -> Var const* {
         for (auto const& var : env) {
@@ -31,6 +57,7 @@ struct Context {
 
     std::vector<Var> env;
     Context*         parent = nullptr;
+    Func const*      _current_function;
 };
 
 struct Typing {
@@ -68,6 +95,8 @@ struct Typing {
                     return node->set_type(ts->get_type_err());
                 }
 
+                auto const& name = name_node->value_string();
+
                 std::vector<TypeHandle> args;
                 for (auto& arg : f.args) args.push_back(add_types(c, arg));
 
@@ -79,9 +108,19 @@ struct Typing {
                     ret = eval_to_type(c, f.ret);
                 }
 
-                add_types(c, f.body);
+                auto type = ts->get_type_fn(args, ret);
+                auto bc =
+                    c.new_child_for_func({.name = name,
+                                          .type = type,
+                                          .ret_span = ast->get(f.ret)->span});
+                add_types(bc, f.body);
 
-                return node->set_type(ts->get_type_fn(args, ret));
+                ctx.define({.name = name,
+                            .type = type,
+                            .inner_type = ts->get_type_err(),
+                            .where = node->span});
+
+                return node->set_type(type);
             }
 
             case NodeKind::FuncArg: {
@@ -131,15 +170,23 @@ struct Typing {
             case NodeKind::ExprStmt: break;
 
             case NodeKind::ReturnStmt: {
+                auto type = ts->get_type_void();
+
                 if (!ast->get(node->first)->is_nil()) {
-                    auto v = add_types(ctx, node->first);
-                    er->report_note(node->span,
-                                    "checking the return type has not been "
-                                    "implemented ({})",
-                                    ts->fatten(v));
+                    type = add_types(ctx, node->first);
                 }
 
-                // FIXME: check the return type
+                auto curr_func = ctx.current_func();
+                auto func_type = ts->get(curr_func->type)->as_func(*ts);
+                if (func_type.ret != type) {
+                    er->report_error(node->span,
+                                     "type mismatch, function expects {}, but "
+                                     "return has type: {}",
+                                     ts->fatten(func_type.ret),
+                                     ts->fatten(type));
+                    er->report_note(curr_func->ret_span,
+                                    "return type declared here");
+                }
 
                 return node->set_type(ts->get_type_void());
             }
