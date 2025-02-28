@@ -353,6 +353,7 @@ struct Parser {
         return ast.new_node_def_decl(span, ids, type, init);
     }
 
+    // id_pack ::= ID { "," ID } ;
     auto parse_id_pack() -> NodeHandle {
         std::vector<NodeHandle> ids;
 
