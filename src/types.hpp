@@ -121,6 +121,10 @@ struct Type {
         return second.as_count();
     }
 
+    [[nodiscard]] constexpr auto is_integral() const -> bool {
+        return kind == TypeKind::Int32;
+    }
+
     [[nodiscard]] constexpr auto is_type() const -> bool {
         return kind == TypeKind::Type;
     }

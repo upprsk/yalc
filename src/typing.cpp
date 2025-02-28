@@ -312,6 +312,13 @@ struct Typing {
                         node->kind, ts->fatten(lhs), ts->fatten(rhs));
                 }
 
+                // NOTE: support floats and operator overloads
+                if (!ts->get(lhs)->is_integral()) {
+                    er->report_error(node->span,
+                                     "value of type {} does not support {}",
+                                     ts->fatten(lhs), node->kind);
+                }
+
                 return node->set_type(lhs);
             }
 
