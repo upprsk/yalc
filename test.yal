@@ -1,5 +1,5 @@
 // extern
-func malloc(sz: i32) [*]u8
+func malloc(sz: usize) [*]u8
 {}
 
 // extern
@@ -8,6 +8,6 @@ func free(ptr: [*]const u8)
 
 func main() {
     var size = 1024;
-    var data = malloc(size);
-    defer free(data);
+    var data = malloc(size as usize);
+    defer free(data as [*]const u8);
 }

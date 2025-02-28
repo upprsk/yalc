@@ -151,7 +151,7 @@ struct Type {
     }
 
     [[nodiscard]] constexpr auto is_ptr() const -> bool {
-        return kind == TypeKind::Ptr;
+        return kind == TypeKind::Ptr || kind == TypeKind::MultiPtr;
     }
 
     [[nodiscard]] constexpr auto is_void() const -> bool {

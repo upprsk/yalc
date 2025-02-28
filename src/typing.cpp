@@ -357,7 +357,41 @@ struct Typing {
                 return node->set_type(lhs);
             }
 
-            case NodeKind::Cast:
+            case NodeKind::Cast: {
+                auto lhs = add_types(ctx, node->first);
+                auto rhs = add_types(ctx, node->second);
+
+                if (!ts->get(rhs)->is_type()) {
+                    er->report_error(ast->get(node->second)->span,
+                                     "can't cast {} value to non-type: {}",
+                                     ts->fatten(lhs), ts->fatten(rhs));
+                    return lhs;
+                }
+
+                auto ty = eval_to_type(ctx, node->second);
+                if (ts->get(lhs)->is_integral()) {
+                    if (ts->get(ty)->is_integral()) return node->set_type(ty);
+
+                    er->report_error(node->span,
+                                     "can't cast type {} to type: {}",
+                                     ts->fatten(lhs), ts->fatten(ty));
+                    return node->set_type(ty);
+                }
+
+                if (ts->get(lhs)->is_ptr()) {
+                    if (ts->get(ty)->is_ptr()) return node->set_type(ty);
+
+                    er->report_error(node->span,
+                                     "can't cast type {} to type: {}",
+                                     ts->fatten(lhs), ts->fatten(ty));
+                    return node->set_type(ty);
+                }
+
+                er->report_error(node->span, "can't cast type {} to type: {}",
+                                 ts->fatten(lhs), ts->fatten(ty));
+                return node->set_type(lhs);
+            }
+
             case NodeKind::OrElse:
             case NodeKind::OrReturn: break;
 
@@ -409,9 +443,12 @@ struct Typing {
             case NodeKind::ArrayType:
             case NodeKind::ArrayAutoLen: break;
             case NodeKind::Deref: {
+                // TODO: handle const pointers
+
                 auto child = add_types(ctx, node->first);
 
                 // TODO: handle optionals
+                // TODO: handle multi pointers
                 if (!ts->get(child)->is_ptr()) {
                     er->report_error(node->span,
                                      "can't dereference non-pointer type: {}",
