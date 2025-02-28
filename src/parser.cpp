@@ -185,7 +185,6 @@ struct Parser {
 
         auto ret = ast.new_node_nil(prev_span());
         if (!check(TokenType::Lbrace)) {
-            // TODO: handle multiple returns and named returns
             ret = parse_func_ret();
         }
 
@@ -216,7 +215,6 @@ struct Parser {
 
         auto ret = ast.new_node_nil(prev_span());
         if (!check(TokenType::Semi)) {
-            // TODO: handle multiple returns and named returns
             ret = parse_func_ret();
         }
 
