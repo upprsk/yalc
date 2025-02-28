@@ -64,6 +64,7 @@ struct Context {
 };
 
 struct Typing {
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto add_types(Context& ctx, NodeHandle n) -> TypeHandle {
         auto node = ast->get_mut(n);
         // er->report_debug(node->span, "pass_add_types: {}", node->kind);

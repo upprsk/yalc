@@ -815,6 +815,7 @@ struct Parser {
     //                ;
     //
     // array ::= "[" ( expr | "_" ) "]" expr "{" array_items "}" ;
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto parse_pointer_type_or_array() -> NodeHandle {
         auto s = span();
 

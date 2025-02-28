@@ -5,6 +5,7 @@
 
 namespace yal {
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
     -> fmt::format_context::iterator {
     using fmt::format_to;
