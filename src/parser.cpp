@@ -882,6 +882,8 @@ struct Parser {
         auto end = ast.get(items.at(items.size() - 1))->span;
         auto span = ast.get(items.at(0))->span.extend(end);
 
+        if (items.size() == 1) return items.at(0);
+
         return ast.new_node_expr_pack(span, items);
     }
 
