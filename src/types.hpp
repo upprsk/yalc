@@ -133,6 +133,8 @@ struct Type {
         return kind == TypeKind::Pack;
     }
 
+    [[nodiscard]] constexpr auto size(TypeStore const& ts) const -> size_t;
+
     [[nodiscard]] constexpr auto has_flag_ptr_is_const() const -> bool {
         return fmt::underlying(flags) & fmt::underlying(TypeFlags::PtrIsConst);
     }
@@ -324,6 +326,10 @@ struct TypeStore {
         return type_refs.size();
     }
 
+    [[nodiscard]] constexpr auto ptr_size() const -> size_t {
+        return sizeof(uintptr_t);
+    }
+
     auto dump(fmt::format_context& ctx, TypeHandle n) const
         -> fmt::format_context::iterator;
 
@@ -389,6 +395,20 @@ constexpr auto Type::as_func(TypeStore const& store) const -> TypeFunc {
             6, "invalid number of children for func: {} < 1", items.size());
 
     return {.ret = items[0], .args = items.subspan(1)};
+}
+
+constexpr auto Type::size(TypeStore const& ts) const -> size_t {
+    switch (kind) {
+        case TypeKind::Err:
+        case TypeKind::Type:
+        case TypeKind::Pack:
+        case TypeKind::Void:
+        case TypeKind::Func: return 0;
+        case TypeKind::Int32: return 4;
+        case TypeKind::Ptr: return ts.ptr_size();
+    }
+
+    return 0;
 }
 
 }  // namespace yal

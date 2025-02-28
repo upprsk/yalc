@@ -1,9 +1,11 @@
 #include "typing.hpp"
 
 #include <optional>
+#include <ranges>
 
 #include "ast.hpp"
 #include "error_reporter.hpp"
+#include "fmt/ranges.h"
 #include "span.hpp"
 #include "types.hpp"
 
@@ -46,7 +48,7 @@ struct Context {
     }
 
     auto lookup(std::string const& name) -> Var const* {
-        for (auto const& var : env) {
+        for (auto const& var : env | std::ranges::views::reverse) {
             if (var.name == name) return &var;
         }
 
@@ -165,7 +167,90 @@ struct Typing {
                 return node->set_type(ts->get_type_void());
             }
 
-            case NodeKind::VarDecl:
+            case NodeKind::VarDecl: {
+                // in case we have an initializer, the type annotation is
+                // optional
+                auto decl = node->as_var_decl(*ast);
+
+                // check for multiple returns
+                std::vector<std::string_view> ids;
+                if (ast->get(decl.ids)->is_id_pack()) {
+                    for (auto const& id : ast->get_children(decl.ids))
+                        ids.push_back(ast->get(id)->value_string());
+                } else {
+                    ids.push_back(ast->get(decl.ids)->value_string());
+                }
+
+                if (!ast->get(decl.init)->is_nil()) {
+                    // in case we have a type, type and eval here
+                    TypeHandle h;
+                    if (!ast->get(decl.type)->is_nil()) {
+                        auto c = ctx.new_child();
+                        add_types(c, decl.type);
+
+                        h = eval_to_type(c, decl.type);
+                    }
+
+                    // type the initializer and check
+                    auto v = add_types(ctx, decl.init);
+                    if (h.is_valid()) {
+                        if (v != h) {
+                            er->report_error(
+                                node->span,
+                                "type mismatch, declaration expects "
+                                "{}, but initializer has type: {}",
+                                ts->fatten(h), ts->fatten(v));
+                        }
+                    } else {
+                        h = v;
+                    }
+
+                    if (ts->get(h)->is_pack()) {
+                        auto recved = ts->get_children(h);
+                        if (ids.size() != recved.size()) {
+                            er->report_error(
+                                node->span,
+                                "return count mismatch, declaration has {} "
+                                "receiver(s) but call returns {} values",
+                                ids.size(), recved.size());
+
+                            er->report_note(ast->get(decl.ids)->span,
+                                            "got {} identifiers here",
+                                            ids.size());
+
+                            er->report_note(
+                                ast->get(decl.init)->span, "call returns ({})",
+                                fmt::join(
+                                    std::ranges::views::transform(
+                                        recved,
+                                        [&](auto h) { return ts->fatten(h); }),
+                                    ", "));
+                        }
+
+                        // NOTE: don't check that any of the types in the packs
+                        // are zero-width
+                    }
+
+                    else if (ts->get(h)->size(*ts) == 0) {
+                        er->report_error(node->span,
+                                         "using zero-width value of type {} in "
+                                         "variable declaration",
+                                         ts->fatten(h));
+                    }
+
+                    for (auto const& name : ids) {
+                        ctx.define({.name = std::string{name},
+                                    .type = v,
+                                    .inner_type = ts->get_type_err(),
+                                    .where = node->span});
+                    }
+
+                    return node->set_type(h);
+                }
+
+                throw std::runtime_error{"not implemented"};
+            }
+
             case NodeKind::DefDecl:
             case NodeKind::ExprStmt: break;
 
@@ -232,8 +317,60 @@ struct Typing {
             case NodeKind::Array:
             case NodeKind::ArrayType:
             case NodeKind::ArrayAutoLen:
-            case NodeKind::Deref:
-            case NodeKind::Call:
+            case NodeKind::Deref: break;
+
+            case NodeKind::Call: {
+                auto call = node->as_call(*ast);
+
+                auto callee = add_types(ctx, call.callee);
+                if (!ts->get(callee)->is_func()) {
+                    er->report_error(node->span,
+                                     "can't call non function of type: {}",
+                                     ts->fatten(callee));
+
+                    // NOTE: use the inferred expected type when it fails
+                    return node->set_type(ts->get_type_err());
+                }
+
+                std::vector<TypeHandle> arg_types;
+                for (auto& a : call.args)
+                    arg_types.push_back(add_types(ctx, a));
+
+                auto f = ts->get(callee)->as_func(*ts);
+                if (f.args.size() != call.args.size()) {
+                    er->report_error(node->span,
+                                     "mismatched number of arguments for call, "
+                                     "expected {} arguments but got {}",
+                                     f.args.size(), call.args.size());
+
+                    er->report_note(
+                        ast->get(call.callee)->span, "callee expects ({})",
+                        fmt::join(
+                            std::ranges::views::transform(
+                                f.args, [&](auto h) { return ts->fatten(h); }),
+                            ", "));
+
+                    er->report_note(
+                        node->span, "but received ({})",
+                        fmt::join(std::ranges::views::transform(
+                                      arg_types,
+                                      [&](auto h) { return ts->fatten(h); }),
+                                  ", "));
+                }
+
+                auto count = std::min(arg_types.size(), f.args.size());
+                for (size_t i = 0; i < count; i++) {
+                    if (arg_types[i] != f.args[i]) {
+                        er->report_error(
+                            ast->get(call.args[i])->span,
+                            "type mismatch, function expects {}, but got: {}",
+                            ts->fatten(f.args[i]), ts->fatten(arg_types[i]));
+                    }
+                }
+
+                return node->set_type(f.ret);
+            }
+
             case NodeKind::Field: break;
 
             case NodeKind::ExprPack: {

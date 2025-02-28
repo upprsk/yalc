@@ -169,6 +169,10 @@ struct Node {
         return kind == NodeKind::Id;
     }
 
+    [[nodiscard]] constexpr auto is_id_pack() const -> bool {
+        return kind == NodeKind::IdPack;
+    }
+
     [[nodiscard]] constexpr auto is_nil() const -> bool {
         return kind == NodeKind::Nil;
     }
