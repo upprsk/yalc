@@ -800,11 +800,10 @@ struct Parser {
         }
 
         if (match(TokenType::Str)) {
-            // FIXME: escape strings
             auto s = prev_span().str(source);
+            auto es = escape_string(s.substr(1, s.size() - 2));
 
-            return ast.new_node_str(prev_span(),
-                                    std::string{s.substr(1, s.size() - 2)});
+            return ast.new_node_str(prev_span(), es);
         }
 
         return parse_number();
@@ -1032,6 +1031,31 @@ struct Parser {
         } while (match(TokenType::Comma));
 
         return items;
+    }
+
+    // ------------------------------------------------------------------------
+
+    static auto escape_string(std::string_view src) -> std::string {
+        std::string out;
+
+        for (size_t i = 0; i < src.size(); i++) {
+            if (src[i] == '\\') {
+                switch (src.at(++i)) {
+                    case '\\': out.push_back('\\'); break;
+                    case 'n': out.push_back('\n'); break;
+                    case 'r': out.push_back('\r'); break;
+                    case 't': out.push_back('\t'); break;
+                    case 'v': out.push_back('\v'); break;
+                    default:
+                        out.push_back('\\');
+                        out.push_back(src.at(i));
+                        break;
+                }
+            } else
+                out.push_back(src[i]);
+        }
+
+        return out;
     }
 
     // ------------------------------------------------------------------------

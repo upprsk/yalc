@@ -556,8 +556,9 @@ struct Typing {
             }
 
             case NodeKind::Str:
-                //
-                break;
+                // FIXME: this is an array type
+                return node->set_type(ts->get_type_multi_ptr(
+                    ts->get_type_u8(), TypeFlags::IsConst));
         }
 
         er->report_debug(node->span, "not_implemented: {}", node->kind);

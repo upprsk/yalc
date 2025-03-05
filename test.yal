@@ -1,12 +1,6 @@
-extern func malloc(sz: usize) [*]u8;
-extern func free(ptr: [*]const u8);
+extern func write(fd: i32, buf: [*]const u8, sz: usize) isize;
 
 func main() {
-    var size = 1024 as usize;
-    var data = malloc(size);
-    defer free(data);
-}
-
-func test() usize {
-    return 120 as u32;
+    var buf = "Hello, World!\n";
+    _ = write(1, buf, 14 as usize);
 }
