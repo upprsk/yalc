@@ -17,8 +17,8 @@ namespace yal {
 // for if the handle is valid. Bit 30 is used as a check for if the handle
 // points to an array.
 struct NodeHandle {
-    constexpr NodeHandle(uint32_t idx = 0xFFFF'FFFF) : idx{idx} {}
-    constexpr NodeHandle(uint64_t) = delete;
+    constexpr NodeHandle() : idx{0xFFFF'FFFF} {}
+
     constexpr auto operator=(NodeHandle const&) -> NodeHandle& = default;
     constexpr auto operator=(NodeHandle&&) -> NodeHandle& = default;
     constexpr NodeHandle(NodeHandle&& o) = default;
@@ -57,6 +57,9 @@ struct NodeHandle {
     }
 
     [[nodiscard]] constexpr auto value() const -> uint32_t { return idx; }
+
+private:
+    constexpr NodeHandle(uint32_t idx) : idx{idx} {}
 
 private:
     uint32_t idx;
