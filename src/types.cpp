@@ -22,6 +22,7 @@ auto TypeStore::new_store() -> TypeStore {
     ts.u8_type = ts.new_type(TypeKind::Uint8);
 
     ts.usize_type = ts.new_type(TypeKind::Usize);
+    ts.isize_type = ts.new_type(TypeKind::Isize);
 
     return ts;
 }
@@ -78,7 +79,8 @@ auto TypeStore::coerce_to(Span span, TypeHandle target, TypeHandle rhs,
         case TypeKind::Uint16:
         case TypeKind::Int8:
         case TypeKind::Uint8:
-        case TypeKind::Usize: {
+        case TypeKind::Usize:
+        case TypeKind::Isize: {
             auto r = get(rhs);
             if (!r->is_integral()) {
                 er.report_error(
@@ -166,6 +168,7 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
         case TypeKind::Int8: return format_to(ctx.out(), "i8");
         case TypeKind::Uint8: return format_to(ctx.out(), "u8");
         case TypeKind::Usize: return format_to(ctx.out(), "usize");
+        case TypeKind::Isize: return format_to(ctx.out(), "isize");
 
         case TypeKind::Ptr:
             format_to(ctx.out(), "*");
@@ -230,6 +233,7 @@ auto fmt::formatter<yal::TypeKind>::format(yal::TypeKind   n,
         case yal::TypeKind::Int8: name = "Int8"; break;
         case yal::TypeKind::Uint8: name = "Uint8"; break;
         case yal::TypeKind::Usize: name = "Usize"; break;
+        case yal::TypeKind::Isize: name = "Isize"; break;
         case yal::TypeKind::Ptr: name = "Ptr"; break;
         case yal::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::TypeKind::Func: name = "Func"; break;

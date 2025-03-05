@@ -105,6 +105,7 @@ enum class TypeKind : uint16_t {
     Int8,
     Uint8,
     Usize,
+    Isize,
     Ptr,
     MultiPtr,
     Func,
@@ -151,12 +152,13 @@ struct Type {
                kind == TypeKind::Int32 || kind == TypeKind::Uint32 ||
                kind == TypeKind::Int16 || kind == TypeKind::Uint16 ||
                kind == TypeKind::Int8 || kind == TypeKind::Uint8 ||
-               kind == TypeKind::Usize;
+               kind == TypeKind::Usize || kind == TypeKind::Isize;
     }
 
     [[nodiscard]] constexpr auto is_signed() const -> bool {
         return kind == TypeKind::Int64 || kind == TypeKind::Int32 ||
-               kind == TypeKind::Int16 || kind == TypeKind::Int8;
+               kind == TypeKind::Int16 || kind == TypeKind::Int8 ||
+               kind == TypeKind::Isize;
     }
 
     [[nodiscard]] constexpr auto is_unsigned() const -> bool {
@@ -225,6 +227,10 @@ struct TypeStore {
 
     [[nodiscard]] auto get_type_usize() const -> TypeHandle {
         return usize_type;
+    }
+
+    [[nodiscard]] auto get_type_isize() const -> TypeHandle {
+        return isize_type;
     }
 
     [[nodiscard]] auto get_type_ptr(TypeHandle child, TypeFlags flags)
@@ -436,6 +442,7 @@ struct TypeStore {
     TypeHandle i8_type;
     TypeHandle u8_type;
     TypeHandle usize_type;
+    TypeHandle isize_type;
 
     std::vector<Type>       types;
     std::vector<TypeHandle> type_refs;
@@ -514,6 +521,7 @@ constexpr auto Type::size(TypeStore const& ts) const -> size_t {
         case TypeKind::Uint8: return 1;
 
         case TypeKind::Usize:
+        case TypeKind::Isize:
         case TypeKind::Ptr:
         case TypeKind::MultiPtr: return ts.ptr_size();
     }

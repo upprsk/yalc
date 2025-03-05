@@ -686,6 +686,12 @@ auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporter& er)
                 .where = {},
                 .is_const = true});
 
+    ctx.define({.name = "isize",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_isize(),
+                .where = {},
+                .is_const = true});
+
     ctx.define({.name = "usize",
                 .type = ts.get_type_type(),
                 .inner_type = ts.get_type_usize(),
