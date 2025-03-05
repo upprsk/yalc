@@ -2,7 +2,11 @@ extern func malloc(sz: usize) [*]u8;
 extern func free(ptr: [*]const u8);
 
 func main() {
-    var size = 1024;
-    var data = malloc(size as usize);
-    defer free(data as [*]const u8);
+    var size = 1024 as usize;
+    var data = malloc(size);
+    defer free(data);
+}
+
+func test() usize {
+    return 120 as u32;
 }

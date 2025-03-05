@@ -6,6 +6,7 @@
 #include <span>
 #include <vector>
 
+#include "error_reporter.hpp"
 #include "fmt/format.h"
 
 namespace yal {
@@ -95,6 +96,8 @@ enum class TypeKind : uint16_t {
     Type,
     Pack,  // ordered type pack, for function returns
     Void,
+    Int64,
+    Uint64,
     Int32,
     Uint32,
     Int16,
@@ -144,9 +147,21 @@ struct Type {
     }
 
     [[nodiscard]] constexpr auto is_integral() const -> bool {
-        return kind == TypeKind::Int32 || kind == TypeKind::Uint32 ||
+        return kind == TypeKind::Int64 || kind == TypeKind::Uint64 ||
+               kind == TypeKind::Int32 || kind == TypeKind::Uint32 ||
                kind == TypeKind::Int16 || kind == TypeKind::Uint16 ||
                kind == TypeKind::Int8 || kind == TypeKind::Uint8 ||
+               kind == TypeKind::Usize;
+    }
+
+    [[nodiscard]] constexpr auto is_signed() const -> bool {
+        return kind == TypeKind::Int64 || kind == TypeKind::Int32 ||
+               kind == TypeKind::Int16 || kind == TypeKind::Int8;
+    }
+
+    [[nodiscard]] constexpr auto is_unsigned() const -> bool {
+        return kind == TypeKind::Uint64 || kind == TypeKind::Uint32 ||
+               kind == TypeKind::Uint16 || kind == TypeKind::Uint8 ||
                kind == TypeKind::Usize;
     }
 
@@ -199,6 +214,8 @@ struct TypeStore {
     [[nodiscard]] auto get_type_type() const -> TypeHandle { return type_type; }
     [[nodiscard]] auto get_type_void() const -> TypeHandle { return void_type; }
 
+    [[nodiscard]] auto get_type_i64() const -> TypeHandle { return i64_type; }
+    [[nodiscard]] auto get_type_u64() const -> TypeHandle { return u64_type; }
     [[nodiscard]] auto get_type_i32() const -> TypeHandle { return i32_type; }
     [[nodiscard]] auto get_type_u32() const -> TypeHandle { return u32_type; }
     [[nodiscard]] auto get_type_i16() const -> TypeHandle { return i16_type; }
@@ -400,12 +417,18 @@ struct TypeStore {
         return sizeof(uintptr_t);
     }
 
+    // given a target type and an rhs to be coerced.
+    [[nodiscard]] auto coerce_to(Span span, TypeHandle target, TypeHandle rhs,
+                                 ErrorReporter& er) -> TypeHandle;
+
     auto dump(fmt::format_context& ctx, TypeHandle n) const
         -> fmt::format_context::iterator;
 
     TypeHandle void_type;
     TypeHandle type_type;
     TypeHandle err_type;
+    TypeHandle i64_type;
+    TypeHandle u64_type;
     TypeHandle i32_type;
     TypeHandle u32_type;
     TypeHandle i16_type;
@@ -481,6 +504,8 @@ constexpr auto Type::size(TypeStore const& ts) const -> size_t {
         case TypeKind::Void:
         case TypeKind::Func: return 0;
 
+        case TypeKind::Int64:
+        case TypeKind::Uint64: return 8;
         case TypeKind::Int32:
         case TypeKind::Uint32: return 4;
         case TypeKind::Int16:

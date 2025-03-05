@@ -201,13 +201,8 @@ struct Typing {
                     // type the initializer and check
                     auto v = add_types(ctx, decl.init);
                     if (h.is_valid()) {
-                        if (v != h) {
-                            er->report_error(
-                                node->span,
-                                "type mismatch, declaration expects "
-                                "{}, but initializer has type: {}",
-                                ts->fatten(h), ts->fatten(v));
-                        }
+                        auto r = ts->coerce_to(node->span, h, v, *er);
+                        if (r.is_valid()) h = r;
                     } else {
                         h = v;
                     }
@@ -245,9 +240,11 @@ struct Typing {
                                          ts->fatten(h));
                     }
 
+                    // FIXME: assigning types here does not seem to take packs
+                    // into account
                     for (auto const& name : ids) {
                         ctx.define({.name = std::string{name},
-                                    .type = v,
+                                    .type = h,
                                     .inner_type = ts->get_type_err(),
                                     .where = node->span,
                                     .is_const = false});
@@ -280,12 +277,8 @@ struct Typing {
 
                 auto curr_func = ctx.current_func();
                 auto func_type = ts->get(curr_func->type)->as_func(*ts);
-                if (func_type.ret != type) {
-                    er->report_error(node->span,
-                                     "type mismatch, function expects {}, but "
-                                     "return has type: {}",
-                                     ts->fatten(func_type.ret),
-                                     ts->fatten(type));
+                auto r = ts->coerce_to(node->span, func_type.ret, type, *er);
+                if (!r.is_valid()) {
                     er->report_note(curr_func->ret_span,
                                     "return type declared here");
                 }
@@ -307,12 +300,7 @@ struct Typing {
                     er->report_error(node->span, "can't assign of non l-value");
                 }
 
-                if (lhs != rhs) {
-                    er->report_error(node->span,
-                                     "type mismatch, left side of assignment "
-                                     "has type {} but right side has type {}",
-                                     ts->fatten(lhs), ts->fatten(rhs));
-                }
+                auto _ = ts->coerce_to(node->span, lhs, rhs, *er);
 
                 return node->set_type(ts->get_type_void());
             }
@@ -345,18 +333,34 @@ struct Typing {
                 auto lhs = add_types(ctx, node->first);
                 auto rhs = add_types(ctx, node->second);
 
-                if (lhs != rhs) {
-                    er->report_error(
-                        node->span, "incompatiple values in {}: {} and {}",
-                        node->kind, ts->fatten(lhs), ts->fatten(rhs));
-                }
-
                 // NOTE: support floats and operator overloads
+                // NOTE: returning i32 when this fails
                 if (!ts->get(lhs)->is_integral()) {
                     er->report_error(node->span,
                                      "value of type {} does not support {}",
                                      ts->fatten(lhs), node->kind);
+                    return ts->get_type_i32();
                 }
+
+                if (!ts->get(rhs)->is_integral()) {
+                    er->report_error(node->span,
+                                     "value of type {} does not support {}",
+                                     ts->fatten(rhs), node->kind);
+                    return ts->get_type_i32();
+                }
+
+                // select the largest integers as the result
+                if (ts->get(lhs)->size(*ts) < ts->get(rhs)->size(*ts)) {
+                    std::swap(lhs, rhs);
+                }
+
+                if (auto r = ts->coerce_to(node->span, lhs, rhs, *er);
+                    !r.is_valid()) {
+                    er->report_error(
+                        node->span, "incompatiple values in {}: {} and {}",
+                        node->kind, ts->fatten(lhs), ts->fatten(rhs));
+                } else
+                    lhs = r;
 
                 return node->set_type(lhs);
             }
@@ -507,7 +511,9 @@ struct Typing {
 
                 auto count = std::min(arg_types.size(), f.args.size());
                 for (size_t i = 0; i < count; i++) {
-                    if (arg_types[i] != f.args[i]) {
+                    if (!ts->coerce_to(ast->get(call.args[i])->span, f.args[i],
+                                       arg_types[i], *er)
+                             .is_valid()) {
                         er->report_error(
                             ast->get(call.args[i])->span,
                             "type mismatch, function expects {}, but got: {}",
@@ -631,6 +637,18 @@ auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporter& er)
     -> TypeHandle {
     auto t = Typing{.ast = &ast, .ts = &ts, .er = &er};
     auto ctx = Context{};
+
+    ctx.define({.name = "i64",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_i64(),
+                .where = {},
+                .is_const = true});
+
+    ctx.define({.name = "u64",
+                .type = ts.get_type_type(),
+                .inner_type = ts.get_type_u64(),
+                .where = {},
+                .is_const = true});
 
     ctx.define({.name = "i32",
                 .type = ts.get_type_type(),
