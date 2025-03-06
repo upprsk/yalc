@@ -542,8 +542,8 @@ TEST_CASE("extern function", "[parser][func]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(extern Id(malloc), [FuncArg(sz, Id(usize))], "
-            "MultiPtr(Id(u8)), Nil)])");
+            "File([FuncExtern(Id(malloc), [FuncArg(sz, Id(usize))], "
+            "MultiPtr(Id(u8)))])");
 }
 
 TEST_CASE("extern bound function", "[parser][func]") {
@@ -563,8 +563,8 @@ TEST_CASE("extern bound function", "[parser][func]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(extern Field(Id(mem), alloc), [FuncArg(sz, "
-            "Id(usize))], MultiPtr(Id(u8)), Nil)])");
+            "File([FuncExtern(Field(Id(mem), alloc), [FuncArg(sz, "
+            "Id(usize))], MultiPtr(Id(u8)))])");
 }
 
 TEST_CASE("assignments", "[parser][func][stmt]") {
@@ -715,10 +715,10 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), [], Nil, Block(["
-                "IfStmt(Smaller(Int(1), Call(Id(abc), [])), Block(["
-                "ExprStmt(Call(Id(print_something), []))]),"
-                " Block([ReturnStmt(Nil)]))]))])");
+                "File([Func(Id(main), [], Nil, "
+                "Block([IfStmtWithElse(Smaller(Int(1), Call(Id(abc), [])), "
+                "Block([ExprStmt(Call(Id(print_something), []))]), "
+                "Block([ReturnStmt(Nil)]))]))])");
     }
 
     SECTION("with decl") {
@@ -738,8 +738,9 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), [], Nil, Block([IfStmt(VarDecl(Id(a), "
-                "Nil, Call(Id(check), [])), Smaller(Int(1), Id(a)), "
+                "File([Func(Id(main), [], Nil, "
+                "Block([IfStmtWithDecl(VarDecl(Id(a), Nil, Call(Id(check), "
+                "[])), Smaller(Int(1), Id(a)), "
                 "Block([ExprStmt(Call(Id(print_something), []))]))]))])");
     }
 
@@ -761,8 +762,8 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
                 "File([Func(Id(main), [], Nil, "
-                "Block([IfStmt(VarDecl(IdPack([Id(a), Id(b), Id(ok)]), Nil, "
-                "Call(Id(check), [])), Id(ok), "
+                "Block([IfStmtWithDecl(VarDecl(IdPack([Id(a), Id(b), Id(ok)]), "
+                "Nil, Call(Id(check), [])), Id(ok), "
                 "Block([ExprStmt(Call(Id(print_something), []))]))]))])");
     }
 
@@ -785,8 +786,9 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
 
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "File([Func(Id(main), [], Nil, Block([IfStmt(VarDecl(Id(a), "
-                "Nil, Call(Id(check), [])), Smaller(Int(1), Id(a)), "
+                "File([Func(Id(main), [], Nil, "
+                "Block([IfStmtWithDeclAndElse(VarDecl(Id(a), Nil, "
+                "Call(Id(check), [])), Smaller(Int(1), Id(a)), "
                 "Block([ExprStmt(Call(Id(print_something), []))]), "
                 "Block([ReturnStmt(Nil)]))]))])");
     }
@@ -840,8 +842,6 @@ TEST_CASE("while statement", "[parser][func][stmt]") {
 }
 
 TEST_CASE("break statement", "[parser][func][stmt]") {
-    SKIP("break not implemented");
-
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
@@ -860,7 +860,7 @@ TEST_CASE("break statement", "[parser][func][stmt]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
-            "File([Func(Id(main), [], Nil, Block([BreakStmt]))])");
+            "File([Func(Id(main), [], Nil, Block([Break]))])");
 }
 
 TEST_CASE("locals", "[parser][func][var]") {
@@ -1586,7 +1586,7 @@ TEST_CASE("pointers", "[parser][expr]") {
 
         auto [ast, root] = parse_expr(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(fmt::to_string(ast.fatten(root)) == "Ptr(const Id(u8))");
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "PtrConst(Id(u8))");
     }
 
     SECTION("multi pointer") {
@@ -1614,7 +1614,7 @@ TEST_CASE("pointers", "[parser][expr]") {
 
         auto [ast, root] = parse_expr(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(fmt::to_string(ast.fatten(root)) == "MultiPtr(const Id(u8))");
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "MultiPtrConst(Id(u8))");
     }
 
     SECTION("slice") {
@@ -1642,7 +1642,7 @@ TEST_CASE("pointers", "[parser][expr]") {
 
         auto [ast, root] = parse_expr(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
-        REQUIRE(fmt::to_string(ast.fatten(root)) == "SlicePtr(const Id(u8))");
+        REQUIRE(fmt::to_string(ast.fatten(root)) == "SlicePtrConst(Id(u8))");
     }
 }
 

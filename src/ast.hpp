@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -13,10 +14,27 @@
 
 namespace yal {
 
-// A handle to an AST node. 30 bits are used as index. Bit 31 is used as a check
-// for if the handle is valid. Bit 30 is used as a check for if the handle
-// points to an array.
+// A handle to an AST node. A typed index into the AST nodes buffer.
+//
+// 30 bits are used for the index, which means an AST can have up to about 1
+// billion nodes (2^30=1'073'741'824). This should be enough.
+//
+// The 2 remaining bits are used for sanity checking what the handle points (or
+// not) to.
+//
+// - Index: Points to a single node in the AST.
+// - Array: Points to an array of AST node handles (does not store the length).
+// - Count: Is not an index, but a plain count. Normally used to determine the
+//   size of an array.
 struct NodeHandle {
+    enum class Discriminator {
+        Index = 0b00,
+        Array = 0b01,
+        Count = 0b10,
+        Invalid = 0b11,
+    };
+
+    // Default constructor creates an invalid handle (all bits set).
     constexpr NodeHandle() : idx{0xFFFF'FFFF} {}
 
     constexpr auto operator=(NodeHandle const&) -> NodeHandle& = default;
@@ -24,38 +42,84 @@ struct NodeHandle {
     constexpr NodeHandle(NodeHandle&& o) = default;
     constexpr NodeHandle(NodeHandle const& o) = default;
 
-    static constexpr auto from_size(size_t idx) -> NodeHandle {
-        return {static_cast<uint32_t>(idx)};
+    // create a node handle to the given node index.
+    [[nodiscard]] static constexpr auto init(uint32_t idx) -> NodeHandle {
+        auto h = NodeHandle{idx};
+        return h.with_discriminator(Discriminator::Index);
     }
 
-    [[nodiscard]] constexpr auto as_idx() const -> uint32_t {
-        return idx & 0x3FFF'FFFF;
+    // create a handle to the given node array.
+    [[nodiscard]] static constexpr auto init_array(uint32_t idx) -> NodeHandle {
+        auto h = NodeHandle{idx};
+        return h.with_discriminator(Discriminator::Array);
+    }
+
+    // create a handle to the given node array.
+    [[nodiscard]] static constexpr auto init_count(uint32_t idx) -> NodeHandle {
+        auto h = NodeHandle{idx};
+        return h.with_discriminator(Discriminator::Count);
+    }
+
+    // create an invalid handle.
+    [[nodiscard]] static constexpr auto init_invalid(uint32_t idx = -1)
+        -> NodeHandle {
+        auto h = NodeHandle{idx};
+        return h.with_discriminator(Discriminator::Invalid);
+    }
+
+    // -----------------------------------------------------------------------
+
+    // Create a new handle with the given discriminator.
+    [[nodiscard]] constexpr auto with_discriminator(Discriminator d) const
+        -> NodeHandle {
+        return idx | static_cast<uint32_t>(d) << 30;
+    }
+
+    // Get the discriminator for the handle.
+    [[nodiscard]] constexpr auto get_discriminator() const -> Discriminator {
+        return static_cast<Discriminator>(idx >> 30);
+    }
+
+    [[nodiscard]] constexpr auto is_index() const -> bool {
+        return get_discriminator() == Discriminator::Index;
+    }
+    [[nodiscard]] constexpr auto is_array() const -> bool {
+        return get_discriminator() == Discriminator::Array;
+    }
+    [[nodiscard]] constexpr auto is_count() const -> bool {
+        return get_discriminator() == Discriminator::Count;
+    }
+    [[nodiscard]] constexpr auto is_invalid() const -> bool {
+        return get_discriminator() == Discriminator::Invalid;
+    }
+    [[nodiscard]] constexpr auto is_valid() const -> bool {
+        return !is_invalid();
+    }
+
+    // -----------------------------------------------------------------------
+
+    [[nodiscard]] constexpr auto as_index() const -> uint32_t {
+        if (!is_index()) throw std::runtime_error{"NodeHandle is not an index"};
+        return as_raw_idx();
+    }
+
+    [[nodiscard]] constexpr auto as_array() const -> uint32_t {
+        if (!is_array()) throw std::runtime_error{"NodeHandle is not an array"};
+        return as_raw_idx();
     }
 
     [[nodiscard]] constexpr auto as_count() const -> uint32_t {
-        return as_idx();
+        if (!is_count()) throw std::runtime_error{"NodeHandle is not an count"};
+        return as_raw_idx();
     }
 
-    // check that this handle has not been invalidated
-    [[nodiscard]] constexpr auto is_valid() const -> bool {
-        return (idx & (1 << 31)) == 0;
+    // Use the handle as an index. This removes the discriminator from the top
+    // bits so that this can be used for indexing into an array directly.
+    [[nodiscard]] constexpr auto as_raw_idx() const -> uint32_t {
+        return idx & 0x3FFF'FFFF;
     }
 
-    // check that this handle refers to an array
-    [[nodiscard]] constexpr auto is_array() const -> bool {
-        return idx & (1 << 30);
-    }
-
-    // return a copy of the handle marked as invalid
-    [[nodiscard]] constexpr auto to_invalid() const -> NodeHandle {
-        return {idx | (1 << 31)};
-    }
-
-    // return a copy of the handle marked as an array
-    [[nodiscard]] constexpr auto to_array() const -> NodeHandle {
-        return {idx | (1 << 30)};
-    }
-
+    // Get the internal value.
     [[nodiscard]] constexpr auto value() const -> uint32_t { return idx; }
 
 private:
@@ -66,80 +130,197 @@ private:
 };
 
 enum class NodeKind : uint16_t {
+    // no children
     Err,
-    Nil,
-    File,
-    Func,
-    FuncArg,
-    FuncRetPack,
-    Block,
-    VarDecl,
-    DefDecl,
-    ExprStmt,
-    ReturnStmt,
-    IfStmt,
-    IfStmtWithElse,
-    IfStmtWithDecl,
-    IfStmtWithDeclAndElse,
-    WhileStmt,
-    Assign,
     Break,
-    Defer,
-    LogicOr,
-    LogicAnd,
-    BinOr,
-    BinXor,
-    BinAnd,
-    Equal,
-    NotEqual,
-    Greater,
-    GreaterEqual,
-    Smaller,
-    SmallerEqual,
-    ShftLeft,
-    ShftRight,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Cast,
-    OrElse,
-    OrReturn,
+    Nil,
+
+    // - first: points to array of children
+    // - second: number of children
+    //
+    // > Uses `WithChildren`.
+    Block,
+    ExprPack,
+    File,
+    FuncRetPack,
+    IdPack,
+
+    // - first: points to array of children
+    // - second: number of children
+    //
+    // The children are:
+    // - [0]: name (which may be a single Id or an IdPack)
+    // - [1]: return type
+    // - [2]: body
+    // - [3:]: argument list
+    //
+    // > Uses `Func`.
+    Func,
+    FuncExtern,
+
+    // - first: points to the type of the argument
+    // - value: the name of the argument
+    //
+    // > Uses `Named`
+    FuncArg,
+
+    // - first: names of declared variables
+    // - second: points to array with type and initializer ({type, init})
+    //
+    // > Uses `Decl`
+    DefDecl,
+    VarDecl,
+
+    // - first: points to child
+    //
+    // > Uses `WithChild`
     AddrOf,
-    LogicNot,
     BinNot,
-    Plus,
+    Defer,
+    Deref,
+    ExprStmt,
+    LogicNot,
+    MultiPtr,
+    MultiPtrConst,
     Neg,
     Optional,
+    OrReturn,
+    Plus,
     Ptr,
-    MultiPtr,
+    PtrConst,
+    ReturnStmt,
     SlicePtr,
+    SlicePtrConst,
+
+    // - first: the condition
+    // - second: the _then_ branch
+    //
+    // > Uses `IfStmt`
+    IfStmt,
+
+    // - first: the condition
+    // - second: points to array with _then_ and _else_ branches ({when_true,
+    //   when_false})
+    //
+    // > Uses `IfStmt`
+    IfStmtWithElse,
+
+    // - first: the condition
+    // - second: points to array with _decl_ and _then_ branch ({decl,
+    //   when_true})
+    //
+    // > Uses `IfStmt`
+    IfStmtWithDecl,
+
+    // - first: the condition
+    // - second: points to array with _decl_, _then_ and _else_ branches ({decl,
+    //   when_true, when_false})
+    //
+    // > Uses `IfStmt`
+    IfStmtWithDeclAndElse,
+
+    // - first: the condition
+    // - second: the loop's block
+    //
+    // > Uses `WithChildPair`
+    WhileStmt,
+
+    // - first: the lhs of the assignment
+    // - second: the rhs of the assignment
+    //
+    // > Uses `WithChildPair`
+    Assign,
+
+    // - first: the lhs of operation
+    // - second: the rhs of operation
+    //
+    // > Uses `WithChildPair`
+    Add,
+    BinAnd,
+    BinOr,
+    BinXor,
+    Div,
+    Equal,
+    Greater,
+    GreaterEqual,
+    LogicAnd,
+    LogicOr,
+    Mod,
+    Mul,
+    NotEqual,
+    OrElse,
+    ShftLeft,
+    ShftRight,
+    Smaller,
+    SmallerEqual,
+    Sub,
+
+    // - first: the expression to cast
+    // - second: the type to cast to
+    //
+    // > Uses `WithChildPair`
+    Cast,
+
+    // - first: points to array of children
+    // - second: number of children
+    //
+    // The children are:
+    // - [0]: size of array
+    // - [1]: type of array
+    // - [2:]: argument list
+    //
+    // > Uses `Array`
     Array,
-    ArrayType,
+
+    // - first: points to array of children
+    // - second: number of children
+    //
+    // The children are:
+    // - [0]: type of array
+    // - [1:]: argument list
+    //
+    // > Uses `Array`
     ArrayAutoLen,
-    Deref,
+
+    // - first: size of array
+    // - second: type of array
+    //
+    // > Uses `Array`
+    ArrayType,
+
+    // - first: points to array of children
+    // - second: number of children
+    //
+    // The children are:
+    // - [0]: callee
+    // - [1:]: argument list
+    //
+    // > Uses `Call`
     Call,
+
+    // - first: the receiver
+    // - value: the field name
+    //
+    // > Uses `Named`
     Field,
-    ExprPack,
+
+    // - value: the field name
     EnumLit,
-    IdPack,
+
+    // - value: the integer literal value
     Int,
+
+    // - value: the identifier
     Id,
+
+    // - value: the string literal value, with escape sequences already applied.
     Str,
 };
 
 struct Ast;
 
-enum class NodeFlags : uint16_t {
-    None = 0,
-    PtrIsConst = (1 << 0),
-    FuncIsExtern = (1 << 1),
-};
-
 struct Node {
     NodeKind                                            kind = NodeKind::Err;
-    NodeFlags                                           flags = NodeFlags::None;
     Span                                                span;
     NodeHandle                                          first;
     NodeHandle                                          second;
@@ -148,14 +329,6 @@ struct Node {
 
     constexpr auto set_type(TypeHandle ty) -> TypeHandle { return type = ty; }
 
-    [[nodiscard]] constexpr auto children() const -> NodeHandle {
-        return first;
-    }
-
-    [[nodiscard]] constexpr auto count() const -> uint32_t {
-        return second.as_count();
-    }
-
     [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
         return std::get<uint64_t>(value);
     }
@@ -163,6 +336,8 @@ struct Node {
     [[nodiscard]] constexpr auto value_string() const -> std::string const& {
         return std::get<std::string>(value);
     }
+
+    // ------------------------------------------------------------------------
 
     [[nodiscard]] constexpr auto is_lvalue() const -> bool {
         return kind == NodeKind::Deref || kind == NodeKind::Field ||
@@ -181,52 +356,61 @@ struct Node {
         return kind == NodeKind::Nil;
     }
 
-    [[nodiscard]] constexpr auto has_flag_ptr_is_const() const -> bool {
-        return fmt::underlying(flags) & fmt::underlying(NodeFlags::PtrIsConst);
+    [[nodiscard]] constexpr auto is_oneof(auto&&... kinds) const -> bool {
+        return ((kind == kinds) || ...);
     }
 
-    [[nodiscard]] constexpr auto has_flag_func_is_extern() const -> bool {
-        return fmt::underlying(flags) &
-               fmt::underlying(NodeFlags::FuncIsExtern);
-    }
+    // ------------------------------------------------------------------------
 
-    struct NodeFunc {
+    struct WithChild {
+        NodeHandle child;
+    };
+
+    struct WithChildPair {
+        NodeHandle first;
+        NodeHandle second;
+    };
+
+    struct WithChildren {
+        std::span<NodeHandle const> children;
+    };
+
+    struct Func {
         NodeHandle                  name;
         NodeHandle                  ret;
         NodeHandle                  body;
         std::span<NodeHandle const> args;
+        bool                        is_extern;
     };
 
-    struct NodeCall {
-        NodeHandle                  callee;
-        std::span<NodeHandle const> args;
+    struct Named {
+        std::string_view name;
+        NodeHandle       child;
     };
 
-    struct NodeIfStmt {
+    struct Decl {
+        NodeHandle ids;
+        NodeHandle type;
+        NodeHandle init;
+    };
+
+    struct IfStmt {
         NodeHandle decl;
         NodeHandle cond;
         NodeHandle when_true;
         NodeHandle when_false;
     };
 
-    struct NodeVarDecl {
-        NodeHandle ids;
-        NodeHandle type;
-        NodeHandle init;
-    };
-
-    struct NodeArray {
+    struct Array {
         NodeHandle                  type;
         NodeHandle                  size;
         std::span<NodeHandle const> items;
     };
 
-    [[nodiscard]] constexpr auto as_func(Ast const& ast) const -> NodeFunc;
-    [[nodiscard]] constexpr auto as_call(Ast const& ast) const -> NodeCall;
-    [[nodiscard]] constexpr auto as_ifstmt(Ast const& ast) const -> NodeIfStmt;
-    [[nodiscard]] constexpr auto as_var_decl(Ast const& ast) const
-        -> NodeVarDecl;
-    [[nodiscard]] constexpr auto as_array(Ast const& ast) const -> NodeArray;
+    struct Call {
+        NodeHandle                  callee;
+        std::span<NodeHandle const> args;
+    };
 };
 
 struct FatNodeHandle {
@@ -235,361 +419,160 @@ struct FatNodeHandle {
 };
 
 struct Ast {
+    [[nodiscard]] auto node_with_children(Node const& n) const
+        -> Node::WithChildren;
+    [[nodiscard]] auto node_with_child(Node const& n) const -> Node::WithChild;
+    [[nodiscard]] auto node_with_child_pair(Node const& n) const
+        -> Node::WithChildPair;
+    [[nodiscard]] auto node_func(Node const& n) const -> Node::Func;
+    [[nodiscard]] auto node_named(Node const& n) const -> Node::Named;
+    [[nodiscard]] auto node_decl(Node const& n) const -> Node::Decl;
+    [[nodiscard]] auto node_if_stmt(Node const& n) const -> Node::IfStmt;
+    [[nodiscard]] auto node_array(Node const& n) const -> Node::Array;
+    [[nodiscard]] auto node_call(Node const& n) const -> Node::Call;
+
+    // ------------------------------------------------------------------------
+
+    void assert_is_oneof(std::string_view name, Node const& n,
+                         auto&&... kinds) const;
+
+    // ------------------------------------------------------------------------
+
     [[nodiscard]] auto new_node_err(Span span) -> NodeHandle {
-        return new_node(NodeKind::Err, NodeFlags::None, span).second;
+        return new_node(NodeKind::Err, span);
     }
 
     [[nodiscard]] auto new_node_nil(Span span) -> NodeHandle {
-        return new_node(NodeKind::Nil, NodeFlags::None, span).second;
-    }
-
-    [[nodiscard]] auto new_node_file(Span const&                 span,
-                                     std::span<NodeHandle const> children)
-        -> NodeHandle {
-        return new_node(NodeKind::File, NodeFlags::None, span,
-                        new_array(children),
-                        NodeHandle::from_size(children.size()))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_func(Span const& span, NodeHandle name,
-                                     std::span<NodeHandle const> args,
-                                     NodeHandle ret, NodeHandle body)
-        -> NodeHandle {
-        return new_node(NodeKind::Func, NodeFlags::None, span,
-                        new_array_plus_three(name, ret, body, args),
-                        NodeHandle::from_size(args.size() + 3))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_extern_func(Span const& span, NodeHandle name,
-                                            std::span<NodeHandle const> args,
-                                            NodeHandle ret) -> NodeHandle {
-        return new_node(
-                   NodeKind::Func, NodeFlags::FuncIsExtern, span,
-                   new_array_plus_three(name, ret, new_node_nil(span), args),
-                   NodeHandle::from_size(args.size() + 3))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_func_arg(Span const& span, std::string name,
-                                         NodeHandle type) -> NodeHandle {
-        return new_node(NodeKind::FuncArg, NodeFlags::None, span, type,
-                        NodeHandle{}, TypeHandle{}, name)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_block(Span const&                 span,
-                                      std::span<NodeHandle const> children)
-        -> NodeHandle {
-        return new_node(NodeKind::Block, NodeFlags::None, span,
-                        new_array(children),
-                        NodeHandle::from_size(children.size()))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_array_auto_len(
-        Span const& span, NodeHandle type, std::span<NodeHandle const> items)
-        -> NodeHandle {
-        return new_node(NodeKind::ArrayAutoLen, NodeFlags::None, span,
-                        new_array_plus_one(type, items),
-                        NodeHandle::from_size(items.size() + 1))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_array(Span const& span, NodeHandle size,
-                                      NodeHandle                  type,
-                                      std::span<NodeHandle const> items)
-        -> NodeHandle {
-        return new_node(NodeKind::Array, NodeFlags::None, span,
-                        new_array_plus_two(size, type, items),
-                        NodeHandle::from_size(items.size() + 2))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_array_type(Span const& span, NodeHandle size,
-                                           NodeHandle type) -> NodeHandle {
-        return new_node(NodeKind::ArrayType, NodeFlags::None, span, size, type)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_expr_pack(Span const&                 span,
-                                          std::span<NodeHandle const> children)
-        -> NodeHandle {
-        return new_node(NodeKind::ExprPack, NodeFlags::None, span,
-                        new_array(children),
-                        NodeHandle::from_size(children.size()))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_id_pack(Span const&                 span,
-                                        std::span<NodeHandle const> children)
-        -> NodeHandle {
-        return new_node(NodeKind::IdPack, NodeFlags::None, span,
-                        new_array(children),
-                        NodeHandle::from_size(children.size()))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_func_ret_pack(
-        Span const& span, std::span<NodeHandle const> children) -> NodeHandle {
-        return new_node(NodeKind::FuncRetPack, NodeFlags::None, span,
-                        new_array(children),
-                        NodeHandle::from_size(children.size()))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_call(Span const& span, NodeHandle callee,
-                                     std::span<NodeHandle const> parts)
-        -> NodeHandle {
-        return new_node(NodeKind::Call, NodeFlags::None, span,
-                        new_array_plus_one(callee, parts),
-                        NodeHandle::from_size(parts.size() + 1))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_int(Span span, uint64_t v) -> NodeHandle {
-        return new_node(NodeKind::Int, NodeFlags::None, span, NodeHandle{},
-                        NodeHandle{}, TypeHandle{}, v)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_id(Span span, std::string v) -> NodeHandle {
-        return new_node(NodeKind::Id, NodeFlags::None, span, NodeHandle{},
-                        NodeHandle{}, TypeHandle{}, v)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_str(Span span, std::string v) -> NodeHandle {
-        return new_node(NodeKind::Str, NodeFlags::None, span, NodeHandle{},
-                        NodeHandle{}, TypeHandle{}, v)
-            .second;
+        return new_node(NodeKind::Nil, span);
     }
 
     [[nodiscard]] auto new_node_break(Span span) -> NodeHandle {
-        return new_node(NodeKind::Break, NodeFlags::None, span).second;
+        return new_node(NodeKind::Break, span);
     }
 
-    [[nodiscard]] auto new_node_enumlit(Span span, std::string v)
+    [[nodiscard]] auto new_node_with_children(
+        NodeKind kind, Span span, std::span<NodeHandle const> children)
         -> NodeHandle {
-        return new_node(NodeKind::EnumLit, NodeFlags::None, span, NodeHandle{},
-                        NodeHandle{}, TypeHandle{}, v)
-            .second;
+        return new_node(kind, span, new_array(children),
+                        NodeHandle::init_count(children.size()));
     }
 
-    [[nodiscard]] auto new_node_field(Span span, NodeHandle recv,
-                                      std::string field) -> NodeHandle {
-        return new_node(NodeKind::Field, NodeFlags::None, span, recv,
-                        NodeHandle{}, TypeHandle{}, field)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_if(Span span, NodeHandle cond, NodeHandle wt)
+    [[nodiscard]] auto new_node_with_child(NodeKind kind, Span span,
+                                           NodeHandle first,
+                                           NodeHandle second = {})
         -> NodeHandle {
-        return new_node(NodeKind::IfStmt, NodeFlags::None, span, cond, wt)
-            .second;
+        return new_node(kind, span, first, second);
     }
 
-    [[nodiscard]] auto new_node_if_with_else(Span span, NodeHandle cond,
-                                             NodeHandle wt, NodeHandle wf)
+    [[nodiscard]] auto new_node_func(NodeKind kind, Span span, NodeHandle name,
+                                     std::span<NodeHandle const> args,
+                                     NodeHandle ret, NodeHandle body)
         -> NodeHandle {
-        return new_node(NodeKind::IfStmtWithElse, NodeFlags::None, span, cond,
-                        new_array_of_two(wt, wf))
-            .second;
+        return new_node(kind, span, new_array_prepend(args, name, ret, body),
+                        NodeHandle::init_count(args.size() + 3));
     }
 
-    [[nodiscard]] auto new_node_if_with_decl(Span span, NodeHandle decl,
-                                             NodeHandle cond, NodeHandle wt)
+    [[nodiscard]] auto new_node_named(NodeKind kind, Span span,
+                                      NodeHandle child, std::string name)
         -> NodeHandle {
-        return new_node(NodeKind::IfStmtWithDecl, NodeFlags::None, span, cond,
-                        new_array_of_two(decl, wt))
-            .second;
+        return new_node(kind, span, child, NodeHandle{}, TypeHandle{}, name);
     }
 
-    [[nodiscard]] auto new_node_if_with_decl_and_else(
-        Span span, NodeHandle decl, NodeHandle cond, NodeHandle wt,
-        NodeHandle wf) -> NodeHandle {
-        return new_node(NodeKind::IfStmtWithDeclAndElse, NodeFlags::None, span,
-                        cond, new_array_of_three(decl, wt, wf))
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_binary(NodeKind kind, Span span, NodeHandle lhs,
-                                       NodeHandle rhs) -> NodeHandle {
-        return new_node(kind, NodeFlags::None, span, lhs, rhs).second;
-    }
-
-    [[nodiscard]] auto new_node_unary(NodeKind kind, Span span, NodeHandle lhs)
+    [[nodiscard]] auto new_node_named(NodeKind kind, Span span,
+                                      std::string name, NodeHandle child)
         -> NodeHandle {
-        return new_node(kind, NodeFlags::None, span, lhs).second;
-    }
-
-    [[nodiscard]] auto new_node_ptr(Span span, bool is_const, NodeHandle lhs)
-        -> NodeHandle {
-        return new_node(NodeKind::Ptr,
-                        is_const ? NodeFlags::PtrIsConst : NodeFlags::None,
-                        span, lhs)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_multiptr(Span span, bool is_const,
-                                         NodeHandle lhs) -> NodeHandle {
-        return new_node(NodeKind::MultiPtr,
-                        is_const ? NodeFlags::PtrIsConst : NodeFlags::None,
-                        span, lhs)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_sliceptr(Span span, bool is_const,
-                                         NodeHandle lhs) -> NodeHandle {
-        return new_node(NodeKind::SlicePtr,
-                        is_const ? NodeFlags::PtrIsConst : NodeFlags::None,
-                        span, lhs)
-            .second;
-    }
-
-    [[nodiscard]] auto new_node_var_decl(Span span, NodeHandle ids,
-                                         NodeHandle type, NodeHandle init)
-        -> NodeHandle {
-        return new_node_decl(NodeKind::VarDecl, span, ids, type, init);
-    }
-
-    [[nodiscard]] auto new_node_def_decl(Span span, NodeHandle ids,
-                                         NodeHandle type, NodeHandle init)
-        -> NodeHandle {
-        return new_node_decl(NodeKind::DefDecl, span, ids, type, init);
+        return new_node(kind, span, child, NodeHandle{}, TypeHandle{}, name);
     }
 
     [[nodiscard]] auto new_node_decl(NodeKind kind, Span span, NodeHandle ids,
                                      NodeHandle type, NodeHandle init)
         -> NodeHandle {
-        return new_node(kind, NodeFlags::None, span, ids,
-                        new_array_of_two(type, init))
-            .second;
+        return new_node(kind, span, ids, new_array_of(type, init));
     }
 
-    [[nodiscard]] auto new_node(auto&&... args)
-        -> std::pair<Node*, NodeHandle> {
+    [[nodiscard]] auto new_node_if(NodeKind kind, Span span,
+                                   Node::IfStmt params) -> NodeHandle;
+
+    [[nodiscard]] auto new_node_array(NodeKind kind, Span span,
+                                      Node::Array params) -> NodeHandle;
+
+    [[nodiscard]] auto new_node_call(Span span, NodeHandle callee,
+                                     std::span<NodeHandle const> args)
+        -> NodeHandle {
+        return new_node(NodeKind::Call, span, new_array_prepend(args, callee),
+                        NodeHandle::init_count(args.size() + 1));
+    }
+
+    [[nodiscard]] auto new_node_with_str(NodeKind kind, Span span,
+                                         std::string value) -> NodeHandle {
+        return new_node(kind, span, NodeHandle{}, NodeHandle{}, TypeHandle{},
+                        value);
+    }
+
+    [[nodiscard]] auto new_node_with_int(NodeKind kind, Span span,
+                                         uint64_t value) -> NodeHandle {
+        return new_node(kind, span, NodeHandle{}, NodeHandle{}, TypeHandle{},
+                        value);
+    }
+
+    // ------------------------------------------------------------------------
+
+    [[nodiscard]] auto new_node_id(Span span, std::string value) -> NodeHandle {
+        return new_node_with_str(NodeKind::Id, span, value);
+    }
+
+    // ------------------------------------------------------------------------
+
+    [[nodiscard]] auto new_node(auto&&... args) -> NodeHandle {
         auto sz = nodes.size();
         nodes.emplace_back(std::forward<decltype(args)>(args)...);
-        auto node = &nodes.at(sz);
-
-        return {node, NodeHandle::from_size(sz)};
+        return NodeHandle::init(sz);
     }
 
     [[nodiscard]] auto new_array(std::span<NodeHandle const> handles)
         -> NodeHandle {
         auto sz = node_refs.size();
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
-
-        return NodeHandle::from_size(sz).to_array();
+        return NodeHandle::init_array(sz);
     }
 
-    [[nodiscard]] auto new_array_plus_one(NodeHandle                  first,
-                                          std::span<NodeHandle const> handles)
-        -> NodeHandle {
+    [[nodiscard]] auto new_array_prepend(std::span<NodeHandle const> handles,
+                                         auto&&... prepend) -> NodeHandle {
         auto sz = node_refs.size();
-        node_refs.push_back(first);
+        (node_refs.push_back(prepend), ...);
         node_refs.insert(node_refs.end(), handles.begin(), handles.end());
-
-        return NodeHandle::from_size(sz).to_array();
+        return NodeHandle::init_array(sz);
     }
 
-    [[nodiscard]] auto new_array_plus_two(NodeHandle first, NodeHandle second,
-                                          std::span<NodeHandle const> handles)
-        -> NodeHandle {
+    [[nodiscard]] auto new_array_of(auto&&... prepend) -> NodeHandle {
         auto sz = node_refs.size();
-        node_refs.push_back(first);
-        node_refs.push_back(second);
-        node_refs.insert(node_refs.end(), handles.begin(), handles.end());
-
-        return NodeHandle::from_size(sz).to_array();
+        (node_refs.push_back(prepend), ...);
+        return NodeHandle::init_array(sz);
     }
 
-    [[nodiscard]] auto new_array_of_two(NodeHandle first, NodeHandle second)
-        -> NodeHandle {
-        auto sz = node_refs.size();
-        node_refs.push_back(first);
-        node_refs.push_back(second);
-
-        return NodeHandle::from_size(sz).to_array();
-    }
-
-    [[nodiscard]] auto new_array_of_three(NodeHandle first, NodeHandle second,
-                                          NodeHandle third) -> NodeHandle {
-        auto sz = node_refs.size();
-        node_refs.push_back(first);
-        node_refs.push_back(second);
-        node_refs.push_back(third);
-
-        return NodeHandle::from_size(sz).to_array();
-    }
-
-    [[nodiscard]] auto new_array_plus_three(NodeHandle first, NodeHandle second,
-                                            NodeHandle                  third,
-                                            std::span<NodeHandle const> handles)
-        -> NodeHandle {
-        auto sz = node_refs.size();
-        node_refs.push_back(first);
-        node_refs.push_back(second);
-        node_refs.push_back(third);
-        node_refs.insert(node_refs.end(), handles.begin(), handles.end());
-
-        return NodeHandle::from_size(sz).to_array();
-    }
-
-    [[nodiscard]] constexpr auto get_children(NodeHandle h) const
-        -> std::span<NodeHandle const> {
-        return get_children(get(h));
-    }
-
-    [[nodiscard]] constexpr auto get_children(Node const* h) const
-        -> std::span<NodeHandle const> {
-        return get_children(*h);
-    }
-
-    [[nodiscard]] constexpr auto get_children(Node const& h) const
-        -> std::span<NodeHandle const> {
-        return get_array(h.children(), h.count());
-    }
+    // ------------------------------------------------------------------------
 
     // Get a reference to a node from it's handle. The pointer is invalid after
     // any modification to the ast, do not hold on to it.
     [[nodiscard]] constexpr auto get(NodeHandle h) const -> Node const* {
-        if (!h.is_valid())
-            throw fmt::system_error(6, "invalid node handle: {:x}", h.value());
-        if (h.is_array())
-            throw fmt::system_error(1, "node handle is an array: {:x}",
-                                    h.value());
-
-        return &nodes.at(h.as_idx());
+        return &nodes.at(h.as_index());
     }
 
     // Get a mutable reference to a node from it's handle. The pointer is
     // invalid after any modification to the ast, do not hold on to it.
     [[nodiscard]] constexpr auto get_mut(NodeHandle h) -> Node* {
-        if (!h.is_valid())
-            throw fmt::system_error(6, "invalid node handle: {:x}", h.value());
-        if (h.is_array())
-            throw fmt::system_error(1, "node handle is an array: {:x}",
-                                    h.value());
-
-        return &nodes.at(h.as_idx());
+        return &nodes.at(h.as_index());
     }
 
     // Get a reference to a node array from it's handle. The pointer is invalid
     // after any modification to the ast, do not hold on to it.
     [[nodiscard]] constexpr auto get_array(NodeHandle h, size_t count) const
         -> std::span<NodeHandle const> {
-        if (!h.is_valid())
-            throw fmt::system_error(0, "invalid node handle: {:x}", h.value());
-        if (!h.is_array())
-            throw fmt::system_error(0, "node handle is not an array: {:x}",
-                                    h.value());
-
         std::span s = node_refs;
-        return s.subspan(h.as_idx(), count);
+        return s.subspan(h.as_array(), count);
     }
+
+    // ------------------------------------------------------------------------
 
     [[nodiscard]] constexpr auto fatten(NodeHandle h) const -> FatNodeHandle {
         return {.ast = this, .node = h};
@@ -652,6 +635,7 @@ struct fmt::formatter<yal::FatNodeHandle> {
         -> format_context::iterator;
 };
 
+/*
 namespace yal {
 
 constexpr auto Node::as_func(Ast const& ast) const -> NodeFunc {
@@ -789,3 +773,4 @@ constexpr auto Node::as_array(Ast const& ast) const -> NodeArray {
 }
 
 }  // namespace yal
+*/

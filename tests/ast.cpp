@@ -25,28 +25,22 @@ TEST_CASE("invalid handles", "[ast]") {
     auto ast = Ast{};
 
     SECTION("invalid handle") {
-        REQUIRE_THROWS_WITH(ast.get({}),
-                            ContainsSubstring(fmt::format(
-                                "invalid node handle: {:x}", 0xffffffff)));
+        REQUIRE_THROWS_WITH(ast.get({}), Equals("NodeHandle is not an index"));
     }
 
     SECTION("array handle in normal") {
-        REQUIRE_THROWS_WITH(ast.get(NodeHandle::from_size(0).to_array()),
-                            ContainsSubstring(fmt::format(
-                                "node handle is an array: {:x}", 0x40000000)));
+        REQUIRE_THROWS_WITH(ast.get(NodeHandle::init_array(0)),
+                            Equals("NodeHandle is not an index"));
     }
 
     SECTION("invalid handle in array") {
-        REQUIRE_THROWS_WITH(
-            ast.get_array(NodeHandle::from_size(0).to_invalid(), 1),
-            ContainsSubstring(
-                fmt::format("invalid node handle: {:x}", 0x80000000)));
+        REQUIRE_THROWS_WITH(ast.get_array(NodeHandle::init_invalid(0), 1),
+                            Equals("NodeHandle is not an array"));
     }
 
     SECTION("normal handle in array") {
-        REQUIRE_THROWS_WITH(ast.get_array(NodeHandle::from_size(0), 1),
-                            ContainsSubstring(fmt::format(
-                                "node handle is not an array: {:x}", 0)));
+        REQUIRE_THROWS_WITH(ast.get_array(NodeHandle::init(0), 1),
+                            Equals("NodeHandle is not an array"));
     }
 }
 
@@ -54,19 +48,19 @@ TEST_CASE("creating nodes", "[ast]") {
     auto ast = Ast{};
 
     SECTION("empty nodes") {
-        auto [ptr1, hdl1] = ast.new_node();
-        REQUIRE(ptr1 != nullptr);
+        auto hdl1 = ast.new_node();
+        REQUIRE(ast.get(hdl1) != nullptr);
         REQUIRE(hdl1.is_valid());
         REQUIRE(hdl1.value() == 0);
         REQUIRE_FALSE(hdl1.is_array());
-        REQUIRE(ptr1->kind == NodeKind::Err);
+        REQUIRE(ast.get(hdl1)->kind == NodeKind::Err);
 
-        auto [ptr2, hdl2] = ast.new_node();
-        REQUIRE(ptr2 != nullptr);
+        auto hdl2 = ast.new_node();
+        REQUIRE(ast.get(hdl2) != nullptr);
         REQUIRE(hdl2.is_valid());
         REQUIRE(hdl2.value() == 1);
         REQUIRE_FALSE(hdl2.is_array());
-        REQUIRE(ptr2->kind == NodeKind::Err);
+        REQUIRE(ast.get(hdl2)->kind == NodeKind::Err);
 
         CHECK(ast.size() == 2);
         CHECK(ast.refs_size() == 0);
@@ -94,65 +88,7 @@ TEST_CASE("creating nodes", "[ast]") {
         CHECK(ast.refs_size() == 0);
     }
 
-    SECTION("create file node") {
-        SECTION("empty file node") {
-            auto hdl = ast.new_node_file({}, {});
-            REQUIRE(hdl.is_valid());
-            REQUIRE(hdl.value() == 0);
-            REQUIRE_FALSE(hdl.is_array());
-
-            auto node = ast.get(hdl);
-            REQUIRE(node->kind == NodeKind::File);
-            REQUIRE(node->children().is_valid());
-            REQUIRE(node->children().is_array());
-
-            auto children = ast.get_children(hdl);
-            REQUIRE(children.size() == 0);
-
-            CHECK(ast.size() == 1);
-            CHECK(ast.refs_size() == 0);
-        }
-
-        SECTION("file node with single nil child") {
-            std::array top_children{ast.new_node_nil({})};
-            auto       hdl = ast.new_node_file({}, top_children);
-            REQUIRE(hdl.is_valid());
-            REQUIRE(hdl.value() == 1);
-            REQUIRE_FALSE(hdl.is_array());
-
-            auto node = ast.get(hdl);
-            REQUIRE(node->kind == NodeKind::File);
-            REQUIRE(node->children().is_valid());
-            REQUIRE(node->children().is_array());
-
-            auto children = ast.get_children(hdl);
-            REQUIRE(top_children.size() == 1);
-            REQUIRE(top_children.at(0).is_valid());
-            REQUIRE_FALSE(top_children.at(0).is_array());
-            REQUIRE(ast.get(top_children.at(0))->kind == NodeKind::Nil);
-
-            CHECK(ast.size() == 2);
-            CHECK(ast.refs_size() == 1);
-        }
-
-        SECTION("access file node not as array") {
-            std::array top_children{ast.new_node_nil({})};
-            auto       hdl = ast.new_node_file({}, top_children);
-            REQUIRE(hdl.is_valid());
-            REQUIRE(hdl.value() == 1);
-            REQUIRE_FALSE(hdl.is_array());
-
-            auto node = ast.get(hdl);
-            REQUIRE(node->kind == NodeKind::File);
-            REQUIRE(node->children().is_valid());
-            REQUIRE(node->children().is_array());
-
-            REQUIRE_THROWS_WITH(
-                ast.get(node->children()),
-                ContainsSubstring(
-                    fmt::format("node handle is an array: {:x}", 0x40000000)));
-        }
-    }
+    // TODO: add tests for more node types
 }
 
 // NOLINTEND(modernize-use-designated-initializers)

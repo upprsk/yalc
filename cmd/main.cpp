@@ -48,12 +48,12 @@ auto main(int argc, char** argv) -> int {
 
         fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
 
-        auto ts = yal::TypeStore::new_store();
-        yal::pass_add_types(root, ast, ts, er);
-
-        for (size_t i = 0; i < ts.size(); i++) {
-            fmt::println("{}", ts.fatten(yal::TypeHandle::from_size(i)));
-        }
+        // auto ts = yal::TypeStore::new_store();
+        // yal::pass_add_types(root, ast, ts, er);
+        //
+        // for (size_t i = 0; i < ts.size(); i++) {
+        //     fmt::println("{}", ts.fatten(yal::TypeHandle::from_size(i)));
+        // }
 
         return 0;
     }

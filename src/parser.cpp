@@ -146,7 +146,7 @@ struct Parser {
             s = start.extend(end);
         }
 
-        return ast.new_node_file(s, children);
+        return ast.new_node_with_children(NodeKind::File, s, children);
     }
 
     auto parse_top_stmt() -> NodeHandle {
@@ -183,8 +183,8 @@ struct Parser {
 
         auto body = parse_block();
 
-        return ast.new_node_func(s.extend(ast.get(body)->span), name, args, ret,
-                                 body);
+        return ast.new_node_func(NodeKind::Func, s.extend(ast.get(body)->span),
+                                 name, args, ret, body);
     }
 
     // extern_func ::= "extern" "func" { ID "." } ID "(" func_args ")" [
@@ -198,8 +198,9 @@ struct Parser {
                                     std::string{prev_span().str(source)});
         while (match(TokenType::Dot)) {
             try(consume(TokenType::Id));
-            name = ast.new_node_field(ast.get(name)->span, name,
-                                      std::string{prev_span().str(source)});
+            name =
+                ast.new_node_named(NodeKind::Field, ast.get(name)->span, name,
+                                   std::string{prev_span().str(source)});
         }
 
         try(consume(TokenType::Lparen));
@@ -213,7 +214,8 @@ struct Parser {
 
         try(consume(TokenType::Semi));
 
-        return ast.new_node_extern_func(s.extend(prev_span()), name, args, ret);
+        return ast.new_node_func(NodeKind::FuncExtern, s.extend(prev_span()),
+                                 name, args, ret, {});
     }
 
     auto parse_func_id() -> NodeHandle {
@@ -233,7 +235,8 @@ struct Parser {
             }
 
             auto end = ast.get(ids.at(ids.size() - 1))->span;
-            return ast.new_node_id_pack(s.extend(end), ids);
+            return ast.new_node_with_children(NodeKind::IdPack, s.extend(end),
+                                              ids);
         }
 
         return name;
@@ -272,14 +275,14 @@ struct Parser {
             auto rhs = parse_expr();
             try(consume(TokenType::Semi));
 
-            return ast.new_node_binary(NodeKind::Assign,
-                                       ast.get(expr)->span.extend(prev_span()),
-                                       expr, rhs);
+            return ast.new_node_with_child(
+                NodeKind::Assign, ast.get(expr)->span.extend(prev_span()), expr,
+                rhs);
         }
 
         try(consume(TokenType::Semi));
 
-        return ast.new_node_unary(
+        return ast.new_node_with_child(
             NodeKind::ExprStmt, ast.get(expr)->span.extend(prev_span()), expr);
     }
 
@@ -293,8 +296,8 @@ struct Parser {
 
         try(consume(TokenType::Semi));
 
-        return ast.new_node_unary(NodeKind::ReturnStmt,
-                                  s.extend(ast.get(expr)->span), expr);
+        return ast.new_node_with_child(NodeKind::ReturnStmt,
+                                       s.extend(ast.get(expr)->span), expr);
     }
 
     // if_stmt ::= "if" expr block [ "else" expr ]
@@ -312,12 +315,20 @@ struct Parser {
             if (match_kw("else")) {
                 auto wf = parse_block();
 
-                return ast.new_node_if_with_decl_and_else(
-                    s.extend(ast.get(wf)->span), decl, cond, wt, wf);
+                return ast.new_node_if(NodeKind::IfStmtWithDeclAndElse,
+                                       s.extend(ast.get(wt)->span),
+                                       {.decl = decl,
+                                        .cond = cond,
+                                        .when_true = wt,
+                                        .when_false = wf});
             }
 
-            return ast.new_node_if_with_decl(s.extend(ast.get(wt)->span), decl,
-                                             cond, wt);
+            return ast.new_node_if(NodeKind::IfStmtWithDecl,
+                                   s.extend(ast.get(wt)->span),
+                                   {.decl = decl,
+                                    .cond = cond,
+                                    .when_true = wt,
+                                    .when_false = {}});
         }
 
         auto cond = parse_expr();
@@ -326,11 +337,14 @@ struct Parser {
         if (match_kw("else")) {
             auto wf = parse_block();
 
-            return ast.new_node_if_with_else(s.extend(ast.get(wf)->span), cond,
-                                             wt, wf);
+            return ast.new_node_if(
+                NodeKind::IfStmtWithElse, s.extend(ast.get(wt)->span),
+                {.decl = {}, .cond = cond, .when_true = wt, .when_false = wf});
         }
 
-        return ast.new_node_if(s.extend(ast.get(wt)->span), cond, wt);
+        return ast.new_node_if(
+            NodeKind::IfStmt, s.extend(ast.get(wt)->span),
+            {.decl = {}, .cond = cond, .when_true = wt, .when_false = {}});
     }
 
     // block ::= "{" { stmt } "}" ;
@@ -347,7 +361,8 @@ struct Parser {
 
         try(consume(TokenType::Rbrace));
 
-        return ast.new_node_block(s.extend(prev_span()), children);
+        return ast.new_node_with_children(NodeKind::Block,
+                                          s.extend(prev_span()), children);
     }
 
     // var_decl ::= "var" id_pack [ ":" expr ] "=" expr ";"
@@ -367,7 +382,7 @@ struct Parser {
             try(consume(TokenType::Semi));
 
             auto span = s.extend(prev_span());
-            return ast.new_node_var_decl(span, ids, type, init);
+            return ast.new_node_decl(NodeKind::VarDecl, span, ids, type, init);
         }
 
         try(consume(TokenType::Equal));
@@ -376,8 +391,8 @@ struct Parser {
         try(consume(TokenType::Semi));
 
         auto span = s.extend(prev_span());
-        return ast.new_node_var_decl(span, ids, ast.new_node_nil(prev_span()),
-                                     init);
+        return ast.new_node_decl(NodeKind::VarDecl, span, ids,
+                                 ast.new_node_nil(prev_span()), init);
     }
 
     // def_decl ::= "def" id_pack [ ":" expr ] "=" expr ";" ;
@@ -397,7 +412,7 @@ struct Parser {
         try(consume(TokenType::Semi));
 
         auto span = s.extend(prev_span());
-        return ast.new_node_def_decl(span, ids, type, init);
+        return ast.new_node_decl(NodeKind::DefDecl, span, ids, type, init);
     }
 
     // id_pack ::= ID { "," ID } ;
@@ -416,7 +431,7 @@ struct Parser {
 
         if (ids.size() == 1) return ids.at(0);
 
-        return ast.new_node_id_pack(span, ids);
+        return ast.new_node_with_children(NodeKind::IdPack, span, ids);
     }
 
     auto parse_break() -> NodeHandle {
@@ -430,8 +445,8 @@ struct Parser {
         auto s = prev_span();
         auto child = parse_stmt();
 
-        return ast.new_node_unary(NodeKind::Defer, s.extend(prev_span()),
-                                  child);
+        return ast.new_node_with_child(NodeKind::Defer, s.extend(prev_span()),
+                                       child);
     }
 
     // ------------------------------------------------------------------------
@@ -447,7 +462,7 @@ struct Parser {
             auto rhs = parse_logic_and();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(NodeKind::LogicOr, span, lhs, rhs);
+            lhs = ast.new_node_with_child(NodeKind::LogicOr, span, lhs, rhs);
         }
 
         return lhs;
@@ -461,7 +476,7 @@ struct Parser {
             auto rhs = parse_bin_or();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(NodeKind::LogicAnd, span, lhs, rhs);
+            lhs = ast.new_node_with_child(NodeKind::LogicAnd, span, lhs, rhs);
         }
 
         return lhs;
@@ -475,7 +490,7 @@ struct Parser {
             auto rhs = parse_bin_xor();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(NodeKind::BinOr, span, lhs, rhs);
+            lhs = ast.new_node_with_child(NodeKind::BinOr, span, lhs, rhs);
         }
 
         return lhs;
@@ -489,7 +504,7 @@ struct Parser {
             auto rhs = parse_bin_and();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(NodeKind::BinXor, span, lhs, rhs);
+            lhs = ast.new_node_with_child(NodeKind::BinXor, span, lhs, rhs);
         }
 
         return lhs;
@@ -503,7 +518,7 @@ struct Parser {
             auto rhs = parse_equality();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(NodeKind::BinAnd, span, lhs, rhs);
+            lhs = ast.new_node_with_child(NodeKind::BinAnd, span, lhs, rhs);
         }
 
         return lhs;
@@ -525,7 +540,7 @@ struct Parser {
             auto rhs = parse_comparison();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(k, span, lhs, rhs);
+            lhs = ast.new_node_with_child(k, span, lhs, rhs);
         }
 
         return lhs;
@@ -550,7 +565,7 @@ struct Parser {
             auto rhs = parse_shift();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(k, span, lhs, rhs);
+            lhs = ast.new_node_with_child(k, span, lhs, rhs);
         }
 
         return lhs;
@@ -572,7 +587,7 @@ struct Parser {
             auto rhs = parse_term();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(k, span, lhs, rhs);
+            lhs = ast.new_node_with_child(k, span, lhs, rhs);
         }
 
         return lhs;
@@ -594,7 +609,7 @@ struct Parser {
             auto rhs = parse_factor();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(k, span, lhs, rhs);
+            lhs = ast.new_node_with_child(k, span, lhs, rhs);
         }
 
         return lhs;
@@ -618,7 +633,7 @@ struct Parser {
             auto rhs = parse_cast();
 
             auto span = ast.get(lhs)->span.extend(ast.get(rhs)->span);
-            lhs = ast.new_node_binary(k, span, lhs, rhs);
+            lhs = ast.new_node_with_child(k, span, lhs, rhs);
         }
 
         return lhs;
@@ -638,21 +653,21 @@ struct Parser {
         if (match_kw("or_else")) {
             auto rhs = parse_expr();
 
-            return ast.new_node_binary(
+            return ast.new_node_with_child(
                 NodeKind::OrElse, ast.get(lhs)->span.extend(ast.get(rhs)->span),
                 lhs, rhs);
         }
 
         if (match_kw("or_return")) {
-            return ast.new_node_unary(NodeKind::OrReturn,
-                                      ast.get(lhs)->span.extend(prev_span()),
-                                      lhs);
+            return ast.new_node_with_child(
+                NodeKind::OrReturn, ast.get(lhs)->span.extend(prev_span()),
+                lhs);
         }
 
         while (match_kw("as")) {
             auto rhs = parse_unary();
 
-            lhs = ast.new_node_binary(
+            lhs = ast.new_node_with_child(
                 NodeKind::Cast, ast.get(lhs)->span.extend(ast.get(rhs)->span),
                 lhs, rhs);
         }
@@ -667,38 +682,38 @@ struct Parser {
         auto t = span();
         if (match(TokenType::Bang)) {
             auto child = parse_unary();
-            return ast.new_node_unary(NodeKind::LogicNot,
-                                      t.extend(ast.get(child)->span), child);
+            return ast.new_node_with_child(
+                NodeKind::LogicNot, t.extend(ast.get(child)->span), child);
         }
 
         if (match(TokenType::Plus)) {
             auto child = parse_unary();
-            return ast.new_node_unary(NodeKind::Plus,
-                                      t.extend(ast.get(child)->span), child);
+            return ast.new_node_with_child(
+                NodeKind::Plus, t.extend(ast.get(child)->span), child);
         }
 
         if (match(TokenType::Minus)) {
             auto child = parse_unary();
-            return ast.new_node_unary(NodeKind::Neg,
-                                      t.extend(ast.get(child)->span), child);
+            return ast.new_node_with_child(
+                NodeKind::Neg, t.extend(ast.get(child)->span), child);
         }
 
         if (match(TokenType::Tilde)) {
             auto child = parse_unary();
-            return ast.new_node_unary(NodeKind::BinNot,
-                                      t.extend(ast.get(child)->span), child);
+            return ast.new_node_with_child(
+                NodeKind::BinNot, t.extend(ast.get(child)->span), child);
         }
 
         if (match(TokenType::Ampersand)) {
             auto child = parse_unary();
-            return ast.new_node_unary(NodeKind::AddrOf,
-                                      t.extend(ast.get(child)->span), child);
+            return ast.new_node_with_child(
+                NodeKind::AddrOf, t.extend(ast.get(child)->span), child);
         }
 
         if (match(TokenType::Question)) {
             auto child = parse_unary();
-            return ast.new_node_unary(NodeKind::Optional,
-                                      t.extend(ast.get(child)->span), child);
+            return ast.new_node_with_child(
+                NodeKind::Optional, t.extend(ast.get(child)->span), child);
         }
 
         return parse_deref();
@@ -709,7 +724,7 @@ struct Parser {
         auto lhs = parse_call();
 
         while (match(TokenType::DotStar)) {
-            lhs = ast.new_node_unary(
+            lhs = ast.new_node_with_child(
                 NodeKind::Deref, ast.get(lhs)->span.extend(prev_span()), lhs);
         }
 
@@ -743,7 +758,8 @@ struct Parser {
             auto t = peek();
             try(consume(TokenType::Id));
 
-            lhs = ast.new_node_field(ast.get(lhs)->span.extend(t.span), lhs,
+            lhs = ast.new_node_named(NodeKind::Field,
+                                     ast.get(lhs)->span.extend(t.span), lhs,
                                      std::string{t.span.str(source)});
         }
 
@@ -775,7 +791,8 @@ struct Parser {
 
                 auto end = ast.get(items.at(items.size() - 1))->span;
                 auto span = ast.get(items.at(0))->span.extend(end);
-                child = ast.new_node_expr_pack(span, items);
+                child =
+                    ast.new_node_with_children(NodeKind::ExprPack, span, items);
             }
 
             try(consume(TokenType::Rparen));
@@ -787,8 +804,8 @@ struct Parser {
             auto t = peek();
             try(consume(TokenType::Id));
 
-            return ast.new_node_enumlit(s.extend(t.span),
-                                        std::string{t.span.str(source)});
+            return ast.new_node_with_str(NodeKind::EnumLit, s.extend(t.span),
+                                         std::string{t.span.str(source)});
         }
 
         if (check(TokenType::Star) || check(TokenType::Lbracket))
@@ -803,7 +820,7 @@ struct Parser {
             auto s = prev_span().str(source);
             auto es = escape_string(s.substr(1, s.size() - 2));
 
-            return ast.new_node_str(prev_span(), es);
+            return ast.new_node_with_str(NodeKind::Str, prev_span(), es);
         }
 
         return parse_number();
@@ -819,12 +836,12 @@ struct Parser {
         auto s = span();
 
         if (match(TokenType::Star)) {
-            auto is_const = false;
-            if (match_kw("const")) is_const = true;
+            auto kind = NodeKind::Ptr;
+            if (match_kw("const")) kind = NodeKind::PtrConst;
 
             auto inner = parse_unary();
-            return ast.new_node_ptr(s.extend(ast.get(inner)->span), is_const,
-                                    inner);
+            return ast.new_node_with_child(kind, s.extend(ast.get(inner)->span),
+                                           inner);
         }
 
         if (check(TokenType::Lbracket) && check_next(TokenType::Star)) {
@@ -832,24 +849,24 @@ struct Parser {
             try(consume(TokenType::Star));
             try(consume(TokenType::Rbracket));
 
-            auto is_const = false;
-            if (match_kw("const")) is_const = true;
+            auto kind = NodeKind::MultiPtr;
+            if (match_kw("const")) kind = NodeKind::MultiPtrConst;
 
             auto inner = parse_unary();
-            return ast.new_node_multiptr(s.extend(ast.get(inner)->span),
-                                         is_const, inner);
+            return ast.new_node_with_child(kind, s.extend(ast.get(inner)->span),
+                                           inner);
         }
 
         if (check(TokenType::Lbracket) && check_next(TokenType::Rbracket)) {
             try(consume(TokenType::Lbracket));
             try(consume(TokenType::Rbracket));
 
-            auto is_const = false;
-            if (match_kw("const")) is_const = true;
+            auto kind = NodeKind::SlicePtr;
+            if (match_kw("const")) kind = NodeKind::SlicePtrConst;
 
             auto inner = parse_unary();
-            return ast.new_node_sliceptr(s.extend(ast.get(inner)->span),
-                                         is_const, inner);
+            return ast.new_node_with_child(kind, s.extend(ast.get(inner)->span),
+                                           inner);
         }
 
         try(consume(TokenType::Lbracket));
@@ -863,8 +880,9 @@ struct Parser {
             auto items = parse_array_items();
             try(consume(TokenType::Rbrace));
 
-            return ast.new_node_array_auto_len(s.extend(prev_span()), type,
-                                               items);
+            return ast.new_node_array(
+                NodeKind::ArrayAutoLen, s.extend(prev_span()),
+                {.type = type, .size = {}, .items = items});
         }
 
         auto size = parse_expr();
@@ -874,14 +892,17 @@ struct Parser {
         auto type = parse_expr();
 
         if (!check(TokenType::Lbrace)) {
-            return ast.new_node_array_type(s.extend(prev_span()), size, type);
+            return ast.new_node_array(
+                NodeKind::ArrayType, s.extend(prev_span()),
+                {.type = type, .size = size, .items = {}});
         }
 
         try(consume(TokenType::Lbrace));
         auto items = parse_array_items();
         try(consume(TokenType::Rbrace));
 
-        return ast.new_node_array(s.extend(prev_span()), size, type, items);
+        return ast.new_node_array(NodeKind::Array, s.extend(prev_span()),
+                                  {.type = type, .size = size, .items = items});
     }
 
     // number ::= INT | HEX | OCT | BIN | FLOAT ;
@@ -905,7 +926,7 @@ struct Parser {
                 er->report_bug(t.span, "invalid integer (from_chars)");
             }
 
-            return ast.new_node_int(t.span, value);
+            return ast.new_node_with_int(NodeKind::Int, t.span, value);
         }
 
         if (t.is_hex()) {
@@ -927,7 +948,7 @@ struct Parser {
                                "invalid hexadecimal integer (from_chars)");
             }
 
-            return ast.new_node_int(t.span, value);
+            return ast.new_node_with_int(NodeKind::Int, t.span, value);
         }
 
         er->report_error(t.span, "expected number, got {}", t.type);
@@ -947,7 +968,7 @@ struct Parser {
 
         if (items.size() == 1) return items.at(0);
 
-        return ast.new_node_expr_pack(span, items);
+        return ast.new_node_with_children(NodeKind::ExprPack, span, items);
     }
 
     // ------------------------------------------------------------------------
@@ -969,8 +990,9 @@ struct Parser {
                 hdl = ast.new_node_nil(prev_span());
             }
 
-            items.push_back(ast.new_node_func_arg(s.extend(ast.get(hdl)->span),
-                                                  std::string{id}, hdl));
+            items.push_back(ast.new_node_named(NodeKind::FuncArg,
+                                               s.extend(ast.get(hdl)->span),
+                                               std::string{id}, hdl));
         } while (match(TokenType::Comma));
 
         return items;
@@ -987,7 +1009,8 @@ struct Parser {
 
             try(consume(TokenType::Rparen));
 
-            return ast.new_node_func_ret_pack(s.extend(prev_span()), children);
+            return ast.new_node_with_children(NodeKind::FuncRetPack,
+                                              s.extend(prev_span()), children);
         }
 
         return parse_expr();
@@ -1002,8 +1025,9 @@ struct Parser {
 
             auto e = parse_expr();
 
-            return ast.new_node_func_arg(name.extend(ast.get(e)->span),
-                                         std::string{name.str(source)}, e);
+            return ast.new_node_named(NodeKind::FuncArg,
+                                      name.extend(ast.get(e)->span),
+                                      std::string{name.str(source)}, e);
         }
 
         return parse_expr();

@@ -1,6 +1,7 @@
 add_library(yal
     ast.cpp
     ast.hpp
+    astwalk.hpp
     error_reporter.cpp
     error_reporter.hpp
     parser.cpp
@@ -11,8 +12,8 @@ add_library(yal
     tokenizer.hpp
     types.cpp
     types.hpp
-    typing.cpp
-    typing.hpp
+    # typing.cpp
+    # typing.hpp
 )
 target_include_directories(yal PUBLIC .)
 target_compile_options(yal PRIVATE -Wall -Wextra)
