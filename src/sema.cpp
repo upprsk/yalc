@@ -261,6 +261,7 @@ struct SemaFunc {
                 auto p = ast->node_with_child(*node);
                 auto ret = ts->get(func.type)->as_func(*ts).ret;
 
+                // FIXME: allow bare returns (in void funcs of course)
                 auto child = sema_expr(env, {.expected = ret}, p.child);
 
                 // FIXME: allow type coercion
@@ -440,6 +441,8 @@ struct SemaFunc {
     // ------------------------------------------------------------------------
 
     auto push_inst(Span s, hlir::InstKind kind, uint8_t arg = 0) -> size_t {
+        er->report_note(s, "push_inst({}, {}, {})", s, kind, arg);
+
         auto blk = current_block();
         auto sz = blk->code.size();
 
