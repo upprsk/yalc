@@ -212,13 +212,47 @@ struct SemaFunc {
                 auto rhs = sema_expr(env, ctx, p.second);
 
                 // FIXME: type coersion
-                if (lhs != rhs) {
+                if ((!ts->get(lhs)->is_err() && !ts->get(rhs)->is_err()) &&
+                    lhs != rhs) {
                     er->report_error(node->span, "type mismatch: {} and {}",
                                      ts->fatten(lhs), ts->fatten(rhs));
                 }
 
+                // FIXME: allow adding things other than integers
+                if (!ts->get(lhs)->is_err() && !ts->get(lhs)->is_integral()) {
+                    er->report_error(
+                        node->span,
+                        "can't use {} operation on non-integral type: {}", kind,
+                        ts->fatten(lhs));
+                }
+
                 push_inst(node->span, kind);
                 return ast->get_mut(n)->set_type(lhs);
+            }
+
+            case NodeKind::Neg: {
+                auto p = ast->node_with_child(*node);
+
+                auto patch_idx = push_inst_const(
+                    node->span, {.type = {}, .value = uint64_t{0}});
+                auto child = sema_expr(env, ctx, p.child);
+
+                current_block()
+                    ->consts.at(current_block()->code.at(patch_idx).arg)
+                    .type = child;
+
+                // FIXME: allow adding things other than integers
+                if (!ts->get(child)->is_err() &&
+                    !ts->get(child)->is_integral()) {
+                    er->report_error(
+                        node->span,
+                        "can't use {} operation on non-integral type: {}",
+                        node->kind, ts->fatten(child));
+                }
+
+                push_inst(node->span, hlir::InstKind::Sub);
+
+                return ast->get_mut(n)->set_type(child);
             }
 
             case NodeKind::Id: {
@@ -284,22 +318,24 @@ struct SemaFunc {
 
     // ------------------------------------------------------------------------
 
-    void push_inst(Span s, hlir::InstKind kind, uint8_t arg = 0) {
+    auto push_inst(Span s, hlir::InstKind kind, uint8_t arg = 0) -> size_t {
         auto blk = current_block();
+        auto sz = blk->code.size();
+
         blk->spans.push_back(s);
         blk->code.push_back({kind, arg});
+
+        return sz;
     }
 
-    void push_inst_const(Span s, hlir::Value v) {
+    auto push_inst_const(Span s, hlir::Value v) -> size_t {
         auto blk = current_block();
         auto sz = blk->consts.size();
-        if (sz == std::numeric_limits<uint8_t>::max()) {
-            er->report_bug(s, "too many constants in block: {}", sz);
-            return;
-        }
+        if (sz == std::numeric_limits<uint8_t>::max())
+            throw std::runtime_error{"too many constants in block"};
 
         blk->consts.push_back(v);
-        push_inst(s, hlir::InstKind::Const, sz);
+        return push_inst(s, hlir::InstKind::Const, sz);
     }
 
     void push_inst_load(Span s, Decl const& decl) {
