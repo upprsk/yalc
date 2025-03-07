@@ -512,7 +512,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
         case NodeKind::Id:
             format_to(ctx.out(), "Id(");
             dump_type(ctx, ts, *node);
-            return format_to(ctx.out(), ".{})", node->value_string());
+            return format_to(ctx.out(), "{})", node->value_string());
         case NodeKind::Str:
             format_to(ctx.out(), "Str(");
             dump_type(ctx, ts, *node);
