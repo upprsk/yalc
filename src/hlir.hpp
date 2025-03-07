@@ -22,6 +22,8 @@ struct Value {
     [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
         return std::get<uint64_t>(value);
     }
+
+    constexpr auto operator==(Value const&) const -> bool = default;
 };
 
 // NOTE: If we ever need more opcodes, we can use `arg` of `Inst` as a
@@ -47,6 +49,8 @@ enum class InstKind : uint8_t {
 struct Inst {
     InstKind kind;
     uint8_t  arg;
+
+    constexpr auto operator==(Inst const&) const -> bool = default;
 };
 
 struct Block {
@@ -60,6 +64,8 @@ struct Local {
     std::string name;
     TypeHandle  type;
     uint8_t     idx;
+
+    constexpr auto operator==(Local const&) const -> bool = default;
 };
 
 struct Func {
