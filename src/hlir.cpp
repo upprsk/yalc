@@ -35,7 +35,8 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                           ts.fatten(l.type));
                 } break;
 
-                case InstKind::Branch: {
+                case InstKind::Branch:
+                case InstKind::BranchFalse: {
                     print(f, " b {}", inst.arg);
                 } break;
 
