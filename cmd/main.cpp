@@ -48,6 +48,10 @@ auto main(int argc, char** argv) -> int {
 
         fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
 
+        auto ts = yal::TypeStore::new_store();
+        fmt::println("{}",
+                     yal::FatNodeHandle{.ast = &ast, .node = root, .ts = &ts});
+
         {
             auto                                   dotgraph = "ast.gv";
             std::unique_ptr<FILE, void (*)(FILE*)> f = {
@@ -57,10 +61,9 @@ auto main(int argc, char** argv) -> int {
                 return 1;
             }
 
-            ast.dump_dot(f.get(), root);
+            ast.dump_dot(f.get(), root, &ts);
         }
 
-        // auto ts = yal::TypeStore::new_store();
         // yal::pass_add_types(root, ast, ts, er);
         //
         // for (size_t i = 0; i < ts.size(); i++) {

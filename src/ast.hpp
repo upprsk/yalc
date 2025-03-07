@@ -434,8 +434,9 @@ struct Node {
 };
 
 struct FatNodeHandle {
-    Ast const* ast;
-    NodeHandle node;
+    Ast const*       ast;
+    NodeHandle       node;
+    TypeStore const* ts = nullptr;
 };
 
 struct Ast {
@@ -606,11 +607,13 @@ struct Ast {
         return node_refs.size();
     }
 
-    auto dump(fmt::format_context& ctx, NodeHandle n) const
+    auto dump(fmt::format_context& ctx, NodeHandle n,
+              TypeStore const* ts = nullptr) const
         -> fmt::format_context::iterator;
 
-    void dump_dot(FILE* f, NodeHandle n) const;
-    void dump_dot_node(FILE* f, NodeHandle n) const;
+    void dump_dot(FILE* f, NodeHandle n, TypeStore const* ts = nullptr) const;
+    void dump_dot_node(FILE* f, NodeHandle n,
+                       TypeStore const* ts = nullptr) const;
 
 private:
     std::vector<Node>       nodes;

@@ -140,6 +140,8 @@ auto TypeStore::coerce_to(Span span, TypeHandle target, TypeHandle rhs,
 
 auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
     -> fmt::format_context::iterator {
+    if (!n.is_valid()) return format_to(ctx.out(), "{}", n);
+
     auto type = get(n);
     switch (type->kind) {
         case TypeKind::Err: return format_to(ctx.out(), "Err");
