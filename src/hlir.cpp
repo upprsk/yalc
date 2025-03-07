@@ -38,7 +38,11 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
             }
 
             println(f, "");
+
+            j++;
         }
+
+        i++;
     }
 }
 
