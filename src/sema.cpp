@@ -70,7 +70,7 @@ struct Env {
     }
 
     std::vector<Decl> decls;
-    Env*              parent;
+    Env*              parent{};
 };
 
 struct SemaFunc {
