@@ -348,6 +348,26 @@ struct Node {
         return kind == NodeKind::Id;
     }
 
+    [[nodiscard]] constexpr auto is_int() const -> bool {
+        return kind == NodeKind::Int;
+    }
+
+    [[nodiscard]] constexpr auto is_enum_lit() const -> bool {
+        return kind == NodeKind::EnumLit;
+    }
+
+    [[nodiscard]] constexpr auto is_func_arg() const -> bool {
+        return kind == NodeKind::FuncArg;
+    }
+
+    [[nodiscard]] constexpr auto is_field() const -> bool {
+        return kind == NodeKind::Field;
+    }
+
+    [[nodiscard]] constexpr auto is_str() const -> bool {
+        return kind == NodeKind::Str;
+    }
+
     [[nodiscard]] constexpr auto is_id_pack() const -> bool {
         return kind == NodeKind::IdPack;
     }
@@ -589,6 +609,9 @@ struct Ast {
     auto dump(fmt::format_context& ctx, NodeHandle n) const
         -> fmt::format_context::iterator;
 
+    void dump_dot(FILE* f, NodeHandle n) const;
+    void dump_dot_node(FILE* f, NodeHandle n) const;
+
 private:
     std::vector<Node>       nodes;
     std::vector<NodeHandle> node_refs;
@@ -598,9 +621,19 @@ private:
 
 template <>
 struct fmt::formatter<yal::NodeHandle> {
+    bool is_escaped = false;
+
     constexpr auto parse(format_parse_context& ctx)
         -> format_parse_context::iterator {
-        return ctx.begin();
+        auto it = ctx.begin();
+        if (it != ctx.end()) {
+            if (*it == '#') {
+                is_escaped = true;
+                it++;
+            }
+        }
+
+        return it;
     }
 
     auto format(yal::NodeHandle n, format_context& ctx) const

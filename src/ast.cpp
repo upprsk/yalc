@@ -241,6 +241,8 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
 
     if (!n.is_valid()) return format_to(ctx.out(), "{}", n);
 
+    // FIXME: type info should be shown
+
     auto node = get(n);
     switch (node->kind) {
         case NodeKind::Err: return format_to(ctx.out(), "Err({})", node->span);
@@ -480,24 +482,255 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
     return format_to(ctx.out(), "unknown");
 }
 
+void Ast::dump_dot(FILE* f, NodeHandle n) const {
+    using fmt::println;
+
+    println(f, "digraph g {{");
+    println(f, R"~~(fontname="Helvetica,Arial,sans-serif")~~");
+    println(f, R"~~(node [fontname="Helvetica,Arial,sans-serif"])~~");
+    println(f, R"~~(edge [fontname="Helvetica,Arial,sans-serif"])~~");
+    println(f, R"~~(graph [ rankdir = "LR" ];)~~");
+    println(f, R"~~(node [ fontsize = "16" shape = "ellipse" ];)~~");
+    println(f, R"~~(edge [ ];)~~");
+
+    dump_dot_node(f, n);
+
+    println(f, "}}");
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void Ast::dump_dot_node(FILE* f, NodeHandle n) const {
+    using fmt::print;
+    using fmt::println;
+
+    println(f, R"~~("node{}" [)~~", n.as_raw_idx());
+    println(f, R"~~(shape = "record")~~");
+
+    if (n.is_valid()) {
+        auto node = get(n);
+        print(f, R"~~(label = "<f0> {} | {})~~", n.as_raw_idx(), node->kind);
+        if (node->first.is_valid())
+            print(f, R"~~( | <f1> {:#})~~", node->first);
+        if (node->second.is_valid())
+            print(f, R"~~( | <f2> {:#})~~", node->second);
+
+        if (node->is_id() || node->is_func_arg() || node->is_field())
+            print(f, R"~~( | `{}`)~~", node->value_string());
+        if (node->is_enum_lit())
+            print(f, R"~~( | `.{}`)~~", node->value_string());
+        if (node->is_int()) print(f, R"~~( | {})~~", node->value_uint64());
+
+        if (node->is_str()) {
+            // double escape the string before printing it.
+            // this is very suboptimal, but it was easy.
+            auto s = fmt::format("{:?}", node->value_string());
+            s = fmt::format("{:?}", s.substr(1, s.length() - 2));
+            print(f, R"~~( | \"{}\")~~", s.substr(1, s.length() - 2));
+        }
+
+        println(f, "\"");
+    }
+
+    println(f, R"~~(];)~~", n.as_raw_idx());
+
+    auto conn = [f](NodeHandle from, NodeHandle to, std::string_view t = "f1") {
+        println(f, R"~~("node{}":{} -> "node{}":f0 [])~~", from.as_raw_idx(), t,
+                to.as_raw_idx());
+    };
+
+    auto dump_and_conn = [this, f, &conn](NodeHandle from, NodeHandle to,
+                                          std::string_view t = "f1") {
+        dump_dot_node(f, to);
+        conn(from, to, t);
+    };
+
+    if (n.is_valid()) {
+        auto node = get(n);
+
+        switch (node->kind) {
+            case NodeKind::Err:
+            case NodeKind::Break:
+            case NodeKind::Nil:
+            case NodeKind::EnumLit:
+            case NodeKind::Int:
+            case NodeKind::Id:
+            case NodeKind::Str: break;
+
+            case NodeKind::Block:
+            case NodeKind::ExprPack:
+            case NodeKind::File:
+            case NodeKind::FuncRetPack:
+            case NodeKind::IdPack: {
+                auto p = node_with_children(*node);
+                for (auto const& c : p.children) dump_and_conn(n, c);
+            } break;
+
+            case NodeKind::Func: {
+                auto p = node_func(*node);
+
+                dump_and_conn(n, p.name);
+                for (auto const& c : p.args) dump_and_conn(n, c);
+                dump_and_conn(n, p.ret);
+                dump_and_conn(n, p.body);
+            } break;
+
+            case NodeKind::FuncExtern: {
+                auto p = node_func(*node);
+
+                dump_and_conn(n, p.name);
+                for (auto const& c : p.args) dump_and_conn(n, c);
+                dump_and_conn(n, p.ret);
+            } break;
+
+            case NodeKind::FuncArg:
+            case NodeKind::Field: {
+                auto p = node_named(*node);
+                dump_and_conn(n, p.child);
+            } break;
+
+            case NodeKind::DefDecl:
+            case NodeKind::VarDecl: {
+                auto p = node_decl(*node);
+
+                dump_and_conn(n, p.ids);
+                dump_and_conn(n, p.type);
+                dump_and_conn(n, p.init);
+            } break;
+
+            case NodeKind::AddrOf:
+            case NodeKind::BinNot:
+            case NodeKind::Defer:
+            case NodeKind::Deref:
+            case NodeKind::ExprStmt:
+            case NodeKind::LogicNot:
+            case NodeKind::MultiPtr:
+            case NodeKind::MultiPtrConst:
+            case NodeKind::Neg:
+            case NodeKind::Optional:
+            case NodeKind::OrReturn:
+            case NodeKind::Plus:
+            case NodeKind::Ptr:
+            case NodeKind::PtrConst:
+            case NodeKind::ReturnStmt:
+            case NodeKind::SlicePtr:
+            case NodeKind::SlicePtrConst: {
+                auto p = node_with_child(*node);
+                dump_and_conn(n, p.child);
+            } break;
+
+            case NodeKind::IfStmt: {
+                auto p = node_if_stmt(*node);
+
+                dump_and_conn(n, p.cond);
+                dump_and_conn(n, p.when_true);
+            } break;
+
+            case NodeKind::IfStmtWithElse: {
+                auto p = node_if_stmt(*node);
+
+                dump_and_conn(n, p.cond);
+                dump_and_conn(n, p.when_true);
+                dump_and_conn(n, p.when_false);
+            } break;
+
+            case NodeKind::IfStmtWithDecl: {
+                auto p = node_if_stmt(*node);
+
+                dump_and_conn(n, p.decl);
+                dump_and_conn(n, p.cond);
+                dump_and_conn(n, p.when_true);
+            } break;
+
+            case NodeKind::IfStmtWithDeclAndElse: {
+                auto p = node_if_stmt(*node);
+
+                dump_and_conn(n, p.decl);
+                dump_and_conn(n, p.cond);
+                dump_and_conn(n, p.when_true);
+                dump_and_conn(n, p.when_false);
+            } break;
+
+            case NodeKind::WhileStmt:
+            case NodeKind::Assign:
+            case NodeKind::Add:
+            case NodeKind::BinAnd:
+            case NodeKind::BinOr:
+            case NodeKind::BinXor:
+            case NodeKind::Div:
+            case NodeKind::Equal:
+            case NodeKind::Greater:
+            case NodeKind::GreaterEqual:
+            case NodeKind::LogicAnd:
+            case NodeKind::LogicOr:
+            case NodeKind::Mod:
+            case NodeKind::Mul:
+            case NodeKind::NotEqual:
+            case NodeKind::OrElse:
+            case NodeKind::ShftLeft:
+            case NodeKind::ShftRight:
+            case NodeKind::Smaller:
+            case NodeKind::SmallerEqual:
+            case NodeKind::Sub:
+            case NodeKind::Cast: {
+                auto p = node_with_child_pair(*node);
+
+                dump_and_conn(n, p.first);
+                dump_and_conn(n, p.second, "f2");
+            } break;
+
+            case NodeKind::Array: {
+                auto p = node_array(*node);
+
+                dump_and_conn(n, p.size);
+                dump_and_conn(n, p.type);
+                for (auto const& c : p.items) dump_and_conn(n, c);
+            } break;
+
+            case NodeKind::ArrayAutoLen: {
+                auto p = node_array(*node);
+
+                dump_and_conn(n, p.type);
+                for (auto const& c : p.items) dump_and_conn(n, c);
+            } break;
+
+            case NodeKind::ArrayType: {
+                auto p = node_array(*node);
+
+                dump_and_conn(n, p.size);
+                dump_and_conn(n, p.type, "f2");
+            } break;
+
+            case NodeKind::Call: {
+                auto p = node_call(*node);
+
+                dump_and_conn(n, p.callee);
+                for (auto const& c : p.args) dump_and_conn(n, c);
+            } break;
+        }
+    }
+}
+
 }  // namespace yal
 
 auto fmt::formatter<yal::NodeHandle>::format(yal::NodeHandle n,
                                              format_context& ctx) const
     -> format_context::iterator {
-    fmt::format_to(ctx.out(), "{{");
+    if (!is_escaped) fmt::format_to(ctx.out(), "{{");
 
     if (!n.is_valid()) {
         fmt::format_to(ctx.out(), "!");
     }
 
+    auto it = ctx.out();
     if (n.is_array()) {
-        fmt::format_to(ctx.out(), "[{:x}]", n.as_raw_idx());
+        it = fmt::format_to(ctx.out(), "[{:x}]", n.as_raw_idx());
     } else {
-        fmt::format_to(ctx.out(), "{:x}", n.as_raw_idx());
+        it = fmt::format_to(ctx.out(), "{:x}", n.as_raw_idx());
     }
 
-    return fmt::format_to(ctx.out(), "}}");
+    if (!is_escaped) it = fmt::format_to(ctx.out(), "{{");
+
+    return it;
 }
 
 auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,

@@ -48,6 +48,18 @@ auto main(int argc, char** argv) -> int {
 
         fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
 
+        {
+            auto                                   dotgraph = "ast.gv";
+            std::unique_ptr<FILE, void (*)(FILE*)> f = {
+                fopen(dotgraph, "wb"), [](auto f) { fclose(f); }};
+            if (!f) {
+                fmt::println(stderr, "failed to open: {}", dotgraph);
+                return 1;
+            }
+
+            ast.dump_dot(f.get(), root);
+        }
+
         // auto ts = yal::TypeStore::new_store();
         // yal::pass_add_types(root, ast, ts, er);
         //
