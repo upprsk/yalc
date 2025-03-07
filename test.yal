@@ -1,7 +1,7 @@
 func main() i32 {
     var x = 42;
 
-    if (x == 0) {
+    if ((x == 0) == true) {
         x = x + 27;
     }
 

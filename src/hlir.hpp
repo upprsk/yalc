@@ -18,6 +18,10 @@ struct Value {
     [[nodiscard]] constexpr auto value_type() const -> TypeHandle {
         return std::get<TypeHandle>(value);
     }
+
+    [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
+        return std::get<uint64_t>(value);
+    }
 };
 
 // NOTE: If we ever need more opcodes, we can use `arg` of `Inst` as a

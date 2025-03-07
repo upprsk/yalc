@@ -27,6 +27,7 @@ struct Context {
 enum class DeclFlags {
     None = 0,
     Local = (1 << 0),
+    Builtin = (1 << 1),
 };
 
 constexpr auto operator|(DeclFlags const& lhs, DeclFlags const& rhs)
@@ -50,6 +51,10 @@ struct Decl {
 
     [[nodiscard]] constexpr auto is_local() const -> bool {
         return (flags & DeclFlags::Local) == DeclFlags::Local;
+    }
+
+    [[nodiscard]] constexpr auto is_builtin() const -> bool {
+        return (flags & DeclFlags::Builtin) == DeclFlags::Builtin;
     }
 };
 
@@ -305,14 +310,6 @@ struct SemaFunc {
                                      ts->fatten(lhs), ts->fatten(rhs));
                 }
 
-                // FIXME: allow adding things other than integers
-                if (!ts->get(lhs)->is_err() && !ts->get(lhs)->is_integral()) {
-                    er->report_error(
-                        node->span,
-                        "can't use {} operation on non-integral type: {}", kind,
-                        ts->fatten(lhs));
-                }
-
                 push_inst(node->span, kind);
                 return ast->get_mut(n)->set_type(ts->get_type_bool());
             }
@@ -475,6 +472,12 @@ struct SemaFunc {
             return;
         }
 
+        // this is a value that we can inline (without doing an actual load)
+        if (decl.is_builtin()) {
+            push_inst_const(s, decl.value);
+            return;
+        }
+
         throw std::runtime_error{fmt::format(
             "push_inst_load({}): non-locals have not been implemented",
             decl.name)};
@@ -618,6 +621,11 @@ auto sema(Ast& ast, TypeStore& ts, NodeHandle root, ErrorReporter& er)
     Env env;
     env.declare("i32",
                 {.type = ts.get_type_type(), .value = ts.get_type_i32()});
+
+    env.declare("false", {.type = ts.get_type_bool(), .value = uint64_t{0}},
+                DeclFlags::Builtin);
+    env.declare("true", {.type = ts.get_type_bool(), .value = uint64_t{1}},
+                DeclFlags::Builtin);
 
     s.sema_node(env, root);
 
