@@ -1,9 +1,5 @@
-func main() i32 {
-    var x = 42;
+func zeroer(x: i32) i32 {
+    if x == 0 { return x; }
 
-    if ((x == 0) == true) {
-        x = x + 27;
-    }
-
-    return 69 + -x;
+    return 0;
 }

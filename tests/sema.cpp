@@ -5,7 +5,9 @@
 #include <catch2/matchers/catch_matchers_exception.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
+#include <cstdint>
 
+#include "hlir.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
 #include "types.hpp"
@@ -41,6 +43,374 @@ TEST_CASE("empty source", "[sema]") {
 
     REQUIRE_FALSE(er.had_error());
     REQUIRE(m.funcs.empty());
+}
+
+TEST_CASE("empty void func", "[sema]") {
+    SKIP("implicit returns not implemented");
+
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = "func f() {}";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto ts = TypeStore::new_store();
+    auto m = sema(ast, ts, root, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(m.funcs.size() == 1);
+
+    auto f = m.funcs.at(0);
+    REQUIRE(f.name == "f");
+    REQUIRE(f.type == ts.get_type_func({}, ts.get_type_void()));
+    REQUIRE(f.locals.empty());
+    REQUIRE(f.blocks.size() == 1);
+
+    auto b = f.blocks.at(0);
+    REQUIRE(b.consts.empty());
+    REQUIRE(b.spans.size() == 1);
+    REQUIRE(b.code.size() == 1);
+
+    auto i = b.code.at(0);
+    REQUIRE(i.kind == hlir::InstKind::Ret);
+    REQUIRE(i.arg == 0);
+}
+
+TEST_CASE("void func with just single return", "[sema]") {
+    SKIP("bare returns not implemented");
+
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = "func f() { return; }";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto ts = TypeStore::new_store();
+    auto m = sema(ast, ts, root, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(m.funcs.size() == 1);
+
+    auto f = m.funcs.at(0);
+    REQUIRE(f.name == "f");
+    REQUIRE(f.type == ts.get_type_func({}, ts.get_type_void()));
+    REQUIRE(f.locals.empty());
+    REQUIRE(f.blocks.size() == 1);
+
+    auto b = f.blocks.at(0);
+    REQUIRE(b.consts.empty());
+    REQUIRE(b.spans.size() == 1);
+    REQUIRE(b.code.size() == 1);
+
+    auto i = b.code.at(0);
+    REQUIRE(i.kind == hlir::InstKind::Ret);
+    REQUIRE(i.arg == 0);
+}
+
+TEST_CASE("func that adds two i32", "[sema]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    SECTION("no parameters, just consts") {
+        auto source = "func result() i32 { return 10 + 22; }";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto ts = TypeStore::new_store();
+        auto m = sema(ast, ts, root, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(m.funcs.size() == 1);
+
+        auto f = m.funcs.at(0);
+        REQUIRE(f.name == "result");
+        REQUIRE(f.type == ts.get_type_func({}, ts.get_type_i32()));
+
+        std::vector<hlir::Local> expected_locals{};
+
+        REQUIRE_THAT(f.locals, Equals(expected_locals));
+
+        REQUIRE(f.blocks.size() == 1);
+
+        auto b = f.blocks.at(0);
+
+        std::vector<hlir::Value> expected_consts{
+            {ts.get_type_i32(), uint64_t{10}},
+            {ts.get_type_i32(), uint64_t{22}},
+        };
+
+        std::vector<hlir::Inst> expected_code{
+            {hlir::InstKind::Const, 0},
+            {hlir::InstKind::Const, 1},
+            {  hlir::InstKind::Add, 0},
+            {  hlir::InstKind::Ret, 0},
+        };
+
+        std::vector<Span> expected_spans{
+            {27, 29},
+            {32, 34},
+            {27, 34},
+            {20, 35},
+        };
+
+        REQUIRE_THAT(b.consts, Equals(expected_consts));
+        REQUIRE_THAT(b.code, Equals(expected_code));
+        REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
+
+    SECTION("one i32 parameter") {
+        auto source = "func next(x: i32) i32 { return x + 1; }";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto ts = TypeStore::new_store();
+        auto m = sema(ast, ts, root, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(m.funcs.size() == 1);
+
+        auto f = m.funcs.at(0);
+        REQUIRE(f.name == "next");
+        REQUIRE(f.type == ts.get_type_func(std::array{ts.get_type_i32()},
+                                           ts.get_type_i32()));
+
+        std::vector<hlir::Local> expected_locals{
+            {"x", ts.get_type_i32(), 0},
+        };
+
+        REQUIRE_THAT(f.locals, Equals(expected_locals));
+
+        REQUIRE(f.blocks.size() == 1);
+
+        auto b = f.blocks.at(0);
+
+        std::vector<hlir::Value> expected_consts{
+            {ts.get_type_i32(), uint64_t{1}},
+        };
+
+        std::vector<hlir::Inst> expected_code{
+            {hlir::InstKind::LoadLocal, 0},
+            {    hlir::InstKind::Const, 0},
+            {      hlir::InstKind::Add, 0},
+            {      hlir::InstKind::Ret, 0},
+        };
+
+        std::vector<Span> expected_spans{
+            {31, 32},
+            {35, 36},
+            {31, 36},
+            {24, 37},
+        };
+
+        REQUIRE_THAT(b.consts, Equals(expected_consts));
+        REQUIRE_THAT(b.code, Equals(expected_code));
+        REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
+
+    SECTION("two i32 parameters") {
+        auto source = "func add(x: i32, y: i32) i32 { return x + y; }";
+        auto path = ":memory:";
+
+        auto er = ErrorReporter{source, path, devnull};
+        auto tokens = tokenize(source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto [ast, root] = parse(tokens, source, er);
+
+        REQUIRE_FALSE(er.had_error());
+
+        auto ts = TypeStore::new_store();
+        auto m = sema(ast, ts, root, er);
+
+        REQUIRE_FALSE(er.had_error());
+        REQUIRE(m.funcs.size() == 1);
+
+        auto f = m.funcs.at(0);
+        REQUIRE(f.name == "add");
+        REQUIRE(f.type == ts.get_type_func(
+                              std::array{ts.get_type_i32(), ts.get_type_i32()},
+                              ts.get_type_i32()));
+
+        std::vector<hlir::Local> expected_locals{
+            {"x", ts.get_type_i32(), 0},
+            {"y", ts.get_type_i32(), 1},
+        };
+
+        REQUIRE_THAT(f.locals, Equals(expected_locals));
+
+        REQUIRE(f.blocks.size() == 1);
+
+        auto b = f.blocks.at(0);
+
+        std::vector<hlir::Value> expected_consts{};
+
+        std::vector<hlir::Inst> expected_code{
+            {hlir::InstKind::LoadLocal, 0},
+            {hlir::InstKind::LoadLocal, 1},
+            {      hlir::InstKind::Add, 0},
+            {      hlir::InstKind::Ret, 0},
+        };
+
+        std::vector<Span> expected_spans{
+            {38, 39},
+            {42, 43},
+            {38, 43},
+            {31, 44},
+        };
+
+        REQUIRE_THAT(b.consts, Equals(expected_consts));
+        REQUIRE_THAT(b.code, Equals(expected_code));
+        REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
+}
+
+TEST_CASE("function with ifs", "[sema]") {
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    auto source = R"~~(func zeroer(x: i32) i32 {
+    if x == 0 { return x; }
+
+    return 0;
+})~~";
+    auto path = ":memory:";
+
+    auto er = ErrorReporter{source, path, devnull};
+    auto tokens = tokenize(source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto [ast, root] = parse(tokens, source, er);
+
+    REQUIRE_FALSE(er.had_error());
+
+    auto ts = TypeStore::new_store();
+    auto m = sema(ast, ts, root, er);
+
+    REQUIRE_FALSE(er.had_error());
+    REQUIRE(m.funcs.size() == 1);
+
+    auto f = m.funcs.at(0);
+    REQUIRE(f.name == "zeroer");
+    REQUIRE(f.type ==
+            ts.get_type_func(std::array{ts.get_type_i32()}, ts.get_type_i32()));
+
+    std::vector<hlir::Local> expected_locals{
+        {"x", ts.get_type_i32(), 0},
+    };
+
+    REQUIRE_THAT(f.locals, Equals(expected_locals));
+
+    REQUIRE(f.blocks.size() == 3);
+
+    {
+        auto b = f.blocks.at(0);
+
+        std::vector<hlir::Value> expected_consts{
+            {ts.get_type_i32(), uint64_t{0}},
+        };
+
+        std::vector<hlir::Inst> expected_code{
+            {  hlir::InstKind::LoadLocal, 0},
+            {      hlir::InstKind::Const, 0},
+            {         hlir::InstKind::Eq, 0},
+            {hlir::InstKind::BranchFalse, 2},
+        };
+
+        std::vector<Span> expected_spans{
+            {33, 34},
+            {38, 39},
+            {33, 39},
+            {30, 53},
+        };
+
+        REQUIRE_THAT(b.consts, Equals(expected_consts));
+        REQUIRE_THAT(b.code, Equals(expected_code));
+        REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
+
+    {
+        auto b = f.blocks.at(1);
+
+        std::vector<hlir::Value> expected_consts{};
+
+        std::vector<hlir::Inst> expected_code{
+            {hlir::InstKind::LoadLocal, 0},
+            {      hlir::InstKind::Ret, 0},
+            {   hlir::InstKind::Branch, 2},
+        };
+
+        std::vector<Span> expected_spans{
+            {49, 50},
+            {42, 51},
+            {30, 53},
+        };
+
+        REQUIRE_THAT(b.consts, Equals(expected_consts));
+        REQUIRE_THAT(b.code, Equals(expected_code));
+        REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
+
+    {
+        auto b = f.blocks.at(2);
+
+        std::vector<hlir::Value> expected_consts{
+            {ts.get_type_i32(), uint64_t{0}},
+        };
+
+        std::vector<hlir::Inst> expected_code{
+            {hlir::InstKind::Const, 0},
+            {      hlir::InstKind::Ret, 0},
+        };
+
+        std::vector<Span> expected_spans{
+            {66, 67},
+            {59, 68},
+        };
+
+        REQUIRE_THAT(b.consts, Equals(expected_consts));
+        REQUIRE_THAT(b.code, Equals(expected_code));
+        REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
 }
 
 // NOLINTEND(modernize-use-designated-initializers)
