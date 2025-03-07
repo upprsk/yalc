@@ -106,6 +106,7 @@ enum class TypeKind : uint16_t {
     Uint8,
     Usize,
     Isize,
+    Bool,
     Ptr,
     MultiPtr,
     Func,
@@ -149,6 +150,10 @@ struct Type {
 
     [[nodiscard]] constexpr auto is_err() const -> bool {
         return kind == TypeKind::Err;
+    }
+
+    [[nodiscard]] constexpr auto is_bool() const -> bool {
+        return kind == TypeKind::Bool;
     }
 
     [[nodiscard]] constexpr auto is_integral() const -> bool {
@@ -228,6 +233,7 @@ struct TypeStore {
     [[nodiscard]] auto get_type_u16() const -> TypeHandle { return u16_type; }
     [[nodiscard]] auto get_type_i8() const -> TypeHandle { return i8_type; }
     [[nodiscard]] auto get_type_u8() const -> TypeHandle { return u8_type; }
+    [[nodiscard]] auto get_type_bool() const -> TypeHandle { return bool_type; }
 
     [[nodiscard]] auto get_type_usize() const -> TypeHandle {
         return usize_type;
@@ -446,6 +452,7 @@ private:
     TypeHandle u16_type;
     TypeHandle i8_type;
     TypeHandle u8_type;
+    TypeHandle bool_type;
     TypeHandle usize_type;
     TypeHandle isize_type;
 
@@ -523,7 +530,8 @@ constexpr auto Type::size(TypeStore const& ts) const -> size_t {
         case TypeKind::Int16:
         case TypeKind::Uint16: return 2;
         case TypeKind::Int8:
-        case TypeKind::Uint8: return 1;
+        case TypeKind::Uint8:
+        case TypeKind::Bool: return 1;
 
         case TypeKind::Usize:
         case TypeKind::Isize:

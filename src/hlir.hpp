@@ -32,11 +32,12 @@ enum class InstKind : uint8_t {
     Sub,
     Mul,
     Div,
+    Eq,
 
     Ret,
 
     Branch,
-    BranchZero,
+    BranchFalse,
 };
 
 struct Inst {

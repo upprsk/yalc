@@ -21,6 +21,8 @@ auto TypeStore::new_store() -> TypeStore {
     ts.i8_type = ts.new_type(TypeKind::Int8);
     ts.u8_type = ts.new_type(TypeKind::Uint8);
 
+    ts.bool_type = ts.new_type(TypeKind::Bool);
+
     ts.usize_type = ts.new_type(TypeKind::Usize);
     ts.isize_type = ts.new_type(TypeKind::Isize);
 
@@ -38,6 +40,7 @@ auto TypeStore::coerce_to(Span span, TypeHandle target, TypeHandle rhs,
         case TypeKind::Type:
         case TypeKind::Void:
         case TypeKind::Func:
+        case TypeKind::Bool:
             if (target != rhs) {
                 er.report_error(span,
                                 "type mismatch, can't coerce type {} to {}",
@@ -172,6 +175,8 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
         case TypeKind::Usize: return format_to(ctx.out(), "usize");
         case TypeKind::Isize: return format_to(ctx.out(), "isize");
 
+        case TypeKind::Bool: return format_to(ctx.out(), "bool");
+
         case TypeKind::Ptr:
             format_to(ctx.out(), "*");
             if (type->is_const()) format_to(ctx.out(), "const ");
@@ -236,6 +241,7 @@ auto fmt::formatter<yal::TypeKind>::format(yal::TypeKind   n,
         case yal::TypeKind::Uint8: name = "Uint8"; break;
         case yal::TypeKind::Usize: name = "Usize"; break;
         case yal::TypeKind::Isize: name = "Isize"; break;
+        case yal::TypeKind::Bool: name = "Bool"; break;
         case yal::TypeKind::Ptr: name = "Ptr"; break;
         case yal::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::TypeKind::Func: name = "Func"; break;

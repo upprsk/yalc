@@ -1,0 +1,127 @@
+digraph g {
+fontname="Helvetica,Arial,sans-serif"
+node [fontname="Helvetica,Arial,sans-serif"]
+edge [fontname="Helvetica,Arial,sans-serif"]
+graph [ rankdir = "LR" ];
+node [ fontsize = "16" shape = "ellipse" ];
+edge [ ];
+"node25" [
+shape = "record"
+label = "<f0> 25 | File | void | <f1> [9] | <f2> 1"
+];
+"node24" [
+shape = "record"
+label = "<f0> 24 | Func | func() i32 | <f1> [6] | <f2> 3"
+];
+"node0" [
+shape = "record"
+label = "<f0> 0 | Id | {![1fffffff]} | `main`"
+];
+"node24":f1 -> "node0":f0 []
+"node2" [
+shape = "record"
+label = "<f0> 2 | Id | type | `i32`"
+];
+"node24":f1 -> "node2":f0 []
+"node23" [
+shape = "record"
+label = "<f0> 23 | Block | void | <f1> [3] | <f2> 3"
+];
+"node6" [
+shape = "record"
+label = "<f0> 6 | VarDecl | void | <f1> 3 | <f2> [0]"
+];
+"node3" [
+shape = "record"
+label = "<f0> 3 | Id | {![1fffffff]} | `x`"
+];
+"node6":f1 -> "node3":f0 []
+"node5" [
+shape = "record"
+label = "<f0> 5 | Nil | {![1fffffff]}"
+];
+"node6":f1 -> "node5":f0 []
+"node4" [
+shape = "record"
+label = "<f0> 4 | Int | i32 | 42"
+];
+"node6":f1 -> "node4":f0 []
+"node23":f1 -> "node6":f0 []
+"node16" [
+shape = "record"
+label = "<f0> 16 | IfStmt | void | <f1> 9 | <f2> f"
+];
+"node9" [
+shape = "record"
+label = "<f0> 9 | Equal | bool | <f1> 7 | <f2> 8"
+];
+"node7" [
+shape = "record"
+label = "<f0> 7 | Id | i32 | `x`"
+];
+"node9":f1 -> "node7":f0 []
+"node8" [
+shape = "record"
+label = "<f0> 8 | Int | i32 | 0"
+];
+"node9":f2 -> "node8":f0 []
+"node16":f1 -> "node9":f0 []
+"node15" [
+shape = "record"
+label = "<f0> 15 | Block | void | <f1> [2] | <f2> 1"
+];
+"node14" [
+shape = "record"
+label = "<f0> 14 | Assign | void | <f1> a | <f2> d"
+];
+"node10" [
+shape = "record"
+label = "<f0> 10 | Id | {![1fffffff]} | `x`"
+];
+"node14":f1 -> "node10":f0 []
+"node13" [
+shape = "record"
+label = "<f0> 13 | Add | i32 | <f1> b | <f2> c"
+];
+"node11" [
+shape = "record"
+label = "<f0> 11 | Id | i32 | `x`"
+];
+"node13":f1 -> "node11":f0 []
+"node12" [
+shape = "record"
+label = "<f0> 12 | Int | i32 | 27"
+];
+"node13":f2 -> "node12":f0 []
+"node14":f2 -> "node13":f0 []
+"node15":f1 -> "node14":f0 []
+"node16":f1 -> "node15":f0 []
+"node23":f1 -> "node16":f0 []
+"node22" [
+shape = "record"
+label = "<f0> 22 | ReturnStmt | void | <f1> 15"
+];
+"node21" [
+shape = "record"
+label = "<f0> 21 | Add | i32 | <f1> 12 | <f2> 14"
+];
+"node18" [
+shape = "record"
+label = "<f0> 18 | Int | i32 | 69"
+];
+"node21":f1 -> "node18":f0 []
+"node20" [
+shape = "record"
+label = "<f0> 20 | Neg | i32 | <f1> 13"
+];
+"node19" [
+shape = "record"
+label = "<f0> 19 | Id | i32 | `x`"
+];
+"node20":f1 -> "node19":f0 []
+"node21":f2 -> "node20":f0 []
+"node22":f1 -> "node21":f0 []
+"node23":f1 -> "node22":f0 []
+"node24":f1 -> "node23":f0 []
+"node25":f1 -> "node24":f0 []
+}

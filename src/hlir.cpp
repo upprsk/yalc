@@ -72,8 +72,9 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Sub: name = "Sub"; break;
         case yal::hlir::InstKind::Mul: name = "Mul"; break;
         case yal::hlir::InstKind::Div: name = "Div"; break;
+        case yal::hlir::InstKind::Eq: name = "Eq"; break;
         case yal::hlir::InstKind::Ret: name = "Ret"; break;
-        case yal::hlir::InstKind::BranchZero: name = "BranchZero"; break;
+        case yal::hlir::InstKind::BranchFalse: name = "BranchFalse"; break;
         case yal::hlir::InstKind::Branch: name = "Branch"; break;
     }
 

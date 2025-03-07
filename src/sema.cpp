@@ -152,7 +152,8 @@ struct SemaFunc {
             sema_stmt(e, c);
         }
 
-        // FIXME: pop all locals define in the block
+        // FIXME: pop all locals define in the block (that are not used later)
+        // How do you even do this?
 
         return ast->get_mut(n)->set_type(ts->get_type_void());
     }
@@ -227,12 +228,19 @@ struct SemaFunc {
                 auto p = ast->node_if_stmt(*node);
 
                 // FIXME: use booleans (inference and check)
-                auto cond = sema_expr(env, {}, p.cond);
+                auto cond =
+                    sema_expr(env, {.expected = ts->get_type_bool()}, p.cond);
+                if (!ts->get(cond)->is_bool()) {
+                    er->report_error(
+                        ast->get(p.cond)->span,
+                        "expected boolean for if condition, got {}",
+                        ts->fatten(cond));
+                }
 
                 auto wt = allocate_block();
                 auto after = allocate_block();
 
-                push_inst(node->span, hlir::InstKind::BranchZero, after);
+                push_inst(node->span, hlir::InstKind::BranchFalse, after);
 
                 set_active_block(wt);
                 sema_stmt(env, p.when_true);
@@ -278,6 +286,37 @@ struct SemaFunc {
         auto node = ast->get(n);
 
         switch (node->kind) {
+            case NodeKind::Equal: {
+                auto p = ast->node_with_child_pair(*node);
+
+                auto kind = hlir::InstKind::Eq;
+                switch (node->kind) {
+                    case NodeKind::Equal: kind = hlir::InstKind::Eq; break;
+                    default: __builtin_unreachable();
+                }
+
+                auto lhs = sema_expr(env, ctx, p.first);
+                auto rhs = sema_expr(env, ctx, p.second);
+
+                // FIXME: type coersion
+                if ((!ts->get(lhs)->is_err() && !ts->get(rhs)->is_err()) &&
+                    lhs != rhs) {
+                    er->report_error(node->span, "type mismatch: {} and {}",
+                                     ts->fatten(lhs), ts->fatten(rhs));
+                }
+
+                // FIXME: allow adding things other than integers
+                if (!ts->get(lhs)->is_err() && !ts->get(lhs)->is_integral()) {
+                    er->report_error(
+                        node->span,
+                        "can't use {} operation on non-integral type: {}", kind,
+                        ts->fatten(lhs));
+                }
+
+                push_inst(node->span, kind);
+                return ast->get_mut(n)->set_type(ts->get_type_bool());
+            }
+
             case NodeKind::Add:
             case NodeKind::Sub:
             case NodeKind::Mul:
