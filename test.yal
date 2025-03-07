@@ -1,6 +1,7 @@
-extern func write(fd: i32, buf: [*]const u8, sz: usize) isize;
+func main() i32 {
+    return 1 + 2;
+}
 
-func main() {
-    var buf = "Hello, World!\n";
-    _ = write(1, buf, 14 as usize);
+func add(x: i32, y: i32) i32 {
+    return x * 2 + y;
 }

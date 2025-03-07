@@ -147,6 +147,10 @@ struct Type {
         return second.as_count();
     }
 
+    [[nodiscard]] constexpr auto is_err() const -> bool {
+        return kind == TypeKind::Err;
+    }
+
     [[nodiscard]] constexpr auto is_integral() const -> bool {
         return kind == TypeKind::Int64 || kind == TypeKind::Uint64 ||
                kind == TypeKind::Int32 || kind == TypeKind::Uint32 ||
@@ -255,8 +259,8 @@ struct TypeStore {
         return new_type(TypeKind::MultiPtr, flags, child);
     }
 
-    [[nodiscard]] auto get_type_fn(std::span<TypeHandle const> args,
-                                   TypeHandle ret) -> TypeHandle {
+    [[nodiscard]] auto get_type_func(std::span<TypeHandle const> args,
+                                     TypeHandle ret) -> TypeHandle {
         auto t = find_type_fn(args, ret);
         if (t.is_valid()) return t;
 
@@ -430,6 +434,7 @@ struct TypeStore {
     auto dump(fmt::format_context& ctx, TypeHandle n) const
         -> fmt::format_context::iterator;
 
+private:
     TypeHandle void_type;
     TypeHandle type_type;
     TypeHandle err_type;

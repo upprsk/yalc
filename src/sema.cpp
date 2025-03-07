@@ -1,0 +1,439 @@
+#include "sema.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <ranges>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include "ast.hpp"
+#include "error_reporter.hpp"
+#include "fmt/format.h"
+#include "hlir.hpp"
+#include "span.hpp"
+#include "types.hpp"
+
+namespace yal {
+
+struct Context {
+    TypeHandle expected;
+};
+
+enum class DeclFlags {
+    None = 0,
+    Local = (1 << 0),
+};
+
+constexpr auto operator|(DeclFlags const& lhs, DeclFlags const& rhs)
+    -> DeclFlags {
+    return static_cast<DeclFlags>(fmt::underlying(lhs) | fmt::underlying(rhs));
+}
+
+constexpr auto operator&(DeclFlags const& lhs, DeclFlags const& rhs)
+    -> DeclFlags {
+    return static_cast<DeclFlags>(fmt::underlying(lhs) & fmt::underlying(rhs));
+}
+
+constexpr auto operator|=(DeclFlags& lhs, DeclFlags const& rhs) -> DeclFlags {
+    return lhs = lhs | rhs;
+}
+
+struct Decl {
+    DeclFlags   flags;
+    std::string name;
+    hlir::Value value;
+
+    [[nodiscard]] constexpr auto is_local() const -> bool {
+        return (flags & DeclFlags::Local) == DeclFlags::Local;
+    }
+};
+
+struct Env {
+    auto child() -> Env { return {.decls = {}, .parent = this}; }
+
+    auto lookup(std::string_view name) -> Decl* {
+        for (auto& item : decls | std::ranges::views::reverse) {
+            if (item.name == name) return &item;
+        }
+
+        return parent ? parent->lookup(name) : nullptr;
+    }
+
+    void declare(std::string name, hlir::Value value,
+                 DeclFlags flags = DeclFlags::None) {
+        decls.push_back({flags, name, value});
+    }
+
+    std::vector<Decl> decls;
+    Env*              parent;
+};
+
+struct SemaFunc {
+    auto sema(Env& env) -> TypeHandle {
+        auto e = env.child();
+
+        auto p = ast->node_func(func_node_handle);
+
+        // first, check for plain name of the function
+        if (ast->get(p.name)->is_id()) {
+            func.name = ast->get(p.name)->value_string();
+        }
+
+        // it might be a bound function
+        else if (ast->get(p.name)->is_id_pack()) {
+            er->report_bug(ast->get(func_node_handle)->span,
+                           "bound functions have not been implemented");
+
+            return ast->get_mut(func_node_handle)->set_type(ts->get_type_err());
+        } else {
+            er->report_bug(ast->get(p.name)->span,
+                           "invalid node found for function name: {}",
+                           ast->get(p.name)->kind);
+            return ast->get_mut(func_node_handle)->set_type(ts->get_type_err());
+        }
+
+        std::vector<TypeHandle> args;
+        for (auto const& arg : p.args) {
+            auto ty = sema_func_arg(e, arg);
+            args.push_back(ty);
+        }
+
+        auto ret = ts->get_type_void();
+        ret_span = ast->get(p.name)->span;
+
+        if (!ast->get(p.ret)->is_nil()) {
+            ret = eval_to_type(e, p.ret);
+            ret_span = ast->get(p.ret)->span;
+        }
+
+        func.type = ast->get_mut(func_node_handle)
+                        ->set_type(ts->get_type_func(args, ret));
+
+        sema_block(e, p.body);
+
+        return func.type;
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto sema_func_arg(Env& env, NodeHandle n) -> TypeHandle {
+        auto node = ast->get_mut(n);
+        if (!node->is_func_arg()) {
+            er->report_bug(node->span, "invalid node in `sema_func_arg`: {}",
+                           node->kind);
+            return node->set_type(ts->get_type_err());
+        }
+
+        auto p = ast->node_named(*node);
+        auto ty = eval_to_type(env, p.child);
+
+        env.declare(std::string{p.name}, {.type = ty}, DeclFlags::Local);
+        append_local(std::string{p.name});
+
+        return node->set_type(ty);
+    }
+
+    auto sema_block(Env& env, NodeHandle n) -> TypeHandle {
+        auto node = ast->get(n);
+        if (!node->is_block()) {
+            er->report_bug(node->span, "invalid node in sema_block: {}",
+                           node->kind);
+            return ast->get_mut(n)->set_type(ts->get_type_err());
+        }
+
+        auto e = env.child();
+        auto p = ast->node_with_children(*node);
+        for (auto const& c : p.children) {
+            sema_stmt(e, c);
+        }
+
+        return ast->get_mut(n)->set_type(ts->get_type_void());
+    }
+
+    auto sema_stmt(Env& env, NodeHandle n) -> TypeHandle {
+        auto node = ast->get(n);
+
+        switch (node->kind) {
+            case NodeKind::ReturnStmt: {
+                auto p = ast->node_with_child(*node);
+                auto ret = ts->get(func.type)->as_func(*ts).ret;
+
+                auto child = sema_expr(env, {.expected = ret}, p.child);
+
+                // FIXME: allow type coercion
+                if (!ts->get(child)->is_err() && ret != child) {
+                    er->report_error(
+                        ast->get(p.child)->span,
+                        "type mismatch, function expects {} but got {}",
+                        ts->fatten(ret), ts->fatten(child));
+
+                    er->report_note(ret_span,
+                                    "function return specified as {} here",
+                                    ts->fatten(ret));
+                }
+
+                push_inst(node->span, hlir::InstKind::Ret);
+
+                return ast->get_mut(n)->set_type(ts->get_type_void());
+            }
+
+            default:
+                er->report_bug(node->span, "invalid node in sema_stmt: {}",
+                               node->kind);
+                return ast->get_mut(n)->set_type(ts->get_type_err());
+        }
+    }
+
+    auto sema_expr(Env& env, Context ctx, NodeHandle n) -> TypeHandle {
+        auto node = ast->get(n);
+
+        switch (node->kind) {
+            case NodeKind::Add:
+            case NodeKind::Sub:
+            case NodeKind::Mul:
+            case NodeKind::Div: {
+                auto p = ast->node_with_child_pair(*node);
+
+                auto kind = hlir::InstKind::Add;
+                switch (node->kind) {
+                    case NodeKind::Add: kind = hlir::InstKind::Add; break;
+                    case NodeKind::Sub: kind = hlir::InstKind::Sub; break;
+                    case NodeKind::Mul: kind = hlir::InstKind::Mul; break;
+                    case NodeKind::Div: kind = hlir::InstKind::Div; break;
+                    default: __builtin_unreachable();
+                }
+
+                auto lhs = sema_expr(env, ctx, p.first);
+                auto rhs = sema_expr(env, ctx, p.second);
+
+                // FIXME: type coersion
+                if (lhs != rhs) {
+                    er->report_error(node->span, "type mismatch: {} and {}",
+                                     ts->fatten(lhs), ts->fatten(rhs));
+                }
+
+                push_inst(node->span, kind);
+                return ast->get_mut(n)->set_type(lhs);
+            }
+
+            case NodeKind::Id: {
+                auto d = env.lookup(node->value_string());
+                if (!d) {
+                    er->report_error(node->span, "undefined identifier: {}",
+                                     node->value_string());
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                push_inst_load(node->span, *d);
+                return ast->get_mut(n)->set_type(d->value.type);
+            }
+
+            case NodeKind::Int: {
+                auto ty = ts->get_type_i32();
+
+                if (ctx.expected.is_valid()) {
+                    auto expected = ts->get(ctx.expected);
+                    if (expected->is_integral()) {
+                        ty = ctx.expected;
+                    }
+                }
+
+                push_inst_const(node->span,
+                                {.type = ty, .value = node->value_uint64()});
+                return ast->get_mut(n)->set_type(ty);
+            }
+
+            default:
+                er->report_bug(node->span, "invalid node in sema_expr: {}",
+                               node->kind);
+                return ast->get_mut(n)->set_type(ts->get_type_err());
+        }
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto eval_to_type(Env& env, NodeHandle n) const -> TypeHandle {
+        auto node = ast->get_mut(n);
+
+        switch (node->kind) {
+            case NodeKind::Id: {
+                auto d = env.lookup(node->value_string());
+                if (!ts->get(d->value.type)->is_type()) {
+                    er->report_error(node->span,
+                                     "can't use value of type `{}` as type",
+                                     ts->fatten(d->value.type));
+                    return node->set_type(ts->get_type_err());
+                }
+
+                node->set_type(ts->get_type_type());
+
+                return d->value.value_type();
+            }
+
+            default:
+                er->report_error(node->span, "can't evaluate {} to type",
+                                 node->kind);
+                return node->set_type(ts->get_type_err());
+        }
+    }
+
+    // ------------------------------------------------------------------------
+
+    void push_inst(Span s, hlir::InstKind kind, uint8_t arg = 0) {
+        auto blk = current_block();
+        blk->spans.push_back(s);
+        blk->code.push_back({kind, arg});
+    }
+
+    void push_inst_const(Span s, hlir::Value v) {
+        auto blk = current_block();
+        auto sz = blk->consts.size();
+        if (sz == std::numeric_limits<uint8_t>::max()) {
+            er->report_bug(s, "too many constants in block: {}", sz);
+            return;
+        }
+
+        blk->consts.push_back(v);
+        push_inst(s, hlir::InstKind::Const, sz);
+    }
+
+    void push_inst_load(Span s, Decl const& decl) {
+        if (decl.is_local()) {
+            auto [loc, off] = lookup_local(decl.name);
+            if (!loc)
+                throw std::runtime_error{
+                    fmt::format("push_inst_load({}): marked as local but not "
+                                "found in locals",
+                                decl.name)};
+
+            push_inst(s, hlir::InstKind::LoadLocal, off);
+            return;
+        }
+
+        throw std::runtime_error{fmt::format(
+            "push_inst_load({}): non-locals have not been implemented",
+            decl.name)};
+    }
+
+    auto current_block() -> hlir::Block* {
+        if (func.blocks.size() == 0) func.blocks.push_back({});
+
+        return &func.blocks.at(func.blocks.size() - 1);
+    }
+
+    [[nodiscard]] auto lookup_local(std::string_view name) const
+        -> std::pair<hlir::Local const*, size_t> {
+        size_t i{};
+        for (auto& item : func.locals | std::ranges::views::reverse) {
+            if (item.name == name) return {&item, func.locals.size() - i - 1};
+            i++;
+        }
+
+        return {nullptr, 0};
+    }
+
+    void append_local(std::string name) {
+        func.locals.push_back({name, stack_top++});
+    }
+
+    void pop_local() {
+        if (stack_top == 0)
+            throw std::runtime_error{"popping empty virtual stack"};
+
+        stack_top--;
+    }
+
+    // ------------------------------------------------------------------------
+
+    hlir::Func func{};
+    Span       ret_span{};
+    uint8_t    stack_top{};
+
+    Ast*           ast;
+    TypeStore*     ts;
+    ErrorReporter* er;
+    NodeHandle     func_node_handle;
+};
+
+struct Sema {
+    auto sema_node(Env& env, NodeHandle n) -> TypeHandle {
+        auto node = ast->get_mut(n);
+
+        switch (node->kind) {
+            case NodeKind::Err:
+                er->report_error(node->span, "found error node in sema");
+                return node->set_type(ts->get_type_err());
+
+            case NodeKind::Nil:
+                er->report_bug(node->span, "found nil node in sema");
+                return node->set_type(ts->get_type_err());
+
+            case NodeKind::File: {
+                auto e = env.child();
+
+                auto p = ast->node_with_children(*node);
+                for (auto const& node : p.children) sema_node(e, node);
+
+                return node->set_type(ts->get_type_void());
+            }
+
+            case NodeKind::Func: return sema_node_func(env, n);
+
+            case NodeKind::FuncExtern:
+                er->report_bug(node->span, "{} not implemented", node->kind);
+                return ts->get_type_err();
+
+            default:
+                er->report_bug(node->span,
+                               "invalid node found in the top-level: {}",
+                               node->kind);
+                return ts->get_type_err();
+        }
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto sema_node_func(Env& env, NodeHandle h) -> TypeHandle {
+        auto sf = SemaFunc{
+            .ast = ast,
+            .ts = ts,
+            .er = er,
+            .func_node_handle = h,
+        };
+
+        auto ty = sf.sema(env);
+
+        // NOTE: should encapsulate this into a method
+        mod.funcs.push_back(sf.func);
+
+        return ty;
+    }
+
+    // ------------------------------------------------------------------------
+
+    hlir::Module mod{};
+
+    Ast*           ast;
+    TypeStore*     ts;
+    ErrorReporter* er;
+};
+
+auto sema(Ast& ast, TypeStore& ts, NodeHandle root, ErrorReporter& er)
+    -> hlir::Module {
+    auto s = Sema{.ast = &ast, .ts = &ts, .er = &er};
+
+    Env env;
+    env.declare("i32",
+                {.type = ts.get_type_type(), .value = ts.get_type_i32()});
+
+    s.sema_node(env, root);
+
+    return s.mod;
+}
+
+}  // namespace yal

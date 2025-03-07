@@ -356,8 +356,16 @@ struct Node {
         return kind == NodeKind::EnumLit;
     }
 
+    [[nodiscard]] constexpr auto is_func() const -> bool {
+        return kind == NodeKind::Func;
+    }
+
     [[nodiscard]] constexpr auto is_func_arg() const -> bool {
         return kind == NodeKind::FuncArg;
+    }
+
+    [[nodiscard]] constexpr auto is_block() const -> bool {
+        return kind == NodeKind::Block;
     }
 
     [[nodiscard]] constexpr auto is_field() const -> bool {
@@ -451,6 +459,12 @@ struct Ast {
     [[nodiscard]] auto node_if_stmt(Node const& n) const -> Node::IfStmt;
     [[nodiscard]] auto node_array(Node const& n) const -> Node::Array;
     [[nodiscard]] auto node_call(Node const& n) const -> Node::Call;
+
+    // ------------------------------------------------------------------------
+
+    [[nodiscard]] auto node_func(NodeHandle h) const -> Node::Func {
+        return node_func(*get(h));
+    }
 
     // ------------------------------------------------------------------------
 

@@ -6,6 +6,7 @@
 #include "fmt/base.h"
 #include "fmt/ranges.h"
 #include "parser.hpp"
+#include "sema.hpp"
 #include "tokenizer.hpp"
 #include "types.hpp"
 #include "typing.hpp"
@@ -49,8 +50,15 @@ auto main(int argc, char** argv) -> int {
         fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
 
         auto ts = yal::TypeStore::new_store();
+        auto m = yal::sema(ast, ts, root, er);
+
         fmt::println("{}",
                      yal::FatNodeHandle{.ast = &ast, .node = root, .ts = &ts});
+
+        for (auto const& func : m.funcs) {
+            func.disasm(stdout, ts);
+            fmt::println(stdout, "");
+        }
 
         {
             auto                                   dotgraph = "ast.gv";
@@ -64,16 +72,12 @@ auto main(int argc, char** argv) -> int {
             ast.dump_dot(f.get(), root, &ts);
         }
 
-        // yal::pass_add_types(root, ast, ts, er);
-        //
-        // for (size_t i = 0; i < ts.size(); i++) {
-        //     fmt::println("{}", ts.fatten(yal::TypeHandle::from_size(i)));
-        // }
-
-        return 0;
+        return er.had_error() ? 1 : 0;
     }
     CPPTRACE_CATCH(std::exception const& ex) {
         fmt::println(stderr, "exception: {}", ex.what());
         cpptrace::from_current_exception().print();
+
+        return 1;
     }
 }
