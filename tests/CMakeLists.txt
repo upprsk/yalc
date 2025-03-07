@@ -1,7 +1,8 @@
 set(TEST_FILES
-  tokenizer.cpp
   ast.cpp
   parser.cpp
+  sema.cpp
+  tokenizer.cpp
 )
 
 add_executable(tests ${TEST_FILES})
