@@ -133,7 +133,7 @@ struct SemaFunc {
         auto ty = eval_to_type(env, p.child);
 
         env.declare(std::string{p.name}, {.type = ty}, DeclFlags::Local);
-        append_local(std::string{p.name});
+        append_local(std::string{p.name}, ty);
 
         return node->set_type(ty);
     }
@@ -159,6 +159,32 @@ struct SemaFunc {
         auto node = ast->get(n);
 
         switch (node->kind) {
+            case NodeKind::VarDecl: {
+                auto p = ast->node_decl(*node);
+
+                // first, check for multiple returns
+                if (!ast->get(p.ids)->is_id()) {
+                    er->report_bug(node->span,
+                                   "support for multiple returns has not been "
+                                   "implemented");
+                    return ast->get_mut(n)->set_type(ts->get_type_void());
+                }
+
+                if (!ast->get(p.type)->is_nil()) {
+                    er->report_bug(node->span,
+                                   "explicit typing of parameters has not been "
+                                   "implemented");
+                }
+
+                auto init = sema_expr(env, {}, p.init);
+
+                auto name = ast->get(p.ids)->value_string();
+                env.declare(name, {.type = init}, DeclFlags::Local);
+                append_local(name, init);
+
+                return ast->get_mut(n)->set_type(ts->get_type_void());
+            }
+
             case NodeKind::ReturnStmt: {
                 auto p = ast->node_with_child(*node);
                 auto ret = ts->get(func.type)->as_func(*ts).ret;
@@ -373,8 +399,8 @@ struct SemaFunc {
         return {nullptr, 0};
     }
 
-    void append_local(std::string name) {
-        func.locals.push_back({name, stack_top++});
+    void append_local(std::string name, TypeHandle ty) {
+        func.locals.push_back({name, ty, stack_top++});
     }
 
     void pop_local() {

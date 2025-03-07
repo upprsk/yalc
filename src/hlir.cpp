@@ -29,7 +29,8 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                 } break;
                 case InstKind::LoadLocal: {
                     auto l = locals.at(inst.arg);
-                    print(f, " {} ({})", inst.arg, l);
+                    print(f, " {} ({:?}, {})", inst.arg, l.name,
+                          ts.fatten(l.type));
                 } break;
 
                 default: break;
@@ -75,5 +76,5 @@ auto fmt::formatter<yal::hlir::Inst>::format(yal::hlir::Inst n,
 auto fmt::formatter<yal::hlir::Local>::format(yal::hlir::Local n,
                                               format_context&  ctx) const
     -> format_context::iterator {
-    return fmt::format_to(ctx.out(), "{{{}, {}}}", n.name, n.idx);
+    return fmt::format_to(ctx.out(), "{{{}, {}, {}}}", n.name, n.type, n.idx);
 }

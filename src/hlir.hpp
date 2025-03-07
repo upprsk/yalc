@@ -49,6 +49,7 @@ struct Block {
 // idx is a uint8_t because that is the maximum an opcode can store for now.
 struct Local {
     std::string name;
+    TypeHandle  type;
     uint8_t     idx;
 };
 
