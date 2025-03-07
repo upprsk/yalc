@@ -27,11 +27,16 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                     print(f, " {} ({}, {})", inst.arg, c.value,
                           ts.fatten(c.type));
                 } break;
+
                 case InstKind::LoadLocal:
                 case InstKind::StoreLocal: {
                     auto l = locals.at(inst.arg);
                     print(f, " {} ({:?}, {})", inst.arg, l.name,
                           ts.fatten(l.type));
+                } break;
+
+                case InstKind::Branch: {
+                    print(f, " b {}", inst.arg);
                 } break;
 
                 default: break;
@@ -68,6 +73,8 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Mul: name = "Mul"; break;
         case yal::hlir::InstKind::Div: name = "Div"; break;
         case yal::hlir::InstKind::Ret: name = "Ret"; break;
+        case yal::hlir::InstKind::BranchZero: name = "BranchZero"; break;
+        case yal::hlir::InstKind::Branch: name = "Branch"; break;
     }
 
     return formatter<string_view>::format(name, ctx);

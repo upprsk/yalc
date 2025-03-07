@@ -34,6 +34,9 @@ enum class InstKind : uint8_t {
     Div,
 
     Ret,
+
+    Branch,
+    BranchZero,
 };
 
 struct Inst {

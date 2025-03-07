@@ -152,6 +152,8 @@ struct SemaFunc {
             sema_stmt(e, c);
         }
 
+        // FIXME: pop all locals define in the block
+
         return ast->get_mut(n)->set_type(ts->get_type_void());
     }
 
@@ -159,6 +161,8 @@ struct SemaFunc {
         auto node = ast->get(n);
 
         switch (node->kind) {
+            case NodeKind::Block: return sema_block(env, n);
+
             case NodeKind::VarDecl: {
                 auto p = ast->node_decl(*node);
 
@@ -215,6 +219,27 @@ struct SemaFunc {
                                      ast->get(p.first)->kind);
                     return ast->get_mut(n)->set_type(ts->get_type_err());
                 }
+
+                return ast->get_mut(n)->set_type(ts->get_type_void());
+            }
+
+            case NodeKind::IfStmt: {
+                auto p = ast->node_if_stmt(*node);
+
+                // FIXME: use booleans (inference and check)
+                auto cond = sema_expr(env, {}, p.cond);
+
+                auto wt = allocate_block();
+                auto after = allocate_block();
+
+                push_inst(node->span, hlir::InstKind::BranchZero, after);
+
+                set_active_block(wt);
+                sema_stmt(env, p.when_true);
+
+                push_inst(node->span, hlir::InstKind::Branch, after);
+
+                set_active_block(after);
 
                 return ast->get_mut(n)->set_type(ts->get_type_void());
             }
@@ -435,10 +460,19 @@ struct SemaFunc {
     }
 
     auto current_block() -> hlir::Block* {
+        // make sure we have at least one block
         if (func.blocks.size() == 0) func.blocks.push_back({});
 
-        return &func.blocks.at(func.blocks.size() - 1);
+        return &func.blocks.at(current_block_idx);
     }
+
+    [[nodiscard]] auto allocate_block() -> size_t {
+        auto sz = func.blocks.size();
+        func.blocks.push_back({});
+        return sz;
+    }
+
+    constexpr void set_active_block(size_t block) { current_block_idx = block; }
 
     [[nodiscard]] auto lookup_local(std::string_view name) const
         -> std::pair<hlir::Local const*, size_t> {
@@ -467,6 +501,7 @@ struct SemaFunc {
     hlir::Func func{};
     Span       ret_span{};
     uint8_t    stack_top{};
+    size_t     current_block_idx{};
 
     Ast*           ast;
     TypeStore*     ts;
