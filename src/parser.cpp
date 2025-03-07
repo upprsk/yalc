@@ -297,7 +297,7 @@ struct Parser {
         try(consume(TokenType::Semi));
 
         return ast.new_node_with_child(NodeKind::ReturnStmt,
-                                       s.extend(ast.get(expr)->span), expr);
+                                       s.extend(prev_span()), expr);
     }
 
     // if_stmt ::= "if" expr block [ "else" expr ]
