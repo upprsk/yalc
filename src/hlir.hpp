@@ -26,6 +26,7 @@ enum class InstKind : uint8_t {
     Err,
     Const,
     LoadLocal,
+    StoreLocal,
 
     Add,
     Sub,

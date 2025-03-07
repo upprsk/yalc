@@ -185,6 +185,40 @@ struct SemaFunc {
                 return ast->get_mut(n)->set_type(ts->get_type_void());
             }
 
+            case NodeKind::Assign: {
+                auto p = ast->node_with_child_pair(*node);
+
+                if (ast->get(p.first)->is_id()) {
+                    auto d = env.lookup(ast->get(p.first)->value_string());
+                    if (!d) {
+                        er->report_error(node->span, "undefined identifier: {}",
+                                         node->value_string());
+                        return ast->get_mut(n)->set_type(ts->get_type_err());
+                    }
+
+                    auto rhs =
+                        sema_expr(env, {.expected = d->value.type}, p.second);
+
+                    // FIXME: type coersion
+                    if (rhs != d->value.type) {
+                        er->report_error(node->span,
+                                         "can't assign to value of type {} "
+                                         "with value of type {}",
+                                         ts->fatten(d->value.type),
+                                         ts->fatten(rhs));
+                    }
+
+                    push_inst_store(node->span, *d);
+                } else {
+                    er->report_error(node->span,
+                                     "can't assign to non-l-value {}",
+                                     ast->get(p.first)->kind);
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                return ast->get_mut(n)->set_type(ts->get_type_void());
+            }
+
             case NodeKind::ReturnStmt: {
                 auto p = ast->node_with_child(*node);
                 auto ret = ts->get(func.type)->as_func(*ts).ret;
@@ -379,6 +413,24 @@ struct SemaFunc {
 
         throw std::runtime_error{fmt::format(
             "push_inst_load({}): non-locals have not been implemented",
+            decl.name)};
+    }
+
+    void push_inst_store(Span s, Decl const& decl) {
+        if (decl.is_local()) {
+            auto [loc, off] = lookup_local(decl.name);
+            if (!loc)
+                throw std::runtime_error{
+                    fmt::format("push_inst_load({}): marked as local but not "
+                                "found in locals",
+                                decl.name)};
+
+            push_inst(s, hlir::InstKind::StoreLocal, off);
+            return;
+        }
+
+        throw std::runtime_error{fmt::format(
+            "push_inst_store({}): non-locals have not been implemented",
             decl.name)};
     }
 

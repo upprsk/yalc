@@ -1,5 +1,8 @@
 func main() i32 {
     var x = 42;
+    // if (x == 0) {
+        x = x + 27;
+    // }
 
-    return 1 + -x;
+    return 69 + -x;
 }

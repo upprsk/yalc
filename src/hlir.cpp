@@ -27,7 +27,8 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                     print(f, " {} ({}, {})", inst.arg, c.value,
                           ts.fatten(c.type));
                 } break;
-                case InstKind::LoadLocal: {
+                case InstKind::LoadLocal:
+                case InstKind::StoreLocal: {
                     auto l = locals.at(inst.arg);
                     print(f, " {} ({:?}, {})", inst.arg, l.name,
                           ts.fatten(l.type));
@@ -57,6 +58,7 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Err: name = "Err"; break;
         case yal::hlir::InstKind::Const: name = "Const"; break;
         case yal::hlir::InstKind::LoadLocal: name = "LoadLocal"; break;
+        case yal::hlir::InstKind::StoreLocal: name = "StoreLocal"; break;
         case yal::hlir::InstKind::Add: name = "Add"; break;
         case yal::hlir::InstKind::Sub: name = "Sub"; break;
         case yal::hlir::InstKind::Mul: name = "Mul"; break;
