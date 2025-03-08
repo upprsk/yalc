@@ -23,21 +23,24 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
 
             switch (inst.kind) {
                 case InstKind::Const: {
-                    auto c = blk.consts.at(inst.arg);
-                    print(f, " {} ({}, {})", inst.arg, c.value,
+                    auto c = blk.consts.at(inst.a);
+                    print(f, " {} ({}, {})", inst.a, c.value,
                           ts.fatten(c.type));
                 } break;
 
                 case InstKind::LoadLocal:
                 case InstKind::StoreLocal: {
-                    auto l = locals.at(inst.arg);
-                    print(f, " {} ({:?}, {})", inst.arg, l.name,
+                    auto l = locals.at(inst.a);
+                    print(f, " {} ({:?}, {})", inst.a, l.name,
                           ts.fatten(l.type));
                 } break;
 
-                case InstKind::Branch:
-                case InstKind::BranchFalse: {
-                    print(f, " b {}", inst.arg);
+                case InstKind::Jump: {
+                    print(f, " j {}", inst.a);
+                } break;
+
+                case InstKind::Branch: {
+                    print(f, " b {}, {}", inst.a, inst.b);
                 } break;
 
                 default: break;
@@ -75,7 +78,7 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Div: name = "Div"; break;
         case yal::hlir::InstKind::Eq: name = "Eq"; break;
         case yal::hlir::InstKind::Ret: name = "Ret"; break;
-        case yal::hlir::InstKind::BranchFalse: name = "BranchFalse"; break;
+        case yal::hlir::InstKind::Jump: name = "Jump"; break;
         case yal::hlir::InstKind::Branch: name = "Branch"; break;
     }
 
@@ -85,7 +88,7 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
 auto fmt::formatter<yal::hlir::Inst>::format(yal::hlir::Inst n,
                                              format_context& ctx) const
     -> format_context::iterator {
-    return fmt::format_to(ctx.out(), "({}, {})", n.kind, n.arg);
+    return fmt::format_to(ctx.out(), "({}, {})", n.kind, n.a);
 }
 
 auto fmt::formatter<yal::hlir::Local>::format(yal::hlir::Local n,

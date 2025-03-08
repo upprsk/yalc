@@ -26,8 +26,8 @@ struct Value {
     constexpr auto operator==(Value const&) const -> bool = default;
 };
 
-// NOTE: If we ever need more opcodes, we can use `arg` of `Inst` as a
-// discriminator for instructions that don't need it.
+// NOTE: If we ever need more opcodes, we can use `a` and `b` of `Inst` as
+// discriminators for instructions that don't need them.
 enum class InstKind : uint8_t {
     Err,
     Const,
@@ -42,13 +42,18 @@ enum class InstKind : uint8_t {
 
     Ret,
 
+    // unconditionally jump to the block in `b`
+    Jump,
+
+    // conditionally jump to `a` (when condition is true) or `b` (when condition
+    // is false).
     Branch,
-    BranchFalse,
 };
 
 struct Inst {
-    InstKind kind;
-    uint8_t  arg;
+    InstKind kind = InstKind::Err;
+    uint8_t  a = 0;
+    uint8_t  b = 0;
 
     constexpr auto operator==(Inst const&) const -> bool = default;
 };

@@ -83,7 +83,7 @@ TEST_CASE("empty void func", "[sema]") {
 
     auto i = b.code.at(0);
     REQUIRE(i.kind == hlir::InstKind::Ret);
-    REQUIRE(i.arg == 0);
+    REQUIRE(i.a == 0);
 }
 
 TEST_CASE("void func with just single return", "[sema]") {
@@ -124,7 +124,7 @@ TEST_CASE("void func with just single return", "[sema]") {
 
     auto i = b.code.at(0);
     REQUIRE(i.kind == hlir::InstKind::Ret);
-    REQUIRE(i.arg == 0);
+    REQUIRE(i.a == 0);
 }
 
 TEST_CASE("func that adds two i32", "[sema]") {
@@ -350,10 +350,10 @@ TEST_CASE("function with ifs", "[sema]") {
         };
 
         std::vector<hlir::Inst> expected_code{
-            {  hlir::InstKind::LoadLocal, 0},
-            {      hlir::InstKind::Const, 0},
-            {         hlir::InstKind::Eq, 0},
-            {hlir::InstKind::BranchFalse, 2},
+            {hlir::InstKind::LoadLocal, 0},
+            {hlir::InstKind::Const, 0},
+            {hlir::InstKind::Eq, 0},
+            {hlir::InstKind::Branch, 1, 2},
         };
 
         std::vector<Span> expected_spans{
@@ -376,7 +376,7 @@ TEST_CASE("function with ifs", "[sema]") {
         std::vector<hlir::Inst> expected_code{
             {hlir::InstKind::LoadLocal, 0},
             {      hlir::InstKind::Ret, 0},
-            {   hlir::InstKind::Branch, 2},
+            {     hlir::InstKind::Jump, 2},
         };
 
         std::vector<Span> expected_spans{
@@ -399,7 +399,7 @@ TEST_CASE("function with ifs", "[sema]") {
 
         std::vector<hlir::Inst> expected_code{
             {hlir::InstKind::Const, 0},
-            {      hlir::InstKind::Ret, 0},
+            {  hlir::InstKind::Ret, 0},
         };
 
         std::vector<Span> expected_spans{

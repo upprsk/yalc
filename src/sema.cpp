@@ -245,12 +245,12 @@ struct SemaFunc {
                 auto wt = allocate_block();
                 auto after = allocate_block();
 
-                push_inst(node->span, hlir::InstKind::BranchFalse, after);
+                push_inst(node->span, hlir::InstKind::Branch, wt, after);
 
                 set_active_block(wt);
                 sema_stmt(env, p.when_true);
 
-                push_inst(node->span, hlir::InstKind::Branch, after);
+                push_inst(node->span, hlir::InstKind::Jump, after);
 
                 set_active_block(after);
 
@@ -360,7 +360,7 @@ struct SemaFunc {
                 auto child = sema_expr(env, ctx, p.child);
 
                 current_block()
-                    ->consts.at(current_block()->code.at(patch_idx).arg)
+                    ->consts.at(current_block()->code.at(patch_idx).a)
                     .type = child;
 
                 // FIXME: allow adding things other than integers
@@ -440,14 +440,15 @@ struct SemaFunc {
 
     // ------------------------------------------------------------------------
 
-    auto push_inst(Span s, hlir::InstKind kind, uint8_t arg = 0) -> size_t {
-        er->report_note(s, "push_inst({}, {}, {})", s, kind, arg);
+    auto push_inst(Span s, hlir::InstKind kind, uint8_t a = 0, uint8_t b = 0)
+        -> size_t {
+        er->report_note(s, "push_inst({}, {}, {})", s, kind, a);
 
         auto blk = current_block();
         auto sz = blk->code.size();
 
         blk->spans.push_back(s);
-        blk->code.push_back({kind, arg});
+        blk->code.push_back({kind, a, b});
 
         return sz;
     }
