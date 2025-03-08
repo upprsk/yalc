@@ -422,7 +422,7 @@ TEST_CASE("one function with multiple return values", "[parser][func][stmt]") {
     REQUIRE_FALSE(er.had_error());
     REQUIRE(fmt::to_string(ast.fatten(root)) ==
             "File([Func(Id(main), [], FuncRetPack([Id(i32), Id(u64)]), "
-            "Block([ReturnStmt(ExprPack([Int(0), Int(0)]))]))])");
+            "Block([ReturnStmt(ExprPack([Int(0), Int(4294967295)]))]))])");
 }
 
 TEST_CASE("with various return values", "[parser][func]") {
@@ -1132,7 +1132,7 @@ TEST_CASE("unary expresions", "[parser][expr]") {
         auto [ast, root] = parse_expr(tokens, source, er);
         REQUIRE_FALSE(er.had_error());
         REQUIRE(fmt::to_string(ast.fatten(root)) ==
-                "BinAnd(BinNot(ShftLeft(Int(1), Int(8))), Int(0))");
+                "BinAnd(BinNot(ShftLeft(Int(1), Int(8))), Int(4080))");
     }
 
     SECTION("unary 3") {
