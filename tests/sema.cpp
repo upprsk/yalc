@@ -423,8 +423,22 @@ TEST_CASE("function with ifs", "[sema]") {
     }
 }
 
+auto find_root_folder(size_t limit = 3, std::filesystem::path dir =
+                                            std::filesystem::current_path())
+    -> std::filesystem::path {
+    if (limit == 0) return {};
+
+    for (auto const& f : std::filesystem::directory_iterator{dir}) {
+        if (f.is_directory() && f.path().filename() == ".git")
+            return f.path().parent_path();
+    }
+
+    return find_root_folder(limit - 1, dir.parent_path());
+}
+
 TEST_CASE("files") {
-    std::filesystem::path p = "tests/cases";
+    auto root = find_root_folder();
+    auto p = root.concat("/tests/cases");
 
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
