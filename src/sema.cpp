@@ -14,6 +14,7 @@
 #include "ast.hpp"
 #include "error_reporter.hpp"
 #include "fmt/format.h"
+#include "fmt/ranges.h"
 #include "hlir.hpp"
 #include "span.hpp"
 #include "types.hpp"
@@ -48,6 +49,7 @@ struct Decl {
     DeclFlags   flags;
     std::string name;
     hlir::Value value;
+    Span        span;
 
     [[nodiscard]] constexpr auto is_local() const -> bool {
         return (flags & DeclFlags::Local) == DeclFlags::Local;
@@ -69,9 +71,9 @@ struct Env {
         return parent ? parent->lookup(name) : nullptr;
     }
 
-    void declare(std::string name, hlir::Value value,
+    void declare(Span span, std::string name, hlir::Value value,
                  DeclFlags flags = DeclFlags::None) {
-        decls.push_back({flags, name, value});
+        decls.push_back({flags, name, value, span});
     }
 
     std::vector<Decl> decls;
@@ -86,7 +88,7 @@ struct SemaFunc {
 
         // first, check for plain name of the function
         if (ast->get(p.name)->is_id()) {
-            func.name = ast->get(p.name)->value_string();
+            func->name = ast->get(p.name)->value_string();
         }
 
         // it might be a bound function
@@ -116,12 +118,15 @@ struct SemaFunc {
             ret_span = ast->get(p.ret)->span;
         }
 
-        func.type = ast->get_mut(func_node_handle)
-                        ->set_type(ts->get_type_func(args, ret));
+        func->type = ast->get_mut(func_node_handle)
+                         ->set_type(ts->get_type_func(args, ret));
+
+        env.declare(ast->get(func_node_handle)->span, func->name,
+                    {.type = func->type, .value = func_handle});
 
         sema_block(e, p.body);
 
-        return func.type;
+        return func->type;
     }
 
     // ------------------------------------------------------------------------
@@ -137,7 +142,8 @@ struct SemaFunc {
         auto p = ast->node_named(*node);
         auto ty = eval_to_type(env, p.child);
 
-        env.declare(std::string{p.name}, {.type = ty}, DeclFlags::Local);
+        env.declare(node->span, std::string{p.name}, {.type = ty},
+                    DeclFlags::Local);
         append_local(std::string{p.name}, ty);
 
         return node->set_type(ty);
@@ -169,6 +175,23 @@ struct SemaFunc {
         switch (node->kind) {
             case NodeKind::Block: return sema_block(env, n);
 
+            case NodeKind::ExprStmt: {
+                auto p = ast->node_with_child(*node);
+
+                auto child = sema_expr(env, {}, p.child);
+                if (!ts->get(child)->is_err() && !ts->get(child)->is_void()) {
+                    er->report_error(node->span,
+                                     "expression result is ignored");
+                    er->report_note(ast->get(p.child)->span,
+                                    "expression has type: {}",
+                                    ts->fatten(child));
+                }
+
+                push_inst(node->span, hlir::InstKind::Pop, 1);
+
+                return ast->get_mut(n)->set_type(ts->get_type_void());
+            }
+
             case NodeKind::VarDecl: {
                 auto p = ast->node_decl(*node);
 
@@ -189,7 +212,7 @@ struct SemaFunc {
                 auto init = sema_expr(env, {}, p.init);
 
                 auto name = ast->get(p.ids)->value_string();
-                env.declare(name, {.type = init}, DeclFlags::Local);
+                env.declare(node->span, name, {.type = init}, DeclFlags::Local);
                 append_local(name, init);
 
                 return ast->get_mut(n)->set_type(ts->get_type_void());
@@ -289,7 +312,7 @@ struct SemaFunc {
 
             case NodeKind::ReturnStmt: {
                 auto p = ast->node_with_child(*node);
-                auto ret = ts->get(func.type)->as_func(*ts).ret;
+                auto ret = ts->get(func->type)->as_func(*ts).ret;
 
                 auto ty = ts->get_type_void();
                 if (!ast->get(p.child)->is_nil()) {
@@ -442,6 +465,90 @@ struct SemaFunc {
                 return ast->get_mut(n)->set_type(child);
             }
 
+            case NodeKind::Call: {
+                auto p = ast->node_call(*node);
+
+                // TODO: handle indirect calls
+                if (!ast->get(p.callee)->is_id()) {
+                    er->report_error(
+                        node->span,
+                        "can't call {} (indirect calls not implemented)",
+                        ast->get(p.callee)->kind);
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                auto d = env.lookup(ast->get(p.callee)->value_string());
+                if (!d) {
+                    er->report_error(ast->get(p.callee)->span,
+                                     "undefined identifier: {}",
+                                     ast->get(p.callee)->value_string());
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                ast->get_mut(p.callee)->set_type(d->value.type);
+
+                auto f = ts->get(d->value.type);
+                if (!f->is_func()) {
+                    er->report_bug(ast->get(p.callee)->span,
+                                   "can't call non-func: {}",
+                                   ts->fatten(d->value.type));
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                auto func = f->as_func(*ts);
+                if (func.args.size() != p.args.size()) {
+                    er->report_error(node->span,
+                                     "wrong number of types for func call, "
+                                     "expected {} but got {}",
+                                     func.args.size(), p.args.size());
+
+                    er->report_note(
+                        d->span, "func expects ({})",
+                        fmt::join(func.args | std::ranges::views::transform(
+                                                  [&](auto h) {
+                                                      return ts->fatten(h);
+                                                  }),
+                                  ", "));
+                }
+
+                for (size_t i = 0; i < p.args.size(); i++) {
+                    auto v = sema_expr(
+                        env,
+                        {.expected = i < func.args.size() ? func.args[i]
+                                                          : TypeHandle{}},
+                        p.args[i]);
+                    if (i < func.args.size()) {
+                        // FIXME: type coercion
+                        if (func.args[i] != v) {
+                            er->report_error(ast->get(p.args[i])->span,
+                                             "type mismatch, func expects {} "
+                                             "for argument but got {}",
+                                             ts->fatten(func.args[i]),
+                                             ts->fatten(v));
+
+                            er->report_note(
+                                d->span, "func expects ({})",
+                                fmt::join(
+                                    func.args | std::ranges::views::transform(
+                                                    [&](auto h) {
+                                                        return ts->fatten(h);
+                                                    }),
+                                    ", "));
+                        }
+                    }
+                }
+
+                if (d->value.holds_func()) {
+                    push_inst_call(node->span, d->value.value_func());
+                } else {
+                    er->report_bug(ast->get(p.callee)->span,
+                                   "indirect calls have not been implemented");
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                return ast->get_mut(n)->set_type(func.ret);
+            }
+
             case NodeKind::Id: {
                 auto d = env.lookup(node->value_string());
                 if (!d) {
@@ -534,6 +641,15 @@ struct SemaFunc {
         return push_inst(s, hlir::InstKind::Const, sz);
     }
 
+    auto push_inst_call(Span s, hlir::FuncHandle fn) -> size_t {
+        auto sz = func->calls.size();
+        if (sz == std::numeric_limits<uint8_t>::max())
+            throw std::runtime_error{"too many calls in func"};
+
+        func->calls.push_back(fn);
+        return push_inst(s, hlir::InstKind::Call, sz);
+    }
+
     void push_inst_load(Span s, Decl const& decl) {
         if (decl.is_local()) {
             auto [loc, off] = lookup_local(decl.name);
@@ -576,19 +692,19 @@ struct SemaFunc {
             decl.name)};
     }
 
-    auto current_block() -> hlir::Block* {
+    auto current_block() const -> hlir::Block* {
         // make sure we have at least one block
-        if (func.blocks.size() == 0) func.blocks.push_back({});
+        if (func->blocks.size() == 0) func->blocks.push_back({});
 
-        return &func.blocks.at(current_block_idx);
+        return &func->blocks.at(current_block_idx);
     }
 
-    [[nodiscard]] auto allocate_block() -> size_t {
+    [[nodiscard]] auto allocate_block() const -> size_t {
         // make sure we have at least one block
-        if (func.blocks.size() == 0) func.blocks.push_back({});
+        if (func->blocks.size() == 0) func->blocks.push_back({});
 
-        auto sz = func.blocks.size();
-        func.blocks.push_back({});
+        auto sz = func->blocks.size();
+        func->blocks.push_back({});
         return sz;
     }
 
@@ -597,8 +713,8 @@ struct SemaFunc {
     [[nodiscard]] auto lookup_local(std::string_view name) const
         -> std::pair<hlir::Local const*, size_t> {
         size_t i{};
-        for (auto& item : func.locals | std::ranges::views::reverse) {
-            if (item.name == name) return {&item, func.locals.size() - i - 1};
+        for (auto& item : func->locals | std::ranges::views::reverse) {
+            if (item.name == name) return {&item, func->locals.size() - i - 1};
             i++;
         }
 
@@ -606,7 +722,7 @@ struct SemaFunc {
     }
 
     void append_local(std::string name, TypeHandle ty) {
-        func.locals.push_back({name, ty, stack_top++});
+        func->locals.push_back({name, ty, stack_top++});
     }
 
     void pop_local() {
@@ -618,10 +734,11 @@ struct SemaFunc {
 
     // ------------------------------------------------------------------------
 
-    hlir::Func func{};
-    Span       ret_span{};
-    uint8_t    stack_top{};
-    size_t     current_block_idx{};
+    hlir::Func*      func;
+    hlir::FuncHandle func_handle;
+    Span             ret_span{};
+    uint8_t          stack_top{};
+    size_t           current_block_idx{};
 
     Ast*           ast;
     TypeStore*     ts;
@@ -668,7 +785,11 @@ struct Sema {
     // ------------------------------------------------------------------------
 
     auto sema_node_func(Env& env, NodeHandle h) -> TypeHandle {
+        auto fn = mod.add_func({});
+
         auto sf = SemaFunc{
+            .func = mod.get_mut(fn),
+            .func_handle = fn,
             .ast = ast,
             .ts = ts,
             .er = er,
@@ -676,9 +797,6 @@ struct Sema {
         };
 
         auto ty = sf.sema(env);
-
-        // NOTE: should encapsulate this into a method
-        mod.funcs.push_back(sf.func);
 
         return ty;
     }
@@ -697,15 +815,15 @@ auto sema(Ast& ast, TypeStore& ts, NodeHandle root, ErrorReporter& er)
     auto s = Sema{.ast = &ast, .ts = &ts, .er = &er};
 
     Env env;
-    env.declare("i32",
+    env.declare({}, "i32",
                 {.type = ts.get_type_type(), .value = ts.get_type_i32()});
 
-    env.declare("bool",
+    env.declare({}, "bool",
                 {.type = ts.get_type_type(), .value = ts.get_type_bool()});
 
-    env.declare("false", {.type = ts.get_type_bool(), .value = uint64_t{0}},
+    env.declare({}, "false", {.type = ts.get_type_bool(), .value = uint64_t{0}},
                 DeclFlags::Builtin);
-    env.declare("true", {.type = ts.get_type_bool(), .value = uint64_t{1}},
+    env.declare({}, "true", {.type = ts.get_type_bool(), .value = uint64_t{1}},
                 DeclFlags::Builtin);
 
     s.sema_node(env, root);

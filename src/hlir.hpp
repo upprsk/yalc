@@ -2,6 +2,7 @@
 
 // A High-Level Itermediate Representation.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <variant>
@@ -11,12 +12,33 @@
 
 namespace yal::hlir {
 
+struct FuncHandle {
+    FuncHandle(size_t idx) : idx{static_cast<uint32_t>(idx)} {}
+    FuncHandle(uint32_t idx) : idx{idx} {}
+
+    [[nodiscard]] constexpr auto index() const -> uint32_t { return idx; }
+
+    constexpr auto operator==(FuncHandle const&) const -> bool = default;
+
+private:
+    uint32_t idx;
+};
+
 struct Value {
-    TypeHandle                                         type;
-    std::variant<std::monostate, uint64_t, TypeHandle> value = std::monostate{};
+    TypeHandle                                                     type;
+    std::variant<std::monostate, uint64_t, TypeHandle, FuncHandle> value =
+        std::monostate{};
+
+    [[nodiscard]] constexpr auto holds_func() const -> bool {
+        return std::holds_alternative<FuncHandle>(value);
+    }
 
     [[nodiscard]] constexpr auto value_type() const -> TypeHandle {
         return std::get<TypeHandle>(value);
+    }
+
+    [[nodiscard]] constexpr auto value_func() const -> FuncHandle {
+        return std::get<FuncHandle>(value);
     }
 
     [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
@@ -31,6 +53,7 @@ struct Value {
 enum class InstKind : uint8_t {
     Err,
     Const,
+    Pop,
     LoadLocal,
     StoreLocal,
 
@@ -42,6 +65,9 @@ enum class InstKind : uint8_t {
     Neq,
 
     Ret,
+
+    // call the function with handle stored in `calls[a]`.
+    Call,
 
     // unconditionally jump to the block in `b`
     Jump,
@@ -75,19 +101,56 @@ struct Local {
 };
 
 struct Func {
-    TypeHandle         type;
-    std::string        name;
-    std::vector<Block> blocks;
-    std::vector<Local> locals;
+    TypeHandle              type;
+    std::string             name;
+    std::vector<Block>      blocks;
+    std::vector<Local>      locals;
+    std::vector<FuncHandle> calls;
 
     void disasm(FILE* f, TypeStore const& ts) const;
 };
 
 struct Module {
+    auto add_func(Func f) -> FuncHandle {
+        auto sz = funcs.size();
+        funcs.push_back(f);
+
+        return {sz};
+    }
+
+    [[nodiscard]] auto get(FuncHandle h) const -> Func const* {
+        return &funcs.at(h.index());
+    }
+
+    [[nodiscard]] auto get_mut(FuncHandle h) -> Func* {
+        return &funcs.at(h.index());
+    }
+
     std::vector<Func> funcs;
 };
 
 }  // namespace yal::hlir
+
+template <>
+struct fmt::formatter<yal::hlir::FuncHandle> {
+    bool is_escaped = false;
+
+    constexpr auto parse(format_parse_context& ctx)
+        -> format_parse_context::iterator {
+        auto it = ctx.begin();
+        if (it != ctx.end()) {
+            if (*it == '#') {
+                is_escaped = true;
+                it++;
+            }
+        }
+
+        return it;
+    }
+
+    auto format(yal::hlir::FuncHandle n, format_context& ctx) const
+        -> format_context::iterator;
+};
 
 template <>
 struct fmt::formatter<yal::hlir::Value> {

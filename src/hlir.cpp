@@ -14,10 +14,19 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
 
     println(f, "{}: # {}", name, ts.fatten(type));
 
-    print(f, "[");
+    print(f, "locals: [");
     for (size_t i{}; auto const& l : locals) {
         if (i != 0) print(f, ", ");
         print(f, "({}, {:?}, {})", l.idx, l.name, ts.fatten(l.type));
+
+        i++;
+    }
+    println(f, "]");
+
+    print(f, "calls: [");
+    for (size_t i{}; auto const& l : calls) {
+        if (i != 0) print(f, ", ");
+        print(f, "{}", l.index());
 
         i++;
     }
@@ -38,11 +47,20 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                           ts.fatten(c.type));
                 } break;
 
+                case InstKind::Pop: {
+                    print(f, " {}", inst.a);
+                } break;
+
                 case InstKind::LoadLocal:
                 case InstKind::StoreLocal: {
                     auto l = locals.at(inst.a);
                     print(f, " {} ({:?}, {})", inst.a, l.name,
                           ts.fatten(l.type));
+                } break;
+
+                case InstKind::Call: {
+                    auto h = calls.at(inst.a);
+                    print(f, " {}", h);
                 } break;
 
                 case InstKind::Jump: {
@@ -67,6 +85,16 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
 
 }  // namespace yal::hlir
 
+auto fmt::formatter<yal::hlir::FuncHandle>::format(yal::hlir::FuncHandle n,
+                                                   format_context& ctx) const
+    -> format_context::iterator {
+    if (!is_escaped) fmt::format_to(ctx.out(), "{{");
+    auto it = fmt::format_to(ctx.out(), "{:x}", n.index());
+    if (!is_escaped) it = fmt::format_to(ctx.out(), "}}");
+
+    return it;
+}
+
 auto fmt::formatter<yal::hlir::Value>::format(yal::hlir::Value n,
                                               format_context&  ctx) const
     -> format_context::iterator {
@@ -80,6 +108,7 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
     switch (n) {
         case yal::hlir::InstKind::Err: name = "Err"; break;
         case yal::hlir::InstKind::Const: name = "Const"; break;
+        case yal::hlir::InstKind::Pop: name = "Pop"; break;
         case yal::hlir::InstKind::LoadLocal: name = "LoadLocal"; break;
         case yal::hlir::InstKind::StoreLocal: name = "StoreLocal"; break;
         case yal::hlir::InstKind::Add: name = "Add"; break;
@@ -89,6 +118,7 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Eq: name = "Eq"; break;
         case yal::hlir::InstKind::Neq: name = "Neq"; break;
         case yal::hlir::InstKind::Ret: name = "Ret"; break;
+        case yal::hlir::InstKind::Call: name = "Call"; break;
         case yal::hlir::InstKind::Jump: name = "Jump"; break;
         case yal::hlir::InstKind::Branch: name = "Branch"; break;
     }
