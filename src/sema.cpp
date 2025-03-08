@@ -232,7 +232,6 @@ struct SemaFunc {
             case NodeKind::IfStmt: {
                 auto p = ast->node_if_stmt(*node);
 
-                // FIXME: use booleans (inference and check)
                 auto cond =
                     sema_expr(env, {.expected = ts->get_type_bool()}, p.cond);
                 if (!ts->get(cond)->is_bool()) {
@@ -250,6 +249,37 @@ struct SemaFunc {
                 set_active_block(wt);
                 sema_stmt(env, p.when_true);
 
+                push_inst(node->span, hlir::InstKind::Jump, after);
+
+                set_active_block(after);
+
+                return ast->get_mut(n)->set_type(ts->get_type_void());
+            }
+
+            case NodeKind::IfStmtWithElse: {
+                auto p = ast->node_if_stmt(*node);
+
+                auto cond =
+                    sema_expr(env, {.expected = ts->get_type_bool()}, p.cond);
+                if (!ts->get(cond)->is_bool()) {
+                    er->report_error(
+                        ast->get(p.cond)->span,
+                        "expected boolean for if condition, got {}",
+                        ts->fatten(cond));
+                }
+
+                auto wt = allocate_block();
+                auto wf = allocate_block();
+                auto after = allocate_block();
+
+                push_inst(node->span, hlir::InstKind::Branch, wt, wf);
+
+                set_active_block(wt);
+                sema_stmt(env, p.when_true);
+                push_inst(node->span, hlir::InstKind::Jump, after);
+
+                set_active_block(wf);
+                sema_stmt(env, p.when_false);
                 push_inst(node->span, hlir::InstKind::Jump, after);
 
                 set_active_block(after);
@@ -292,12 +322,14 @@ struct SemaFunc {
         auto node = ast->get(n);
 
         switch (node->kind) {
-            case NodeKind::Equal: {
+            case NodeKind::Equal:
+            case NodeKind::NotEqual: {
                 auto p = ast->node_with_child_pair(*node);
 
                 auto kind = hlir::InstKind::Eq;
                 switch (node->kind) {
                     case NodeKind::Equal: kind = hlir::InstKind::Eq; break;
+                    case NodeKind::NotEqual: kind = hlir::InstKind::Neq; break;
                     default: __builtin_unreachable();
                 }
 
@@ -442,7 +474,7 @@ struct SemaFunc {
 
     auto push_inst(Span s, hlir::InstKind kind, uint8_t a = 0, uint8_t b = 0)
         -> size_t {
-        er->report_note(s, "push_inst({}, {}, {})", s, kind, a);
+        // er->report_note(s, "push_inst({}, {}, {})", s, kind, a);
 
         auto blk = current_block();
         auto sz = blk->code.size();
