@@ -26,7 +26,7 @@ func main() i32 {
 // calls: []
 // main: # func() i32
 // locals: []
-// calls: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+// calls: [0]
 // b 0:
 // 0000 | Const 0 (variant(72), i32)
 // 0001 | Call {0}

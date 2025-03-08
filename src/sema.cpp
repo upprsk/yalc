@@ -769,6 +769,9 @@ struct SemaFunc {
 
     // NOLINTNEXTLINE(modernize-use-nodiscard)
     auto push_inst_call(Span s, hlir::FuncHandle fn) const -> size_t {
+        auto idx = dedup_calls(fn);
+        if (idx >= 0) return push_inst(s, hlir::InstKind::Call, idx);
+
         auto sz = func->calls.size();
         if (sz == std::numeric_limits<uint8_t>::max())
             throw std::runtime_error{"too many calls in func"};
@@ -856,6 +859,16 @@ struct SemaFunc {
             throw std::runtime_error{"popping empty virtual stack"};
 
         stack_top--;
+    }
+
+    [[nodiscard]] constexpr auto dedup_calls(hlir::FuncHandle fn) const
+        -> ssize_t {
+        for (size_t i{}; auto const& h : func->calls) {
+            if (h == fn) return i;
+            i++;
+        }
+
+        return -1;
     }
 
     // ------------------------------------------------------------------------
