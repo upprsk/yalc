@@ -15,6 +15,8 @@ add_library(yal
     tokenizer.hpp
     types.cpp
     types.hpp
+    utils.cpp
+    utils.hpp
 )
 target_include_directories(yal PUBLIC .)
 target_compile_options(yal PRIVATE -Wall -Wextra)
