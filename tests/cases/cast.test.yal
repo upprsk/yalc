@@ -1,0 +1,43 @@
+func main() {
+    var a: usize = 10;
+    var b = 20;
+
+    var c = a + b as usize;
+    var d = a as i32 - b;
+
+    var e: i64 = b as i64 + 1;
+}
+
+func next(x: usize) usize {
+    return x + 1;
+}
+
+// OUTPUT:
+// File(void, [Func(func() void, Id({![1fffffff]}, main), [], Nil({![1fffffff]}), Block(void, [VarDecl(void, Id({![1fffffff]}, a), Id(type, usize), Int(usize, 10)), VarDecl(void, Id({![1fffffff]}, b), Nil({![1fffffff]}), Int(i32, 20)), VarDecl(void, Id({![1fffffff]}, c), Nil({![1fffffff]}), Add(usize, Id(usize, a), Cast(usize, Id(i32, b), Id(type, usize)))), VarDecl(void, Id({![1fffffff]}, d), Nil({![1fffffff]}), Sub(i32, Cast(i32, Id(usize, a), Id(type, i32)), Id(i32, b))), VarDecl(void, Id({![1fffffff]}, e), Id(type, i64), Add(i64, Cast(i64, Id(i32, b), Id(type, i64)), Int(i64, 1)))])), Func(func(usize) usize, Id({![1fffffff]}, next), [FuncArg(usize, x, Id(type, usize))], Id(type, usize), Block(void, [ReturnStmt(void, Add(usize, Id(usize, x), Int(usize, 1)))]))])
+// main: # func() void
+// locals: [(0, "a", usize), (1, "b", i32), (2, "c", usize), (3, "d", i32), (4, "e", i64)]
+// calls: []
+// b 0:
+// 0000 | Const 0 (variant(10), usize)
+// 0001 | Const 1 (variant(20), i32)
+// 0002 | LoadLocal 0 ("a", usize)
+// 0003 | LoadLocal 1 ("b", i32)
+// 0004 | Uext 8B
+// 0005 | Add
+// 0006 | LoadLocal 0 ("a", usize)
+// 0007 | Trunc 4B
+// 0008 | LoadLocal 1 ("b", i32)
+// 0009 | Sub
+// 0010 | LoadLocal 1 ("b", i32)
+// 0011 | Iext 8B
+// 0012 | Const 2 (variant(1), i64)
+// 0013 | Add
+// next: # func(usize) usize
+// locals: [(0, "x", usize)]
+// calls: []
+// b 0:
+// 0000 | LoadLocal 0 ("x", usize)
+// 0001 | Const 0 (variant(1), usize)
+// 0002 | Add
+// 0003 | Ret
+// 

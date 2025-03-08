@@ -204,13 +204,19 @@ struct SemaFunc {
                     return ast->get_mut(n)->set_type(ts->get_type_void());
                 }
 
+                TypeHandle anon;
                 if (!ast->get(p.type)->is_nil()) {
-                    er->report_bug(node->span,
-                                   "explicit typing of parameters has not been "
-                                   "implemented");
+                    anon = eval_to_type(env, p.type);
                 }
 
-                auto init = sema_expr(env, {}, p.init);
+                auto init = sema_expr(env, {.expected = anon}, p.init);
+
+                // FIXME: implement coercion
+                if (anon.is_valid() && init != anon) {
+                    er->report_bug(node->span,
+                                   "support for type coersion in variable "
+                                   "declarations has not been implemented");
+                }
 
                 auto name = ast->get(p.ids)->value_string();
                 env.declare(node->span, name, {.type = init}, DeclFlags::Local);
@@ -591,6 +597,51 @@ struct SemaFunc {
                 return ast->get_mut(n)->set_type(func.ret);
             }
 
+            case NodeKind::Cast: {
+                auto p = ast->node_with_child_pair(*node);
+
+                auto target_type = eval_to_type(env, p.second);
+                auto child = sema_expr(env, {.expected = target_type}, p.first);
+
+                if (target_type == child) return target_type;
+
+                if (!ts->get(target_type)->is_integral()) {
+                    er->report_error(
+                        node->span,
+                        "casting to non-integrals has not been implemented");
+                    return ast->get_mut(n)->set_type(target_type);
+                }
+
+                auto tt = ts->get(target_type);
+                auto tc = ts->get(child);
+
+                auto tt_sz = tt->size(*ts);
+                auto tc_sz = tc->size(*ts);
+
+                // handle when target is smaller than current. In this case we
+                // just truncate it.
+                // TODO: maybe there is something we need to do for signed?
+                if (tt_sz < tc_sz) {
+                    push_inst(node->span, hlir::InstKind::Trunc, tt_sz);
+                }
+
+                // handle when target is larger than current. In this case, we
+                // need to handle the difference in signedness
+                else if (tt_sz > tc_sz) {
+                    push_inst(node->span,
+                              tt->is_signed() ? hlir::InstKind::Iext
+                                              : hlir::InstKind::Uext,
+                              tt_sz);
+                }
+
+                // handle when target has the same size as current, there is
+                // nothing we need to do
+                else {
+                }
+
+                return ast->get_mut(n)->set_type(target_type);
+            }
+
             case NodeKind::Id: {
                 auto d = env.lookup(node->value_string());
                 if (!d) {
@@ -859,8 +910,26 @@ auto sema(Ast& ast, TypeStore& ts, NodeHandle root, ErrorReporter& er)
     auto s = Sema{.ast = &ast, .ts = &ts, .er = &er};
 
     Env env;
+    env.declare({}, "isize",
+                {.type = ts.get_type_type(), .value = ts.get_type_isize()});
+    env.declare({}, "usize",
+                {.type = ts.get_type_type(), .value = ts.get_type_usize()});
+    env.declare({}, "i64",
+                {.type = ts.get_type_type(), .value = ts.get_type_i64()});
+    env.declare({}, "u64",
+                {.type = ts.get_type_type(), .value = ts.get_type_u64()});
     env.declare({}, "i32",
                 {.type = ts.get_type_type(), .value = ts.get_type_i32()});
+    env.declare({}, "u32",
+                {.type = ts.get_type_type(), .value = ts.get_type_u32()});
+    env.declare({}, "i16",
+                {.type = ts.get_type_type(), .value = ts.get_type_i16()});
+    env.declare({}, "u16",
+                {.type = ts.get_type_type(), .value = ts.get_type_u16()});
+    env.declare({}, "i8",
+                {.type = ts.get_type_type(), .value = ts.get_type_i8()});
+    env.declare({}, "u8",
+                {.type = ts.get_type_type(), .value = ts.get_type_u8()});
 
     env.declare({}, "bool",
                 {.type = ts.get_type_type(), .value = ts.get_type_bool()});

@@ -58,6 +58,12 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                           ts.fatten(l.type));
                 } break;
 
+                case InstKind::Iext:
+                case InstKind::Uext:
+                case InstKind::Trunc: {
+                    print(f, " {}B", inst.a);
+                } break;
+
                 case InstKind::Call: {
                     auto h = calls.at(inst.a);
                     print(f, " {}", h);
@@ -122,6 +128,9 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Gt: name = "Gt"; break;
         case yal::hlir::InstKind::Gte: name = "Gte"; break;
         case yal::hlir::InstKind::LogicNot: name = "LogicNot"; break;
+        case yal::hlir::InstKind::Iext: name = "Iext"; break;
+        case yal::hlir::InstKind::Uext: name = "Uext"; break;
+        case yal::hlir::InstKind::Trunc: name = "Trunc"; break;
         case yal::hlir::InstKind::Ret: name = "Ret"; break;
         case yal::hlir::InstKind::Call: name = "Call"; break;
         case yal::hlir::InstKind::Jump: name = "Jump"; break;

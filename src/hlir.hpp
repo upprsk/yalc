@@ -69,6 +69,10 @@ enum class InstKind : uint8_t {
     Gte,
     LogicNot,
 
+    Iext,
+    Uext,
+    Trunc,
+
     Ret,
 
     // call the function with handle stored in `calls[a]`.
