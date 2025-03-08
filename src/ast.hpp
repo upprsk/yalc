@@ -613,6 +613,11 @@ struct Ast {
         return {.ast = this, .node = h};
     }
 
+    [[nodiscard]] constexpr auto fatten(NodeHandle h, TypeStore const& ts) const
+        -> FatNodeHandle {
+        return {.ast = this, .node = h, .ts = &ts};
+    }
+
     // get the total number of nodes
     [[nodiscard]] constexpr auto size() const -> size_t { return nodes.size(); }
 

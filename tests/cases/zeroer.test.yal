@@ -1,0 +1,23 @@
+func zeroer(x: i32) i32 {
+    if x == 0 { return x; }
+
+    return 0;
+}
+
+// OUTPUT:
+// zeroer: # func(i32) i32
+// locals: [(0, "x", i32)]
+// calls: []
+// b 0:
+// 0000 | LoadLocal 0 ("x", i32)
+// 0001 | Const 0 (variant(0), i32)
+// 0002 | Eq
+// 0003 | Branch b 1, 2
+// b 1:
+// 0000 | LoadLocal 0 ("x", i32)
+// 0001 | Ret
+// 0002 | Jump j 2
+// b 2:
+// 0000 | Const 0 (variant(0), i32)
+// 0001 | Ret
+// 
