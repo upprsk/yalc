@@ -239,6 +239,9 @@ struct SemaFunc {
                                          "with value of type {}",
                                          ts->fatten(d->value.type),
                                          ts->fatten(rhs));
+
+                        er->report_note(d->span, "declared here with type {}",
+                                        ts->fatten(d->value.type));
                     }
 
                     push_inst_store(node->span, *d);
