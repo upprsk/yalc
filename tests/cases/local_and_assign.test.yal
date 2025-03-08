@@ -1,0 +1,17 @@
+func test_01() {
+    var x = 0;
+    x = x + 1 * 2;
+}
+
+// OUTPUT:
+// test_01: # func() void
+// [(0, "x", i32)]
+// b 0:
+// 0000 | Const 0 (variant(0), i32)
+// 0001 | LoadLocal 0 ("x", i32)
+// 0002 | Const 1 (variant(1), i32)
+// 0003 | Const 2 (variant(2), i32)
+// 0004 | Mul
+// 0005 | Add
+// 0006 | StoreLocal 0 ("x", i32)
+// 

@@ -1,0 +1,31 @@
+func add(x: i32, y: i32) i32 {
+    return x + y;
+}
+
+func add_one(v: i32) i32 {
+    return v + 1;
+}
+
+func answer() i32 { return 42; }
+
+// OUTPUT:
+// add: # func(i32, i32) i32
+// [(0, "x", i32), (1, "y", i32)]
+// b 0:
+// 0000 | LoadLocal 0 ("x", i32)
+// 0001 | LoadLocal 1 ("y", i32)
+// 0002 | Add
+// 0003 | Ret
+// add_one: # func(i32) i32
+// [(0, "v", i32)]
+// b 0:
+// 0000 | LoadLocal 0 ("v", i32)
+// 0001 | Const 0 (variant(1), i32)
+// 0002 | Add
+// 0003 | Ret
+// answer: # func() i32
+// []
+// b 0:
+// 0000 | Const 0 (variant(42), i32)
+// 0001 | Ret
+// 

@@ -1,0 +1,10 @@
+func test_01() {}
+
+func test_02() {}
+
+// OUTPUT:
+// test_01: # func() void
+// []
+// test_02: # func() void
+// []
+// 

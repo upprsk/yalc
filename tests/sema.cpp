@@ -1,16 +1,26 @@
 #include "sema.hpp"
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 #include <cstdint>
+#include <cstdio>
+#include <filesystem>
+#include <ranges>
+#include <string>
+#include <string_view>
 
+#include "fmt/format.h"
+#include "fmt/ranges.h"
+#include "fmt/std.h"
 #include "hlir.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
 #include "types.hpp"
+#include "utils.hpp"
 
 using namespace yal;
 
@@ -410,6 +420,75 @@ TEST_CASE("function with ifs", "[sema]") {
         REQUIRE_THAT(b.consts, Equals(expected_consts));
         REQUIRE_THAT(b.code, Equals(expected_code));
         REQUIRE_THAT(b.spans, Equals(expected_spans));
+    }
+}
+
+TEST_CASE("files") {
+    std::filesystem::path p = "tests/cases";
+
+    auto                                   devnull = fopen("/dev/null", "w+");
+    std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
+                                             [](auto f) { fclose(f); }};
+
+    for (auto const& file : std::filesystem::directory_iterator{p}) {
+        if (!file.is_regular_file()) continue;
+
+        SECTION(file.path().string()) {
+            auto contents = read_entire_file(file.path());
+            REQUIRE(contents.has_value());
+
+            std::string_view src = *contents;
+
+            std::string_view skip_tag = "// SKIP:";
+            if (src.starts_with(skip_tag)) {
+                SKIP(src.substr(src.length(),
+                                src.find('\n') - skip_tag.length()));
+            }
+
+            std::string_view output_tag = "// OUTPUT:\n";
+            auto             it = src.find(output_tag);
+            REQUIRE(it != std::string::npos);
+
+            namespace sv = std::ranges::views;
+
+            auto expected_output =
+                src.substr(it + output_tag.length()) | sv::split('\n') |
+                sv::transform([](auto it) { return std::string_view(it); }) |
+                sv::filter([](auto it) { return it.starts_with("// "); }) |
+                sv::transform([](auto it) { return it.substr(3); }) |
+                sv::join_with('\n') | std::ranges::to<std::string>();
+
+            auto er = ErrorReporter{*contents, file.path().string(), devnull};
+            auto tokens = tokenize(src, er);
+            REQUIRE_FALSE(er.had_error());
+
+            auto [ast, root] = parse(tokens, src, er);
+            REQUIRE_FALSE(er.had_error());
+
+            auto ts = TypeStore::new_store();
+            auto m = sema(ast, ts, root, er);
+
+            REQUIRE_FALSE(er.had_error());
+
+            char*  buf{};
+            size_t sizeloc{};
+            auto   memstream = open_memstream(&buf, &sizeloc);
+            std::unique_ptr<FILE, void (*)(FILE*)> _{memstream,
+                                                     [](auto f) { fclose(f); }};
+
+            std::unique_ptr<char, void (*)(char*)> __{buf,
+                                                      [](auto b) { free(b); }};
+
+            for (auto const& f : m.funcs) {
+                f.disasm(memstream, ts);
+            }
+
+            // close memstream
+            _ = nullptr;
+
+            std::string_view ms{buf, sizeloc};
+            REQUIRE(ms == expected_output);
+        }
     }
 }
 

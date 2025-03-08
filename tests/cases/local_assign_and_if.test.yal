@@ -1,0 +1,24 @@
+func test_01() {
+    var x = 70;
+    if 1 == 1 {
+        x = x - 1;
+    }
+}
+
+// OUTPUT:
+// test_01: # func() void
+// [(0, "x", i32)]
+// b 0:
+// 0000 | Const 0 (variant(70), i32)
+// 0001 | Const 1 (variant(1), i32)
+// 0002 | Const 2 (variant(1), i32)
+// 0003 | Eq
+// 0004 | Branch b 1, 2
+// b 1:
+// 0000 | LoadLocal 0 ("x", i32)
+// 0001 | Const 0 (variant(1), i32)
+// 0002 | Sub
+// 0003 | StoreLocal 0 ("x", i32)
+// 0004 | Jump j 2
+// b 2:
+// 
