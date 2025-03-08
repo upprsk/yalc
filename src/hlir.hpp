@@ -63,6 +63,11 @@ enum class InstKind : uint8_t {
     Div,
     Eq,
     Neq,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    LogicNot,
 
     Ret,
 

@@ -117,6 +117,11 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Div: name = "Div"; break;
         case yal::hlir::InstKind::Eq: name = "Eq"; break;
         case yal::hlir::InstKind::Neq: name = "Neq"; break;
+        case yal::hlir::InstKind::Lt: name = "Lt"; break;
+        case yal::hlir::InstKind::Lte: name = "Lte"; break;
+        case yal::hlir::InstKind::Gt: name = "Gt"; break;
+        case yal::hlir::InstKind::Gte: name = "Gte"; break;
+        case yal::hlir::InstKind::LogicNot: name = "LogicNot"; break;
         case yal::hlir::InstKind::Ret: name = "Ret"; break;
         case yal::hlir::InstKind::Call: name = "Call"; break;
         case yal::hlir::InstKind::Jump: name = "Jump"; break;

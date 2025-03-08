@@ -169,6 +169,7 @@ struct SemaFunc {
         return ast->get_mut(n)->set_type(ts->get_type_void());
     }
 
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto sema_stmt(Env& env, NodeHandle n) -> TypeHandle {
         auto node = ast->get(n);
 
@@ -346,18 +347,31 @@ struct SemaFunc {
         }
     }
 
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto sema_expr(Env& env, Context ctx, NodeHandle n) -> TypeHandle {
         auto node = ast->get(n);
 
         switch (node->kind) {
             case NodeKind::Equal:
-            case NodeKind::NotEqual: {
+            case NodeKind::NotEqual:
+            case NodeKind::Smaller:
+            case NodeKind::SmallerEqual:
+            case NodeKind::Greater:
+            case NodeKind::GreaterEqual: {
                 auto p = ast->node_with_child_pair(*node);
 
                 auto kind = hlir::InstKind::Eq;
                 switch (node->kind) {
                     case NodeKind::Equal: kind = hlir::InstKind::Eq; break;
                     case NodeKind::NotEqual: kind = hlir::InstKind::Neq; break;
+                    case NodeKind::Smaller: kind = hlir::InstKind::Lt; break;
+                    case NodeKind::SmallerEqual:
+                        kind = hlir::InstKind::Lte;
+                        break;
+                    case NodeKind::Greater: kind = hlir::InstKind::Gt; break;
+                    case NodeKind::GreaterEqual:
+                        kind = hlir::InstKind::Gte;
+                        break;
                     default: __builtin_unreachable();
                 }
 
@@ -369,6 +383,31 @@ struct SemaFunc {
                     lhs != rhs) {
                     er->report_error(node->span, "type mismatch: {} and {}",
                                      ts->fatten(lhs), ts->fatten(rhs));
+                }
+
+                push_inst(node->span, kind);
+                return ast->get_mut(n)->set_type(ts->get_type_bool());
+            }
+
+            case NodeKind::LogicNot: {
+                auto p = ast->node_with_child(*node);
+
+                auto kind = hlir::InstKind::LogicNot;
+                switch (node->kind) {
+                    case NodeKind::LogicNot:
+                        kind = hlir::InstKind::LogicNot;
+                        break;
+                    default: __builtin_unreachable();
+                }
+
+                auto child = sema_expr(env, ctx, p.child);
+
+                // FIXME: allow negating things other than integers
+                if (!ts->get(child)->is_err() && !ts->get(child)->is_bool()) {
+                    er->report_error(
+                        node->span,
+                        "can't use {} operation on non-boolean type: {}", kind,
+                        ts->fatten(child));
                 }
 
                 push_inst(node->span, kind);
@@ -621,8 +660,9 @@ struct SemaFunc {
 
     // ------------------------------------------------------------------------
 
-    auto push_inst(Span s, hlir::InstKind kind, uint8_t a = 0, uint8_t b = 0)
-        -> size_t {
+    // NOLINTNEXTLINE(modernize-use-nodiscard)
+    auto push_inst(Span s, hlir::InstKind kind, uint8_t a = 0,
+                   uint8_t b = 0) const -> size_t {
         // er->report_note(s, "push_inst({}, {}, {})", s, kind, a);
 
         auto blk = current_block();
@@ -634,7 +674,8 @@ struct SemaFunc {
         return sz;
     }
 
-    auto push_inst_const(Span s, hlir::Value v) -> size_t {
+    // NOLINTNEXTLINE(modernize-use-nodiscard)
+    auto push_inst_const(Span s, hlir::Value v) const -> size_t {
         auto blk = current_block();
         auto sz = blk->consts.size();
         if (sz == std::numeric_limits<uint8_t>::max())
@@ -644,7 +685,8 @@ struct SemaFunc {
         return push_inst(s, hlir::InstKind::Const, sz);
     }
 
-    auto push_inst_call(Span s, hlir::FuncHandle fn) -> size_t {
+    // NOLINTNEXTLINE(modernize-use-nodiscard)
+    auto push_inst_call(Span s, hlir::FuncHandle fn) const -> size_t {
         auto sz = func->calls.size();
         if (sz == std::numeric_limits<uint8_t>::max())
             throw std::runtime_error{"too many calls in func"};
@@ -653,7 +695,8 @@ struct SemaFunc {
         return push_inst(s, hlir::InstKind::Call, sz);
     }
 
-    void push_inst_load(Span s, Decl const& decl) {
+    // NOLINTNEXTLINE(modernize-use-nodiscard)
+    auto push_inst_load(Span s, Decl const& decl) const -> size_t {
         if (decl.is_local()) {
             auto [loc, off] = lookup_local(decl.name);
             if (!loc)
@@ -662,14 +705,12 @@ struct SemaFunc {
                                 "found in locals",
                                 decl.name)};
 
-            push_inst(s, hlir::InstKind::LoadLocal, off);
-            return;
+            return push_inst(s, hlir::InstKind::LoadLocal, off);
         }
 
         // this is a value that we can inline (without doing an actual load)
         if (decl.is_builtin()) {
-            push_inst_const(s, decl.value);
-            return;
+            return push_inst_const(s, decl.value);
         }
 
         throw std::runtime_error{fmt::format(
@@ -677,7 +718,8 @@ struct SemaFunc {
             decl.name)};
     }
 
-    void push_inst_store(Span s, Decl const& decl) {
+    // NOLINTNEXTLINE(modernize-use-nodiscard)
+    auto push_inst_store(Span s, Decl const& decl) const -> size_t {
         if (decl.is_local()) {
             auto [loc, off] = lookup_local(decl.name);
             if (!loc)
@@ -686,8 +728,7 @@ struct SemaFunc {
                                 "found in locals",
                                 decl.name)};
 
-            push_inst(s, hlir::InstKind::StoreLocal, off);
-            return;
+            return push_inst(s, hlir::InstKind::StoreLocal, off);
         }
 
         throw std::runtime_error{fmt::format(
@@ -695,7 +736,7 @@ struct SemaFunc {
             decl.name)};
     }
 
-    auto current_block() const -> hlir::Block* {
+    [[nodiscard]] auto current_block() const -> hlir::Block* {
         // make sure we have at least one block
         if (func->blocks.size() == 0) func->blocks.push_back({});
 
