@@ -1,6 +1,7 @@
 #include "hlir.hpp"
 
 #include <cstddef>
+#include <ranges>
 
 #include "fmt/ranges.h"
 #include "fmt/std.h"
@@ -12,6 +13,15 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
     using fmt::println;
 
     println(f, "{}: # {}", name, ts.fatten(type));
+
+    print(f, "[");
+    for (size_t i{}; auto const& l : locals) {
+        if (i != 0) print(f, ", ");
+        print(f, "({}, {:?}, {})", l.idx, l.name, ts.fatten(l.type));
+
+        i++;
+    }
+    println(f, "]");
 
     size_t i{};
     for (auto const& blk : blocks) {
