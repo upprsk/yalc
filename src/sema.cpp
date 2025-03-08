@@ -664,6 +664,9 @@ auto sema(Ast& ast, TypeStore& ts, NodeHandle root, ErrorReporter& er)
     env.declare("i32",
                 {.type = ts.get_type_type(), .value = ts.get_type_i32()});
 
+    env.declare("bool",
+                {.type = ts.get_type_type(), .value = ts.get_type_bool()});
+
     env.declare("false", {.type = ts.get_type_bool(), .value = uint64_t{0}},
                 DeclFlags::Builtin);
     env.declare("true", {.type = ts.get_type_bool(), .value = uint64_t{1}},
