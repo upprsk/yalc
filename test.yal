@@ -1,12 +1,20 @@
 extern func putchar(c: i32);
 
 func main() i32 {
-    putchar(0x48);
-    putchar(0x65);
-    putchar(0x6C);
-    putchar(0x6C);
-    putchar(0x6F);
-    putchar(0x0A);
+    putchar(0x48); // H
+    putchar(0x65); // e
+    putchar(0x6C); // l
+    putchar(0x6C); // l
+    putchar(0x6F); // o
+    putchar(0x2C); // ,
+    putchar(0x20); // 
+    putchar(0x57); // W
+    putchar(0x6F); // o
+    putchar(0x72); // r
+    putchar(0x6C); // l
+    putchar(0x64); // d
+    putchar(0x21); // !
+    putchar(0x0A); // \n
 
     return 0;
 }

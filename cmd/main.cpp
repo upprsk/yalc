@@ -36,13 +36,12 @@ auto main(int argc, char** argv) -> int {
         auto ts = yal::TypeStore::new_store();
         auto m = yal::sema(ast, ts, root, er);
 
-        // fmt::println(stderr, "{}",
-        //              yal::FatNodeHandle{.ast = &ast, .node = root, .ts =
-        //              &ts});
+        fmt::println(stderr, "{}",
+                     yal::FatNodeHandle{.ast = &ast, .node = root, .ts =
+                     &ts});
 
         for (auto const& func : m.funcs) {
             func.disasm(stderr, ts);
-            fmt::println(stderr, "");
         }
 
         yal::codegen::qbe::codegen(m, ts, er, stdout);
