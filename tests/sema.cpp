@@ -13,6 +13,7 @@
 #include <string>
 #include <string_view>
 
+#include "catch2/catch_message.hpp"
 #include "fmt/format.h"
 #include "fmt/ranges.h"
 #include "fmt/std.h"
@@ -446,6 +447,8 @@ TEST_CASE("files") {
         if (!file.is_regular_file()) continue;
 
         SECTION(file.path().string()) {
+            INFO("in file: " << file.path().string());
+
             auto contents = read_entire_file(file.path());
             REQUIRE(contents.has_value());
 

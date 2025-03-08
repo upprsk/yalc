@@ -9,7 +9,8 @@ func test_01() {
 
 // OUTPUT:
 // test_01: # func() void
-// [(0, "x", i32)]
+// locals: [(0, "x", i32)]
+// calls: []
 // b 0:
 // 0000 | Const 0 (variant(70), i32)
 // 0001 | Const 1 (variant(1), i32)

@@ -1,0 +1,15 @@
+func a() {}
+
+func b() { a(); }
+
+// OUTPUT:
+// a: # func() void
+// locals: []
+// calls: []
+// b: # func() void
+// locals: []
+// calls: [0]
+// b 0:
+// 0000 | Call {0}
+// 0001 | Pop 1
+// 

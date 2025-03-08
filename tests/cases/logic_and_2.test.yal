@@ -6,7 +6,8 @@ func test_and(a: i32, b: i32, check: bool) bool {
 
 // OUTPUT:
 // test_and: # func(i32, i32, bool) bool
-// [(0, "a", i32), (1, "b", i32), (2, "check", bool)]
+// locals: [(0, "a", i32), (1, "b", i32), (2, "check", bool)]
+// calls: []
 // b 0:
 // 0000 | LoadLocal 0 ("a", i32)
 // 0001 | Const 0 (variant(1), i32)

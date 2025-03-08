@@ -4,7 +4,9 @@ func test_02() {}
 
 // OUTPUT:
 // test_01: # func() void
-// []
+// locals: []
+// calls: []
 // test_02: # func() void
-// []
+// locals: []
+// calls: []
 // 

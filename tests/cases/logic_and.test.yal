@@ -4,7 +4,8 @@ func test_and(a: i32, b: i32) bool {
 
 // OUTPUT:
 // test_and: # func(i32, i32) bool
-// [(0, "a", i32), (1, "b", i32)]
+// locals: [(0, "a", i32), (1, "b", i32)]
+// calls: []
 // b 0:
 // 0000 | LoadLocal 0 ("a", i32)
 // 0001 | Const 0 (variant(0), i32)
