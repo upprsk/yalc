@@ -9,6 +9,7 @@ func process(a: i32, b: i32) i32 {
 }
 
 // OUTPUT:
+// File(void, [Func(func(i32, i32) i32, Id({![1fffffff]}, process), [FuncArg(i32, a, Id(type, i32)), FuncArg(i32, b, Id(type, i32))], Id(type, i32), Block(void, [IfStmtWithElse(void, LogicAnd(bool, NotEqual(bool, Id(i32, a), Int(i32, 0)), NotEqual(bool, Id(i32, a), Id(i32, b))), Block(void, [Assign(void, Id({![1fffffff]}, b), Mul(i32, Id(i32, b), Int(i32, 2)))]), Block(void, [Assign(void, Id({![1fffffff]}, b), Div(i32, Int(i32, 10), Id(i32, a)))])), ReturnStmt(void, Id(i32, b))]))])
 // process: # func(i32, i32) i32
 // locals: [(0, "a", i32), (1, "b", i32)]
 // calls: []

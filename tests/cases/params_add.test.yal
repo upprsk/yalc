@@ -9,6 +9,7 @@ func add_one(v: i32) i32 {
 func answer() i32 { return 42; }
 
 // OUTPUT:
+// File(void, [Func(func(i32, i32) i32, Id({![1fffffff]}, add), [FuncArg(i32, x, Id(type, i32)), FuncArg(i32, y, Id(type, i32))], Id(type, i32), Block(void, [ReturnStmt(void, Add(i32, Id(i32, x), Id(i32, y)))])), Func(func(i32) i32, Id({![1fffffff]}, add_one), [FuncArg(i32, v, Id(type, i32))], Id(type, i32), Block(void, [ReturnStmt(void, Add(i32, Id(i32, v), Int(i32, 1)))])), Func(func() i32, Id({![1fffffff]}, answer), [], Id(type, i32), Block(void, [ReturnStmt(void, Int(i32, 42))]))])
 // add: # func(i32, i32) i32
 // locals: [(0, "x", i32), (1, "y", i32)]
 // calls: []

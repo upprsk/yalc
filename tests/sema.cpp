@@ -494,6 +494,8 @@ TEST_CASE("files") {
             std::unique_ptr<char, void (*)(char*)> __{buf,
                                                       [](auto b) { free(b); }};
 
+            fmt::println(memstream, "{}", ast.fatten(root, ts));
+
             for (auto const& f : m.funcs) {
                 f.disasm(memstream, ts);
             }

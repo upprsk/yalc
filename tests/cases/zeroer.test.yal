@@ -5,6 +5,7 @@ func zeroer(x: i32) i32 {
 }
 
 // OUTPUT:
+// File(void, [Func(func(i32) i32, Id({![1fffffff]}, zeroer), [FuncArg(i32, x, Id(type, i32))], Id(type, i32), Block(void, [IfStmt(void, Equal(bool, Id(i32, x), Int(i32, 0)), Block(void, [ReturnStmt(void, Id(i32, x))])), ReturnStmt(void, Int(i32, 0))]))])
 // zeroer: # func(i32) i32
 // locals: [(0, "x", i32)]
 // calls: []

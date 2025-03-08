@@ -3,6 +3,7 @@ func test_01() {}
 func test_02() {}
 
 // OUTPUT:
+// File(void, [Func(func() void, Id({![1fffffff]}, test_01), [], Nil({![1fffffff]}), Block(void, [])), Func(func() void, Id({![1fffffff]}, test_02), [], Nil({![1fffffff]}), Block(void, []))])
 // test_01: # func() void
 // locals: []
 // calls: []

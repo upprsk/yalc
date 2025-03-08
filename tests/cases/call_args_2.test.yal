@@ -12,6 +12,7 @@ func main() {
 }
 
 // OUTPUT:
+// File(void, [Func(func(i32, i32) i32, Id({![1fffffff]}, add), [FuncArg(i32, x, Id(type, i32)), FuncArg(i32, y, Id(type, i32))], Id(type, i32), Block(void, [ReturnStmt(void, Add(i32, Id(i32, x), Id(i32, y)))])), Func(func(i32, i32) i32, Id({![1fffffff]}, sub), [FuncArg(i32, x, Id(type, i32)), FuncArg(i32, y, Id(type, i32))], Id(type, i32), Block(void, [ReturnStmt(void, Sub(i32, Id(i32, x), Id(i32, y)))])), Func(func() void, Id({![1fffffff]}, main), [], Nil({![1fffffff]}), Block(void, [VarDecl(void, Id({![1fffffff]}, x), Nil({![1fffffff]}), Call(i32, Id(func(i32, i32) i32, add), [Int(i32, 12), Int(i32, 2)])), VarDecl(void, Id({![1fffffff]}, y), Nil({![1fffffff]}), Call(i32, Id(func(i32, i32) i32, sub), [Call(i32, Id(func(i32, i32) i32, add), [Id(i32, x), Id(i32, x)]), Int(i32, 10)]))]))])
 // add: # func(i32, i32) i32
 // locals: [(0, "x", i32), (1, "y", i32)]
 // calls: []

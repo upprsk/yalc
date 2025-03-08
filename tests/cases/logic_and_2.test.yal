@@ -5,6 +5,7 @@ func test_and(a: i32, b: i32, check: bool) bool {
 }
 
 // OUTPUT:
+// File(void, [Func(func(i32, i32, bool) bool, Id({![1fffffff]}, test_and), [FuncArg(i32, a, Id(type, i32)), FuncArg(i32, b, Id(type, i32)), FuncArg(bool, check, Id(type, bool))], Id(type, bool), Block(void, [ReturnStmt(void, LogicAnd(bool, LogicAnd(bool, Equal(bool, Id(i32, a), Add(i32, Int(i32, 1), Int(i32, 2))), NotEqual(bool, Equal(bool, Add(i32, Id(i32, b), Int(i32, 12)), Neg(i32, Int(i32, 55))), Id(bool, false))), Equal(bool, Id(bool, check), Id(bool, true))))]))])
 // test_and: # func(i32, i32, bool) bool
 // locals: [(0, "a", i32), (1, "b", i32), (2, "check", bool)]
 // calls: []

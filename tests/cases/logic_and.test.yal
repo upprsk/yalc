@@ -3,6 +3,7 @@ func test_and(a: i32, b: i32) bool {
 }
 
 // OUTPUT:
+// File(void, [Func(func(i32, i32) bool, Id({![1fffffff]}, test_and), [FuncArg(i32, a, Id(type, i32)), FuncArg(i32, b, Id(type, i32))], Id(type, bool), Block(void, [ReturnStmt(void, LogicAnd(bool, Equal(bool, Id(i32, a), Int(i32, 0)), NotEqual(bool, Id(i32, b), Id(i32, a))))]))])
 // test_and: # func(i32, i32) bool
 // locals: [(0, "a", i32), (1, "b", i32)]
 // calls: []

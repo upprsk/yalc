@@ -3,6 +3,7 @@ func a() {}
 func b() { a(); }
 
 // OUTPUT:
+// File(void, [Func(func() void, Id({![1fffffff]}, a), [], Nil({![1fffffff]}), Block(void, [])), Func(func() void, Id({![1fffffff]}, b), [], Nil({![1fffffff]}), Block(void, [ExprStmt(void, Call(void, Id(func() void, a), []))]))])
 // a: # func() void
 // locals: []
 // calls: []

@@ -7,6 +7,7 @@ func add_twice(x: i32, y: i32) i32 {
 }
 
 // OUTPUT:
+// File(void, [Func(func(i32, i32) i32, Id({![1fffffff]}, add), [FuncArg(i32, x, Id(type, i32)), FuncArg(i32, y, Id(type, i32))], Id(type, i32), Block(void, [ReturnStmt(void, Add(i32, Id(i32, x), Id(i32, y)))])), Func(func(i32, i32) i32, Id({![1fffffff]}, add_twice), [FuncArg(i32, x, Id(type, i32)), FuncArg(i32, y, Id(type, i32))], Id(type, i32), Block(void, [ReturnStmt(void, Call(i32, Id(func(i32, i32) i32, add), [Call(i32, Id(func(i32, i32) i32, add), [Id(i32, x), Id(i32, y)]), Call(i32, Id(func(i32, i32) i32, add), [Id(i32, x), Id(i32, y)])]))]))])
 // add: # func(i32, i32) i32
 // locals: [(0, "x", i32), (1, "y", i32)]
 // calls: []

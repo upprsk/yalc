@@ -4,6 +4,7 @@ func test_01() {
 }
 
 // OUTPUT:
+// File(void, [Func(func() void, Id({![1fffffff]}, test_01), [], Nil({![1fffffff]}), Block(void, [VarDecl(void, Id({![1fffffff]}, x), Nil({![1fffffff]}), Int(i32, 0)), Assign(void, Id({![1fffffff]}, x), Add(i32, Id(i32, x), Mul(i32, Int(i32, 1), Int(i32, 2))))]))])
 // test_01: # func() void
 // locals: [(0, "x", i32)]
 // calls: []
