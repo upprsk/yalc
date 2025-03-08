@@ -1,0 +1,43 @@
+func add(x: i32, y: i32) i32 {
+    return x + y;
+}
+
+func sub(x: i32, y: i32) i32 {
+    return x - y;
+}
+
+func main() {
+    var x = add(12, 2);
+    var y = sub(add(x, x), 10);
+}
+
+// OUTPUT:
+// add: # func(i32, i32) i32
+// locals: [(0, "x", i32), (1, "y", i32)]
+// calls: []
+// b 0:
+// 0000 | LoadLocal 0 ("x", i32)
+// 0001 | LoadLocal 1 ("y", i32)
+// 0002 | Add
+// 0003 | Ret
+// sub: # func(i32, i32) i32
+// locals: [(0, "x", i32), (1, "y", i32)]
+// calls: []
+// b 0:
+// 0000 | LoadLocal 0 ("x", i32)
+// 0001 | LoadLocal 1 ("y", i32)
+// 0002 | Sub
+// 0003 | Ret
+// main: # func() void
+// locals: [(0, "x", i32), (1, "y", i32)]
+// calls: [0, 0, 1]
+// b 0:
+// 0000 | Const 0 (variant(12), i32)
+// 0001 | Const 1 (variant(2), i32)
+// 0002 | Call {0}
+// 0003 | LoadLocal 0 ("x", i32)
+// 0004 | LoadLocal 0 ("x", i32)
+// 0005 | Call {0}
+// 0006 | Const 2 (variant(10), i32)
+// 0007 | Call {1}
+// 
