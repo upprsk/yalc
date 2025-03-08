@@ -548,7 +548,7 @@ void Ast::dump_dot_node(FILE* f, NodeHandle n, TypeStore const* ts) const {
 
     if (n.is_valid()) {
         auto node = get(n);
-        print(f, R"~~(label = "<f0> {} | {})~~", n.as_raw_idx(), node->kind);
+        print(f, R"~~(label = "<f0> {:#} | {})~~", n, node->kind);
         if (ts) {
             print(f, R"~~( | {})~~", ts->fatten(node->type));
         }
