@@ -384,6 +384,37 @@ struct SemaFunc {
                 return ast->get_mut(n)->set_type(lhs);
             }
 
+            case NodeKind::LogicAnd: {
+                auto p = ast->node_with_child_pair(*node);
+
+                // logical and has short-circuiting:
+                // only check rhs in case lhs is true
+
+                auto lhs = sema_expr(env, ctx, p.first);
+
+                auto wt = allocate_block();
+                auto after = allocate_block();
+                push_inst(node->span, hlir::InstKind::Branch, wt, after);
+
+                set_active_block(wt);
+                auto rhs = sema_expr(env, ctx, p.second);
+
+                push_inst(node->span, hlir::InstKind::Jump, after);
+                set_active_block(after);
+
+                // FIXME: type coersion
+                if ((!ts->get(lhs)->is_err() && !ts->get(rhs)->is_err()) &&
+                    lhs != rhs && !ts->get(lhs)->is_bool()) {
+                    er->report_error(node->span,
+                                     "type mismatch: expected booleans in {}, "
+                                     "but got {} and {}",
+                                     node->kind, ts->fatten(lhs),
+                                     ts->fatten(rhs));
+                }
+
+                return ast->get_mut(n)->set_type(ts->get_type_bool());
+            }
+
             case NodeKind::Neg: {
                 auto p = ast->node_with_child(*node);
 
@@ -551,6 +582,9 @@ struct SemaFunc {
     }
 
     [[nodiscard]] auto allocate_block() -> size_t {
+        // make sure we have at least one block
+        if (func.blocks.size() == 0) func.blocks.push_back({});
+
         auto sz = func.blocks.size();
         func.blocks.push_back({});
         return sz;
