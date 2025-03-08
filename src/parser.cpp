@@ -940,6 +940,9 @@ struct Parser {
                 s.erase(std::remove(s.begin(), s.end(), '_'), s.end());
             }
 
+            // remove the `0x` prefix
+            s = s.substr(2);
+
             // NOTE: ignoring errors
             auto [ptr, ec] =
                 std::from_chars(s.data(), s.data() + s.length(), value, 16);
