@@ -433,10 +433,6 @@ struct TypeStore {
         return sizeof(uintptr_t);
     }
 
-    // given a target type and an rhs to be coerced.
-    [[nodiscard]] auto coerce_to(Span span, TypeHandle target, TypeHandle rhs,
-                                 ErrorReporter& er) -> TypeHandle;
-
     auto dump(fmt::format_context& ctx, TypeHandle n) const
         -> fmt::format_context::iterator;
 
