@@ -605,15 +605,33 @@ struct SemaFunc {
 
                 if (target_type == child) return target_type;
 
-                if (!ts->get(target_type)->is_integral()) {
+                auto tt = ts->get(target_type);
+                auto tc = ts->get(child);
+
+                if (tt->is_integral()) {
+                    if (!(tc->is_integral() || tc->is_bool())) {
+                        er->report_error(node->span,
+                                         "casting of non-primitives has not "
+                                         "been implemented");
+                        return ast->get_mut(n)->set_type(target_type);
+                    }
+                }
+
+                else if (tt->is_bool()) {
+                    if (!(tc->is_integral() || tc->is_bool())) {
+                        er->report_error(node->span,
+                                         "casting of non-primitives has not "
+                                         "been implemented");
+                        return ast->get_mut(n)->set_type(target_type);
+                    }
+                }
+
+                else {
                     er->report_error(
                         node->span,
                         "casting to non-integrals has not been implemented");
                     return ast->get_mut(n)->set_type(target_type);
                 }
-
-                auto tt = ts->get(target_type);
-                auto tc = ts->get(child);
 
                 auto tt_sz = tt->size(*ts);
                 auto tc_sz = tc->size(*ts);
@@ -622,7 +640,14 @@ struct SemaFunc {
                 // just truncate it.
                 // TODO: maybe there is something we need to do for signed?
                 if (tt_sz < tc_sz) {
-                    push_inst(node->span, hlir::InstKind::Trunc, tt_sz);
+                    if (tt->is_bool()) {
+                        // casting to a boolean is translated to nots, so that
+                        // whatever was the input becomes 0 or 1
+                        push_inst(node->span, hlir::InstKind::LogicNot);
+                        push_inst(node->span, hlir::InstKind::LogicNot);
+                    } else {
+                        push_inst(node->span, hlir::InstKind::Trunc, tt_sz);
+                    }
                 }
 
                 // handle when target is larger than current. In this case, we

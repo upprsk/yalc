@@ -1,0 +1,17 @@
+func main() {
+    var a = true as i32;
+    var b = 0 as bool;
+}
+
+// OUTPUT:
+// File(void, [Func(func() void, Id({![1fffffff]}, main), [], Nil({![1fffffff]}), Block(void, [VarDecl(void, Id({![1fffffff]}, a), Nil({![1fffffff]}), Cast(i32, Id(bool, true), Id(type, i32))), VarDecl(void, Id({![1fffffff]}, b), Nil({![1fffffff]}), Cast(bool, Int(i32, 0), Id(type, bool)))]))])
+// main: # func() void
+// locals: [(0, "a", i32), (1, "b", bool)]
+// calls: []
+// b 0:
+// 0000 | Const 0 (variant(1), bool)
+// 0001 | Iext 4B
+// 0002 | Const 1 (variant(0), i32)
+// 0003 | LogicNot
+// 0004 | LogicNot
+// 
