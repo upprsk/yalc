@@ -39,6 +39,7 @@ enum class InstKind : uint8_t {
     Mul,
     Div,
     Eq,
+    Neq,
 
     Ret,
 
