@@ -1,6 +1,7 @@
 #include <memory>
 #include <optional>
 
+#include "codegen_qbe.hpp"
 #include "cpptrace/from_current.hpp"
 #include "error_reporter.hpp"
 #include "fmt/base.h"
@@ -29,30 +30,22 @@ auto main(int argc, char** argv) -> int {
         auto tokens = yal::tokenize(*contents, er);
         auto [ast, root] = yal::parse(tokens, *contents, er);
 
-        fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
+        // fmt::println(stderr, "{}",
+        //              yal::FatNodeHandle{.ast = &ast, .node = root});
 
         auto ts = yal::TypeStore::new_store();
         auto m = yal::sema(ast, ts, root, er);
 
-        fmt::println("{}",
-                     yal::FatNodeHandle{.ast = &ast, .node = root, .ts = &ts});
+        // fmt::println(stderr, "{}",
+        //              yal::FatNodeHandle{.ast = &ast, .node = root, .ts =
+        //              &ts});
 
-        for (auto const& func : m.funcs) {
-            func.disasm(stdout, ts);
-            fmt::println(stdout, "");
-        }
+        // for (auto const& func : m.funcs) {
+        //     func.disasm(stderr, ts);
+        //     fmt::println(stderr, "");
+        // }
 
-        {
-            auto                                   dotgraph = "ast.gv";
-            std::unique_ptr<FILE, void (*)(FILE*)> f = {
-                fopen(dotgraph, "wb"), [](auto f) { fclose(f); }};
-            if (!f) {
-                fmt::println(stderr, "failed to open: {}", dotgraph);
-                return 1;
-            }
-
-            ast.dump_dot(f.get(), root, &ts);
-        }
+        yal::codegen::qbe::codegen(m, ts, er, stdout);
 
         return er.had_error() ? 1 : 0;
     }

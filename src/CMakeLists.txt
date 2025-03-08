@@ -1,6 +1,8 @@
 add_library(yal
     ast.cpp
     ast.hpp
+    codegen_qbe.cpp
+    codegen_qbe.hpp
     error_reporter.cpp
     error_reporter.hpp
     hlir.cpp
