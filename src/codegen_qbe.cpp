@@ -1,6 +1,7 @@
 #include "codegen_qbe.hpp"
 
 #include <cstdint>
+#include <string_view>
 
 #include "error_reporter.hpp"
 #include "fmt/base.h"
@@ -23,17 +24,9 @@ struct CodegenFunc {
             return;
         }
 
-        std::string_view ret_type = "w";
-        switch (ts->get(ft.ret)->size(*ts)) {
-            case 1: ret_type = "b"; break;
-            case 2: ret_type = "h"; break;
-            case 4: ret_type = "w"; break;
-            case 8: ret_type = "l"; break;
-            default: throw std::runtime_error{"invalid size for return type"};
-        }
-
         // TODO: function arguments
-        println(out, "export function {} ${}() {{", ret_type, func.name);
+        println(out, "export function {} ${}() {{",
+                qbe_type_for_primitive(ft.ret), func.name);
         println(out, "@start");
 
         for (size_t blk_idx{}; auto const& blk : func.blocks) {
@@ -104,6 +97,23 @@ struct CodegenFunc {
         }
 
         println(out, "}} # end of {}", func.name);
+    }
+
+    // ------------------------------------------------------------------------
+
+    [[nodiscard]] auto qbe_type_for_primitive(TypeHandle ty) const
+        -> std::string_view {
+        std::string_view ret_type = "w";
+
+        switch (ts->get(ty)->size(*ts)) {
+            case 1: ret_type = "b"; break;
+            case 2: ret_type = "h"; break;
+            case 4: ret_type = "w"; break;
+            case 8: ret_type = "l"; break;
+            default: throw std::runtime_error{"invalid size for return type"};
+        }
+
+        return ret_type;
     }
 
     // ------------------------------------------------------------------------
