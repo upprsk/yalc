@@ -291,15 +291,17 @@ struct SemaFunc {
                 auto p = ast->node_with_child(*node);
                 auto ret = ts->get(func.type)->as_func(*ts).ret;
 
-                // FIXME: allow bare returns (in void funcs of course)
-                auto child = sema_expr(env, {.expected = ret}, p.child);
+                auto ty = ts->get_type_void();
+                if (!ast->get(p.child)->is_nil()) {
+                    ty = sema_expr(env, {.expected = ret}, p.child);
+                }
 
                 // FIXME: allow type coercion
-                if (!ts->get(child)->is_err() && ret != child) {
+                if (!ts->get(ty)->is_err() && ret != ty) {
                     er->report_error(
                         ast->get(p.child)->span,
                         "type mismatch, function expects {} but got {}",
-                        ts->fatten(ret), ts->fatten(child));
+                        ts->fatten(ret), ts->fatten(ty));
 
                     er->report_note(ret_span,
                                     "function return specified as {} here",

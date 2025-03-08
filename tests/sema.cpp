@@ -97,8 +97,6 @@ TEST_CASE("empty void func", "[sema]") {
 }
 
 TEST_CASE("void func with just single return", "[sema]") {
-    SKIP("bare returns not implemented");
-
     auto                                   devnull = fopen("/dev/null", "w+");
     std::unique_ptr<FILE, void (*)(FILE*)> _{devnull,
                                              [](auto f) { fclose(f); }};
