@@ -82,8 +82,16 @@ struct Env {
 
 struct SemaFunc {
     auto sema(Env& env) -> TypeHandle {
-        auto e = env.child();
+        auto e = sema_func_types(env);
 
+        auto p = ast->node_func(func_node_handle);
+        sema_block(e, p.body);
+
+        return func->type;
+    }
+
+    auto sema_func_types(Env& env) -> Env {
+        auto e = env.child();
         auto p = ast->node_func(func_node_handle);
 
         // first, check for plain name of the function
@@ -96,12 +104,12 @@ struct SemaFunc {
             er->report_bug(ast->get(func_node_handle)->span,
                            "bound functions have not been implemented");
 
-            return ast->get_mut(func_node_handle)->set_type(ts->get_type_err());
+            return {};
         } else {
             er->report_bug(ast->get(p.name)->span,
                            "invalid node found for function name: {}",
                            ast->get(p.name)->kind);
-            return ast->get_mut(func_node_handle)->set_type(ts->get_type_err());
+            return {};
         }
 
         std::vector<TypeHandle> args;
@@ -124,9 +132,7 @@ struct SemaFunc {
         env.declare(ast->get(func_node_handle)->span, func->name,
                     {.type = func->type, .value = func_handle});
 
-        sema_block(e, p.body);
-
-        return func->type;
+        return e;
     }
 
     // ------------------------------------------------------------------------
@@ -889,10 +895,7 @@ struct Sema {
             }
 
             case NodeKind::Func: return sema_node_func(env, n);
-
-            case NodeKind::FuncExtern:
-                er->report_bug(node->span, "{} not implemented", node->kind);
-                return ts->get_type_err();
+            case NodeKind::FuncExtern: return sema_node_func_extern(env, n);
 
             default:
                 er->report_bug(node->span,
@@ -903,6 +906,23 @@ struct Sema {
     }
 
     // ------------------------------------------------------------------------
+
+    auto sema_node_func_extern(Env& env, NodeHandle h) -> TypeHandle {
+        auto fn = mod.add_func({});
+
+        auto sf = SemaFunc{
+            .func = mod.get_mut(fn),
+            .func_handle = fn,
+            .ast = ast,
+            .ts = ts,
+            .er = er,
+            .func_node_handle = h,
+        };
+
+        sf.sema_func_types(env);
+
+        return sf.func->type;
+    }
 
     auto sema_node_func(Env& env, NodeHandle h) -> TypeHandle {
         auto fn = mod.add_func({});

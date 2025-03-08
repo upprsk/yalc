@@ -40,10 +40,10 @@ auto main(int argc, char** argv) -> int {
         //              yal::FatNodeHandle{.ast = &ast, .node = root, .ts =
         //              &ts});
 
-        // for (auto const& func : m.funcs) {
-        //     func.disasm(stderr, ts);
-        //     fmt::println(stderr, "");
-        // }
+        for (auto const& func : m.funcs) {
+            func.disasm(stderr, ts);
+            fmt::println(stderr, "");
+        }
 
         yal::codegen::qbe::codegen(m, ts, er, stdout);
 

@@ -5,14 +5,20 @@
 
 #include "error_reporter.hpp"
 #include "fmt/base.h"
+#include "hlir.hpp"
 #include "types.hpp"
 
 namespace yal::codegen::qbe {
 
+using fmt::print;
 using fmt::println;
 
 struct CodegenFunc {
     void codegen(hlir::Func const& func) {
+        // in case we have no body, this is an extern function. In QBE there is
+        // no need to declare externs.
+        if (func.blocks.empty()) return;
+
         println(out, "# {}", ts->fatten(func.type));
 
         auto ft = ts->get(func.type)->as_func(*ts);
@@ -56,7 +62,10 @@ struct CodegenFunc {
                                 v.value_uint64());
                     } break;
 
-                    case hlir::InstKind::Pop:
+                    case hlir::InstKind::Pop: {
+                        pop_tmp();
+                    } break;
+
                     case hlir::InstKind::LoadLocal:
                     case hlir::InstKind::StoreLocal:
                     case hlir::InstKind::Add:
@@ -82,7 +91,43 @@ struct CodegenFunc {
                         println(out, "    ret %tmp_{}", r);
                     } break;
 
-                    case hlir::InstKind::Call:
+                    case hlir::InstKind::Call: {
+                        auto r = push_tmp();
+
+                        // we don't want to touch this during the args
+                        pop_tmp();
+
+                        auto callee = mod->get(func.calls.at(inst.a));
+                        auto ct = ts->get(callee->type)->as_func(*ts);
+
+                        if (!ts->get(ct.ret)->is_void()) {
+                            print(out, "    %tmp_{} = {} ", r,
+                                  qbe_type_for_primitive(ct.ret));
+                        } else
+                            print(out, "    ");
+
+                        print(out, "call ${}(", callee->name);
+
+                        std::vector<uint32_t> args;
+                        for (auto const& arg : ct.args) {
+                            args.push_back(pop_tmp());
+                        }
+
+                        for (size_t i{}; auto const& arg : ct.args) {
+                            if (i != 0) print(out, ", ");
+
+                            print(out, "{} %tmp_{}",
+                                  qbe_type_for_primitive(arg),
+                                  args.at(args.size() - i - 1));
+
+                            i++;
+                        }
+
+                        push_tmp(r);
+
+                        println(out, ")");
+                    } break;
+
                     case hlir::InstKind::Jump:
                     case hlir::InstKind::Branch:
                         er->report_bug(blk.spans[i], "not implemented: {}",
@@ -118,22 +163,39 @@ struct CodegenFunc {
 
     // ------------------------------------------------------------------------
 
-    auto push_tmp() -> uint32_t { return tmp_top++; }
-    auto pop_tmp() -> uint32_t { return --tmp_top; }
+    auto push_tmp() -> uint32_t {
+        auto r = next_reg++;
+        stack.push_back(r);
+        return r;
+    }
+
+    auto push_tmp(uint32_t reg) -> uint32_t {
+        stack.push_back(reg);
+        return reg;
+    }
+
+    auto pop_tmp() -> uint32_t {
+        auto r = stack.end();
+        stack.pop_back();
+
+        return *--r;
+    }
 
     // ------------------------------------------------------------------------
 
-    uint32_t tmp_top{};
+    uint32_t              next_reg{};
+    std::vector<uint32_t> stack{};  // NOLINT(readability-redundant-member-init)
 
-    ErrorReporter*   er;
-    TypeStore const* ts;
-    FILE*            out;
+    ErrorReporter*      er;
+    TypeStore const*    ts;
+    hlir::Module const* mod;
+    FILE*               out;
 };
 
 void codegen(hlir::Module const& mod, TypeStore const& ts, ErrorReporter& er,
              FILE* f) {
     for (auto const& func : mod.funcs) {
-        auto cf = CodegenFunc{.er = &er, .ts = &ts, .out = f};
+        auto cf = CodegenFunc{.er = &er, .ts = &ts, .mod = &mod, .out = f};
         cf.codegen(func);
     }
 }
