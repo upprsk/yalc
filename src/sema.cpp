@@ -451,6 +451,12 @@ struct SemaFunc {
         switch (node->kind) {
             case NodeKind::Id: {
                 auto d = env.lookup(node->value_string());
+                if (!d) {
+                    er->report_error(node->span, "undefined identifier: {}",
+                                     node->value_string());
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
                 if (!ts->get(d->value.type)->is_type()) {
                     er->report_error(node->span,
                                      "can't use value of type `{}` as type",
