@@ -25,9 +25,10 @@ private:
 };
 
 struct Value {
-    TypeHandle                                                     type;
-    std::variant<std::monostate, uint64_t, TypeHandle, FuncHandle> value =
-        std::monostate{};
+    TypeHandle type;
+    std::variant<std::monostate, uint64_t, std::vector<uint8_t>, TypeHandle,
+                 FuncHandle>
+        value = std::monostate{};
 
     [[nodiscard]] constexpr auto holds_func() const -> bool {
         return std::holds_alternative<FuncHandle>(value);
@@ -43,6 +44,11 @@ struct Value {
 
     [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
         return std::get<uint64_t>(value);
+    }
+
+    [[nodiscard]] constexpr auto value_bytes() const
+        -> std::span<uint8_t const> {
+        return std::get<std::vector<uint8_t>>(value);
     }
 
     constexpr auto operator==(Value const&) const -> bool = default;

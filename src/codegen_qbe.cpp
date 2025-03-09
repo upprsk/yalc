@@ -5,6 +5,7 @@
 
 #include "error_reporter.hpp"
 #include "fmt/base.h"
+#include "fmt/ranges.h"
 #include "hlir.hpp"
 #include "types.hpp"
 
@@ -49,7 +50,21 @@ struct CodegenFunc {
                         auto        r = push_tmp();
                         auto const& v = blk.consts.at(inst.a);
 
-                        if (!ts->get(v.type)->is_integral()) {
+                        if (ts->get(v.type)->is_integral()) {
+                            println(out, "    %tmp_{} = w copy {}", r,
+                                    v.value_uint64());
+                        }
+
+                        else if (ts->get(v.type)->is_array()) {
+                            auto r = push_tmp();
+                            auto sz = pending_data.size();
+                            pending_data.push_back(v);
+
+                            println(out, "    %tmp_{} = w copy $data_{}", r,
+                                    sz);
+                        }
+
+                        else {
                             er->report_bug(
                                 blk.spans[i],
                                 "constants other than integral "
@@ -57,9 +72,6 @@ struct CodegenFunc {
                                 ts->fatten(v.type));
                             return;  // abort
                         }
-
-                        println(out, "    %tmp_{} = w copy {}", r,
-                                v.value_uint64());
                     } break;
 
                     case hlir::InstKind::Pop: {
@@ -92,6 +104,8 @@ struct CodegenFunc {
                     } break;
 
                     case hlir::InstKind::Call: {
+                        // FIXME: this needs some rework
+
                         auto r = push_tmp();
 
                         // we don't want to touch this during the args
@@ -109,7 +123,7 @@ struct CodegenFunc {
                         print(out, "call ${}(", callee->name);
 
                         std::vector<uint32_t> args;
-                        for (auto const& arg : ct.args) {
+                        for (auto const& _ : ct.args) {
                             args.push_back(pop_tmp());
                         }
 
@@ -142,6 +156,18 @@ struct CodegenFunc {
         }
 
         println(out, "}} # end of {}", func.name);
+
+        for (size_t i{}; auto const& p : pending_data) {
+            if (ts->get(p.type)->is_array()) {
+                println(out, "data $data_{} = {{ b {} }}", i,
+                        fmt::join(p.value_bytes(), " "));
+            } else {
+                throw std::runtime_error{fmt::format(
+                    "invalid type in pending data: {}", ts->fatten(p.type))};
+            }
+
+            i++;
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -185,6 +211,9 @@ struct CodegenFunc {
 
     uint32_t              next_reg{};
     std::vector<uint32_t> stack{};  // NOLINT(readability-redundant-member-init)
+
+    // NOLINTNEXTLINE(readability-redundant-member-init)
+    std::vector<hlir::Value> pending_data{};
 
     ErrorReporter*      er;
     TypeStore const*    ts;

@@ -361,6 +361,7 @@ struct SemaFunc {
 
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto sema_expr(Env& env, Context ctx, NodeHandle n) -> TypeHandle {
+        // FIXME: handle constness
         auto node = ast->get(n);
 
         switch (node->kind) {
@@ -697,6 +698,24 @@ struct SemaFunc {
 
                 push_inst_const(node->span,
                                 {.type = ty, .value = node->value_uint64()});
+                return ast->get_mut(n)->set_type(ty);
+            }
+
+            case NodeKind::Str: {
+                // FIXME: we should have an actual string type
+
+                auto                 s = node->value_string();
+                std::vector<uint8_t> value{
+                    reinterpret_cast<uint8_t*>(s.data()),
+                    reinterpret_cast<uint8_t*>(s.data()) + s.size(),
+                };
+
+                value.push_back(0);
+
+                auto ty = ts->get_type_array(ts->get_type_u8(), value.size(),
+                                             TypeFlags::IsConst);
+                push_inst_const(node->span, {.type = ty, .value = value});
+
                 return ast->get_mut(n)->set_type(ty);
             }
 
