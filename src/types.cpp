@@ -65,6 +65,10 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
 
         case TypeKind::Bool: return format_to(ctx.out(), "bool");
 
+        case TypeKind::Array:
+            format_to(ctx.out(), "[{}]", type->second.value());
+            return dump(ctx, type->first);
+
         case TypeKind::Ptr:
             format_to(ctx.out(), "*");
             if (type->is_const()) format_to(ctx.out(), "const ");
@@ -130,6 +134,7 @@ auto fmt::formatter<yal::TypeKind>::format(yal::TypeKind   n,
         case yal::TypeKind::Usize: name = "Usize"; break;
         case yal::TypeKind::Isize: name = "Isize"; break;
         case yal::TypeKind::Bool: name = "Bool"; break;
+        case yal::TypeKind::Array: name = "Array"; break;
         case yal::TypeKind::Ptr: name = "Ptr"; break;
         case yal::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::TypeKind::Func: name = "Func"; break;

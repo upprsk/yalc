@@ -107,6 +107,7 @@ enum class TypeKind : uint16_t {
     Usize,
     Isize,
     Bool,
+    Array,
     Ptr,
     MultiPtr,
     Func,
@@ -180,6 +181,10 @@ struct Type {
         return kind == TypeKind::Ptr || kind == TypeKind::MultiPtr;
     }
 
+    [[nodiscard]] constexpr auto is_array() const -> bool {
+        return kind == TypeKind::Array;
+    }
+
     [[nodiscard]] constexpr auto is_void() const -> bool {
         return kind == TypeKind::Void;
     }
@@ -241,6 +246,17 @@ struct TypeStore {
 
     [[nodiscard]] auto get_type_isize() const -> TypeHandle {
         return isize_type;
+    }
+
+    [[nodiscard]] auto get_type_array(TypeHandle inner, uint32_t size,
+                                      TypeFlags flags) -> TypeHandle {
+        auto t = find_type(Type{.kind = TypeKind::Array,
+                                .flags = flags,
+                                .first = inner,
+                                .second = size});
+        if (t.is_valid()) return t;
+
+        return new_type(TypeKind::Array, flags, inner, size);
     }
 
     [[nodiscard]] auto get_type_ptr(TypeHandle child, TypeFlags flags)
@@ -533,6 +549,8 @@ constexpr auto Type::size(TypeStore const& ts) const -> size_t {
         case TypeKind::Isize:
         case TypeKind::Ptr:
         case TypeKind::MultiPtr: return ts.ptr_size();
+
+        case TypeKind::Array: return ts.get(first)->size(ts) * second.value();
     }
 
     return 0;
