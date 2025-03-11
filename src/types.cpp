@@ -66,7 +66,8 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
         case TypeKind::Bool: return format_to(ctx.out(), "bool");
 
         case TypeKind::Array:
-            format_to(ctx.out(), "[{}]", type->second.value());
+            format_to(ctx.out(), "[{}]{}", type->second.value(),
+                      type->is_const() ? "const " : "");
             return dump(ctx, type->first);
 
         case TypeKind::Ptr:

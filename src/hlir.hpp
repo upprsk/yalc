@@ -60,6 +60,7 @@ enum class InstKind : uint8_t {
     Err,
     Const,
     Pop,
+    AddLocal,
     LoadLocal,
     StoreLocal,
 
@@ -92,10 +93,29 @@ enum class InstKind : uint8_t {
     Branch,
 };
 
+enum class InstType : uint8_t {
+    Err = '!',
+    Byte = 'b',
+    Half = 'h',
+    Word = 'w',
+    Long = 'l',
+};
+
+[[nodiscard]] constexpr auto inst_type_from_size(size_t sz) -> InstType {
+    switch (sz) {
+        case 1: return InstType::Byte;
+        case 2: return InstType::Half;
+        case 4: return InstType::Word;
+        case 8: return InstType::Long;
+        default: return InstType::Err;
+    }
+}
+
 struct Inst {
     InstKind kind = InstKind::Err;
     uint8_t  a = 0;
     uint8_t  b = 0;
+    InstType type = InstType::Err;
 
     constexpr auto operator==(Inst const&) const -> bool = default;
 };
@@ -181,6 +201,12 @@ struct fmt::formatter<yal::hlir::Value> {
 template <>
 struct fmt::formatter<yal::hlir::InstKind> : formatter<string_view> {
     auto format(yal::hlir::InstKind n, format_context& ctx) const
+        -> format_context::iterator;
+};
+
+template <>
+struct fmt::formatter<yal::hlir::InstType> : formatter<string_view> {
+    auto format(yal::hlir::InstType n, format_context& ctx) const
         -> format_context::iterator;
 };
 

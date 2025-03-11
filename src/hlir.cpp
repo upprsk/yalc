@@ -38,7 +38,8 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
 
         size_t j{};
         for (auto const& inst : blk.code) {
-            print(f, "{:04} | {}", j, inst.kind);
+            print(f, "{:04} | {} {:c}", j, inst.kind,
+                  fmt::underlying(inst.type));
 
             switch (inst.kind) {
                 case InstKind::Const: {
@@ -51,6 +52,7 @@ void Func::disasm(FILE* f, TypeStore const& ts) const {
                     print(f, " {}", inst.a);
                 } break;
 
+                case InstKind::AddLocal:
                 case InstKind::LoadLocal:
                 case InstKind::StoreLocal: {
                     auto l = locals.at(inst.a);
@@ -115,6 +117,7 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
         case yal::hlir::InstKind::Err: name = "Err"; break;
         case yal::hlir::InstKind::Const: name = "Const"; break;
         case yal::hlir::InstKind::Pop: name = "Pop"; break;
+        case yal::hlir::InstKind::AddLocal: name = "AddLocal"; break;
         case yal::hlir::InstKind::LoadLocal: name = "LoadLocal"; break;
         case yal::hlir::InstKind::StoreLocal: name = "StoreLocal"; break;
         case yal::hlir::InstKind::Add: name = "Add"; break;
@@ -140,10 +143,17 @@ auto fmt::formatter<yal::hlir::InstKind>::format(yal::hlir::InstKind n,
     return formatter<string_view>::format(name, ctx);
 }
 
+auto fmt::formatter<yal::hlir::InstType>::format(yal::hlir::InstType n,
+                                                 format_context&     ctx) const
+    -> format_context::iterator {
+    return fmt::format_to(ctx.out(), "{:c}", fmt::underlying(n));
+}
+
 auto fmt::formatter<yal::hlir::Inst>::format(yal::hlir::Inst n,
                                              format_context& ctx) const
     -> format_context::iterator {
-    return fmt::format_to(ctx.out(), "({}, {})", n.kind, n.a);
+    return fmt::format_to(ctx.out(), "({}, {}, {}, {})", n.kind, n.a, n.b,
+                          n.type);
 }
 
 auto fmt::formatter<yal::hlir::Local>::format(yal::hlir::Local n,

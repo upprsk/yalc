@@ -214,8 +214,15 @@ struct Type {
         std::span<TypeHandle const> args;
     };
 
+    struct TypeArray {
+        TypeHandle inner;
+        uint32_t   length;
+    };
+
     [[nodiscard]] constexpr auto as_func(TypeStore const& store) const
         -> TypeFunc;
+
+    [[nodiscard]] constexpr auto as_array() const -> TypeArray;
 };
 
 struct FatTypeHandle {
@@ -526,6 +533,14 @@ constexpr auto Type::as_func(TypeStore const& store) const -> TypeFunc {
 
     return {.ret = items[0], .args = items.subspan(1)};
 }
+
+constexpr auto Type::as_array() const -> TypeArray {
+    if (kind != TypeKind::Array)
+        throw fmt::system_error(6, "invalid type kind for `as_array`: {}",
+                                kind);
+
+    return {.inner = first, .length = second.as_count()};
+};
 
 constexpr auto Type::size(TypeStore const& ts) const -> size_t {
     switch (kind) {

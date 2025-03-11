@@ -372,6 +372,11 @@ struct Node {
         return kind == NodeKind::Field;
     }
 
+    [[nodiscard]] constexpr auto is_array() const -> bool {
+        return kind == NodeKind::Array || kind == NodeKind::ArrayType ||
+               kind == NodeKind::ArrayAutoLen;
+    }
+
     [[nodiscard]] constexpr auto is_str() const -> bool {
         return kind == NodeKind::Str;
     }

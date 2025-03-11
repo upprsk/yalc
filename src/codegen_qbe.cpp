@@ -51,7 +51,8 @@ struct CodegenFunc {
                         auto const& v = blk.consts.at(inst.a);
 
                         if (ts->get(v.type)->is_integral()) {
-                            println(out, "    %tmp_{} = w copy {}", r,
+                            println(out, "    %tmp_{} = {} copy {}", r,
+                                    qbe_type_for_primitive(v.type),
                                     v.value_uint64());
                         }
 
@@ -60,8 +61,8 @@ struct CodegenFunc {
                             auto sz = pending_data.size();
                             pending_data.push_back(v);
 
-                            println(out, "    %tmp_{} = w copy $data_{}", r,
-                                    sz);
+                            println(out, "    %tmp_{} = {} copy $data_{}", r,
+                                    qbe_ptr_type(), sz);
                         }
 
                         else {
@@ -78,9 +79,30 @@ struct CodegenFunc {
                         pop_tmp();
                     } break;
 
-                    case hlir::InstKind::LoadLocal:
-                    case hlir::InstKind::StoreLocal:
-                    case hlir::InstKind::Add:
+                    case hlir::InstKind::AddLocal: {
+                        auto r = peek_tmp();
+                        locals.push_back(r);
+                    } break;
+
+                    case hlir::InstKind::LoadLocal: {
+                        auto r = push_tmp();
+                        println(
+                            out, "    %tmp_{} = {} copy %tmp_{}", r,
+                            qbe_type_for_primitive(func.locals.at(inst.a).type),
+                            locals.at(inst.a));
+                    } break;
+
+                    case hlir::InstKind::StoreLocal: break;
+
+                    case hlir::InstKind::Add: {
+                        auto rhs = pop_tmp();
+                        auto lhs = pop_tmp();
+
+                        auto r = push_tmp();
+                        println(out, "    %tmp_{} = {} add %tmp_{}, %tmp_{}", r,
+                                inst.type, lhs, rhs);
+                    } break;
+
                     case hlir::InstKind::Sub:
                     case hlir::InstKind::Mul:
                     case hlir::InstKind::Div:
@@ -181,10 +203,20 @@ struct CodegenFunc {
             case 2: ret_type = "h"; break;
             case 4: ret_type = "w"; break;
             case 8: ret_type = "l"; break;
-            default: throw std::runtime_error{"invalid size for return type"};
+            default:
+                if (ts->get(ty)->is_ptr() || ts->get(ty)->is_array()) {
+                    ret_type = qbe_ptr_type();
+                    break;
+                }
+
+                throw std::runtime_error{"invalid size for qbe type"};
         }
 
         return ret_type;
+    }
+
+    [[nodiscard]] auto qbe_ptr_type() const -> std::string_view {
+        return ts->ptr_size() == 8 ? "l" : "w";
     }
 
     // ------------------------------------------------------------------------
@@ -201,16 +233,26 @@ struct CodegenFunc {
     }
 
     auto pop_tmp() -> uint32_t {
+        // assume stack is not empty
         auto r = stack.end();
         stack.pop_back();
 
         return *--r;
     }
 
+    auto peek_tmp() -> uint32_t {
+        // assume stack is not empty
+        auto r = stack.end() - 1;
+        return *r;
+    }
+
     // ------------------------------------------------------------------------
 
     uint32_t              next_reg{};
     std::vector<uint32_t> stack{};  // NOLINT(readability-redundant-member-init)
+
+    // NOLINTNEXTLINE(readability-redundant-member-init)
+    std::vector<uint32_t> locals{};
 
     // NOLINTNEXTLINE(readability-redundant-member-init)
     std::vector<hlir::Value> pending_data{};

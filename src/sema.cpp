@@ -226,7 +226,11 @@ struct SemaFunc {
 
                 auto name = ast->get(p.ids)->value_string();
                 env.declare(node->span, name, {.type = init}, DeclFlags::Local);
-                append_local(name, init);
+                auto idx = append_local(name, init);
+                push_inst(node->span, {.kind = hlir::InstKind::AddLocal,
+                                       .a = static_cast<uint8_t>(idx),
+                                       .type = hlir::inst_type_from_size(
+                                           ts->get(init)->size(*ts))});
 
                 return ast->get_mut(n)->set_type(ts->get_type_void());
             }
@@ -256,6 +260,8 @@ struct SemaFunc {
                         er->report_note(d->span, "declared here with type {}",
                                         ts->fatten(d->value.type));
                     }
+
+                    // FIXME: check for constant in lhs
 
                     push_inst_store(node->span, *d);
                 } else {
@@ -460,7 +466,9 @@ struct SemaFunc {
                         ts->fatten(lhs));
                 }
 
-                push_inst(node->span, kind);
+                push_inst(node->span, {.kind = kind,
+                                       .type = hlir::inst_type_from_size(
+                                           ts->get(lhs)->size(*ts))});
                 return ast->get_mut(n)->set_type(lhs);
             }
 
@@ -674,6 +682,42 @@ struct SemaFunc {
                 return ast->get_mut(n)->set_type(target_type);
             }
 
+            case NodeKind::Field: {
+                auto p = ast->node_named(*node);
+
+                auto child = sema_expr(env, ctx, p.child);
+                if (ts->get(child)->is_array()) {
+                    if (p.name == "len") {
+                        push_inst_const(
+                            node->span,
+                            {.type = ts->get_type_usize(),
+                             .value = ts->get(child)->as_array().length});
+
+                        return ast->get_mut(n)->set_type(ts->get_type_usize());
+                    }
+
+                    if (p.name == "ptr") {
+                        // the pointer to the array should already be at the top
+                        // of the stack because of `child`.
+                        auto inner = ts->get(child)->as_array().inner;
+
+                        return ast->get_mut(n)->set_type(ts->get_type_multi_ptr(
+                            inner, ts->get(child)->is_const()
+                                       ? TypeFlags::IsConst
+                                       : TypeFlags::None));
+                    }
+
+                    er->report_error(node->span,
+                                     "undefined field for array: {}", p.name);
+                    return ast->get_mut(n)->set_type(ts->get_type_err());
+                }
+
+                er->report_error(node->span,
+                                 "type {} does not support field access",
+                                 node->value_string());
+                return ast->get_mut(n)->set_type(ts->get_type_err());
+            }
+
             case NodeKind::Id: {
                 auto d = env.lookup(node->value_string());
                 if (!d) {
@@ -752,6 +796,14 @@ struct SemaFunc {
                 return d->value.value_type();
             }
 
+            case NodeKind::MultiPtrConst: {
+                auto p = ast->node_with_child(*node);
+                auto inner = eval_to_type(env, p.child);
+                node->set_type(ts->get_type_type());
+
+                return ts->get_type_multi_ptr(inner, TypeFlags::IsConst);
+            }
+
             default:
                 er->report_error(node->span, "can't evaluate {} to type",
                                  node->kind);
@@ -762,17 +814,22 @@ struct SemaFunc {
     // ------------------------------------------------------------------------
 
     // NOLINTNEXTLINE(modernize-use-nodiscard)
-    auto push_inst(Span s, hlir::InstKind kind, uint8_t a = 0,
-                   uint8_t b = 0) const -> size_t {
+    auto push_inst(Span s, hlir::Inst inst) const -> size_t {
         // er->report_note(s, "push_inst({}, {}, {})", s, kind, a);
 
         auto blk = current_block();
         auto sz = blk->code.size();
 
         blk->spans.push_back(s);
-        blk->code.push_back({kind, a, b});
+        blk->code.push_back(inst);
 
         return sz;
+    }
+
+    // NOLINTNEXTLINE(modernize-use-nodiscard)
+    auto push_inst(Span s, hlir::InstKind kind, uint8_t a = 0, uint8_t b = 0,
+                   hlir::InstType type = hlir::InstType::Err) const -> size_t {
+        return push_inst(s, {.kind = kind, .a = a, .b = b, .type = type});
     }
 
     // NOLINTNEXTLINE(modernize-use-nodiscard)
@@ -869,8 +926,11 @@ struct SemaFunc {
         return {nullptr, 0};
     }
 
-    void append_local(std::string name, TypeHandle ty) {
+    auto append_local(std::string name, TypeHandle ty) -> size_t {
+        auto idx = func->locals.size();
         func->locals.push_back({name, ty, stack_top++});
+
+        return idx;
     }
 
     void pop_local() {
