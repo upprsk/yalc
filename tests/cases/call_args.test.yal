@@ -12,20 +12,20 @@ func add_twice(x: i32, y: i32) i32 {
 // locals: [(0, "x", i32), (1, "y", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", i32)
-// 0001 | LoadLocal 1 ("y", i32)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", i32)
+// 0001 | LoadLocal ! 1 ("y", i32)
+// 0002 | Add w
+// 0003 | Ret !
 // add_twice: # func(i32, i32) i32
 // locals: [(0, "x", i32), (1, "y", i32)]
 // calls: [0]
 // b 0:
-// 0000 | LoadLocal 0 ("x", i32)
-// 0001 | LoadLocal 1 ("y", i32)
-// 0002 | Call {0}
-// 0003 | LoadLocal 0 ("x", i32)
-// 0004 | LoadLocal 1 ("y", i32)
-// 0005 | Call {0}
-// 0006 | Call {0}
-// 0007 | Ret
+// 0000 | LoadLocal ! 0 ("x", i32)
+// 0001 | LoadLocal ! 1 ("y", i32)
+// 0002 | Call ! {0}
+// 0003 | LoadLocal ! 0 ("x", i32)
+// 0004 | LoadLocal ! 1 ("y", i32)
+// 0005 | Call ! {0}
+// 0006 | Call ! {0}
+// 0007 | Ret !
 // 

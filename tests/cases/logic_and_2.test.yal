@@ -10,30 +10,30 @@ func test_and(a: i32, b: i32, check: bool) bool {
 // locals: [(0, "a", i32), (1, "b", i32), (2, "check", bool)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("a", i32)
-// 0001 | Const 0 (variant(1), i32)
-// 0002 | Const 1 (variant(2), i32)
-// 0003 | Add
-// 0004 | Eq
-// 0005 | Branch b 1, 2
+// 0000 | LoadLocal ! 0 ("a", i32)
+// 0001 | Const ! 0 (variant(1), i32)
+// 0002 | Const ! 1 (variant(2), i32)
+// 0003 | Add w
+// 0004 | Eq !
+// 0005 | Branch ! b 1, 2
 // b 1:
-// 0000 | LoadLocal 1 ("b", i32)
-// 0001 | Const 0 (variant(12), i32)
-// 0002 | Add
-// 0003 | Const 1 (variant(0), i32)
-// 0004 | Const 2 (variant(55), i32)
-// 0005 | Sub
-// 0006 | Eq
-// 0007 | Const 3 (variant(0), bool)
-// 0008 | Neq
-// 0009 | Jump j 2
+// 0000 | LoadLocal ! 1 ("b", i32)
+// 0001 | Const ! 0 (variant(12), i32)
+// 0002 | Add w
+// 0003 | Const ! 1 (variant(0), i32)
+// 0004 | Const ! 2 (variant(55), i32)
+// 0005 | Sub !
+// 0006 | Eq !
+// 0007 | Const ! 3 (variant(0), bool)
+// 0008 | Neq !
+// 0009 | Jump ! j 2
 // b 2:
-// 0000 | Branch b 3, 4
+// 0000 | Branch ! b 3, 4
 // b 3:
-// 0000 | LoadLocal 2 ("check", bool)
-// 0001 | Const 0 (variant(1), bool)
-// 0002 | Eq
-// 0003 | Jump j 4
+// 0000 | LoadLocal ! 2 ("check", bool)
+// 0001 | Const ! 0 (variant(1), bool)
+// 0002 | Eq !
+// 0003 | Jump ! j 4
 // b 4:
-// 0000 | Ret
+// 0000 | Ret !
 // 

@@ -20,34 +20,34 @@ func allowed_4(age: i32) bool {
 // locals: [(0, "age", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("age", i32)
-// 0001 | Const 0 (variant(17), i32)
-// 0002 | Gt
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("age", i32)
+// 0001 | Const ! 0 (variant(17), i32)
+// 0002 | Gt !
+// 0003 | Ret !
 // allowed_2: # func(i32) bool
 // locals: [(0, "age", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("age", i32)
-// 0001 | Const 0 (variant(18), i32)
-// 0002 | Gte
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("age", i32)
+// 0001 | Const ! 0 (variant(18), i32)
+// 0002 | Gte !
+// 0003 | Ret !
 // allowed_3: # func(i32) bool
 // locals: [(0, "age", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("age", i32)
-// 0001 | Const 0 (variant(18), i32)
-// 0002 | Lt
-// 0003 | LogicNot
-// 0004 | Ret
+// 0000 | LoadLocal ! 0 ("age", i32)
+// 0001 | Const ! 0 (variant(18), i32)
+// 0002 | Lt !
+// 0003 | LogicNot !
+// 0004 | Ret !
 // allowed_4: # func(i32) bool
 // locals: [(0, "age", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("age", i32)
-// 0001 | Const 0 (variant(17), i32)
-// 0002 | Lte
-// 0003 | LogicNot
-// 0004 | Ret
+// 0000 | LoadLocal ! 0 ("age", i32)
+// 0001 | Const ! 0 (variant(17), i32)
+// 0002 | Lte !
+// 0003 | LogicNot !
+// 0004 | Ret !
 // 

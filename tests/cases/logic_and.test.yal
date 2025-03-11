@@ -8,15 +8,15 @@ func test_and(a: i32, b: i32) bool {
 // locals: [(0, "a", i32), (1, "b", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("a", i32)
-// 0001 | Const 0 (variant(0), i32)
-// 0002 | Eq
-// 0003 | Branch b 1, 2
+// 0000 | LoadLocal ! 0 ("a", i32)
+// 0001 | Const ! 0 (variant(0), i32)
+// 0002 | Eq !
+// 0003 | Branch ! b 1, 2
 // b 1:
-// 0000 | LoadLocal 1 ("b", i32)
-// 0001 | LoadLocal 0 ("a", i32)
-// 0002 | Neq
-// 0003 | Jump j 2
+// 0000 | LoadLocal ! 1 ("b", i32)
+// 0001 | LoadLocal ! 0 ("a", i32)
+// 0002 | Neq !
+// 0003 | Jump ! j 2
 // b 2:
-// 0000 | Ret
+// 0000 | Ret !
 // 

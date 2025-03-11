@@ -1,8 +1,13 @@
 // SKIP: missing pointers and fields
 
-func hello() i32 {
+extern func puts(s: [*]const u8) i32;
+
+func main() i32 {
     var x     = "Hello!"; // [7]const u8
-    var x_ptr = x.ptr; //    [*]const u8
+    var x_len = x.len;    // usize
+    var x_ptr = x.ptr;    // [*]const u8
+
+    var _ = puts(x_ptr);
 
     return 0;
 }

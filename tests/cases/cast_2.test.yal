@@ -9,9 +9,11 @@ func main() {
 // locals: [(0, "a", i32), (1, "b", bool)]
 // calls: []
 // b 0:
-// 0000 | Const 0 (variant(1), bool)
-// 0001 | Iext 4B
-// 0002 | Const 1 (variant(0), i32)
-// 0003 | LogicNot
-// 0004 | LogicNot
+// 0000 | Const ! 0 (variant(1), bool)
+// 0001 | Iext ! 4B
+// 0002 | AddLocal w 0 ("a", i32)
+// 0003 | Const ! 1 (variant(0), i32)
+// 0004 | LogicNot !
+// 0005 | LogicNot !
+// 0006 | AddLocal b 1 ("b", bool)
 // 

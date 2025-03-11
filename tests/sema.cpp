@@ -180,8 +180,8 @@ TEST_CASE("func that adds two i32", "[sema]") {
         std::vector<hlir::Inst> expected_code{
             {hlir::InstKind::Const, 0},
             {hlir::InstKind::Const, 1},
-            {  hlir::InstKind::Add, 0},
-            {  hlir::InstKind::Ret, 0},
+            {hlir::InstKind::Add, 0, 0, hlir::InstType::Word},
+            {hlir::InstKind::Ret, 0},
         };
 
         std::vector<Span> expected_spans{
@@ -236,9 +236,9 @@ TEST_CASE("func that adds two i32", "[sema]") {
 
         std::vector<hlir::Inst> expected_code{
             {hlir::InstKind::LoadLocal, 0},
-            {    hlir::InstKind::Const, 0},
-            {      hlir::InstKind::Add, 0},
-            {      hlir::InstKind::Ret, 0},
+            {hlir::InstKind::Const, 0},
+            {hlir::InstKind::Add, 0, 0, hlir::InstType::Word},
+            {hlir::InstKind::Ret, 0},
         };
 
         std::vector<Span> expected_spans{
@@ -294,8 +294,8 @@ TEST_CASE("func that adds two i32", "[sema]") {
         std::vector<hlir::Inst> expected_code{
             {hlir::InstKind::LoadLocal, 0},
             {hlir::InstKind::LoadLocal, 1},
-            {      hlir::InstKind::Add, 0},
-            {      hlir::InstKind::Ret, 0},
+            {hlir::InstKind::Add, 0, 0, hlir::InstType::Word},
+            {hlir::InstKind::Ret, 0},
         };
 
         std::vector<Span> expected_spans{
@@ -456,8 +456,9 @@ TEST_CASE("files") {
 
             std::string_view skip_tag = "// SKIP:";
             if (src.starts_with(skip_tag)) {
-                SKIP(src.substr(src.length(),
-                                src.find('\n') - skip_tag.length()));
+                INFO("skipping file: " << src.substr(
+                         src.length(), src.find('\n') - skip_tag.length()));
+                continue;
             }
 
             std::string_view output_tag = "// OUTPUT:\n";

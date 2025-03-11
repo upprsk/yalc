@@ -44,80 +44,80 @@ func add_i8(x: i8, y: i8) i8 {
 // locals: [(0, "x", usize), (1, "y", usize)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", usize)
-// 0001 | LoadLocal 1 ("y", usize)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", usize)
+// 0001 | LoadLocal ! 1 ("y", usize)
+// 0002 | Add l
+// 0003 | Ret !
 // add_isize: # func(isize, isize) isize
 // locals: [(0, "x", isize), (1, "y", isize)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", isize)
-// 0001 | LoadLocal 1 ("y", isize)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", isize)
+// 0001 | LoadLocal ! 1 ("y", isize)
+// 0002 | Add l
+// 0003 | Ret !
 // add_u64: # func(u64, u64) u64
 // locals: [(0, "x", u64), (1, "y", u64)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", u64)
-// 0001 | LoadLocal 1 ("y", u64)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", u64)
+// 0001 | LoadLocal ! 1 ("y", u64)
+// 0002 | Add l
+// 0003 | Ret !
 // add_i64: # func(i64, i64) i64
 // locals: [(0, "x", i64), (1, "y", i64)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", i64)
-// 0001 | LoadLocal 1 ("y", i64)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", i64)
+// 0001 | LoadLocal ! 1 ("y", i64)
+// 0002 | Add l
+// 0003 | Ret !
 // add_u32: # func(u32, u32) u32
 // locals: [(0, "x", u32), (1, "y", u32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", u32)
-// 0001 | LoadLocal 1 ("y", u32)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", u32)
+// 0001 | LoadLocal ! 1 ("y", u32)
+// 0002 | Add w
+// 0003 | Ret !
 // add_i32: # func(i32, i32) i32
 // locals: [(0, "x", i32), (1, "y", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", i32)
-// 0001 | LoadLocal 1 ("y", i32)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", i32)
+// 0001 | LoadLocal ! 1 ("y", i32)
+// 0002 | Add w
+// 0003 | Ret !
 // add_u16: # func(u16, u16) u16
 // locals: [(0, "x", u16), (1, "y", u16)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", u16)
-// 0001 | LoadLocal 1 ("y", u16)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", u16)
+// 0001 | LoadLocal ! 1 ("y", u16)
+// 0002 | Add h
+// 0003 | Ret !
 // add_i16: # func(i16, i16) i16
 // locals: [(0, "x", i16), (1, "y", i16)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", i16)
-// 0001 | LoadLocal 1 ("y", i16)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", i16)
+// 0001 | LoadLocal ! 1 ("y", i16)
+// 0002 | Add h
+// 0003 | Ret !
 // add_u8: # func(u8, u8) u8
 // locals: [(0, "x", u8), (1, "y", u8)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", u8)
-// 0001 | LoadLocal 1 ("y", u8)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", u8)
+// 0001 | LoadLocal ! 1 ("y", u8)
+// 0002 | Add b
+// 0003 | Ret !
 // add_i8: # func(i8, i8) i8
 // locals: [(0, "x", i8), (1, "y", i8)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", i8)
-// 0001 | LoadLocal 1 ("y", i8)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", i8)
+// 0001 | LoadLocal ! 1 ("y", i8)
+// 0002 | Add b
+// 0003 | Ret !
 // 

@@ -18,26 +18,31 @@ func next(x: usize) usize {
 // locals: [(0, "a", usize), (1, "b", i32), (2, "c", usize), (3, "d", i32), (4, "e", i64)]
 // calls: []
 // b 0:
-// 0000 | Const 0 (variant(10), usize)
-// 0001 | Const 1 (variant(20), i32)
-// 0002 | LoadLocal 0 ("a", usize)
-// 0003 | LoadLocal 1 ("b", i32)
-// 0004 | Uext 8B
-// 0005 | Add
-// 0006 | LoadLocal 0 ("a", usize)
-// 0007 | Trunc 4B
-// 0008 | LoadLocal 1 ("b", i32)
-// 0009 | Sub
-// 0010 | LoadLocal 1 ("b", i32)
-// 0011 | Iext 8B
-// 0012 | Const 2 (variant(1), i64)
-// 0013 | Add
+// 0000 | Const ! 0 (variant(10), usize)
+// 0001 | AddLocal l 0 ("a", usize)
+// 0002 | Const ! 1 (variant(20), i32)
+// 0003 | AddLocal w 1 ("b", i32)
+// 0004 | LoadLocal ! 0 ("a", usize)
+// 0005 | LoadLocal ! 1 ("b", i32)
+// 0006 | Uext ! 8B
+// 0007 | Add l
+// 0008 | AddLocal l 2 ("c", usize)
+// 0009 | LoadLocal ! 0 ("a", usize)
+// 0010 | Trunc ! 4B
+// 0011 | LoadLocal ! 1 ("b", i32)
+// 0012 | Sub w
+// 0013 | AddLocal w 3 ("d", i32)
+// 0014 | LoadLocal ! 1 ("b", i32)
+// 0015 | Iext ! 8B
+// 0016 | Const ! 2 (variant(1), i64)
+// 0017 | Add l
+// 0018 | AddLocal l 4 ("e", i64)
 // next: # func(usize) usize
 // locals: [(0, "x", usize)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("x", usize)
-// 0001 | Const 0 (variant(1), usize)
-// 0002 | Add
-// 0003 | Ret
+// 0000 | LoadLocal ! 0 ("x", usize)
+// 0001 | Const ! 0 (variant(1), usize)
+// 0002 | Add l
+// 0003 | Ret !
 // 

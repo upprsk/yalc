@@ -14,23 +14,23 @@ func process(a: i32, b: i32) i32 {
 // locals: [(0, "a", i32), (1, "b", i32)]
 // calls: []
 // b 0:
-// 0000 | LoadLocal 0 ("a", i32)
-// 0001 | Const 0 (variant(0), i32)
-// 0002 | Neq
-// 0003 | Branch b 1, 2
+// 0000 | LoadLocal ! 0 ("a", i32)
+// 0001 | Const ! 0 (variant(0), i32)
+// 0002 | Neq !
+// 0003 | Branch ! b 1, 2
 // b 1:
-// 0000 | LoadLocal 1 ("b", i32)
-// 0001 | Const 0 (variant(2), i32)
-// 0002 | Mul
-// 0003 | StoreLocal 1 ("b", i32)
-// 0004 | Jump j 3
+// 0000 | LoadLocal ! 1 ("b", i32)
+// 0001 | Const ! 0 (variant(2), i32)
+// 0002 | Mul w
+// 0003 | StoreLocal ! 1 ("b", i32)
+// 0004 | Jump ! j 3
 // b 2:
-// 0000 | LoadLocal 1 ("b", i32)
-// 0001 | Const 0 (variant(3), i32)
-// 0002 | Mul
-// 0003 | StoreLocal 1 ("b", i32)
-// 0004 | Jump j 3
+// 0000 | LoadLocal ! 1 ("b", i32)
+// 0001 | Const ! 0 (variant(3), i32)
+// 0002 | Mul w
+// 0003 | StoreLocal ! 1 ("b", i32)
+// 0004 | Jump ! j 3
 // b 3:
-// 0000 | LoadLocal 1 ("b", i32)
-// 0001 | Ret
+// 0000 | LoadLocal ! 1 ("b", i32)
+// 0001 | Ret !
 // 
