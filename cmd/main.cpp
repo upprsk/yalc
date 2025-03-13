@@ -2,13 +2,11 @@
 #include <optional>
 
 #include "argparser.hpp"
-#include "codegen_qbe.hpp"
 #include "cpptrace/from_current.hpp"
 #include "error_reporter.hpp"
 #include "fmt/base.h"
 #include "fmt/ranges.h"
 #include "parser.hpp"
-#include "sema.hpp"
 #include "tokenizer.hpp"
 #include "types.hpp"
 #include "typing.hpp"
@@ -36,16 +34,6 @@ auto main(int argc, char** argv) -> int {
         }
 
         auto ts = yal::TypeStore::new_store();
-        auto m = yal::sema(ast, ts, root, er);
-
-        fmt::println(stderr, "{}",
-                     yal::FatNodeHandle{.ast = &ast, .node = root, .ts = &ts});
-
-        for (auto const& func : m.funcs) {
-            func.disasm(stderr, ts);
-        }
-
-        yal::codegen::qbe::codegen(m, ts, er, stdout);
 
         return er.had_error() ? 1 : 0;
     }

@@ -1,16 +1,12 @@
 add_library(yal
     ast.cpp
     ast.hpp
-    codegen_qbe.cpp
-    codegen_qbe.hpp
     error_reporter.cpp
     error_reporter.hpp
     hlir.cpp
     hlir.hpp
     parser.cpp
     parser.hpp
-    sema.cpp
-    sema.hpp
     span.cpp
     span.hpp
     tokenizer.cpp

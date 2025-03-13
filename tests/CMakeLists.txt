@@ -1,7 +1,6 @@
 set(TEST_FILES
   ast.cpp
   parser.cpp
-  sema.cpp
   tokenizer.cpp
 )
 
