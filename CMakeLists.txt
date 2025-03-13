@@ -32,12 +32,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fmt)
 
 FetchContent_Declare(
-  cpptrace
-  GIT_REPOSITORY https://github.com/jeremy-rifkin/cpptrace.git
-  GIT_TAG        v0.7.5
+  libassert
+  GIT_REPOSITORY https://github.com/jeremy-rifkin/libassert.git
+  GIT_TAG        v2.1.5 # <HASH or TAG>
   GIT_SHALLOW    Yes
 )
-FetchContent_MakeAvailable(cpptrace)
+FetchContent_MakeAvailable(libassert)
 
 FetchContent_Declare(
   Catch2

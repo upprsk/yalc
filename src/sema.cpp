@@ -836,8 +836,8 @@ struct SemaFunc {
     auto push_inst_const(Span s, hlir::Value v) const -> size_t {
         auto blk = current_block();
         auto sz = blk->consts.size();
-        if (sz == std::numeric_limits<uint8_t>::max())
-            throw std::runtime_error{"too many constants in block"};
+        ASSERT(sz < std::numeric_limits<uint8_t>::max(),
+               "too many constants in block");
 
         blk->consts.push_back(v);
         return push_inst(s, hlir::InstKind::Const, sz);
@@ -849,8 +849,8 @@ struct SemaFunc {
         if (idx >= 0) return push_inst(s, hlir::InstKind::Call, idx);
 
         auto sz = func->calls.size();
-        if (sz == std::numeric_limits<uint8_t>::max())
-            throw std::runtime_error{"too many calls in func"};
+        ASSERT(sz < std::numeric_limits<uint8_t>::max(),
+               "too many calls in func");
 
         func->calls.push_back(fn);
         return push_inst(s, hlir::InstKind::Call, sz);
@@ -860,11 +860,9 @@ struct SemaFunc {
     auto push_inst_load(Span s, Decl const& decl) const -> size_t {
         if (decl.is_local()) {
             auto [loc, off] = lookup_local(decl.name);
-            if (!loc)
-                throw std::runtime_error{
-                    fmt::format("push_inst_load({}): marked as local but not "
-                                "found in locals",
-                                decl.name)};
+            ASSERT(loc,
+                   "push_inst_load: marked as local but not found in locals",
+                   decl.name);
 
             return push_inst(s, hlir::InstKind::LoadLocal, off);
         }
@@ -874,27 +872,23 @@ struct SemaFunc {
             return push_inst_const(s, decl.value);
         }
 
-        throw std::runtime_error{fmt::format(
-            "push_inst_load({}): non-locals have not been implemented",
-            decl.name)};
+        PANIC("push_inst_load: non-locals have not been implemented",
+              decl.name);
     }
 
     // NOLINTNEXTLINE(modernize-use-nodiscard)
     auto push_inst_store(Span s, Decl const& decl) const -> size_t {
         if (decl.is_local()) {
             auto [loc, off] = lookup_local(decl.name);
-            if (!loc)
-                throw std::runtime_error{
-                    fmt::format("push_inst_load({}): marked as local but not "
-                                "found in locals",
-                                decl.name)};
+            ASSERT(loc,
+                   "push_inst_store: marked as local but not found in locals",
+                   decl.name);
 
             return push_inst(s, hlir::InstKind::StoreLocal, off);
         }
 
-        throw std::runtime_error{fmt::format(
-            "push_inst_store({}): non-locals have not been implemented",
-            decl.name)};
+        PANIC("push_inst_store: non-locals have not been implemented",
+              decl.name);
     }
 
     [[nodiscard]] auto current_block() const -> hlir::Block* {
@@ -934,9 +928,7 @@ struct SemaFunc {
     }
 
     void pop_local() {
-        if (stack_top == 0)
-            throw std::runtime_error{"popping empty virtual stack"};
-
+        ASSERT(stack_top > 0, "popping empty virtual stack");
         stack_top--;
     }
 

@@ -7,6 +7,7 @@
 
 #include "ast.hpp"
 #include "error_reporter.hpp"
+#include "libassert/assert.hpp"
 #include "tokenizer.hpp"
 
 namespace yal {
@@ -20,6 +21,7 @@ struct Parser {
     }
 
     [[nodiscard]] constexpr auto peek_prev() const -> Token {
+        ASSERT(current > 0);
         // FIXME: this is not good, there is no bounds check
         return tokens[current - 1];
     }

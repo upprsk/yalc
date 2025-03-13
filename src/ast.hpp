@@ -99,17 +99,17 @@ struct NodeHandle {
     // -----------------------------------------------------------------------
 
     [[nodiscard]] constexpr auto as_index() const -> uint32_t {
-        if (!is_index()) throw std::runtime_error{"NodeHandle is not an index"};
+        ASSERT(is_index(), "NodeHandle is not an index");
         return as_raw_idx();
     }
 
     [[nodiscard]] constexpr auto as_array() const -> uint32_t {
-        if (!is_array()) throw std::runtime_error{"NodeHandle is not an array"};
+        ASSERT(is_array(), "NodeHandle is not an array");
         return as_raw_idx();
     }
 
     [[nodiscard]] constexpr auto as_count() const -> uint32_t {
-        if (!is_count()) throw std::runtime_error{"NodeHandle is not an count"};
+        ASSERT(is_count(), "NodeHandle is not an count");
         return as_raw_idx();
     }
 

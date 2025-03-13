@@ -2,14 +2,13 @@
 
 #include "fmt/base.h"
 #include "fmt/format.h"
+#include "libassert/assert.hpp"
 
 namespace yal {
 
 void Ast::assert_is_oneof(std::string_view name, Node const& n,
                           auto&&... kinds) const {
-    if (!n.is_oneof(kinds...))
-        throw std::runtime_error{
-            fmt::format("invalid node for `{}`: {}", name, n.kind)};
+    if (!n.is_oneof(kinds...)) PANIC("invalid node received", name, n.kind);
 }
 
 auto Ast::node_with_children(Node const& n) const -> Node::WithChildren {
@@ -49,10 +48,8 @@ auto Ast::node_func(Node const& n) const -> Node::Func {
     assert_is_oneof("node_func", n, NodeKind::Func, NodeKind::FuncExtern);
 
     auto children = get_array(n.first, n.second.as_count());
-    if (children.size() < 3)
-        throw std::runtime_error{
-            fmt::format("invalid number of children for `node_func`: {} < 3",
-                        children.size())};
+    ASSERT(children.size() >= 3, n.kind,
+           "invalid number of children for `node_func`");
 
     return {
         .name = children[0],
@@ -124,18 +121,16 @@ auto Ast::node_if_stmt(Node const& n) const -> Node::IfStmt {
         };
     }
 
-    throw std::runtime_error{
-        fmt::format("invalid node for `node_if_stmt`: {}", n.kind)};
+    PANIC("invalid node for `node_if_stmt`", n.kind);
 }
 
 auto Ast::node_array(Node const& n) const -> Node::Array {
     if (n.kind == NodeKind::Array) {
         auto children = get_array(n.first, n.second.as_count());
 
-        if (children.size() < 2)
-            throw std::runtime_error{fmt::format(
-                "invalid number of children for `node_array`: {} < 2",
-                children.size())};
+        ASSERT(children.size() >= 2,
+               "invalid number of children for `node_array`", n.kind,
+               children.size());
 
         return {
             .type = children[1],
@@ -147,10 +142,9 @@ auto Ast::node_array(Node const& n) const -> Node::Array {
     if (n.kind == NodeKind::ArrayAutoLen) {
         auto children = get_array(n.first, n.second.as_count());
 
-        if (children.size() < 1)
-            throw std::runtime_error{fmt::format(
-                "invalid number of children for `node_array`: {} < 1",
-                children.size())};
+        ASSERT(children.size() >= 1,
+               "invalid number of children for `node_array`", n.kind,
+               children.size());
 
         return {
             .type = children[0],
@@ -167,18 +161,15 @@ auto Ast::node_array(Node const& n) const -> Node::Array {
         };
     }
 
-    throw std::runtime_error{
-        fmt::format("invalid node for `node_array`: {}", n.kind)};
+    PANIC("invalid number of children for `node_array`", n.kind);
 }
 
 auto Ast::node_call(Node const& n) const -> Node::Call {
     assert_is_oneof("node_call", n, NodeKind::Call);
 
     auto children = get_array(n.first, n.second.as_count());
-    if (children.size() < 1)
-        throw std::runtime_error{
-            fmt::format("invalid number of children for `node_call`: {} < 1",
-                        children.size())};
+    ASSERT(children.size() >= 1, "invalid number of children for `node_call`",
+           n.kind, children.size());
 
     return {
         .callee = children[0],
@@ -203,8 +194,7 @@ auto Ast::new_node_if(NodeKind kind, Span span, Node::IfStmt params)
             kind, span, params.cond,
             new_array_of(params.decl, params.when_true, params.when_false));
 
-    throw std::runtime_error{
-        fmt::format("invalid kind for `new_node_if`: {}", kind)};
+    PANIC("invalid kind for `new_node_if`", kind);
 }
 
 auto Ast::new_node_array(NodeKind kind, Span span, Node::Array params)
@@ -221,8 +211,7 @@ auto Ast::new_node_array(NodeKind kind, Span span, Node::Array params)
     if (kind == NodeKind::ArrayType)
         return new_node(kind, span, params.size, params.type);
 
-    throw std::runtime_error{
-        fmt::format("invalid kind for `new_node_array`: {}", kind)};
+    PANIC("invalid kind for `new_node_array`", kind);
 }
 
 // ----------------------------------------------------------------------------

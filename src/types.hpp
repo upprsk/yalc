@@ -8,6 +8,7 @@
 
 #include "error_reporter.hpp"
 #include "fmt/format.h"
+#include "libassert/assert.hpp"
 
 namespace yal {
 
@@ -390,11 +391,8 @@ struct TypeStore {
     // Get a reference to a type from it's handle. The pointer is invalid after
     // any modification to the ast, do not hold on to it.
     [[nodiscard]] constexpr auto get(TypeHandle h) const -> Type const* {
-        if (!h.is_valid())
-            throw fmt::system_error(6, "invalid type handle: {:x}", h.value());
-        if (h.is_array())
-            throw fmt::system_error(1, "type handle is an array: {:x}",
-                                    h.value());
+        ASSERT(h.is_valid(), "invalid type handle", h.value());
+        ASSERT(!h.is_array(), "type handle is an array", h.value());
 
         return &types.at(h.as_idx());
     }
@@ -402,11 +400,8 @@ struct TypeStore {
     // Get a mutable reference to a type from it's handle. The pointer is
     // invalid after any modification to the ast, do not hold on to it.
     [[nodiscard]] constexpr auto get_mut(TypeHandle h) -> Type* {
-        if (!h.is_valid())
-            throw fmt::system_error(6, "invalid type handle: {:x}", h.value());
-        if (h.is_array())
-            throw fmt::system_error(1, "type handle is an array: {:x}",
-                                    h.value());
+        ASSERT(h.is_valid(), "invalid type handle", h.value());
+        ASSERT(!h.is_array(), "type handle is an array", h.value());
 
         return &types.at(h.as_idx());
     }
@@ -415,11 +410,8 @@ struct TypeStore {
     // after any modification to the ast, do not hold on to it.
     [[nodiscard]] constexpr auto get_array(TypeHandle h, size_t count) const
         -> std::span<TypeHandle const> {
-        if (!h.is_valid())
-            throw fmt::system_error(0, "invalid type handle: {:x}", h.value());
-        if (!h.is_array())
-            throw fmt::system_error(0, "type handle is not an array: {:x}",
-                                    h.value());
+        ASSERT(h.is_valid(), "invalid type handle", h.value());
+        ASSERT(h.is_array(), "type handle is not an array", h.value());
 
         std::span s = type_refs;
         return s.subspan(h.as_idx(), count);
@@ -523,21 +515,17 @@ struct fmt::formatter<yal::FatTypeHandle> {
 namespace yal {
 
 constexpr auto Type::as_func(TypeStore const& store) const -> TypeFunc {
-    if (kind != TypeKind::Func)
-        throw fmt::system_error(6, "invalid type kind for `as_func`: {}", kind);
+    ASSERT(kind == TypeKind::Func, "invalid type kind for `as_func`", kind);
 
     auto items = store.get_children(this);
-    if (items.size() < 1)
-        throw fmt::system_error(
-            6, "invalid number of children for func: {} < 1", items.size());
+    ASSERT(items.size() >= 1, "invalid number of children for func",
+           items.size());
 
     return {.ret = items[0], .args = items.subspan(1)};
 }
 
 constexpr auto Type::as_array() const -> TypeArray {
-    if (kind != TypeKind::Array)
-        throw fmt::system_error(6, "invalid type kind for `as_array`: {}",
-                                kind);
+    ASSERT(kind == TypeKind::Array, "invalid type kind for `as_array`", kind);
 
     return {.inner = first, .length = second.as_count()};
 };

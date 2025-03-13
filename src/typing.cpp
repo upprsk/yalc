@@ -43,8 +43,7 @@ struct Context {
     }
 
     [[nodiscard]] auto current_func() const -> Func const* {
-        if (!_current_function) throw std::runtime_error{"no current func"};
-
+        ASSERT(_current_function, "no current func");
         return _current_function;
     }
 
@@ -253,7 +252,7 @@ struct Typing {
                     return node->set_type(h);
                 }
 
-                throw std::runtime_error{"not implemented"};
+                PANIC("not implemented");
             }
 
             case NodeKind::DefDecl: break;
@@ -561,8 +560,7 @@ struct Typing {
                     ts->get_type_u8(), TypeFlags::IsConst));
         }
 
-        er->report_debug(node->span, "not_implemented: {}", node->kind);
-        throw std::runtime_error{"not implemented"};
+        PANIC("not implemented", node->kind);
     }
 
     auto eval_to_type(Context& ctx, NodeHandle h) const -> TypeHandle {

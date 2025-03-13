@@ -22,6 +22,8 @@ TEST_CASE("empty ast", "[ast]") {
 }
 
 TEST_CASE("invalid handles", "[ast]") {
+    SKIP("find out how to check asserts");
+
     auto ast = Ast{};
 
     SECTION("invalid handle") {

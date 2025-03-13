@@ -184,8 +184,7 @@ struct CodegenFunc {
                 println(out, "data $data_{} = {{ b {} }}", i,
                         fmt::join(p.value_bytes(), " "));
             } else {
-                throw std::runtime_error{fmt::format(
-                    "invalid type in pending data: {}", ts->fatten(p.type))};
+                PANIC("invalid type in pending data", ts->fatten(p.type));
             }
 
             i++;
@@ -209,7 +208,7 @@ struct CodegenFunc {
                     break;
                 }
 
-                throw std::runtime_error{"invalid size for qbe type"};
+                PANIC("invalid size for qbe type");
         }
 
         return ret_type;
