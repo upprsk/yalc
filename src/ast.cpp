@@ -235,31 +235,32 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
                             TypeStore const*            ts) {
         size_t i{};
         for (auto const& chld : lst) {
-            if (i++ != 0) format_to(ctx.out(), ", ");
+            if (i++ != 0) fmt::format_to(ctx.out(), ", ");
             dump(ctx, chld, ts);
         }
     };
 
     auto dump_type = [](fmt::format_context& ctx, TypeStore const* ts,
                         Node const& n) {
-        if (ts) return format_to(ctx.out(), "{}, ", ts->fatten(n.type));
+        if (ts) return fmt::format_to(ctx.out(), "{}, ", ts->fatten(n.type));
 
         return ctx.out();
     };
 
-    if (!n.is_valid()) return format_to(ctx.out(), "{}", n);
+    if (!n.is_valid()) return fmt::format_to(ctx.out(), "{}", n);
 
     auto node = get(n);
     switch (node->kind) {
         case NodeKind::Err:
-            format_to(ctx.out(), "Err(");
+            fmt::format_to(ctx.out(), "Err(");
             dump_type(ctx, ts, *node);
-            return format_to(ctx.out(), "{})", node->span);
+            return fmt::format_to(ctx.out(), "{})", node->span);
 
         case NodeKind::Break:
         case NodeKind::Nil: {
-            auto it = format_to(ctx.out(), "{}", node->kind);
-            if (ts) it = format_to(ctx.out(), "({})", ts->fatten(node->type));
+            auto it = fmt::format_to(ctx.out(), "{}", node->kind);
+            if (ts)
+                it = fmt::format_to(ctx.out(), "({})", ts->fatten(node->type));
             return it;
         }
 
@@ -270,71 +271,71 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
         case NodeKind::IdPack: {
             auto p = node_with_children(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
-            format_to(ctx.out(), "[", node->kind);
+            fmt::format_to(ctx.out(), "[", node->kind);
             dump_list(ctx, p.children, ts);
-            return format_to(ctx.out(), "])");
+            return fmt::format_to(ctx.out(), "])");
         }
 
         case NodeKind::Func: {
             auto p = node_func(*node);
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
 
             dump(ctx, p.name, ts);
 
-            format_to(ctx.out(), ", [");
+            fmt::format_to(ctx.out(), ", [");
             dump_list(ctx, p.args, ts);
-            format_to(ctx.out(), "], ");
+            fmt::format_to(ctx.out(), "], ");
 
             dump(ctx, p.ret, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.body, ts);
 
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::FuncExtern: {
             auto p = node_func(*node);
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
 
             dump(ctx, p.name, ts);
 
-            format_to(ctx.out(), ", [");
+            fmt::format_to(ctx.out(), ", [");
             dump_list(ctx, p.args, ts);
-            format_to(ctx.out(), "], ");
+            fmt::format_to(ctx.out(), "], ");
 
             dump(ctx, p.ret, ts);
 
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::FuncArg: {
             auto p = node_named(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
-            format_to(ctx.out(), "{}, ", p.name);
+            fmt::format_to(ctx.out(), "{}, ", p.name);
             dump(ctx, p.child, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::VarDecl:
         case NodeKind::DefDecl: {
             auto p = node_decl(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
 
             dump(ctx, p.ids, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.type, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.init, ts);
 
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::AddrOf:
@@ -356,62 +357,62 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
         case NodeKind::SlicePtrConst: {
             auto p = node_with_child(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
             dump(ctx, p.child, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::IfStmt: {
             auto p = node_if_stmt(*node);
 
-            format_to(ctx.out(), "IfStmt(");
+            fmt::format_to(ctx.out(), "IfStmt(");
             dump_type(ctx, ts, *node);
             dump(ctx, p.cond, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.when_true, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::IfStmtWithElse: {
             auto p = node_if_stmt(*node);
 
-            format_to(ctx.out(), "IfStmtWithElse(");
+            fmt::format_to(ctx.out(), "IfStmtWithElse(");
             dump_type(ctx, ts, *node);
             dump(ctx, p.cond, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.when_true, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.when_false, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::IfStmtWithDecl: {
             auto p = node_if_stmt(*node);
 
-            format_to(ctx.out(), "IfStmtWithDecl(");
+            fmt::format_to(ctx.out(), "IfStmtWithDecl(");
             dump_type(ctx, ts, *node);
             dump(ctx, p.decl, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.cond, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.when_true, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::IfStmtWithDeclAndElse: {
             auto p = node_if_stmt(*node);
 
-            format_to(ctx.out(), "IfStmtWithDeclAndElse(");
+            fmt::format_to(ctx.out(), "IfStmtWithDeclAndElse(");
             dump_type(ctx, ts, *node);
             dump(ctx, p.decl, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.cond, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.when_true, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.when_false, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::WhileStmt:
@@ -438,88 +439,88 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
         case NodeKind::Cast: {
             auto p = node_with_child_pair(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
             dump(ctx, p.first, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.second, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::Array: {
             auto p = node_array(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
             dump(ctx, p.size, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.type, ts);
-            format_to(ctx.out(), ", [");
+            fmt::format_to(ctx.out(), ", [");
             dump_list(ctx, p.items, ts);
-            return format_to(ctx.out(), "])");
+            return fmt::format_to(ctx.out(), "])");
         }
 
         case NodeKind::ArrayAutoLen: {
             auto p = node_array(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
             dump(ctx, p.type, ts);
-            format_to(ctx.out(), ", [");
+            fmt::format_to(ctx.out(), ", [");
             dump_list(ctx, p.items, ts);
-            return format_to(ctx.out(), "])");
+            return fmt::format_to(ctx.out(), "])");
         }
 
         case NodeKind::ArrayType: {
             auto p = node_array(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
             dump(ctx, p.size, ts);
-            format_to(ctx.out(), ", ");
+            fmt::format_to(ctx.out(), ", ");
             dump(ctx, p.type, ts);
-            return format_to(ctx.out(), ")");
+            return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::Call: {
             auto c = node_call(*node);
-            format_to(ctx.out(), "Call(");
+            fmt::format_to(ctx.out(), "Call(");
             dump_type(ctx, ts, *node);
 
             dump(ctx, c.callee, ts);
-            format_to(ctx.out(), ", [");
+            fmt::format_to(ctx.out(), ", [");
             dump_list(ctx, c.args, ts);
-            return format_to(ctx.out(), "])");
+            return fmt::format_to(ctx.out(), "])");
         }
 
         case NodeKind::Field: {
             auto p = node_named(*node);
 
-            format_to(ctx.out(), "{}(", node->kind);
+            fmt::format_to(ctx.out(), "{}(", node->kind);
             dump_type(ctx, ts, *node);
             dump(ctx, p.child, ts);
-            return format_to(ctx.out(), ", {})", p.name);
+            return fmt::format_to(ctx.out(), ", {})", p.name);
         }
 
         case NodeKind::EnumLit:
-            format_to(ctx.out(), "EnumLit(");
+            fmt::format_to(ctx.out(), "EnumLit(");
             dump_type(ctx, ts, *node);
-            return format_to(ctx.out(), ".{})", node->value_string());
+            return fmt::format_to(ctx.out(), ".{})", node->value_string());
         case NodeKind::Int:
-            format_to(ctx.out(), "Int(");
+            fmt::format_to(ctx.out(), "Int(");
             dump_type(ctx, ts, *node);
-            return format_to(ctx.out(), "{})", node->value_uint64());
+            return fmt::format_to(ctx.out(), "{})", node->value_uint64());
         case NodeKind::Id:
-            format_to(ctx.out(), "Id(");
+            fmt::format_to(ctx.out(), "Id(");
             dump_type(ctx, ts, *node);
-            return format_to(ctx.out(), "{})", node->value_string());
+            return fmt::format_to(ctx.out(), "{})", node->value_string());
         case NodeKind::Str:
-            format_to(ctx.out(), "Str(");
+            fmt::format_to(ctx.out(), "Str(");
             dump_type(ctx, ts, *node);
-            return format_to(ctx.out(), "{:?})", node->value_string());
+            return fmt::format_to(ctx.out(), "{:?})", node->value_string());
     }
 
-    return format_to(ctx.out(), "unknown");
+    return fmt::format_to(ctx.out(), "unknown");
 }
 
 void Ast::dump_dot(FILE* f, NodeHandle n, TypeStore const* ts) const {
