@@ -24,4 +24,4 @@ target_include_directories(yal PUBLIC .)
 target_compile_options(yal PRIVATE -Wall -Wextra)
 target_link_libraries(yal PUBLIC fmt::fmt cpptrace::cpptrace)
 
-add_mocked_library(yal)
+# add_mocked_library(yal)
