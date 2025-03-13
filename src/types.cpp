@@ -29,6 +29,26 @@ auto TypeStore::new_store() -> TypeStore {
     return ts;
 }
 
+auto TypeStore::type_as_func(TypeHandle h) const -> Type::Func {
+    auto ty = get(h);
+    ASSERT(ty->kind == TypeKind::Func, "invalid type kind for `type_as_func`",
+           ty->kind);
+
+    auto items = get_children(h);
+    ASSERT(items.size() >= 1, "invalid number of children for func",
+           items.size());
+
+    return {.ret = items[0], .args = items.subspan(1)};
+}
+
+auto TypeStore::type_as_array(TypeHandle h) const -> Type::Array {
+    auto ty = get(h);
+    ASSERT(ty->kind == TypeKind::Array, "invalid type kind for `as_array`",
+           ty->kind);
+
+    return {.inner = ty->first, .length = ty->second.as_count()};
+}
+
 auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
     -> fmt::format_context::iterator {
     if (!n.is_valid()) return format_to(ctx.out(), "{}", n);
@@ -65,10 +85,12 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
 
         case TypeKind::Bool: return format_to(ctx.out(), "bool");
 
-        case TypeKind::Array:
-            format_to(ctx.out(), "[{}]{}", type->second.value(),
+        case TypeKind::Array: {
+            auto a = type_as_array(n);
+            format_to(ctx.out(), "[{}]{}", a.length,
                       type->is_const() ? "const " : "");
-            return dump(ctx, type->first);
+            return dump(ctx, a.inner);
+        }
 
         case TypeKind::Ptr:
             format_to(ctx.out(), "*");
@@ -79,7 +101,7 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
             if (type->is_const()) format_to(ctx.out(), "const ");
             return dump(ctx, type->first);
         case TypeKind::Func: {
-            auto f = type->as_func(*this);
+            auto f = type_as_func(n);
             format_to(ctx.out(), "func(");
 
             size_t i{};
@@ -95,7 +117,6 @@ auto TypeStore::dump(fmt::format_context& ctx, TypeHandle n) const
 
     return format_to(ctx.out(), "unknown");
 }
-
 }  // namespace yal
 
 auto fmt::formatter<yal::TypeHandle>::format(yal::TypeHandle n,

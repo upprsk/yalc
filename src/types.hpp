@@ -210,20 +210,15 @@ struct Type {
 
     constexpr auto operator==(Type const&) const -> bool = default;
 
-    struct TypeFunc {
+    struct Func {
         TypeHandle                  ret;
         std::span<TypeHandle const> args;
     };
 
-    struct TypeArray {
+    struct Array {
         TypeHandle inner;
         uint32_t   length;
     };
-
-    [[nodiscard]] constexpr auto as_func(TypeStore const& store) const
-        -> TypeFunc;
-
-    [[nodiscard]] constexpr auto as_array() const -> TypeArray;
 };
 
 struct FatTypeHandle {
@@ -233,6 +228,9 @@ struct FatTypeHandle {
 
 struct TypeStore {
     static auto new_store() -> TypeStore;
+
+    [[nodiscard]] auto type_as_func(TypeHandle h) const -> Type::Func;
+    [[nodiscard]] auto type_as_array(TypeHandle h) const -> Type::Array;
 
     [[nodiscard]] auto get_type_err() const -> TypeHandle { return err_type; }
     [[nodiscard]] auto get_type_type() const -> TypeHandle { return type_type; }
@@ -349,7 +347,7 @@ struct TypeStore {
 
         for (auto const& t : types) {
             if (t.is_func()) {
-                auto f = t.as_func(*this);
+                auto f = type_as_func(TypeHandle::from_size(i));
 
                 if (std::ranges::equal(args, f.args) && f.ret == ret)
                     return TypeHandle::from_size(i);
@@ -513,22 +511,6 @@ struct fmt::formatter<yal::FatTypeHandle> {
 };
 
 namespace yal {
-
-constexpr auto Type::as_func(TypeStore const& store) const -> TypeFunc {
-    ASSERT(kind == TypeKind::Func, "invalid type kind for `as_func`", kind);
-
-    auto items = store.get_children(this);
-    ASSERT(items.size() >= 1, "invalid number of children for func",
-           items.size());
-
-    return {.ret = items[0], .args = items.subspan(1)};
-}
-
-constexpr auto Type::as_array() const -> TypeArray {
-    ASSERT(kind == TypeKind::Array, "invalid type kind for `as_array`", kind);
-
-    return {.inner = first, .length = second.as_count()};
-};
 
 constexpr auto Type::size(TypeStore const& ts) const -> size_t {
     switch (kind) {

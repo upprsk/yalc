@@ -334,7 +334,7 @@ struct SemaFunc {
 
             case NodeKind::ReturnStmt: {
                 auto p = ast->node_with_child(*node);
-                auto ret = ts->get(func->type)->as_func(*ts).ret;
+                auto ret = ts->type_as_func(func->type).ret;
 
                 auto ty = ts->get_type_void();
                 if (!ast->get(p.child)->is_nil()) {
@@ -558,7 +558,7 @@ struct SemaFunc {
                     return ast->get_mut(n)->set_type(ts->get_type_err());
                 }
 
-                auto func = f->as_func(*ts);
+                auto func = ts->type_as_func(d->value.type);
                 if (func.args.size() != p.args.size()) {
                     er->report_error(node->span,
                                      "wrong number of types for func call, "
@@ -691,7 +691,7 @@ struct SemaFunc {
                         push_inst_const(
                             node->span,
                             {.type = ts->get_type_usize(),
-                             .value = ts->get(child)->as_array().length});
+                             .value = ts->type_as_array(child).length});
 
                         return ast->get_mut(n)->set_type(ts->get_type_usize());
                     }
@@ -699,7 +699,7 @@ struct SemaFunc {
                     if (p.name == "ptr") {
                         // the pointer to the array should already be at the top
                         // of the stack because of `child`.
-                        auto inner = ts->get(child)->as_array().inner;
+                        auto inner = ts->type_as_array(child).inner;
 
                         return ast->get_mut(n)->set_type(ts->get_type_multi_ptr(
                             inner, ts->get(child)->is_const()

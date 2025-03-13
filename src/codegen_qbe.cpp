@@ -22,7 +22,7 @@ struct CodegenFunc {
 
         println(out, "# {}", ts->fatten(func.type));
 
-        auto ft = ts->get(func.type)->as_func(*ts);
+        auto ft = ts->type_as_func(func.type);
         if (!ts->get(ft.ret)->is_integral()) {
             er->report_bug(
                 func.blocks.at(0).spans[0],
@@ -134,7 +134,7 @@ struct CodegenFunc {
                         pop_tmp();
 
                         auto callee = mod->get(func.calls.at(inst.a));
-                        auto ct = ts->get(callee->type)->as_func(*ts);
+                        auto ct = ts->type_as_func(callee->type);
 
                         if (!ts->get(ct.ret)->is_void()) {
                             print(out, "    %tmp_{} = {} ", r,
