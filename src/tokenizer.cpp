@@ -54,6 +54,7 @@ struct Tokenizer {
         return tokens;
     }
 
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto tokenize_one() -> Token {
         skip_whitespace();
 
