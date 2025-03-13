@@ -1,4 +1,6 @@
 add_executable(yalc
+    argparser.cpp
+    argparser.hpp
     main.cpp
 )
 target_include_directories(yalc PRIVATE .)
