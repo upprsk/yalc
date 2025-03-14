@@ -34,6 +34,7 @@ void print_help(std::string_view self) {
     println(stderr, "    --usage: show usage and exit.");
     println(stderr, "    --dump-tokens: dump tokenization result.");
     println(stderr, "    --dump-ast: dump parsed AST.");
+    println(stderr, "    --dump-ast-dot: dump parsed AST as a dot graph.");
 }
 
 auto argparse(int argc, char** argv) -> Args {
@@ -60,6 +61,8 @@ auto argparse(int argc, char** argv) -> Args {
             args.dump_tokens = true;
         } else if (arg == "--dump-ast") {
             args.dump_ast = true;
+        } else if (arg == "--dump-ast-dot") {
+            args.dump_ast_dot = true;
         } else if (args.program.empty()) {
             args.program = arg;
         } else {

@@ -32,6 +32,9 @@ auto main(int argc, char** argv) -> int {
         if (args.dump_ast) {
             fmt::println("{}", yal::FatNodeHandle{.ast = &ast, .node = root});
         }
+        if (args.dump_ast_dot) {
+            ast.dump_dot(stdout, root);
+        }
 
         auto ts = yal::TypeStore::new_store();
 
