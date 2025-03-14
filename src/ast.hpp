@@ -324,10 +324,7 @@ struct Node {
     Span                                                span;
     NodeHandle                                          first;
     NodeHandle                                          second;
-    TypeHandle                                          type;
     std::variant<std::monostate, std::string, uint64_t> value;
-
-    constexpr auto set_type(TypeHandle ty) -> TypeHandle { return type = ty; }
 
     [[nodiscard]] constexpr auto value_uint64() const -> uint64_t {
         return std::get<uint64_t>(value);
@@ -447,9 +444,8 @@ struct Node {
 };
 
 struct FatNodeHandle {
-    Ast const*       ast;
-    NodeHandle       node;
-    TypeStore const* ts = nullptr;
+    Ast const* ast;
+    NodeHandle node;
 };
 
 struct Ast {
@@ -515,13 +511,13 @@ struct Ast {
     [[nodiscard]] auto new_node_named(NodeKind kind, Span span,
                                       NodeHandle child, std::string name)
         -> NodeHandle {
-        return new_node(kind, span, child, NodeHandle{}, TypeHandle{}, name);
+        return new_node(kind, span, child, NodeHandle{}, name);
     }
 
     [[nodiscard]] auto new_node_named(NodeKind kind, Span span,
                                       std::string name, NodeHandle child)
         -> NodeHandle {
-        return new_node(kind, span, child, NodeHandle{}, TypeHandle{}, name);
+        return new_node(kind, span, child, NodeHandle{}, name);
     }
 
     [[nodiscard]] auto new_node_decl(NodeKind kind, Span span, NodeHandle ids,
@@ -545,14 +541,12 @@ struct Ast {
 
     [[nodiscard]] auto new_node_with_str(NodeKind kind, Span span,
                                          std::string value) -> NodeHandle {
-        return new_node(kind, span, NodeHandle{}, NodeHandle{}, TypeHandle{},
-                        value);
+        return new_node(kind, span, NodeHandle{}, NodeHandle{}, value);
     }
 
     [[nodiscard]] auto new_node_with_int(NodeKind kind, Span span,
                                          uint64_t value) -> NodeHandle {
-        return new_node(kind, span, NodeHandle{}, NodeHandle{}, TypeHandle{},
-                        value);
+        return new_node(kind, span, NodeHandle{}, NodeHandle{}, value);
     }
 
     // ------------------------------------------------------------------------
@@ -618,11 +612,6 @@ struct Ast {
         return {.ast = this, .node = h};
     }
 
-    [[nodiscard]] constexpr auto fatten(NodeHandle h, TypeStore const& ts) const
-        -> FatNodeHandle {
-        return {.ast = this, .node = h, .ts = &ts};
-    }
-
     // get the total number of nodes
     [[nodiscard]] constexpr auto size() const -> size_t { return nodes.size(); }
 
@@ -631,13 +620,11 @@ struct Ast {
         return node_refs.size();
     }
 
-    auto dump(fmt::format_context& ctx, NodeHandle n,
-              TypeStore const* ts = nullptr) const
+    auto dump(fmt::format_context& ctx, NodeHandle n) const
         -> fmt::format_context::iterator;
 
-    void dump_dot(FILE* f, NodeHandle n, TypeStore const* ts = nullptr) const;
-    void dump_dot_node(FILE* f, NodeHandle n,
-                       TypeStore const* ts = nullptr) const;
+    void dump_dot(FILE* f, NodeHandle n) const;
+    void dump_dot_node(FILE* f, NodeHandle n) const;
 
 private:
     std::vector<Node>       nodes;

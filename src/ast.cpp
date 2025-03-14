@@ -217,23 +217,15 @@ auto Ast::new_node_array(NodeKind kind, Span span, Node::Array params)
 // ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
-               TypeStore const* ts) const -> fmt::format_context::iterator {
+auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
+    -> fmt::format_context::iterator {
     auto dump_list = [this](fmt::format_context&        ctx,
-                            std::span<NodeHandle const> lst,
-                            TypeStore const*            ts) {
+                            std::span<NodeHandle const> lst) {
         size_t i{};
         for (auto const& chld : lst) {
             if (i++ != 0) fmt::format_to(ctx.out(), ", ");
-            dump(ctx, chld, ts);
+            dump(ctx, chld);
         }
-    };
-
-    auto dump_type = [](fmt::format_context& ctx, TypeStore const* ts,
-                        Node const& n) {
-        if (ts) return fmt::format_to(ctx.out(), "{}, ", ts->fatten(n.type));
-
-        return ctx.out();
     };
 
     if (!n.is_valid()) return fmt::format_to(ctx.out(), "{}", n);
@@ -242,14 +234,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
     switch (node->kind) {
         case NodeKind::Err:
             fmt::format_to(ctx.out(), "Err(");
-            dump_type(ctx, ts, *node);
             return fmt::format_to(ctx.out(), "{})", node->span);
 
         case NodeKind::Break:
         case NodeKind::Nil: {
             auto it = fmt::format_to(ctx.out(), "{}", node->kind);
-            if (ts)
-                it = fmt::format_to(ctx.out(), "({})", ts->fatten(node->type));
             return it;
         }
 
@@ -261,26 +250,24 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_with_children(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
             fmt::format_to(ctx.out(), "[", node->kind);
-            dump_list(ctx, p.children, ts);
+            dump_list(ctx, p.children);
             return fmt::format_to(ctx.out(), "])");
         }
 
         case NodeKind::Func: {
             auto p = node_func(*node);
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
 
-            dump(ctx, p.name, ts);
+            dump(ctx, p.name);
 
             fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.args, ts);
+            dump_list(ctx, p.args);
             fmt::format_to(ctx.out(), "], ");
 
-            dump(ctx, p.ret, ts);
+            dump(ctx, p.ret);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.body, ts);
+            dump(ctx, p.body);
 
             return fmt::format_to(ctx.out(), ")");
         }
@@ -288,15 +275,14 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
         case NodeKind::FuncExtern: {
             auto p = node_func(*node);
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
 
-            dump(ctx, p.name, ts);
+            dump(ctx, p.name);
 
             fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.args, ts);
+            dump_list(ctx, p.args);
             fmt::format_to(ctx.out(), "], ");
 
-            dump(ctx, p.ret, ts);
+            dump(ctx, p.ret);
 
             return fmt::format_to(ctx.out(), ")");
         }
@@ -305,9 +291,8 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_named(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
             fmt::format_to(ctx.out(), "{}, ", p.name);
-            dump(ctx, p.child, ts);
+            dump(ctx, p.child);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -316,13 +301,12 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_decl(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
 
-            dump(ctx, p.ids, ts);
+            dump(ctx, p.ids);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.type, ts);
+            dump(ctx, p.type);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.init, ts);
+            dump(ctx, p.init);
 
             return fmt::format_to(ctx.out(), ")");
         }
@@ -347,8 +331,7 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_with_child(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.child, ts);
+            dump(ctx, p.child);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -356,10 +339,9 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_if_stmt(*node);
 
             fmt::format_to(ctx.out(), "IfStmt(");
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.cond, ts);
+            dump(ctx, p.cond);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true, ts);
+            dump(ctx, p.when_true);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -367,12 +349,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_if_stmt(*node);
 
             fmt::format_to(ctx.out(), "IfStmtWithElse(");
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.cond, ts);
+            dump(ctx, p.cond);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true, ts);
+            dump(ctx, p.when_true);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_false, ts);
+            dump(ctx, p.when_false);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -380,12 +361,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_if_stmt(*node);
 
             fmt::format_to(ctx.out(), "IfStmtWithDecl(");
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.decl, ts);
+            dump(ctx, p.decl);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.cond, ts);
+            dump(ctx, p.cond);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true, ts);
+            dump(ctx, p.when_true);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -393,14 +373,13 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_if_stmt(*node);
 
             fmt::format_to(ctx.out(), "IfStmtWithDeclAndElse(");
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.decl, ts);
+            dump(ctx, p.decl);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.cond, ts);
+            dump(ctx, p.cond);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true, ts);
+            dump(ctx, p.when_true);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_false, ts);
+            dump(ctx, p.when_false);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -429,10 +408,9 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_with_child_pair(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.first, ts);
+            dump(ctx, p.first);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.second, ts);
+            dump(ctx, p.second);
             return fmt::format_to(ctx.out(), ")");
         }
 
@@ -440,12 +418,11 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_array(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.size, ts);
+            dump(ctx, p.size);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.type, ts);
+            dump(ctx, p.type);
             fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.items, ts);
+            dump_list(ctx, p.items);
             return fmt::format_to(ctx.out(), "])");
         }
 
@@ -453,10 +430,9 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_array(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.type, ts);
+            dump(ctx, p.type);
             fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.items, ts);
+            dump_list(ctx, p.items);
             return fmt::format_to(ctx.out(), "])");
         }
 
@@ -464,21 +440,19 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_array(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.size, ts);
+            dump(ctx, p.size);
             fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.type, ts);
+            dump(ctx, p.type);
             return fmt::format_to(ctx.out(), ")");
         }
 
         case NodeKind::Call: {
             auto c = node_call(*node);
             fmt::format_to(ctx.out(), "Call(");
-            dump_type(ctx, ts, *node);
 
-            dump(ctx, c.callee, ts);
+            dump(ctx, c.callee);
             fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, c.args, ts);
+            dump_list(ctx, c.args);
             return fmt::format_to(ctx.out(), "])");
         }
 
@@ -486,33 +460,25 @@ auto Ast::dump(fmt::format_context& ctx, NodeHandle n,
             auto p = node_named(*node);
 
             fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump_type(ctx, ts, *node);
-            dump(ctx, p.child, ts);
+            dump(ctx, p.child);
             return fmt::format_to(ctx.out(), ", {})", p.name);
         }
 
         case NodeKind::EnumLit:
-            fmt::format_to(ctx.out(), "EnumLit(");
-            dump_type(ctx, ts, *node);
-            return fmt::format_to(ctx.out(), ".{})", node->value_string());
+            return fmt::format_to(ctx.out(), "EnumLit(.{})",
+                                  node->value_string());
         case NodeKind::Int:
-            fmt::format_to(ctx.out(), "Int(");
-            dump_type(ctx, ts, *node);
-            return fmt::format_to(ctx.out(), "{})", node->value_uint64());
+            return fmt::format_to(ctx.out(), "Int({})", node->value_uint64());
         case NodeKind::Id:
-            fmt::format_to(ctx.out(), "Id(");
-            dump_type(ctx, ts, *node);
-            return fmt::format_to(ctx.out(), "{})", node->value_string());
+            return fmt::format_to(ctx.out(), "Id({})", node->value_string());
         case NodeKind::Str:
-            fmt::format_to(ctx.out(), "Str(");
-            dump_type(ctx, ts, *node);
-            return fmt::format_to(ctx.out(), "{:?})", node->value_string());
+            return fmt::format_to(ctx.out(), "Str({:?})", node->value_string());
     }
 
     return fmt::format_to(ctx.out(), "unknown");
 }
 
-void Ast::dump_dot(FILE* f, NodeHandle n, TypeStore const* ts) const {
+void Ast::dump_dot(FILE* f, NodeHandle n) const {
     using fmt::println;
 
     println(f, "digraph g {{");
@@ -523,13 +489,13 @@ void Ast::dump_dot(FILE* f, NodeHandle n, TypeStore const* ts) const {
     println(f, R"~~(node [ fontsize = "16" shape = "ellipse" ];)~~");
     println(f, R"~~(edge [ ];)~~");
 
-    dump_dot_node(f, n, ts);
+    dump_dot_node(f, n);
 
     println(f, "}}");
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void Ast::dump_dot_node(FILE* f, NodeHandle n, TypeStore const* ts) const {
+void Ast::dump_dot_node(FILE* f, NodeHandle n) const {
     using fmt::print;
     using fmt::println;
 
@@ -539,9 +505,6 @@ void Ast::dump_dot_node(FILE* f, NodeHandle n, TypeStore const* ts) const {
     if (n.is_valid()) {
         auto node = get(n);
         print(f, R"~~(label = "<f0> {:#} | {})~~", n, node->kind);
-        if (ts) {
-            print(f, R"~~( | {})~~", ts->fatten(node->type));
-        }
 
         if (node->first.is_valid())
             print(f, R"~~( | <f1> {:#})~~", node->first);
@@ -572,9 +535,9 @@ void Ast::dump_dot_node(FILE* f, NodeHandle n, TypeStore const* ts) const {
                 to.as_raw_idx());
     };
 
-    auto dump_and_conn = [this, f, ts, &conn](NodeHandle from, NodeHandle to,
-                                              std::string_view t = "f1") {
-        dump_dot_node(f, to, ts);
+    auto dump_and_conn = [this, f, &conn](NodeHandle from, NodeHandle to,
+                                          std::string_view t = "f1") {
+        dump_dot_node(f, to);
         conn(from, to, t);
     };
 
@@ -853,5 +816,5 @@ auto fmt::formatter<yal::Node>::format(yal::Node n, format_context& ctx) const
 auto fmt::formatter<yal::FatNodeHandle>::format(yal::FatNodeHandle n,
                                                 format_context&    ctx) const
     -> format_context::iterator {
-    return n.ast->dump(ctx, n.node, n.ts);
+    return n.ast->dump(ctx, n.node);
 }
