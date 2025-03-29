@@ -52,6 +52,7 @@ enum class TokenType : uint8_t {
     DotDotDot,
     DotStar,
     DotEqual,
+    DotLbrace,
     Question,
     Lparen,
     Rparen,
@@ -63,7 +64,9 @@ enum class TokenType : uint8_t {
     Decorator,
     Int,
     Hex,
+    Float,
     Str,
+    Char,
     Comment,
     Eof,
 };

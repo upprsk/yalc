@@ -112,6 +112,10 @@ struct Parser {
         return peek_prev().span;
     }
 
+    [[nodiscard]] constexpr auto to_loc(Span s) const -> Location {
+        return {.fileid = fileid, .span = s};
+    }
+
     [[nodiscard]] constexpr auto loc() const -> Location {
         return {.fileid = fileid, .span = peek().span};
     }
@@ -292,7 +296,139 @@ struct Parser {
 
     // ========================================================================
 
-    auto parse_expr() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_expr() -> ast::NodeId { return parse_prec_expr(PREC_NONE); }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_prec_expr(int precedence) -> ast::NodeId {
+        auto left = parse_prefix_expr();
+        while (get_precedence(peek().type) > precedence)
+            left = parse_infix_expr(left);
+
+        return left;
+    }
+
+    auto parse_prefix_expr() -> ast::NodeId {
+        auto t = peek_and_advance();
+        switch (t.type) {
+            case TokenType::Lparen: {
+                auto expr = parse_expr();
+                (void)consume(TokenType::Rparen);
+                return expr;
+            } break;
+
+            case TokenType::Id:
+                if (check("struct")) return parse_struct();
+                return parse_id(t);
+
+            case TokenType::Int:
+            case TokenType::Hex:
+            case TokenType::Float: return parse_number();
+
+            case TokenType::DotLbrace: return parse_lit();
+            case TokenType::Lbracket: return parse_arr();
+            case TokenType::Str: return parse_str();
+            case TokenType::Char: return parse_char();
+
+            case TokenType::Ampersand:
+            case TokenType::Bang:
+            case TokenType::Tilde:
+            case TokenType::Minus:
+            case TokenType::Plus:
+            case TokenType::Star:
+            case TokenType::Question: return parse_unary();
+
+            default: break;
+        }
+
+        er->report_error(t.span, "expected expression, found {}", t.type);
+        advance();
+
+        return ast.new_err(loc());
+    }
+
+    auto parse_infix_expr(ast::NodeId left) -> ast::NodeId {
+        PANIC("NOT IMPLEMENTED", left);
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_id(Token t) -> ast::NodeId {
+        return ast.new_id(to_loc(t.span), t.span.str(source));
+    }
+
+    auto parse_number() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_lit() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_arr() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_str() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_char() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_struct() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_unary() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+
+    // ------------------------------------------------------------------------
+
+    constexpr static auto const PREC_CALL = 10;
+    constexpr static auto const PREC_UNARY = 9;
+    constexpr static auto const PREC_CAST = 8;
+    constexpr static auto const PREC_MUL = 7;
+    constexpr static auto const PREC_ADD = 6;
+    constexpr static auto const PREC_SHIFT = 5;
+    constexpr static auto const PREC_COMP = 4;
+    constexpr static auto const PREC_BIT = 3;
+    constexpr static auto const PREC_LOGIC = 2;
+    constexpr static auto const PREC_ASSIGN = 1;
+    constexpr static auto const PREC_NONE = 0;
+
+    static constexpr auto get_precedence(std::string_view kw) -> int {
+        if (kw == "as") return PREC_CAST;
+        if (kw == "or" || kw == "and") return PREC_LOGIC;
+
+        return PREC_NONE;
+    }
+
+    static constexpr auto get_precedence(TokenType tt) -> int {
+        switch (tt) {
+            case TokenType::Lparen:
+            case TokenType::Dot: return PREC_CALL;
+            case TokenType::Question:
+            case TokenType::Lbracket: return PREC_UNARY;
+
+            case TokenType::Star:
+            case TokenType::Slash:
+            case TokenType::Percent: return PREC_MUL;
+
+            case TokenType::Plus:
+            case TokenType::Minus: return PREC_ADD;
+
+            case TokenType::LessLess:
+            case TokenType::GreaterGreater: return PREC_SHIFT;
+
+            case TokenType::EqualEqual:
+            case TokenType::BangEqual:
+            case TokenType::Less:
+            case TokenType::LessEqual:
+            case TokenType::Greater:
+            case TokenType::GreaterEqual: return PREC_COMP;
+
+            case TokenType::Ampersand:
+            case TokenType::Carrot:
+            case TokenType::Pipe: return PREC_BIT;
+
+            case TokenType::Equal:
+            case TokenType::PlusEqual:
+            case TokenType::MinusEqual:
+            case TokenType::StarEqual:
+            case TokenType::SlashEqual:
+            case TokenType::PercentEqual:
+            case TokenType::LessLessEqual:
+            case TokenType::GreaterGreaterEqual:
+            case TokenType::AmpersandEqual:
+            case TokenType::CarrotEqual:
+            case TokenType::PipeEqual: return PREC_ASSIGN;
+
+            default: return PREC_NONE;
+        }
+    }
 
     // ========================================================================
 

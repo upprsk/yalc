@@ -16,7 +16,7 @@ struct JsonVisitor : public Visitor {
         j = json{
             {"kind", fmt::to_string(node.get_kind())},
             {  "id",                   node.get_id()},
-            { "loc",                  node.get_loc()},
+            // { "loc",                  node.get_loc()},
         };
     }
 
@@ -100,6 +100,28 @@ struct JsonVisitor : public Visitor {
         j["name"] = ast.fatten(name);
         if (ret.is_valid()) j["ret"] = ast.fatten(ret);
         if (body.is_valid()) j["body"] = ast.fatten(body);
+    }
+
+    void visit_func_id(Ast&                    ast, Node const& /*node*/,
+                       std::span<NodeId const> ids) override {
+        auto arr = json::array();
+        for (auto const& id : ids)
+            arr.push_back(ast.get_identifier(id.as_id()));
+
+        j["names"] = arr;
+    }
+
+    void visit_func_param(Ast& ast, Node const& /*node*/, std::string_view name,
+                          NodeId type) override {
+        j["name"] = name;
+        j["type"] = ast.fatten(type);
+    }
+
+    void visit_block(Ast&                    ast, Node const& /*node*/,
+                     std::span<NodeId const> children) override {
+        auto arr = json::array();
+        for (auto const& child : children) arr.push_back(ast.fatten(child));
+        j["children"] = arr;
     }
 
     json& j;

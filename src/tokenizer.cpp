@@ -125,6 +125,7 @@ struct Tokenizer {
                 }
                 if (match('=')) return mkt(TokenType::DotEqual);
                 if (match('*')) return mkt(TokenType::DotStar);
+                if (match('{')) return mkt(TokenType::DotLbrace);
                 return mkt(TokenType::Dot);
             case '?': return mkt(TokenType::Question);
             case '(': return mkt(TokenType::Lparen);
@@ -139,6 +140,7 @@ struct Tokenizer {
             case '@': return tokenize_decorator();
             case '0' ... '9': return tokenize_number();
             case '"': return tokenize_string();
+            case '\'': return tokenize_char();
             default:
                 er->report_error(span(), "invalid character found '{:#c}'", c);
                 return mkt(TokenType::Err);
@@ -153,6 +155,11 @@ struct Tokenizer {
         }
 
         while (is_digit(peek()) || peek() == '_') advance();
+
+        if (match('.')) {
+            while (is_digit(peek()) || peek() == '_') advance();
+            return mkt(TokenType::Float);
+        }
 
         return mkt(TokenType::Int);
     }
@@ -180,6 +187,19 @@ struct Tokenizer {
         }
 
         return mkt(TokenType::Str);
+    }
+
+    constexpr auto tokenize_char() -> Token {
+        while (!is_at_end() && peek() != '\'') {
+            if (peek() == '\\') advance();
+            advance();
+        }
+
+        if (!match('\'')) {
+            er->report_error(span(), "unterminated character");
+        }
+
+        return mkt(TokenType::Char);
     }
 
     constexpr auto tokenize_comment() -> Token {
@@ -279,6 +299,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::DotDotDot: name = "DotDotDot"; break;
         case yal::TokenType::DotStar: name = "DotStar"; break;
         case yal::TokenType::DotEqual: name = "DotEqual"; break;
+        case yal::TokenType::DotLbrace: name = "DotLbrace"; break;
         case yal::TokenType::Question: name = "Question"; break;
         case yal::TokenType::Lparen: name = "Lparen"; break;
         case yal::TokenType::Rparen: name = "Rparen"; break;
@@ -289,8 +310,10 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::Id: name = "Id"; break;
         case yal::TokenType::Decorator: name = "Decorator"; break;
         case yal::TokenType::Int: name = "Int"; break;
+        case yal::TokenType::Float: name = "Float"; break;
         case yal::TokenType::Hex: name = "Hex"; break;
         case yal::TokenType::Str: name = "Str"; break;
+        case yal::TokenType::Char: name = "Char"; break;
         case yal::TokenType::Comment: name = "Comment"; break;
         case yal::TokenType::Eof: name = "Eof"; break;
     }

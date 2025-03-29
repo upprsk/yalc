@@ -41,7 +41,7 @@ public:
     // Literals
     // --------
 
-    auto new_id(Location loc, std::string s) -> NodeId {
+    auto new_id(Location loc, std::string_view s) -> NodeId {
         return new_node(NodeKind::Id, loc, new_identifier(s),
                         NodeId::invalid());
     }
@@ -56,12 +56,12 @@ public:
         auto v = std::bit_cast<uint64_t>(d);
         auto hi = NodeId::from_raw_data(v >> 32);
         auto lo = NodeId::from_raw_data(v);
-        return new_node(NodeKind::Int, loc, hi, lo);
+        return new_node(NodeKind::Double, loc, hi, lo);
     }
 
     auto new_float(Location loc, float d) -> NodeId {
         auto v = std::bit_cast<uint32_t>(d);
-        return new_node(NodeKind::Int, loc, NodeId::from_raw_data(v),
+        return new_node(NodeKind::Float, loc, NodeId::from_raw_data(v),
                         NodeId::invalid());
     }
 
@@ -115,7 +115,7 @@ public:
 
     auto new_func_param(Location loc, std::string_view name, NodeId type)
         -> NodeId {
-        return new_node(NodeKind::FuncId, loc, new_identifier(name), type);
+        return new_node(NodeKind::FuncParam, loc, new_identifier(name), type);
     }
 
     // -----------

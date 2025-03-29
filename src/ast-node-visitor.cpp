@@ -12,8 +12,7 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
         case NodeKind::Err: visit_err(ast, node); break;
 
         case NodeKind::Id:
-            visit_id(ast, node,
-                     ast.get_bytes_as_string_view(node.get_first().as_bytes()));
+            visit_id(ast, node, ast.get_identifier(node.get_first().as_id()));
             break;
         case NodeKind::Int: visit_int(ast, node, node.cast_u64()); break;
         case NodeKind::Double:
@@ -74,10 +73,9 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                                         node.get_second().as_array()));
             break;
         case NodeKind::FuncParam:
-            visit_func_param(
-                ast, node,
-                ast.get_identifier(node.get_first().as_id()),
-                node.get_second());
+            visit_func_param(ast, node,
+                             ast.get_identifier(node.get_first().as_id()),
+                             node.get_second());
             break;
 
         case NodeKind::Block:

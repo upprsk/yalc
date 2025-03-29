@@ -1,6 +1,4 @@
 module main;
 
-func test() {}
-
-func main() {
+func main(argc: i32) i32 {
 }
