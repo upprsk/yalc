@@ -6,7 +6,7 @@
 
 namespace yal {
 
-auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporter& er)
+auto pass_add_types(NodeHandle n, Ast& ast, TypeStore& ts, ErrorReporterForFile& er)
     -> TypeHandle;
 
 }  // namespace yal

@@ -23,7 +23,7 @@ TEST_CASE("empty source", "[parser]") {
     auto source = "";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -42,7 +42,7 @@ TEST_CASE("just comments", "[parser]") {
     auto source = "// this is a test comment\n\n// more comments!";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -61,7 +61,7 @@ TEST_CASE("extra data", "[parser]") {
     auto source = ";";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -81,7 +81,7 @@ TEST_CASE("global constant", "[parser][var]") {
         auto source = R"~~(def ZERO = 0;)~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -97,7 +97,7 @@ TEST_CASE("global constant", "[parser][var]") {
         auto source = R"~~(def ZERO: u64 = 0;)~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -114,7 +114,7 @@ TEST_CASE("global constant", "[parser][var]") {
             auto source = R"~~(def ZERO = 0)~~";
             auto path = ":memory:";
 
-            auto er = ErrorReporter{source, path, devnull};
+            auto er = ErrorReporterForFile{source, path, devnull};
             auto tokens = tokenize(source, er);
 
             REQUIRE_FALSE(er.had_error());
@@ -138,7 +138,7 @@ TEST_CASE("global variable", "[parser][var]") {
         auto source = R"~~(var ZERO = 0;)~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -154,7 +154,7 @@ TEST_CASE("global variable", "[parser][var]") {
         auto source = R"~~(var ZERO: u64 = 0;)~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -170,7 +170,7 @@ TEST_CASE("global variable", "[parser][var]") {
         auto source = R"~~(var ZERO: u64;)~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -191,7 +191,7 @@ TEST_CASE("one function with nothing", "[parser][func]") {
     auto source = R"~~(func main() {})~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -211,7 +211,7 @@ TEST_CASE("one bound function", "[parser][func]") {
     auto source = R"~~(func Iterator.next() {})~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -232,7 +232,7 @@ TEST_CASE("one function with nothing but returns i32", "[parser][func]") {
     auto source = R"~~(func main() i32 {})~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -253,7 +253,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x: i32) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -269,7 +269,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -285,7 +285,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x: i32, y: string_view) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -302,7 +302,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x, y) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -319,7 +319,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x : i32, y) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -337,7 +337,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x, y: string_view) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -355,7 +355,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x: i32,) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -371,7 +371,7 @@ TEST_CASE("one function arguments", "[parser][func]") {
         auto source = R"~~(func f(x,) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -392,7 +392,7 @@ TEST_CASE("one function with return", "[parser][func][stmt]") {
     auto source = R"~~(func main() i32 { return 0; })~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path};
+    auto er = ErrorReporterForFile{source, path};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -412,7 +412,7 @@ TEST_CASE("one function with multiple return values", "[parser][func][stmt]") {
     auto source = R"~~(func main() (i32, u64) { return 0, 0xFFFF_FFFF; })~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path};
+    auto er = ErrorReporterForFile{source, path};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -434,7 +434,7 @@ TEST_CASE("with various return values", "[parser][func]") {
         auto source = R"~~(func is_check() (ok: bool) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -451,7 +451,7 @@ TEST_CASE("with various return values", "[parser][func]") {
         auto source = R"~~(func validate() (v: i32, ok: bool) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -468,7 +468,7 @@ TEST_CASE("with various return values", "[parser][func]") {
         auto source = R"~~(func validate() (i32, bool) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -485,7 +485,7 @@ TEST_CASE("with various return values", "[parser][func]") {
         auto source = R"~~(func validate() (i32, ok: bool) {})~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -510,7 +510,7 @@ TEST_CASE("one function with expression statements", "[parser][func][stmt]") {
     })~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -533,7 +533,7 @@ TEST_CASE("extern function", "[parser][func]") {
     auto source = R"~~(extern func malloc(sz: usize) [*]u8;)~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -554,7 +554,7 @@ TEST_CASE("extern bound function", "[parser][func]") {
     auto source = R"~~(extern func mem.alloc(sz: usize) [*]u8;)~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -578,7 +578,7 @@ TEST_CASE("assignments", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -597,7 +597,7 @@ TEST_CASE("assignments", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -616,7 +616,7 @@ TEST_CASE("assignments", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -635,7 +635,7 @@ TEST_CASE("assignments", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -654,7 +654,7 @@ TEST_CASE("assignments", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -682,7 +682,7 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -706,7 +706,7 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -729,7 +729,7 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -752,7 +752,7 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -777,7 +777,7 @@ TEST_CASE("if statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -808,7 +808,7 @@ TEST_CASE("while statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -829,7 +829,7 @@ TEST_CASE("while statement", "[parser][func][stmt]") {
     })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -851,7 +851,7 @@ TEST_CASE("break statement", "[parser][func][stmt]") {
     })~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -875,7 +875,7 @@ TEST_CASE("locals", "[parser][func][var]") {
         })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -893,7 +893,7 @@ TEST_CASE("locals", "[parser][func][var]") {
         })~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -915,7 +915,7 @@ TEST_CASE("integer expresions", "[parser][expr]") {
         auto source = "12";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -929,7 +929,7 @@ TEST_CASE("integer expresions", "[parser][expr]") {
         auto source = "120_000";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -949,7 +949,7 @@ TEST_CASE("id expresions", "[parser][expr]") {
         auto source = "the_id_of_things";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -969,7 +969,7 @@ TEST_CASE("pack expresions", "[parser][expr]") {
         auto source = "(a, b, c)";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -984,7 +984,7 @@ TEST_CASE("pack expresions", "[parser][expr]") {
         auto source = "(1 + 2 * 4, abc or_else 4 + 5, extra, false)";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1005,7 +1005,7 @@ TEST_CASE("enum literals", "[parser][expr]") {
     auto source = ".test";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -1024,7 +1024,7 @@ TEST_CASE("pointer types", "[parser][expr]") {
         auto source = "*abc";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1044,7 +1044,7 @@ TEST_CASE("fields", "[parser][expr]") {
         auto source = "abc.test";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1058,7 +1058,7 @@ TEST_CASE("fields", "[parser][expr]") {
         auto source = "abc.test.value";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1073,7 +1073,7 @@ TEST_CASE("fields", "[parser][expr]") {
         auto source = "v.next()";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1088,7 +1088,7 @@ TEST_CASE("fields", "[parser][expr]") {
         auto source = "1 + 12.next(&some_data) - -56";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1110,7 +1110,7 @@ TEST_CASE("unary expresions", "[parser][expr]") {
         auto source = "!false";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1124,7 +1124,7 @@ TEST_CASE("unary expresions", "[parser][expr]") {
         auto source = "~(1 << 8) & 0x0FF0";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1139,7 +1139,7 @@ TEST_CASE("unary expresions", "[parser][expr]") {
         auto source = "+10 - -10";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1154,7 +1154,7 @@ TEST_CASE("unary expresions", "[parser][expr]") {
         auto source = "&abc + -(10 * 2)";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1169,7 +1169,7 @@ TEST_CASE("unary expresions", "[parser][expr]") {
         auto source = "?SomeStruct";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1189,7 +1189,7 @@ TEST_CASE("deref expresions", "[parser][expr]") {
         auto source = "&something.*";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1204,7 +1204,7 @@ TEST_CASE("deref expresions", "[parser][expr]") {
         auto source = "&abc";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1224,7 +1224,7 @@ TEST_CASE("cast expresions", "[parser][expr]") {
         auto source = "1 + 2 as i32";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1239,7 +1239,7 @@ TEST_CASE("cast expresions", "[parser][expr]") {
         auto source = "42 as abc(12)";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1254,7 +1254,7 @@ TEST_CASE("cast expresions", "[parser][expr]") {
         auto source = "124 or_else abc + 1";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1269,7 +1269,7 @@ TEST_CASE("cast expresions", "[parser][expr]") {
         auto source = "(call_to_thing() or_else 1) + 2";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1284,7 +1284,7 @@ TEST_CASE("cast expresions", "[parser][expr]") {
         auto source = "abc or_return";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1298,7 +1298,7 @@ TEST_CASE("cast expresions", "[parser][expr]") {
         auto source = "some_call() or_return";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1319,7 +1319,7 @@ TEST_CASE("binary expresions", "[parser][expr]") {
         auto source = "ab & 1 << 8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1334,7 +1334,7 @@ TEST_CASE("binary expresions", "[parser][expr]") {
         auto source = "FLAGS | a - b ^ testing";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1349,7 +1349,7 @@ TEST_CASE("binary expresions", "[parser][expr]") {
         auto source = "(a << FLAGS_TESTING) | MASK";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1369,7 +1369,7 @@ TEST_CASE("shift expresions", "[parser][expr]") {
     auto source = "abc << 12 + 1 * 2 - (b >> S)";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     REQUIRE_FALSE(er.had_error());
@@ -1390,7 +1390,7 @@ TEST_CASE("comparison expresions", "[parser][expr]") {
         auto source = "a < 12 and 0 >= 12 - 1";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1406,7 +1406,7 @@ TEST_CASE("comparison expresions", "[parser][expr]") {
         auto source = "a == b + 1";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1421,7 +1421,7 @@ TEST_CASE("comparison expresions", "[parser][expr]") {
         auto source = "a == b >> 1 or a != 0";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1437,7 +1437,7 @@ TEST_CASE("comparison expresions", "[parser][expr]") {
         auto source = "a <= b and z.* > 0";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1459,7 +1459,7 @@ TEST_CASE("arithmetic expresions", "[parser][expr]") {
         auto source = "1 + 1 * (2 - 4 / param) + 42 % 2";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1475,7 +1475,7 @@ TEST_CASE("arithmetic expresions", "[parser][expr]") {
         auto source = "1 + 1 + 1";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1496,7 +1496,7 @@ TEST_CASE("logic expresions", "[parser][expr]") {
         auto source = "1 + 2 and (5 - 2 * 2)";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1512,7 +1512,7 @@ TEST_CASE("logic expresions", "[parser][expr]") {
         auto source = "0 and 2 or 5 and (test or a)";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1528,7 +1528,7 @@ TEST_CASE("logic expresions", "[parser][expr]") {
         auto source = R"~~(test1("this is test") and test2())~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1544,7 +1544,7 @@ TEST_CASE("logic expresions", "[parser][expr]") {
         auto source = "!test and &12";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1565,7 +1565,7 @@ TEST_CASE("pointers", "[parser][expr]") {
         auto source = "*u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1579,7 +1579,7 @@ TEST_CASE("pointers", "[parser][expr]") {
         auto source = "*const u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1593,7 +1593,7 @@ TEST_CASE("pointers", "[parser][expr]") {
         auto source = "[*]u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1607,7 +1607,7 @@ TEST_CASE("pointers", "[parser][expr]") {
         auto source = "[*]const u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1621,7 +1621,7 @@ TEST_CASE("pointers", "[parser][expr]") {
         auto source = "[]u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1635,7 +1635,7 @@ TEST_CASE("pointers", "[parser][expr]") {
         auto source = "[]const u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1655,7 +1655,7 @@ TEST_CASE("arrays", "[parser][expr]") {
         auto source = "[1]u8";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1670,7 +1670,7 @@ TEST_CASE("arrays", "[parser][expr]") {
         auto source = "[3]u8{1, 2, 3}";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1685,7 +1685,7 @@ TEST_CASE("arrays", "[parser][expr]") {
         auto source = "[_]u8{1, 2, 3}";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());
@@ -1700,7 +1700,7 @@ TEST_CASE("arrays", "[parser][expr]") {
         auto source = "[_]u8{1, 2, 3,}";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         REQUIRE_FALSE(er.had_error());

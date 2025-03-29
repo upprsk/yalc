@@ -119,7 +119,10 @@ struct Tokenizer {
             case ';': return mkt(TokenType::Semi);
             case ',': return mkt(TokenType::Comma);
             case '.':
-                if (match('.')) return mkt(TokenType::DotDot);
+                if (match('.')) {
+                    if (match('.')) return mkt(TokenType::DotDotDot);
+                    return mkt(TokenType::DotDot);
+                }
                 if (match('=')) return mkt(TokenType::DotEqual);
                 if (match('*')) return mkt(TokenType::DotStar);
                 return mkt(TokenType::Dot);
@@ -133,6 +136,7 @@ struct Tokenizer {
             case 'a' ... 'z':
             case 'A' ... 'Z':
             case '_': return tokenize_id();
+            case '@': return tokenize_decorator();
             case '0' ... '9': return tokenize_number();
             case '"': return tokenize_string();
             default:
@@ -157,6 +161,12 @@ struct Tokenizer {
         while (is_alpha(peek()) || is_digit(peek()) || peek() == '_') advance();
 
         return mkt(TokenType::Id);
+    }
+
+    constexpr auto tokenize_decorator() -> Token {
+        while (is_alpha(peek()) || is_digit(peek()) || peek() == '_') advance();
+
+        return mkt(TokenType::Decorator);
     }
 
     constexpr auto tokenize_string() -> Token {
@@ -203,15 +213,15 @@ struct Tokenizer {
 
     // ------------------------------------------------------------------------
 
-    std::string_view source;
-    ErrorReporter*   er;
-    uint32_t         start{};
-    uint32_t         current{};
+    std::string_view      source;
+    ErrorReporterForFile* er;
+    uint32_t              start{};
+    uint32_t              current{};
 };
 
 // ------------------------------------------------------------------------
 
-auto tokenize(std::string_view source, ErrorReporter& er)
+auto tokenize(std::string_view source, ErrorReporterForFile& er)
     -> std::vector<Token> {
     auto tokenizer = Tokenizer{.source = source, .er = &er};
     return tokenizer.tokenize_all();
@@ -266,6 +276,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::Comma: name = "Comma"; break;
         case yal::TokenType::Dot: name = "Dot"; break;
         case yal::TokenType::DotDot: name = "DotDot"; break;
+        case yal::TokenType::DotDotDot: name = "DotDotDot"; break;
         case yal::TokenType::DotStar: name = "DotStar"; break;
         case yal::TokenType::DotEqual: name = "DotEqual"; break;
         case yal::TokenType::Question: name = "Question"; break;
@@ -276,6 +287,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::Lbracket: name = "Lbracket"; break;
         case yal::TokenType::Rbracket: name = "Rbracket"; break;
         case yal::TokenType::Id: name = "Id"; break;
+        case yal::TokenType::Decorator: name = "Decorator"; break;
         case yal::TokenType::Int: name = "Int"; break;
         case yal::TokenType::Hex: name = "Hex"; break;
         case yal::TokenType::Str: name = "Str"; break;

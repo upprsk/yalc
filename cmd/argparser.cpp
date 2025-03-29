@@ -61,6 +61,8 @@ auto argparse(int argc, char** argv) -> Args {
             args.dump_tokens = true;
         } else if (arg == "--dump-ast") {
             args.dump_ast = true;
+        } else if (arg == "--dump-ast-json") {
+            args.dump_ast_json = true;
         } else if (arg == "--dump-ast-dot") {
             args.dump_ast_dot = true;
         } else if (args.program.empty()) {

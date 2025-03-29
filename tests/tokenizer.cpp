@@ -21,7 +21,7 @@ TEST_CASE("empty or whitespace input", "[tokenizer]") {
         auto source = "";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         CHECK_FALSE(er.had_error());
@@ -36,7 +36,7 @@ TEST_CASE("empty or whitespace input", "[tokenizer]") {
         auto source = "           \t  \n  ";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         CHECK_FALSE(er.had_error());
@@ -53,7 +53,7 @@ TEST_CASE("integers", "[tokenizer]") {
         auto source = "123  456 789 0_0 120_000";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -73,7 +73,7 @@ TEST_CASE("integers", "[tokenizer]") {
         auto source = "0x123 0xdead_BEEF 0x1E";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -93,7 +93,7 @@ TEST_CASE("integers", "[tokenizer]") {
         auto source = "0o117 0o12 0o__007";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -110,7 +110,7 @@ TEST_CASE("integers", "[tokenizer]") {
         auto source = "0b1101 0b00110011 0b1111_1111";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path};
+        auto er = ErrorReporterForFile{source, path};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -126,7 +126,7 @@ TEST_CASE("identifiers", "[tokenizer]") {
     auto source = "aBc _main __start__ void Main_123 A12 _12 xfF";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path};
+    auto er = ErrorReporterForFile{source, path};
     auto tokens = tokenize(source, er);
 
     std::vector<Token> expected{
@@ -154,7 +154,7 @@ TEST_CASE("strings", "[tokenizer]") {
         auto source = R"~~("abc" "12" "\"" "\n")~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -173,7 +173,7 @@ TEST_CASE("strings", "[tokenizer]") {
         auto source = R"~~("abc" "\")~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -196,7 +196,7 @@ TEST_CASE("symbols", "[tokenizer]") {
         auto source = R"~~(  ({[]}) ( { [ ] } ) )~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -223,7 +223,7 @@ TEST_CASE("symbols", "[tokenizer]") {
         auto source = R"~~( < <= == != >= > )~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -244,7 +244,7 @@ TEST_CASE("symbols", "[tokenizer]") {
         auto source = R"~~( = += -= *= /= >>= <<= &= |= ^= ~= %= )~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -271,7 +271,7 @@ TEST_CASE("symbols", "[tokenizer]") {
         auto source = R"~~( + ++ - -- * ** / % & | ^ ~ << >> )~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -300,7 +300,7 @@ TEST_CASE("symbols", "[tokenizer]") {
         auto source = R"~~( : ; , . .. .= .* )~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -322,7 +322,7 @@ TEST_CASE("symbols", "[tokenizer]") {
         auto source = R"~~( ! and or )~~";
         auto path = ":memory:";
 
-        auto er = ErrorReporter{source, path, devnull};
+        auto er = ErrorReporterForFile{source, path, devnull};
         auto tokens = tokenize(source, er);
 
         std::vector<Token> expected{
@@ -346,7 +346,7 @@ TEST_CASE("comment", "[tokenizer]") {
 5;)~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     std::vector<Token> expected{
@@ -371,7 +371,7 @@ TEST_CASE("print array", "[tokenizer]") {
         R"~~(= == => < << <<= <= > >> >= >>= + ++ += - -- -= * ** *= / /= ! != % %= & &= | |= ^ ^= ~ ~= ; : , . .. .* .= ? (){}[] id 12345_67890 0xDEAD_BEEF_0000_EEEF "a string the contains $" // commenting!)~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     std::vector<Token> expected{
@@ -463,7 +463,7 @@ TEST_CASE("invalid character", "[tokenizer]") {
     auto source = R"~~( 12$ )~~";
     auto path = ":memory:";
 
-    auto er = ErrorReporter{source, path, devnull};
+    auto er = ErrorReporterForFile{source, path, devnull};
     auto tokens = tokenize(source, er);
 
     std::vector<Token> expected{

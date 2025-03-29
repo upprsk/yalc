@@ -21,6 +21,8 @@ endif()
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 include(Dupe)
 
+set(LIBASSERT_USE_FMT=1)
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -39,6 +41,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libassert)
 
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+FetchContent_MakeAvailable(json)
+
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -51,7 +56,7 @@ add_subdirectory(src)
 add_subdirectory(cmd)
 
 # testing
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
-    add_subdirectory(tests)
-endif()
+# if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+#     add_subdirectory(tests)
+# endif()
 

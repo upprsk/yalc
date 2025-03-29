@@ -1,820 +1,133 @@
 #include "ast.hpp"
 
-#include "fmt/base.h"
+#include "ast-node-visitor.hpp"
 #include "fmt/format.h"
-#include "libassert/assert.hpp"
+#include "nlohmann/json.hpp"
 
-namespace yal {
+namespace yal::ast {
 
-void Ast::assert_is_oneof(std::string_view name, Node const& n,
-                          auto&&... kinds) const {
-    if (!n.is_oneof(kinds...)) PANIC("invalid node received", name, n.kind);
-}
+struct JsonVisitor : public Visitor {
+    explicit constexpr JsonVisitor(json& j) : j{j} {}
 
-auto Ast::node_with_children(Node const& n) const -> Node::WithChildren {
-    assert_is_oneof("node_with_children", n, NodeKind::Block,
-                    NodeKind::ExprPack, NodeKind::File, NodeKind::FuncRetPack,
-                    NodeKind::IdPack);
+    void visit_before(Ast& /*ast*/, Node const& node) override {
+        fmt::println(stderr, "JsonVisitor(id={}, kind={})", node.get_id(),
+                     node.get_kind());
 
-    return {.children = get_array(n.first, n.second.as_count())};
-}
-
-auto Ast::node_with_child(Node const& n) const -> Node::WithChild {
-    assert_is_oneof("node_with_child", n, NodeKind::AddrOf, NodeKind::BinNot,
-                    NodeKind::Defer, NodeKind::Deref, NodeKind::ExprStmt,
-                    NodeKind::LogicNot, NodeKind::MultiPtr,
-                    NodeKind::MultiPtrConst, NodeKind::Neg, NodeKind::Optional,
-                    NodeKind::OrReturn, NodeKind::Plus, NodeKind::Ptr,
-                    NodeKind::PtrConst, NodeKind::ReturnStmt,
-                    NodeKind::SlicePtr, NodeKind::SlicePtrConst);
-
-    return {.child = n.first};
-}
-
-auto Ast::node_with_child_pair(Node const& n) const -> Node::WithChildPair {
-    assert_is_oneof("node_with_child_pair", n, NodeKind::WhileStmt,
-                    NodeKind::Assign, NodeKind::Add, NodeKind::BinAnd,
-                    NodeKind::BinOr, NodeKind::BinXor, NodeKind::Div,
-                    NodeKind::Equal, NodeKind::Greater, NodeKind::GreaterEqual,
-                    NodeKind::LogicAnd, NodeKind::LogicOr, NodeKind::Mod,
-                    NodeKind::Mul, NodeKind::NotEqual, NodeKind::OrElse,
-                    NodeKind::ShftLeft, NodeKind::ShftRight, NodeKind::Smaller,
-                    NodeKind::SmallerEqual, NodeKind::Sub, NodeKind::Cast);
-
-    return {.first = n.first, .second = n.second};
-}
-
-auto Ast::node_func(Node const& n) const -> Node::Func {
-    assert_is_oneof("node_func", n, NodeKind::Func, NodeKind::FuncExtern);
-
-    auto children = get_array(n.first, n.second.as_count());
-    ASSERT(children.size() >= 3, n.kind,
-           "invalid number of children for `node_func`");
-
-    return {
-        .name = children[0],
-        .ret = children[1],
-        .body = children[2],
-        .args = children.subspan(3),
-        .is_extern = n.kind == NodeKind::FuncExtern,
-    };
-}
-
-auto Ast::node_named(Node const& n) const -> Node::Named {
-    assert_is_oneof("node_named", n, NodeKind::FuncArg, NodeKind::Field);
-
-    return {.name = n.value_string(), .child = n.first};
-}
-
-auto Ast::node_decl(Node const& n) const -> Node::Decl {
-    assert_is_oneof("node_decl", n, NodeKind::DefDecl, NodeKind::VarDecl);
-
-    auto children = get_array(n.second, 2);
-
-    return {
-        .ids = n.first,
-        .type = children[0],
-        .init = children[1],
-    };
-}
-
-auto Ast::node_if_stmt(Node const& n) const -> Node::IfStmt {
-    if (n.kind == NodeKind::IfStmt) {
-        return {
-            .decl = {},
-            .cond = n.first,
-            .when_true = n.second,
-            .when_false = {},
+        j = json{
+            {"kind", fmt::to_string(node.get_kind())},
+            {  "id",                   node.get_id()},
+            { "loc",                  node.get_loc()},
         };
     }
 
-    if (n.kind == NodeKind::IfStmtWithElse) {
-        auto children = get_array(n.second, 2);
-
-        return {
-            .decl = {},
-            .cond = n.first,
-            .when_true = children[0],
-            .when_false = children[1],
-        };
+    void visit_err(Ast& ast, Node const& node) override {
+        if (node.get_first().is_valid()) {
+            j["error"] =
+                ast.get_bytes_as_string_view(node.get_first().as_bytes());
+        }
     }
 
-    if (n.kind == NodeKind::IfStmtWithDecl) {
-        auto children = get_array(n.second, 2);
-
-        return {
-            .decl = children[0],
-            .cond = n.first,
-            .when_true = children[1],
-            .when_false = {},
-        };
+    void visit_id(Ast& /*ast*/, Node const& /*node*/,
+                  std::string_view id) override {
+        j["value"] = id;
     }
 
-    if (n.kind == NodeKind::IfStmtWithDeclAndElse) {
-        auto children = get_array(n.second, 3);
-
-        return {
-            .decl = children[0],
-            .cond = n.first,
-            .when_true = children[1],
-            .when_false = children[2],
-        };
+    void visit_int(Ast& /*ast*/, Node const& /*node*/,
+                   uint64_t value) override {
+        j["value"] = value;
     }
 
-    PANIC("invalid node for `node_if_stmt`", n.kind);
-}
-
-auto Ast::node_array(Node const& n) const -> Node::Array {
-    if (n.kind == NodeKind::Array) {
-        auto children = get_array(n.first, n.second.as_count());
-
-        ASSERT(children.size() >= 2,
-               "invalid number of children for `node_array`", n.kind,
-               children.size());
-
-        return {
-            .type = children[1],
-            .size = children[0],
-            .items = children.subspan(2),
-        };
+    void visit_double(Ast& /*ast*/, Node const& /*node*/,
+                      double value) override {
+        j["value"] = value;
     }
 
-    if (n.kind == NodeKind::ArrayAutoLen) {
-        auto children = get_array(n.first, n.second.as_count());
-
-        ASSERT(children.size() >= 1,
-               "invalid number of children for `node_array`", n.kind,
-               children.size());
-
-        return {
-            .type = children[0],
-            .size = {},
-            .items = children.subspan(1),
-        };
+    void visit_float(Ast& /*ast*/, Node const& /*node*/, float value) override {
+        j["value"] = value;
     }
 
-    if (n.kind == NodeKind::ArrayType) {
-        return {
-            .type = n.second,
-            .size = n.first,
-            .items = {},
-        };
+    void visit_str(Ast& /*ast*/, Node const& /*node*/,
+                   std::string_view bytes) override {
+        j["value"] = bytes;
     }
 
-    PANIC("invalid number of children for `node_array`", n.kind);
-}
+    void visit_char(Ast& /*ast*/, Node const& /*node*/,
+                    uint32_t character) override {
+        j["value"] = character;
+    }
 
-auto Ast::node_call(Node const& n) const -> Node::Call {
-    assert_is_oneof("node_call", n, NodeKind::Call);
+    void visit_module(Ast& ast, Node const& /*node*/, std::string_view name,
+                      std::span<NodeId const> children) override {
+        j["name"] = name;
 
-    auto children = get_array(n.first, n.second.as_count());
-    ASSERT(children.size() >= 1, "invalid number of children for `node_call`",
-           n.kind, children.size());
+        auto arr = json::array();
+        for (auto const& child : children) {
+            arr.push_back(ast.fatten(child));
+        }
+    }
 
-    return {
-        .callee = children[0],
-        .args = children.subspan(1),
-    };
-}
+    void visit_source_file(Ast& ast, Node const& /*node*/, NodeId mod,
+                           std::span<NodeId const> children) override {
+        auto arr = json::array();
+        for (auto const& child : children) arr.push_back(ast.fatten(child));
 
-// ----------------------------------------------------------------------------
+        j["mod"] = ast.fatten(mod);
+        j["children"] = arr;
+    }
 
-auto Ast::new_node_if(NodeKind kind, Span span, Node::IfStmt params)
-    -> NodeHandle {
-    if (kind == NodeKind::IfStmt)
-        return new_node(kind, span, params.cond, params.when_true);
-    if (kind == NodeKind::IfStmtWithElse)
-        return new_node(kind, span, params.cond,
-                        new_array_of(params.when_true, params.when_false));
-    if (kind == NodeKind::IfStmtWithDecl)
-        return new_node(kind, span, params.cond,
-                        new_array_of(params.decl, params.when_true));
-    if (kind == NodeKind::IfStmtWithDeclAndElse)
-        return new_node(
-            kind, span, params.cond,
-            new_array_of(params.decl, params.when_true, params.when_false));
+    void visit_module_decl(Ast& /*ast*/, Node const& /*node*/,
+                           std::string_view name) override {
+        j["name"] = name;
+    }
 
-    PANIC("invalid kind for `new_node_if`", kind);
-}
+    void visit_func_decl(Ast&                    ast, Node const& /*node*/,
+                         std::span<NodeId const> decorators, NodeId name,
+                         std::span<NodeId const> gargs,
+                         std::span<NodeId const> args, NodeId ret,
+                         NodeId body) override {
+        auto buf = json::array();
+        for (auto const& dec : decorators) buf.push_back(ast.fatten(dec));
+        j["decorators"] = buf;
 
-auto Ast::new_node_array(NodeKind kind, Span span, Node::Array params)
-    -> NodeHandle {
-    if (kind == NodeKind::Array)
-        return new_node(
-            kind, span,
-            new_array_prepend(params.items, params.size, params.type),
-            NodeHandle::init_count(params.items.size() + 2));
-    if (kind == NodeKind::ArrayAutoLen)
-        return new_node(kind, span,
-                        new_array_prepend(params.items, params.type),
-                        NodeHandle::init_count(params.items.size() + 1));
-    if (kind == NodeKind::ArrayType)
-        return new_node(kind, span, params.size, params.type);
+        buf = json::array();
+        for (auto const& garg : gargs) buf.push_back(ast.fatten(garg));
+        j["gargs"] = buf;
 
-    PANIC("invalid kind for `new_node_array`", kind);
-}
+        buf = json::array();
+        for (auto const& arg : args) buf.push_back(ast.fatten(arg));
+        j["args"] = buf;
 
-// ----------------------------------------------------------------------------
+        j["name"] = ast.fatten(name);
+        if (ret.is_valid()) j["ret"] = ast.fatten(ret);
+        if (body.is_valid()) j["body"] = ast.fatten(body);
+    }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
-auto Ast::dump(fmt::format_context& ctx, NodeHandle n) const
+    json& j;
+};
+
+// TODO: print the ast?
+// For now json should be more than enough
+auto FatNodeId::dump_to_ctx(fmt::format_context& ctx) const
     -> fmt::format_context::iterator {
-    auto dump_list = [this](fmt::format_context&        ctx,
-                            std::span<NodeHandle const> lst) {
-        size_t i{};
-        for (auto const& chld : lst) {
-            if (i++ != 0) fmt::format_to(ctx.out(), ", ");
-            dump(ctx, chld);
-        }
-    };
-
-    if (!n.is_valid()) return fmt::format_to(ctx.out(), "{}", n);
-
-    auto node = get(n);
-    switch (node->kind) {
-        case NodeKind::Err:
-            fmt::format_to(ctx.out(), "Err(");
-            return fmt::format_to(ctx.out(), "{})", node->span);
-
-        case NodeKind::Break:
-        case NodeKind::Nil: {
-            auto it = fmt::format_to(ctx.out(), "{}", node->kind);
-            return it;
-        }
-
-        case NodeKind::Block:
-        case NodeKind::ExprPack:
-        case NodeKind::File:
-        case NodeKind::FuncRetPack:
-        case NodeKind::IdPack: {
-            auto p = node_with_children(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            fmt::format_to(ctx.out(), "[", node->kind);
-            dump_list(ctx, p.children);
-            return fmt::format_to(ctx.out(), "])");
-        }
-
-        case NodeKind::Func: {
-            auto p = node_func(*node);
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-
-            dump(ctx, p.name);
-
-            fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.args);
-            fmt::format_to(ctx.out(), "], ");
-
-            dump(ctx, p.ret);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.body);
-
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::FuncExtern: {
-            auto p = node_func(*node);
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-
-            dump(ctx, p.name);
-
-            fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.args);
-            fmt::format_to(ctx.out(), "], ");
-
-            dump(ctx, p.ret);
-
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::FuncArg: {
-            auto p = node_named(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            fmt::format_to(ctx.out(), "{}, ", p.name);
-            dump(ctx, p.child);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::VarDecl:
-        case NodeKind::DefDecl: {
-            auto p = node_decl(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-
-            dump(ctx, p.ids);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.type);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.init);
-
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::AddrOf:
-        case NodeKind::BinNot:
-        case NodeKind::Defer:
-        case NodeKind::Deref:
-        case NodeKind::ExprStmt:
-        case NodeKind::LogicNot:
-        case NodeKind::MultiPtr:
-        case NodeKind::MultiPtrConst:
-        case NodeKind::Neg:
-        case NodeKind::Optional:
-        case NodeKind::OrReturn:
-        case NodeKind::Plus:
-        case NodeKind::Ptr:
-        case NodeKind::PtrConst:
-        case NodeKind::ReturnStmt:
-        case NodeKind::SlicePtr:
-        case NodeKind::SlicePtrConst: {
-            auto p = node_with_child(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump(ctx, p.child);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::IfStmt: {
-            auto p = node_if_stmt(*node);
-
-            fmt::format_to(ctx.out(), "IfStmt(");
-            dump(ctx, p.cond);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::IfStmtWithElse: {
-            auto p = node_if_stmt(*node);
-
-            fmt::format_to(ctx.out(), "IfStmtWithElse(");
-            dump(ctx, p.cond);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_false);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::IfStmtWithDecl: {
-            auto p = node_if_stmt(*node);
-
-            fmt::format_to(ctx.out(), "IfStmtWithDecl(");
-            dump(ctx, p.decl);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.cond);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::IfStmtWithDeclAndElse: {
-            auto p = node_if_stmt(*node);
-
-            fmt::format_to(ctx.out(), "IfStmtWithDeclAndElse(");
-            dump(ctx, p.decl);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.cond);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_true);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.when_false);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::WhileStmt:
-        case NodeKind::Assign:
-        case NodeKind::Add:
-        case NodeKind::BinAnd:
-        case NodeKind::BinOr:
-        case NodeKind::BinXor:
-        case NodeKind::Div:
-        case NodeKind::Equal:
-        case NodeKind::Greater:
-        case NodeKind::GreaterEqual:
-        case NodeKind::LogicAnd:
-        case NodeKind::LogicOr:
-        case NodeKind::Mod:
-        case NodeKind::Mul:
-        case NodeKind::NotEqual:
-        case NodeKind::OrElse:
-        case NodeKind::ShftLeft:
-        case NodeKind::ShftRight:
-        case NodeKind::Smaller:
-        case NodeKind::SmallerEqual:
-        case NodeKind::Sub:
-        case NodeKind::Cast: {
-            auto p = node_with_child_pair(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump(ctx, p.first);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.second);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::Array: {
-            auto p = node_array(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump(ctx, p.size);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.type);
-            fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.items);
-            return fmt::format_to(ctx.out(), "])");
-        }
-
-        case NodeKind::ArrayAutoLen: {
-            auto p = node_array(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump(ctx, p.type);
-            fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, p.items);
-            return fmt::format_to(ctx.out(), "])");
-        }
-
-        case NodeKind::ArrayType: {
-            auto p = node_array(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump(ctx, p.size);
-            fmt::format_to(ctx.out(), ", ");
-            dump(ctx, p.type);
-            return fmt::format_to(ctx.out(), ")");
-        }
-
-        case NodeKind::Call: {
-            auto c = node_call(*node);
-            fmt::format_to(ctx.out(), "Call(");
-
-            dump(ctx, c.callee);
-            fmt::format_to(ctx.out(), ", [");
-            dump_list(ctx, c.args);
-            return fmt::format_to(ctx.out(), "])");
-        }
-
-        case NodeKind::Field: {
-            auto p = node_named(*node);
-
-            fmt::format_to(ctx.out(), "{}(", node->kind);
-            dump(ctx, p.child);
-            return fmt::format_to(ctx.out(), ", {})", p.name);
-        }
-
-        case NodeKind::EnumLit:
-            return fmt::format_to(ctx.out(), "EnumLit(.{})",
-                                  node->value_string());
-        case NodeKind::Int:
-            return fmt::format_to(ctx.out(), "Int({})", node->value_uint64());
-        case NodeKind::Id:
-            return fmt::format_to(ctx.out(), "Id({})", node->value_string());
-        case NodeKind::Str:
-            return fmt::format_to(ctx.out(), "Str({:?})", node->value_string());
-    }
-
-    return fmt::format_to(ctx.out(), "unknown");
+    return fmt::format_to(ctx.out(), "FatNodeId({})", id);
 }
 
-void Ast::dump_dot(FILE* f, NodeHandle n) const {
-    using fmt::println;
-
-    println(f, "digraph g {{");
-    println(f, R"~~(fontname="Helvetica,Arial,sans-serif")~~");
-    println(f, R"~~(node [fontname="Helvetica,Arial,sans-serif"])~~");
-    println(f, R"~~(edge [fontname="Helvetica,Arial,sans-serif"])~~");
-    println(f, R"~~(graph [ rankdir = "LR" ];)~~");
-    println(f, R"~~(node [ fontsize = "16" shape = "ellipse" ];)~~");
-    println(f, R"~~(edge [ ];)~~");
-
-    dump_dot_node(f, n);
-
-    println(f, "}}");
+void to_json(json& j, FatNodeId const& n) {
+    auto v = JsonVisitor{j};
+    v.visit(*n.ast, n.id);
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void Ast::dump_dot_node(FILE* f, NodeHandle n) const {
-    using fmt::print;
-    using fmt::println;
-
-    println(f, R"~~("node{}" [)~~", n.as_raw_idx());
-    println(f, R"~~(shape = "record")~~");
-
-    if (n.is_valid()) {
-        auto node = get(n);
-        print(f, R"~~(label = "<f0> {:#} | {})~~", n, node->kind);
-
-        if (node->first.is_valid())
-            print(f, R"~~( | <f1> {:#})~~", node->first);
-        if (node->second.is_valid())
-            print(f, R"~~( | <f2> {:#})~~", node->second);
-
-        if (node->is_id() || node->is_func_arg() || node->is_field())
-            print(f, R"~~( | `{}`)~~", node->value_string());
-        if (node->is_enum_lit())
-            print(f, R"~~( | `.{}`)~~", node->value_string());
-        if (node->is_int()) print(f, R"~~( | {})~~", node->value_uint64());
-
-        if (node->is_str()) {
-            // double escape the string before printing it.
-            // this is very suboptimal, but it was easy.
-            auto s = fmt::format("{:?}", node->value_string());
-            s = fmt::format("{:?}", s.substr(1, s.length() - 2));
-            print(f, R"~~( | \"{}\")~~", s.substr(1, s.length() - 2));
-        }
-
-        println(f, "\"");
-    }
-
-    println(f, R"~~(];)~~", n.as_raw_idx());
-
-    auto conn = [f](NodeHandle from, NodeHandle to, std::string_view t = "f1") {
-        println(f, R"~~("node{}":{} -> "node{}":f0 [])~~", from.as_raw_idx(), t,
-                to.as_raw_idx());
-    };
-
-    auto dump_and_conn = [this, f, &conn](NodeHandle from, NodeHandle to,
-                                          std::string_view t = "f1") {
-        dump_dot_node(f, to);
-        conn(from, to, t);
-    };
-
-    if (n.is_valid()) {
-        auto node = get(n);
-
-        switch (node->kind) {
-            case NodeKind::Err:
-            case NodeKind::Break:
-            case NodeKind::Nil:
-            case NodeKind::EnumLit:
-            case NodeKind::Int:
-            case NodeKind::Id:
-            case NodeKind::Str: break;
-
-            case NodeKind::Block:
-            case NodeKind::ExprPack:
-            case NodeKind::File:
-            case NodeKind::FuncRetPack:
-            case NodeKind::IdPack: {
-                auto p = node_with_children(*node);
-                for (auto const& c : p.children) dump_and_conn(n, c);
-            } break;
-
-            case NodeKind::Func: {
-                auto p = node_func(*node);
-
-                dump_and_conn(n, p.name);
-                for (auto const& c : p.args) dump_and_conn(n, c);
-                dump_and_conn(n, p.ret);
-                dump_and_conn(n, p.body);
-            } break;
-
-            case NodeKind::FuncExtern: {
-                auto p = node_func(*node);
-
-                dump_and_conn(n, p.name);
-                for (auto const& c : p.args) dump_and_conn(n, c);
-                dump_and_conn(n, p.ret);
-            } break;
-
-            case NodeKind::FuncArg:
-            case NodeKind::Field: {
-                auto p = node_named(*node);
-                dump_and_conn(n, p.child);
-            } break;
-
-            case NodeKind::DefDecl:
-            case NodeKind::VarDecl: {
-                auto p = node_decl(*node);
-
-                dump_and_conn(n, p.ids);
-                dump_and_conn(n, p.type);
-                dump_and_conn(n, p.init);
-            } break;
-
-            case NodeKind::AddrOf:
-            case NodeKind::BinNot:
-            case NodeKind::Defer:
-            case NodeKind::Deref:
-            case NodeKind::ExprStmt:
-            case NodeKind::LogicNot:
-            case NodeKind::MultiPtr:
-            case NodeKind::MultiPtrConst:
-            case NodeKind::Neg:
-            case NodeKind::Optional:
-            case NodeKind::OrReturn:
-            case NodeKind::Plus:
-            case NodeKind::Ptr:
-            case NodeKind::PtrConst:
-            case NodeKind::ReturnStmt:
-            case NodeKind::SlicePtr:
-            case NodeKind::SlicePtrConst: {
-                auto p = node_with_child(*node);
-                dump_and_conn(n, p.child);
-            } break;
-
-            case NodeKind::IfStmt: {
-                auto p = node_if_stmt(*node);
-
-                dump_and_conn(n, p.cond);
-                dump_and_conn(n, p.when_true);
-            } break;
-
-            case NodeKind::IfStmtWithElse: {
-                auto p = node_if_stmt(*node);
-
-                dump_and_conn(n, p.cond);
-                dump_and_conn(n, p.when_true);
-                dump_and_conn(n, p.when_false);
-            } break;
-
-            case NodeKind::IfStmtWithDecl: {
-                auto p = node_if_stmt(*node);
-
-                dump_and_conn(n, p.decl);
-                dump_and_conn(n, p.cond);
-                dump_and_conn(n, p.when_true);
-            } break;
-
-            case NodeKind::IfStmtWithDeclAndElse: {
-                auto p = node_if_stmt(*node);
-
-                dump_and_conn(n, p.decl);
-                dump_and_conn(n, p.cond);
-                dump_and_conn(n, p.when_true);
-                dump_and_conn(n, p.when_false);
-            } break;
-
-            case NodeKind::WhileStmt:
-            case NodeKind::Assign:
-            case NodeKind::Add:
-            case NodeKind::BinAnd:
-            case NodeKind::BinOr:
-            case NodeKind::BinXor:
-            case NodeKind::Div:
-            case NodeKind::Equal:
-            case NodeKind::Greater:
-            case NodeKind::GreaterEqual:
-            case NodeKind::LogicAnd:
-            case NodeKind::LogicOr:
-            case NodeKind::Mod:
-            case NodeKind::Mul:
-            case NodeKind::NotEqual:
-            case NodeKind::OrElse:
-            case NodeKind::ShftLeft:
-            case NodeKind::ShftRight:
-            case NodeKind::Smaller:
-            case NodeKind::SmallerEqual:
-            case NodeKind::Sub:
-            case NodeKind::Cast: {
-                auto p = node_with_child_pair(*node);
-
-                dump_and_conn(n, p.first);
-                dump_and_conn(n, p.second, "f2");
-            } break;
-
-            case NodeKind::Array: {
-                auto p = node_array(*node);
-
-                dump_and_conn(n, p.size);
-                dump_and_conn(n, p.type);
-                for (auto const& c : p.items) dump_and_conn(n, c);
-            } break;
-
-            case NodeKind::ArrayAutoLen: {
-                auto p = node_array(*node);
-
-                dump_and_conn(n, p.type);
-                for (auto const& c : p.items) dump_and_conn(n, c);
-            } break;
-
-            case NodeKind::ArrayType: {
-                auto p = node_array(*node);
-
-                dump_and_conn(n, p.size);
-                dump_and_conn(n, p.type, "f2");
-            } break;
-
-            case NodeKind::Call: {
-                auto p = node_call(*node);
-
-                dump_and_conn(n, p.callee);
-                for (auto const& c : p.args) dump_and_conn(n, c);
-            } break;
-        }
+void to_json(json& j, FatNodeArray const& n) {
+    j = json{};
+    for (auto const& id : n.ids) {
+        j.push_back(n.ast->fatten(id));
     }
 }
 
-}  // namespace yal
+}  // namespace yal::ast
 
-auto fmt::formatter<yal::NodeHandle>::format(yal::NodeHandle n,
-                                             format_context& ctx) const
+auto fmt::formatter<yal::ast::FatNodeId>::format(yal::ast::FatNodeId n,
+                                                 format_context&     ctx) const
     -> format_context::iterator {
-    if (!is_escaped) fmt::format_to(ctx.out(), "{{");
-
-    if (!n.is_valid()) {
-        fmt::format_to(ctx.out(), "!");
-    }
-
-    auto it = ctx.out();
-    if (n.is_array()) {
-        it = fmt::format_to(ctx.out(), "[{:x}]", n.as_raw_idx());
-    } else {
-        it = fmt::format_to(ctx.out(), "{:x}", n.as_raw_idx());
-    }
-
-    if (!is_escaped) it = fmt::format_to(ctx.out(), "{{");
-
-    return it;
-}
-
-auto fmt::formatter<yal::NodeKind>::format(yal::NodeKind   n,
-                                           format_context& ctx) const
-    -> format_context::iterator {
-    string_view name = "unknown";
-    switch (n) {
-        case yal::NodeKind::Err: name = "Err"; break;
-        case yal::NodeKind::Break: name = "Break"; break;
-        case yal::NodeKind::Nil: name = "Nil"; break;
-        case yal::NodeKind::Block: name = "Block"; break;
-        case yal::NodeKind::ExprPack: name = "ExprPack"; break;
-        case yal::NodeKind::File: name = "File"; break;
-        case yal::NodeKind::FuncRetPack: name = "FuncRetPack"; break;
-        case yal::NodeKind::IdPack: name = "IdPack"; break;
-        case yal::NodeKind::Func: name = "Func"; break;
-        case yal::NodeKind::FuncExtern: name = "FuncExtern"; break;
-        case yal::NodeKind::FuncArg: name = "FuncArg"; break;
-        case yal::NodeKind::DefDecl: name = "DefDecl"; break;
-        case yal::NodeKind::VarDecl: name = "VarDecl"; break;
-        case yal::NodeKind::AddrOf: name = "AddrOf"; break;
-        case yal::NodeKind::BinNot: name = "BinNot"; break;
-        case yal::NodeKind::Defer: name = "Defer"; break;
-        case yal::NodeKind::Deref: name = "Deref"; break;
-        case yal::NodeKind::ExprStmt: name = "ExprStmt"; break;
-        case yal::NodeKind::LogicNot: name = "LogicNot"; break;
-        case yal::NodeKind::MultiPtr: name = "MultiPtr"; break;
-        case yal::NodeKind::MultiPtrConst: name = "MultiPtrConst"; break;
-        case yal::NodeKind::Neg: name = "Neg"; break;
-        case yal::NodeKind::Optional: name = "Optional"; break;
-        case yal::NodeKind::OrReturn: name = "OrReturn"; break;
-        case yal::NodeKind::Plus: name = "Plus"; break;
-        case yal::NodeKind::Ptr: name = "Ptr"; break;
-        case yal::NodeKind::PtrConst: name = "PtrConst"; break;
-        case yal::NodeKind::ReturnStmt: name = "ReturnStmt"; break;
-        case yal::NodeKind::SlicePtr: name = "SlicePtr"; break;
-        case yal::NodeKind::SlicePtrConst: name = "SlicePtrConst"; break;
-        case yal::NodeKind::IfStmt: name = "IfStmt"; break;
-        case yal::NodeKind::IfStmtWithElse: name = "IfStmtWithElse"; break;
-        case yal::NodeKind::IfStmtWithDecl: name = "IfStmtWithDecl"; break;
-        case yal::NodeKind::IfStmtWithDeclAndElse:
-            name = "IfStmtWithDeclAndElse";
-            break;
-        case yal::NodeKind::WhileStmt: name = "WhileStmt"; break;
-        case yal::NodeKind::Assign: name = "Assign"; break;
-        case yal::NodeKind::Add: name = "Add"; break;
-        case yal::NodeKind::BinAnd: name = "BinAnd"; break;
-        case yal::NodeKind::BinOr: name = "BinOr"; break;
-        case yal::NodeKind::BinXor: name = "BinXor"; break;
-        case yal::NodeKind::Div: name = "Div"; break;
-        case yal::NodeKind::Equal: name = "Equal"; break;
-        case yal::NodeKind::Greater: name = "Greater"; break;
-        case yal::NodeKind::GreaterEqual: name = "GreaterEqual"; break;
-        case yal::NodeKind::LogicAnd: name = "LogicAnd"; break;
-        case yal::NodeKind::LogicOr: name = "LogicOr"; break;
-        case yal::NodeKind::Mod: name = "Mod"; break;
-        case yal::NodeKind::Mul: name = "Mul"; break;
-        case yal::NodeKind::NotEqual: name = "NotEqual"; break;
-        case yal::NodeKind::OrElse: name = "OrElse"; break;
-        case yal::NodeKind::ShftLeft: name = "ShftLeft"; break;
-        case yal::NodeKind::ShftRight: name = "ShftRight"; break;
-        case yal::NodeKind::Smaller: name = "Smaller"; break;
-        case yal::NodeKind::SmallerEqual: name = "SmallerEqual"; break;
-        case yal::NodeKind::Sub: name = "Sub"; break;
-        case yal::NodeKind::Cast: name = "Cast"; break;
-        case yal::NodeKind::Array: name = "Array"; break;
-        case yal::NodeKind::ArrayAutoLen: name = "ArrayAutoLen"; break;
-        case yal::NodeKind::ArrayType: name = "ArrayType"; break;
-        case yal::NodeKind::Call: name = "Call"; break;
-        case yal::NodeKind::Field: name = "Field"; break;
-        case yal::NodeKind::EnumLit: name = "EnumLit"; break;
-        case yal::NodeKind::Int: name = "Int"; break;
-        case yal::NodeKind::Id: name = "Id"; break;
-        case yal::NodeKind::Str: name = "Str"; break;
-    }
-
-    return formatter<string_view>::format(name, ctx);
-}
-
-auto fmt::formatter<yal::Node>::format(yal::Node n, format_context& ctx) const
-    -> format_context::iterator {
-    return fmt::format_to(ctx.out(), "{{{}, {}, {}, {}}}", n.kind, n.span,
-                          n.first, n.second);
-}
-
-auto fmt::formatter<yal::FatNodeHandle>::format(yal::FatNodeHandle n,
-                                                format_context&    ctx) const
-    -> format_context::iterator {
-    return n.ast->dump(ctx, n.node);
+    return n.dump_to_ctx(ctx);
 }

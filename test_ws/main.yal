@@ -1,0 +1,12 @@
+module main;
+
+import "libc";
+
+func main() int {
+    var sz = 256;
+    var buf: [*]u8 = libc.malloc(sz);
+    defer libc.free(buf);
+
+    _ = libc.snprintf(buf, sz, "Hello, %s!", "World");
+    _ = libc.printf("%s\n", buf);
+}

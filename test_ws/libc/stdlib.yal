@@ -1,0 +1,5 @@
+module libc;
+
+@extern func malloc(sz: usize) *struct {};
+@extern func free(ptr: *struct {});
+

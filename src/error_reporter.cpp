@@ -9,7 +9,7 @@
 
 namespace yal {
 
-void ErrorReporter::report(Span s, std::string_view prefix,
+void ErrorReporterForFile::report(Span s, std::string_view prefix,
                            fmt::text_style color, fmt::string_view fmt,
                            fmt::format_args args) {
     auto [row, col] = find_rowcol(s);

@@ -1,0 +1,20 @@
+#include "ast-node-id.hpp"
+
+#include <cstdint>
+
+#include "nlohmann/json.hpp"
+
+namespace yal::ast {
+
+void to_json(json &j, NodeId const &n) { j = n.value(); }
+void from_json(json const &j, NodeId &n) {
+    n = NodeId::from_raw_data(j.get<uint32_t>());
+}
+
+}  // namespace yal::ast
+
+auto fmt::formatter<yal::ast::NodeId>::format(yal::ast::NodeId nid,
+                                              format_context  &ctx) const
+    -> format_context::iterator {
+    return fmt::format_to(ctx.out(), "NodeId({})", nid.value());
+}

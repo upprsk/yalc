@@ -3,16 +3,18 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <string_view>
 #include <utility>
 
+#include "file-store.hpp"
 #include "fmt/color.h"
 #include "fmt/core.h"
 #include "span.hpp"
 
 namespace yal {
 
-class ErrorReporter {
+class ErrorReporterForFile {
     static constexpr auto const error_style = fmt::fg(fmt::color::red);
     static constexpr auto const note_style = fmt::fg(fmt::color::cyan);
     static constexpr auto const debug_style =
@@ -21,11 +23,12 @@ class ErrorReporter {
         fmt::fg(fmt::color::crimson) | fmt::emphasis::bold;
 
 public:
-    constexpr ErrorReporter(std::string source, std::string source_path,
-                            FILE* out = stderr)
+    constexpr ErrorReporterForFile(FileId fileid, std::string source,
+                                   std::string source_path, FILE* out = stderr)
         : source{std::move(source)},
           source_path{std::move(source_path)},
-          out{out} {}
+          out{out},
+          fileid{fileid} {}
 
     template <typename... T>
     void report_error(Span s, fmt::format_string<T...> fmt, T&&... args) {
@@ -69,6 +72,20 @@ public:
     [[nodiscard]] constexpr auto had_error() const -> bool {
         return error_count > 0;
     }
+
+    [[nodiscard]] constexpr auto get_source() const -> std::string const& {
+        return source;
+    }
+
+    [[nodiscard]] constexpr auto get_source_path() const -> std::string const& {
+        return source_path;
+    }
+
+    [[nodiscard]] constexpr auto get_error_count() const -> uint32_t {
+        return error_count;
+    }
+
+    [[nodiscard]] constexpr auto get_fileid() const -> FileId { return fileid; }
 
     // -----------------------------------------------------------------------
 
@@ -116,7 +133,40 @@ private:
     std::string source;
     std::string source_path;
     FILE*       out;
+    FileId      fileid;
     uint32_t    error_count{};
+};
+
+class ErrorReporter {
+public:
+    constexpr ErrorReporter(FileStore& fs, FILE* out) : fs{&fs}, out{out} {}
+
+    [[nodiscard]] auto for_file(FileId id) const -> ErrorReporterForFile {
+        return ErrorReporterForFile{
+            id,
+            fs->get_contents(id),
+            fs->get_filename(id),
+            out,
+        };
+    }
+
+    [[nodiscard]] constexpr auto had_error() const -> bool {
+        return error_count > 0;
+    }
+
+    [[nodiscard]] constexpr auto get_error_count() const -> uint32_t {
+        return error_count;
+    }
+
+    constexpr void update_error_count(uint32_t cnt) { error_count += cnt; }
+    constexpr void update_error_count(ErrorReporterForFile const& er) {
+        update_error_count(er.get_error_count());
+    }
+
+private:
+    FileStore* fs;
+    FILE*      out;
+    uint32_t   error_count{};
 };
 
 }  // namespace yal

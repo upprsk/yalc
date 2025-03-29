@@ -49,6 +49,7 @@ enum class TokenType : uint8_t {
     Comma,
     Dot,
     DotDot,
+    DotDotDot,
     DotStar,
     DotEqual,
     Question,
@@ -59,6 +60,7 @@ enum class TokenType : uint8_t {
     Lbracket,
     Rbracket,
     Id,
+    Decorator,
     Int,
     Hex,
     Str,
@@ -98,7 +100,7 @@ struct Token {
     constexpr auto operator==(Token const& o) const -> bool = default;
 };
 
-auto tokenize(std::string_view source, ErrorReporter& er) -> std::vector<Token>;
+auto tokenize(std::string_view source, ErrorReporterForFile& er) -> std::vector<Token>;
 }  // namespace yal
 
 template <>
