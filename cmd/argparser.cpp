@@ -5,22 +5,10 @@
 
 #include "fmt/base.h"
 #include "types.hpp"
+#include "utils.hpp"
 
 namespace yalc {
 using fmt::println;
-
-struct ArgIterator {
-    int    argc;
-    char** argv;
-
-    constexpr auto next(std::string_view& arg) -> bool {
-        if (argc == 0) return false;
-
-        argc--;
-        arg = std::string_view{*argv++};
-        return true;
-    }
-};
 
 void print_usage(std::string_view self) {
     println(stderr, "usage: {} [options] <program>", self);
@@ -38,7 +26,7 @@ void print_help(std::string_view self) {
 }
 
 auto argparse(int argc, char** argv) -> Args {
-    auto it = ArgIterator{.argc = argc, .argv = argv};
+    auto it = yal::ArgIterator{.argc = argc, .argv = argv};
 
     std::string_view self;
     ASSERT(it.next(self), "no argv[0]");
