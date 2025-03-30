@@ -1,0 +1,179 @@
+#include "test_tokenizer.hpp"
+
+#include <algorithm>
+#include <cstdio>
+#include <filesystem>
+
+#include "file-store.hpp"
+#include "fmt/base.h"
+#include "fmt/color.h"
+#include "fmt/format.h"
+#include "nlohmann/json.hpp"
+#include "tokenizer.hpp"
+#include "utils.hpp"
+
+using json = nlohmann::json;
+
+auto gen_filepath(std::string name) -> std::string {
+    std::filesystem::path path = __FILE__;
+    std::ranges::replace(name, ' ', '-');
+
+    return path.parent_path().append(fmt::format("{}.test.json", name));
+}
+
+auto load_expectation(std::string filename) -> json {
+    auto filedata = yal::read_entire_file(filename);
+    if (!filedata) return json{};
+
+    return json::parse(*filedata);
+}
+
+auto ask_for_updates(std::string_view name) -> bool {
+    fmt::print(fmt::fg(fmt::color::yellow), "Wrong expectation found for ");
+    fmt::print("{}", name);
+    fmt::print(fmt::fg(fmt::color::yellow), ", generate? (Y/n)");
+
+    auto c = getchar();
+    return c == '\n' || c == 'y' || c == 'Y';
+}
+
+auto gen_tokens(std::string source) -> json {
+    char*  buf = nullptr;
+    size_t bufsize = 0;
+
+    std::unique_ptr<FILE, void (*)(FILE*)> f = {open_memstream(&buf, &bufsize),
+                                                [](auto f) { fclose(f); }};
+
+    auto fs = yal::FileStore{};
+    auto er = yal::ErrorReporter{fs, f.get()};
+
+    auto root = fs.add(":memory:", source);
+    auto fer = er.for_file(root);
+    auto tokens = yal::tokenize(fer.get_source(), fer);
+    if (fer.had_error()) {
+        fflush(f.get());
+        return json{
+            {"stderr", std::string_view{buf, bufsize}}
+        };
+    }
+
+    return tokens;
+}
+
+struct Context {
+    int failed{};
+    int ok{};
+
+    [[nodiscard]] constexpr auto total() const -> int { return ok + failed; }
+};
+
+auto run_test_impl(Params const& p, std::string name, std::string source)
+    -> bool {
+    auto tokens = gen_tokens(source);
+
+    auto filename = gen_filepath(name);
+    auto exp = load_expectation(filename);
+    if (exp.is_null()) {
+        // no expectation for test, ask for it if in preview mode
+        if (p.ask_for_updates) {
+            if (tokens.contains("stderr")) {
+                fmt::println("got from tokenizing:\n{}",
+                             tokens.at("stderr").get<std::string_view>());
+            } else {
+                fmt::println("got from tokenizing:\n{}", tokens.dump(2));
+            }
+
+            auto gen = ask_for_updates(name);
+            if (gen) {
+                yal::write_file(filename, tokens.dump());
+                return true;
+            }
+        }
+
+        // error (return 1 (number of errors))
+        fmt::print(fmt::bg(fmt::color::red), "FAIL");
+        fmt::println(" {} has no expectation", name);
+        return false;
+    }
+
+    // check value
+    if (exp != tokens) {
+        if (tokens.contains("stderr")) {
+            fmt::println("got from tokenizing:\n{}",
+                         tokens.at("stderr").get<std::string_view>());
+        } else {
+            fmt::println("got from tokenizing:\n{}", tokens.dump(2));
+        }
+
+        fmt::println("but expected:\n{}", exp.dump(2));
+        fmt::print(fmt::bg(fmt::color::red), "FAIL");
+        fmt::println(" got unexpected value", name);
+
+        if (p.ask_for_updates) {
+            auto gen = ask_for_updates(name);
+            if (gen) {
+                yal::write_file(filename, tokens.dump());
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fmt::print(fmt::bg(fmt::color::green), "OK");
+    fmt::println(" {}", name);
+    return true;
+}
+
+void run_test(Context& ctx, Params const& p, std::string name,
+              std::string source) {
+    if (run_test_impl(p, name, source))
+        ctx.ok++;
+    else
+        ctx.failed++;
+}
+
+auto tokenizer_tests(Params const& p) -> std::pair<int, int> {
+    Context ctx;
+
+    fmt::println("==============================");
+
+    run_test(ctx, p, "empty file", "");
+    run_test(ctx, p, "minimal", "module main;");
+    run_test(ctx, p, "equals", "= == =>");
+    run_test(ctx, p, "less", "< << <<= <=");
+    run_test(ctx, p, "greater", "> >> >= >>=");
+    run_test(ctx, p, "plus", "+ ++ +=");
+    run_test(ctx, p, "minus", "- -- -=");
+    run_test(ctx, p, "star", "* ** *=");
+    run_test(ctx, p, "slash", "/ /=");
+    run_test(ctx, p, "bang", "! !=");
+    run_test(ctx, p, "percent", "% %=");
+    run_test(ctx, p, "ampersand", "& &=");
+    run_test(ctx, p, "pipe", "| |=");
+    run_test(ctx, p, "carrot", "^ ^=");
+    run_test(ctx, p, "tilde", "~ ~=");
+    run_test(ctx, p, "punctuation", "; : , . .. ... .* .= .{ ?");
+    run_test(ctx, p, "parens", "( ) { } [ ]");
+
+    run_test(ctx, p, "identifiers",
+             "hello test _ _one\ntWo_tHREe YAY abc123 _1");
+    run_test(ctx, p, "decorator", "@test @_124 @123 @testing_this_THING");
+    run_test(ctx, p, "numbers",
+             "1234567890 123_456_789 00 0xFF 0xbaba 2145 1.4 3.14 1.99");
+
+    run_test(ctx, p, "string",
+             R"~~("this is a string!" "a string \"with quotes\"")~~");
+    run_test(ctx, p, "char", R"~~('a' 'b' 'c' '\'' '\xF0')~~");
+
+    run_test(ctx, p, "comment", "// this is a comment");
+
+    run_test(ctx, p, "unterminated string", R"~~("unterminated string)~~");
+    run_test(ctx, p, "int dot", R"~~(123.)~~");
+    run_test(ctx, p, "int methods", R"~~(123.test())~~");
+
+    fmt::println("tokenizer tests, {} tests, {} success, {} failed",
+                 ctx.total(), ctx.ok, ctx.failed);
+    return {ctx.ok, ctx.failed};
+}
+

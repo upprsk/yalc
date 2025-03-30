@@ -1,0 +1,1 @@
+[{"span":{"begin":0,"end":4},"type":"Int"},{"span":{"begin":4,"end":8},"type":"Id"},{"span":{"begin":8,"end":9},"type":"Lparen"},{"span":{"begin":9,"end":10},"type":"Rparen"},{"span":{"begin":10,"end":10},"type":"Eof"}]

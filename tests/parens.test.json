@@ -1,0 +1,1 @@
+[{"span":{"begin":0,"end":1},"type":"Lparen"},{"span":{"begin":2,"end":3},"type":"Rparen"},{"span":{"begin":4,"end":5},"type":"Lbrace"},{"span":{"begin":6,"end":7},"type":"Rbrace"},{"span":{"begin":8,"end":9},"type":"Lbracket"},{"span":{"begin":10,"end":11},"type":"Rbracket"},{"span":{"begin":11,"end":11},"type":"Eof"}]

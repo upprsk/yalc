@@ -44,19 +44,11 @@ FetchContent_MakeAvailable(libassert)
 FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
 FetchContent_MakeAvailable(json)
 
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.4.0 # or a later release
-  GIT_SHALLOW    Yes
-)
-FetchContent_MakeAvailable(Catch2)
-
 add_subdirectory(src)
 add_subdirectory(cmd)
 
 # testing
-# if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
-#     add_subdirectory(tests)
-# endif()
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
