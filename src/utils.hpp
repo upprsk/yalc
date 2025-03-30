@@ -19,5 +19,6 @@ struct ArgIterator {
 };
 
 auto read_entire_file(std::string const& path) -> std::optional<std::string>;
+auto write_file(std::string const& path, std::string_view contents) -> bool;
 
 }  // namespace yal
