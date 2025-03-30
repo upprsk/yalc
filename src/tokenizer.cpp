@@ -156,7 +156,7 @@ struct Tokenizer {
 
         while (is_digit(peek()) || peek() == '_') advance();
 
-        if (match('.')) {
+        if (match('.') && is_digit(peek())) {
             while (is_digit(peek()) || peek() == '_') advance();
             return mkt(TokenType::Float);
         }
