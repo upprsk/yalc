@@ -104,6 +104,9 @@ struct Token {
 };
 
 auto tokenize(std::string_view source, ErrorReporterForFile& er) -> std::vector<Token>;
+
+void to_json(json& j, TokenType const& n);
+void to_json(json& j, Token const& t);
 }  // namespace yal
 
 template <>

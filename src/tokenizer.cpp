@@ -1,5 +1,7 @@
 #include "tokenizer.hpp"
 
+#include "nlohmann/json.hpp"
+
 namespace yal {
 
 struct Tokenizer {
@@ -245,6 +247,15 @@ auto tokenize(std::string_view source, ErrorReporterForFile& er)
     -> std::vector<Token> {
     auto tokenizer = Tokenizer{.source = source, .er = &er};
     return tokenizer.tokenize_all();
+}
+
+void to_json(json& j, TokenType const& n) { j = fmt::to_string(n); }
+
+void to_json(json& j, Token const& t) {
+    j = json{
+        {"type", t.type},
+        {"span", t.span},
+    };
 }
 
 }  // namespace yal
