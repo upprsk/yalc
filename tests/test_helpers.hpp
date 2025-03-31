@@ -5,6 +5,7 @@
 
 #include "file-store.hpp"
 #include "fmt/base.h"
+#include "fmt/color.h"
 #include "nlohmann/json_fwd.hpp"
 
 using json = nlohmann::json;
@@ -58,6 +59,8 @@ inline void run_checks_for_test(Context& ctx, TestParams const& p,
     try {
         ok = run_checks_for_test_output(ctx, p, name, get_output());
     } catch (AssertionError const& e) {
+        fmt::print(fmt::bg(fmt::color::red), "FAIL");
+        fmt::println(" {} assertion failed", name);
         ok = false;
     }
 
