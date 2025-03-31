@@ -17,7 +17,8 @@
 using json = nlohmann::json;
 
 struct Args {
-    bool ask = false;
+    bool                     ask = false;
+    std::vector<std::string> filters;
 };
 
 void print_usage(std::string_view self) {
@@ -34,6 +35,9 @@ void print_help(std::string_view self) {
     println(stderr, "    --usage: show usage and exit.");
     println(stderr,
             "    --ask: when a test fails, ask to update the expected value.");
+    println(stderr,
+            "    -f,--filter: filter tests by tags or name. This flag can be "
+            "passed multiple times to add more filters.");
 }
 
 auto argparse(int argc, char** argv) -> Args {
@@ -48,6 +52,13 @@ auto argparse(int argc, char** argv) -> Args {
     while (it.next(arg)) {
         if (arg == "--ask") {
             args.ask = true;
+        } else if (arg == "--filter" || arg == "-f") {
+            if (!it.next(arg)) {
+                fmt::println(stderr, "error: missing argument to filter");
+                exit(1);
+            }
+
+            args.filters.emplace_back(arg);
         } else if (arg == "--help" || arg == "-h") {
             print_help(self);
             exit(0);
@@ -69,7 +80,8 @@ auto real_main(Args args) -> int {
     int ok{};
     int failed{};
 
-    TestParams p{.ask_for_updates = args.ask};
+    TestParams p{.filters = {}, .ask_for_updates = args.ask};
+    for (auto const& s : args.filters) p.filters.insert(s);
 
     {
         auto [tok, tfailed] = test_tokenizer(p);

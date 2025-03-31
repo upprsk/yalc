@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <exception>
 #include <string>
+#include <unordered_set>
 
 #include "file-store.hpp"
 #include "fmt/base.h"
@@ -11,15 +13,24 @@
 using json = nlohmann::json;
 
 struct Context {
-    std::vector<std::string> tags;
+    std::vector<std::string>        tags;
+    std::unordered_set<std::string> filters;
 
     int failed{};
     int ok{};
 
     [[nodiscard]] constexpr auto total() const -> int { return ok + failed; }
+    constexpr auto should_run(std::string const& name) const -> bool {
+        if (filters.size() == 0 || filters.contains(name)) return true;
+
+        return std::ranges::any_of(
+            tags, [&](auto tag) { return filters.contains(tag); });
+    }
 };
 
 struct TestParams {
+    std::unordered_set<std::string> filters;
+
     bool ask_for_updates;
 };
 
@@ -55,6 +66,8 @@ auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
 /// `ctx.failed`.
 inline void run_checks_for_test(Context& ctx, TestParams const& p,
                                 std::string name, auto&& get_output) {
+    if (!ctx.should_run(name)) return;
+
     auto ok = false;
     try {
         ok = run_checks_for_test_output(ctx, p, name, get_output());
