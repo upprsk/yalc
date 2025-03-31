@@ -189,7 +189,8 @@ struct Parser {
                          "expected one of 'import', 'part', 'func', 'var' or "
                          "'def', found '{}'",
                          span().str(source));
-        return ast.new_err(loc());
+        advance();
+        return ast.new_err(prev_loc());
     }
 
     auto parse_import() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
