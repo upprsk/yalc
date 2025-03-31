@@ -22,6 +22,7 @@ void print_help(std::string_view self) {
     println(stderr, "    --usage: show usage and exit.");
     println(stderr, "    --dump-tokens: dump tokenization result.");
     println(stderr, "    --dump-ast: dump parsed AST.");
+    println(stderr, "    --dump-ast-json: dump parsed AST as json.");
     println(stderr, "    --dump-ast-dot: dump parsed AST as a dot graph.");
 }
 
