@@ -21,7 +21,7 @@ endif()
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 include(Dupe)
 
-set(LIBASSERT_USE_FMT=1)
+add_compile_definitions(LIBASSERT_USE_FMT=1)
 
 include(FetchContent)
 
