@@ -134,6 +134,31 @@ var A, B =
     0xEAAA;)");
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("top-level def");
+    run_test(ctx, p, "simple", R"(module test; def GLOBAL = 10;)");
+    run_test(ctx, p, "simple 2",
+             R"(module test; def GLOBAL = something_else;)");
+
+    run_test(ctx, p, "with types and init",
+             R"(module test; def GLOBAL: u64 = 0xDEAD_BEEF;)");
+    run_test(ctx, p, "with types", R"(module test; def GLOBAL: u64;)");
+
+    run_test(ctx, p, "multiple vars",
+             R"(module test; def A, B: u64, u64 = 0xDEAD_BEEF, 0xEAAA;)");
+    run_test(ctx, p, "multiple vars 2",
+             R"(module test;
+def A, B:
+    u64, u64 =
+    0xDEAD_BEEF, 0xEAAA;)");
+    run_test(ctx, p, "multiple vars 3",
+             R"(module test;
+def A, B =
+    0xDEAD_BEEF,
+    0xEAAA;)");
+    ctx.tags.pop_back();
+
+    // TODO: test local variables
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};

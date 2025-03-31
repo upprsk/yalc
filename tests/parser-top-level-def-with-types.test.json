@@ -1,0 +1,1 @@
+{"stderr":":memory::0:28: error: constants must have an initializer, but none found\n0000 | module test; def GLOBAL: u64;\n                                   ^\n"}
