@@ -1,1 +1,3 @@
-module f; func f.g(a, b: int) (c: int) {}
+module test;
+
+var A, B: u64, u32 = 0xDEAD_BEEF, 0xEAAA;

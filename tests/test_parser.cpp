@@ -111,6 +111,29 @@ func main() i32 {
              R"(module _; func _() { 3.14_159; })");
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("top-level var");
+    run_test(ctx, p, "simple", R"(module test; var GLOBAL = 10;)");
+    run_test(ctx, p, "simple 2",
+             R"(module test; var GLOBAL = something_else;)");
+
+    run_test(ctx, p, "with types and init",
+             R"(module test; var GLOBAL: u64 = 0xDEAD_BEEF;)");
+    run_test(ctx, p, "with types", R"(module test; var GLOBAL: u64;)");
+
+    run_test(ctx, p, "multiple defs",
+             R"(module test; var A, B: u64, u64 = 0xDEAD_BEEF, 0xEAAA;)");
+    run_test(ctx, p, "multiple defs 2",
+             R"(module test;
+var A, B:
+    u64, u64 =
+    0xDEAD_BEEF, 0xEAAA;)");
+    run_test(ctx, p, "multiple defs 3",
+             R"(module test;
+var A, B =
+    0xDEAD_BEEF,
+    0xEAAA;)");
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
