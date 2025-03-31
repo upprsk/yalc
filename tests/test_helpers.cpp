@@ -30,6 +30,8 @@ auto ask_for_updates(std::string_view name) -> bool {
     fmt::print(fmt::fg(fmt::color::yellow), ", generate? (Y/n)");
 
     auto c = getchar();
+    while (c != '\n' && getchar() != '\n');
+
     return c == '\n' || c == 'y' || c == 'Y';
 }
 
