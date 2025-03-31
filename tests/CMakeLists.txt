@@ -1,4 +1,5 @@
 add_executable(tests
+    subprocess.hpp
     test_helpers.cpp
     test_helpers.hpp
     test_main.cpp
