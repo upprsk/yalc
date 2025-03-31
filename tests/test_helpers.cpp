@@ -75,9 +75,9 @@ auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
             fmt::println("{} got as output:\n{}", fullname, output.dump(2));
         }
 
-        if (output.contains("stderr")) {
+        if (exp.contains("stderr")) {
             fmt::println("but expected:\n{}",
-                         output.at("stderr").get<std::string_view>());
+                         exp.at("stderr").get<std::string_view>());
         } else {
             fmt::println("but expected:\n{}", exp.dump(2));
         }
