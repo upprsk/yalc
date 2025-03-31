@@ -157,7 +157,73 @@ def A, B =
     0xEAAA;)");
     ctx.tags.pop_back();
 
-    // TODO: test local variables
+    ctx.tags.emplace_back("local var");
+
+    run_test(ctx, p, "simple local",
+             R"(module test;
+
+func test() {
+    var x = 0;
+})");
+
+    run_test(ctx, p, "multiple local",
+             R"(module test;
+
+func test() {
+    var x, y = 0, 1;
+})");
+
+    run_test(ctx, p, "multiple local with types",
+             R"(module test;
+
+func test() {
+    var x, y: i32, u8 = 0, 1;
+})");
+
+    run_test(ctx, p, "operations",
+             R"(module test;
+
+func test() {
+    var x = 0;
+    var y = 0;
+    return x;
+})");
+
+    ctx.tags.pop_back();
+
+    ctx.tags.emplace_back("local def");
+
+    run_test(ctx, p, "simple local",
+             R"(module test;
+
+func test() {
+    def x = 0;
+})");
+
+    run_test(ctx, p, "multiple local",
+             R"(module test;
+
+func test() {
+    def x, y = 0, 1;
+})");
+
+    run_test(ctx, p, "multiple local with types",
+             R"(module test;
+
+func test() {
+    def x, y: i32, u8 = 0, 1;
+})");
+
+    run_test(ctx, p, "operations",
+             R"(module test;
+
+func test() {
+    def x = 0;
+    def y = 0;
+    return x;
+})");
+
+    ctx.tags.pop_back();
 
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);

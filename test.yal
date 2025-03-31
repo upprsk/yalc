@@ -1,5 +1,5 @@
 module test;
 
-def A, B =
-    0xDEAD_BEEF,
-    0xEAAA;
+func test() {
+    var x = 0;
+}
