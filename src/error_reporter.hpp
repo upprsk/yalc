@@ -24,7 +24,7 @@ class ErrorReporterForFile {
 
 public:
     constexpr ErrorReporterForFile(FileId fileid, std::string source,
-                                   std::string source_path, FILE* out = stderr)
+                                   std::string source_path, FILE* out)
         : source{std::move(source)},
           source_path{std::move(source_path)},
           out{out},
@@ -108,7 +108,7 @@ private:
 
     [[nodiscard]] constexpr auto find_linestart(Span s) const -> Span {
         uint32_t line_start{};
-        uint32_t line_end = s.begin;
+        uint32_t line_end = source.length();
 
         for (ssize_t i = s.begin; i >= 0; i--) {
             if (source[i] == '\n') {
