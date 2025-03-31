@@ -102,7 +102,7 @@ enum class NodeKind : uint16_t {
     /// various attributes of the function, like: `extern`, link name,
     /// alignment, etc.
     ///
-    /// - `first` points to a `FuncId` node with the function name (and
+    /// - `first` points to a `IdPack` node with the function name (and
     /// namespacing).
     /// - `second` points to all other things in an array.
     ///
