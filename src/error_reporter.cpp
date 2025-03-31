@@ -10,8 +10,8 @@
 namespace yal {
 
 void ErrorReporterForFile::report(Span s, std::string_view prefix,
-                           fmt::text_style color, fmt::string_view fmt,
-                           fmt::format_args args) {
+                                  fmt::text_style color, fmt::string_view fmt,
+                                  fmt::format_args args) {
     auto [row, col] = find_rowcol(s);
 
     fmt::print(out, "{}:{}:{}: ", source_path, row, col, prefix);
@@ -36,7 +36,8 @@ void ErrorReporterForFile::report(Span s, std::string_view prefix,
         fmt::print(out, color, "{0: <{1}}{0:^<{2}}", "", 4 + 3 + s.begin - ls,
                    std::min(s.end, le) - s.begin);
     } else {
-        fmt::print(out, "       {:<{}}", "^", le - ls);
+        fmt::print(out, "{0: <{1}}{0:^<{2}}", "", 4 + 3 + s.begin - ls,
+                   std::min(s.end, le) - s.begin);
     }
 
     fmt::println(out, "");
