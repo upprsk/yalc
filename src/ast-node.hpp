@@ -126,7 +126,7 @@ enum class NodeKind : uint16_t {
     /// A top-level (global) variable declaration.
     ///
     /// - `first` points to a VarDecl node.
-    /// - `second` points to an array of decorators added to the function.
+    /// - `second` points to an array of decorators added to the declaration.
     ///
     /// The `second` array is made of `[{length}, ...]`.
     TopVarDecl,
