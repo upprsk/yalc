@@ -22,8 +22,9 @@ auto gen_tokens(std::string source) -> json {
     auto root = fs.add(":memory:", source);
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
+    fflush(f.get());
+
     if (fer.had_error()) {
-        fflush(f.get());
         return json{
             {"stderr", std::string_view{buf, bufsize}}
         };
