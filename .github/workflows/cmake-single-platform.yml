@@ -27,7 +27,7 @@ jobs:
       with:
         # GCC version to install
         version: 14
-        
+
     - uses: actions/checkout@v4
 
     - name: Configure CMake
