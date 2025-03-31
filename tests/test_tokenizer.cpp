@@ -1,17 +1,11 @@
 #include "test_tokenizer.hpp"
 
-#include <algorithm>
-#include <cstdio>
-#include <filesystem>
-
 #include "file-store.hpp"
-#include "fmt/base.h"
 #include "fmt/color.h"
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
 #include "test_helpers.hpp"
 #include "tokenizer.hpp"
-#include "utils.hpp"
 
 using json = nlohmann::json;
 
