@@ -94,9 +94,9 @@ enum class NodeKind : uint16_t {
     ///     |                  |       |       |
     ///     |                  |       |       \_ arguments
     ///     |                  |       |
-    ///     \_ (1) decorators  |       \_ generic arguments
+    ///     \_ decorators      |       \_ generic arguments
     ///                        |
-    ///                        \_ name (with namespace
+    ///                        \_ name (with namespace)
     ///
     /// 1. A function may be annotated with a "decorator". This can change
     /// various attributes of the function, like: `extern`, link name,
