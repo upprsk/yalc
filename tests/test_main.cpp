@@ -20,16 +20,40 @@ struct Args {
     bool ask = false;
 };
 
+void print_usage(std::string_view self) {
+    fmt::println(stderr, "usage: {} [options] <program>", self);
+}
+
+void print_help(std::string_view self) {
+    using fmt::println;
+
+    print_usage(self);
+    println(stderr, "");
+    println(stderr, "options:");
+    println(stderr, "    -h,--help: show this message and exit.");
+    println(stderr, "    --usage: show usage and exit.");
+    println(stderr,
+            "    --ask: when a test fails, ask to update the expected value.");
+}
+
 auto argparse(int argc, char** argv) -> Args {
-    auto             it = yal::ArgIterator{.argc = argc, .argv = argv};
-    std::string_view arg;
-    ASSERT(it.next(arg), "no argv[0]");
+    auto it = yal::ArgIterator{.argc = argc, .argv = argv};
+
+    std::string_view self;
+    ASSERT(it.next(self), "no argv[0]");
 
     Args args;
 
+    std::string_view arg;
     while (it.next(arg)) {
         if (arg == "--ask") {
             args.ask = true;
+        } else if (arg == "--help" || arg == "-h") {
+            print_help(self);
+            exit(0);
+        } else if (arg == "--usage") {
+            print_help(self);
+            exit(0);
         } else {
             fmt::println(stderr, "error: unknown option: '{:?}'", arg);
             exit(1);
