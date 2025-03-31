@@ -6,6 +6,7 @@
 
 #include "fmt/color.h"
 #include "fmt/format.h"
+#include "fmt/ranges.h"
 #include "nlohmann/json.hpp"
 #include "utils.hpp"
 
@@ -32,9 +33,13 @@ auto ask_for_updates(std::string_view name) -> bool {
     return c == '\n' || c == 'y' || c == 'Y';
 }
 
-auto run_checks_for_test_output(TestParams const& p, std::string name,
-                                json const& output) -> bool {
-    auto filename = gen_filepath(name);
+auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
+                                std::string name, json const& output) -> bool {
+    auto name_with_tags = ctx.tags;
+    name_with_tags.push_back(name);
+    auto fullname = fmt::to_string(fmt::join(name_with_tags, "-"));
+    auto filename = gen_filepath(fullname);
+
     auto exp = load_expectation(filename);
     if (exp.is_null()) {
         // no expectation for test, ask for it if in preview mode
@@ -46,7 +51,7 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
                 fmt::println("got from tokenizing:\n{}", output.dump(2));
             }
 
-            auto gen = ask_for_updates(name);
+            auto gen = ask_for_updates(fullname);
             if (gen) {
                 yal::write_file(filename, output.dump());
                 return true;
@@ -55,7 +60,7 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
 
         // error
         fmt::print(fmt::bg(fmt::color::red), "FAIL");
-        fmt::println(" {} has no expectation", name);
+        fmt::println(" {} has no expectation", fullname);
         return false;
     }
 
@@ -70,10 +75,10 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
 
         fmt::println("but expected:\n{}", exp.dump(2));
         fmt::print(fmt::bg(fmt::color::red), "FAIL");
-        fmt::println(" got unexpected value", name);
+        fmt::println(" got unexpected value", fullname);
 
         if (p.ask_for_updates) {
-            auto gen = ask_for_updates(name);
+            auto gen = ask_for_updates(fullname);
             if (gen) {
                 yal::write_file(filename, output.dump());
                 return true;
@@ -84,7 +89,7 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
     }
 
     fmt::print(fmt::bg(fmt::color::green), "OK");
-    fmt::println(" {}", name);
+    fmt::println(" {}", fullname);
     return true;
 }
 

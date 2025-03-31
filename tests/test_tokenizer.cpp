@@ -32,13 +32,13 @@ auto gen_tokens(std::string source) -> json {
     return tokens;
 }
 
-void run_test(Context& ctx, TestParams const& p, std::string name,
-              std::string source) {
+static void run_test(Context& ctx, TestParams const& p, std::string name,
+                     std::string source) {
     run_checks_for_test(ctx, p, name, [&]() { return gen_tokens(source); });
 }
 
 auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
-    Context ctx;
+    Context ctx{.tags={"tokenizer"}};
 
     fmt::println("==============================");
 

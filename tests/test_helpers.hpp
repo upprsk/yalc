@@ -10,6 +10,8 @@
 using json = nlohmann::json;
 
 struct Context {
+    std::vector<std::string> tags;
+
     int failed{};
     int ok{};
 
@@ -43,8 +45,8 @@ auto ask_for_updates(std::string_view name) -> bool;
 
 /// Given the output of the test, check against expectations. Returns true when
 /// the test case succeeds and false when it fails.
-auto run_checks_for_test_output(TestParams const& p, std::string name,
-                                json const& output) -> bool;
+auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
+                                std::string name, json const& output) -> bool;
 
 /// Run a given test.
 ///
@@ -54,7 +56,7 @@ inline void run_checks_for_test(Context& ctx, TestParams const& p,
                                 std::string name, auto&& get_output) {
     auto ok = false;
     try {
-        ok = run_checks_for_test_output(p, name, get_output());
+        ok = run_checks_for_test_output(ctx, p, name, get_output());
     } catch (AssertionError const& e) {
         ok = false;
     }
