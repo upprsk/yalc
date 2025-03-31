@@ -40,6 +40,7 @@ FetchContent_Declare(
   GIT_SHALLOW    Yes
 )
 FetchContent_MakeAvailable(libassert)
+target_link_libraries("libassert-lib" PUBLIC fmt::fmt)
 
 FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
 FetchContent_MakeAvailable(json)
