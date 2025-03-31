@@ -9,33 +9,11 @@
 #include "fmt/color.h"
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
+#include "test_helpers.hpp"
 #include "tokenizer.hpp"
 #include "utils.hpp"
 
 using json = nlohmann::json;
-
-auto gen_filepath(std::string name) -> std::string {
-    std::filesystem::path path = __FILE__;
-    std::ranges::replace(name, ' ', '-');
-
-    return path.parent_path().append(fmt::format("{}.test.json", name));
-}
-
-auto load_expectation(std::string filename) -> json {
-    auto filedata = yal::read_entire_file(filename);
-    if (!filedata) return json{};
-
-    return json::parse(*filedata);
-}
-
-auto ask_for_updates(std::string_view name) -> bool {
-    fmt::print(fmt::fg(fmt::color::yellow), "Wrong expectation found for ");
-    fmt::print("{}", name);
-    fmt::print(fmt::fg(fmt::color::yellow), ", generate? (Y/n)");
-
-    auto c = getchar();
-    return c == '\n' || c == 'y' || c == 'Y';
-}
 
 auto gen_tokens(std::string source) -> json {
     char*  buf = nullptr;
@@ -59,13 +37,6 @@ auto gen_tokens(std::string source) -> json {
 
     return tokens;
 }
-
-struct Context {
-    int failed{};
-    int ok{};
-
-    [[nodiscard]] constexpr auto total() const -> int { return ok + failed; }
-};
 
 auto run_test_impl(Params const& p, std::string name, std::string source)
     -> bool {
@@ -176,4 +147,3 @@ auto tokenizer_tests(Params const& p) -> std::pair<int, int> {
                  ctx.total(), ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
 }
-

@@ -1,4 +1,6 @@
 add_executable(tests
+    test_helpers.cpp
+    test_helpers.hpp
     test_main.cpp
     test_tokenizer.cpp
     test_tokenizer.hpp
