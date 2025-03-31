@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 #include "fmt/color.h"
 #include "fmt/format.h"
@@ -85,4 +86,11 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
     fmt::print(fmt::bg(fmt::color::green), "OK");
     fmt::println(" {}", name);
     return true;
+}
+
+void handle_assertion(libassert::assertion_info const& info) {
+    fmt::print(fmt::bg(fmt::color::red), "FAIL");
+    fmt::println(" assertion failed:\n{}", info.to_string());
+
+    throw AssertionError{"Assertion failed"};
 }

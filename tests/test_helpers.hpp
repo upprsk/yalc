@@ -1,7 +1,10 @@
 #pragma once
 
+#include <exception>
 #include <string>
 
+#include "file-store.hpp"
+#include "fmt/base.h"
 #include "nlohmann/json_fwd.hpp"
 
 using json = nlohmann::json;
@@ -15,6 +18,17 @@ struct Context {
 
 struct TestParams {
     bool ask_for_updates;
+};
+
+struct AssertionError : public std::exception {
+    [[nodiscard]] explicit AssertionError(std::string message)
+        : message(std::move(message)) {}
+
+    [[nodiscard]] auto what() const noexcept -> char const* override {
+        return message.c_str();
+    }
+
+    std::string message;
 };
 
 // Generate a path relative to the current .cpp file
@@ -38,9 +52,18 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
 /// `ctx.failed`.
 inline void run_checks_for_test(Context& ctx, TestParams const& p,
                                 std::string name, auto&& get_output) {
-    auto ok = run_checks_for_test_output(p, name, get_output());
+    auto ok = false;
+    try {
+        ok = run_checks_for_test_output(p, name, get_output());
+    } catch (AssertionError const& e) {
+        ok = false;
+    }
+
     if (ok)
         ctx.ok++;
     else
         ctx.failed++;
 }
+
+/// Handler for libassert assertion failures.
+void handle_assertion(libassert::assertion_info const& info);

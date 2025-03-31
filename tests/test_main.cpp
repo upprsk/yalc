@@ -39,6 +39,8 @@ auto argparse(int argc, char** argv) -> Args {
 }
 
 auto real_main(Args args) -> int {
+    libassert::set_failure_handler(handle_assertion);
+
     TestParams p{.ask_for_updates = args.ask};
     test_tokenizer(p);
 
