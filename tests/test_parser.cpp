@@ -89,6 +89,10 @@ func main() (i32, y: i32) {})");
 func main() i32 {
     return 0;
 })");
+    run_test(ctx, p, "namespaced", R"(module f; func g.f() {})");
+    run_test(ctx, p, "namespaced 2", R"(module f; func g.f(a) b {})");
+    run_test(ctx, p, "namespaced 3",
+             R"(module f; func f.g(a, b: int) (c: int) {})");
     ctx.tags.pop_back();
 
     ctx.tags.emplace_back("numbers");

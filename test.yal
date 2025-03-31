@@ -1,1 +1,1 @@
-module _; func _() { return 123_456; }
+module f; func f.g(a, b: int) (c: int) {}
