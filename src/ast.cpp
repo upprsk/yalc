@@ -171,15 +171,15 @@ struct JsonVisitor : public Visitor {
         if (child.is_valid()) j["child"] = ast.fatten(child);
     }
 
-    void visit_var_decl(Ast& ast, Node const& node, NodeId ids, NodeId types,
-                        NodeId inits) override {
+    void visit_var_decl(Ast& ast, Node const& /*node*/, NodeId ids,
+                        NodeId types, NodeId inits) override {
         j["ids"] = ast.fatten(ids);
         if (types.is_valid()) j["types"] = ast.fatten(types);
         if (inits.is_valid()) j["inits"] = ast.fatten(inits);
     }
 
-    void visit_def_decl(Ast& ast, Node const& node, NodeId ids, NodeId types,
-                        NodeId inits) override {
+    void visit_def_decl(Ast& ast, Node const& /*node*/, NodeId ids,
+                        NodeId types, NodeId inits) override {
         j["ids"] = ast.fatten(ids);
         if (types.is_valid()) j["types"] = ast.fatten(types);
         j["inits"] = ast.fatten(inits);
