@@ -9,6 +9,7 @@
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
 #include "test_helpers.hpp"
+#include "test_parser.hpp"
 #include "test_tokenizer.hpp"
 #include "tokenizer.hpp"
 #include "utils.hpp"
@@ -41,10 +42,25 @@ auto argparse(int argc, char** argv) -> Args {
 auto real_main(Args args) -> int {
     libassert::set_failure_handler(handle_assertion);
 
-    TestParams p{.ask_for_updates = args.ask};
-    test_tokenizer(p);
+    int ok{};
+    int failed{};
 
-    return 0;
+    TestParams p{.ask_for_updates = args.ask};
+
+    {
+        auto [tok, tfailed] = test_tokenizer(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
+    {
+        auto [tok, tfailed] = test_parser(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
+    fmt::println("{} tests, {} success, {} failed", ok + failed, ok, failed);
+    return failed > 0;
 }
 
 auto main(int argc, char** argv) -> int {
