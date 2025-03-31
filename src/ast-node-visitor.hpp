@@ -116,6 +116,13 @@ struct Visitor {
 
     // =======================================================================
 
+    virtual void visit_expr_pack(Ast& ast, Node const& node,
+                                 std::span<NodeId const> children) {
+        for (auto const& child : children) visit(ast, child);
+    }
+
+    // =======================================================================
+
     virtual void visit_block(Ast& ast, Node const& node,
                              std::span<NodeId const> children) {
         visit_before_block(ast, node, children);
@@ -127,6 +134,16 @@ struct Visitor {
                                     std::span<NodeId const> children) {}
     virtual void visit_after_block(Ast& ast, Node const& node,
                                    std::span<NodeId const> children) {}
+
+    // -----------------------------------------------------------------------
+
+    virtual void visit_expr_stmt(Ast& ast, Node const& node, NodeId child) {
+        visit(ast, child);
+    }
+
+    virtual void visit_return_stmt(Ast& ast, Node const& node, NodeId child) {
+        if (child.is_valid()) visit(ast, child);
+    }
 
 #pragma GCC diagnostic pop
 };

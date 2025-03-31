@@ -481,7 +481,27 @@ struct Parser {
 
     // ========================================================================
 
-    auto parse_stmt() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_stmt() -> ast::NodeId {
+        if (check("return")) return parse_return_stmt();
+
+        // expression statement
+        auto expr = parse_expr();
+        try(consume(TokenType::Semi));
+
+        return ast.new_expr_stmt(
+            ast.get_node_loc(expr.as_ref()).extend(prev_span()), expr);
+    }
+
+    auto parse_return_stmt() -> ast::NodeId {
+        auto start = loc();
+        try(consume("return"));
+
+        auto expr = ast::NodeId::invalid();
+        if (!check(TokenType::Semi)) expr = parse_expr();
+        try(consume(TokenType::Semi));
+
+        return ast.new_return_stmt(start.extend(prev_span()), expr);
+    }
 
     // ------------------------------------------------------------------------
 

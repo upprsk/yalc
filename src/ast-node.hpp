@@ -155,6 +155,12 @@ enum class NodeKind : uint16_t {
     /// Expressions
     /// -----------
 
+    /// Used for multiple returns and contains a list of expressions.
+    ///
+    /// - `first` has the count of how many children the node has.
+    /// - `second` pointer to array of children.
+    ExprPack,
+
     /// ----------
     /// Statements
     /// ----------
@@ -164,6 +170,18 @@ enum class NodeKind : uint16_t {
     /// - `first` has the number of statements.
     /// - `second` points to array of `first` statements.
     Block,
+
+    /// A statement over an expression, like `print("hi!");`.
+    ///
+    /// - `first` has the child node.
+    ExprStmt,
+
+    /// A return statement.
+    ///
+    /// - `first` has the child node. For multiple return values, child will be
+    /// an ExprPack. When it is a bare return without an expression, child is an
+    /// invalid id.
+    ReturnStmt,
 };
 
 class Node {
@@ -235,7 +253,10 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::FuncId: name = "FuncId"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
+        case NodeKind::ExprPack: name = "ExprPack"; break;
         case NodeKind::Block: name = "Block"; break;
+        case NodeKind::ExprStmt: name = "ExprStmt"; break;
+        case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
     }
 
     return name;

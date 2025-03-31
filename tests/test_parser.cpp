@@ -83,6 +83,7 @@ func main(a: i32, b: i32) (i32, i32) {})");
 func main(a: i32, b: i32) (x: i32, y: i32) {})");
     run_test(ctx, p, "with mixed return values", R"(module main;
 func main() (i32, y: i32) {})");
+    run_test(ctx, p, "bare return", R"(module f; func f() { return; })");
     run_test(ctx, p, "main function", R"(module main;
 
     func main() i32 {

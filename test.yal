@@ -1,2 +1,5 @@
-module f;
-func main(a, b: i32) {}
+module main;
+
+func main() i32 {
+    return 0;
+}

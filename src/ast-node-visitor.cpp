@@ -1,5 +1,7 @@
 #include "ast-node-visitor.hpp"
 
+#include "ast-node.hpp"
+
 namespace yal::ast {
 
 void Visitor::visit(Ast& ast, NodeId node_id) {
@@ -78,15 +80,30 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                              node.get_second());
             break;
         case NodeKind::FuncRetPack:
-            visit_func_ret_pack(ast, node,
-                                ast.get_array(node.get_first().as_count().of_kv(),
-                                              node.get_second().as_array()));
+            visit_func_ret_pack(
+                ast, node,
+                ast.get_array(node.get_first().as_count().of_kv(),
+                              node.get_second().as_array()));
+            break;
+
+        case NodeKind::ExprPack:
+            visit_expr_pack(ast, node,
+                            ast.get_array(node.get_first().as_count(),
+                                          node.get_second().as_array()));
             break;
 
         case NodeKind::Block:
             visit_block(ast, node,
                         ast.get_array(node.get_first().as_count(),
                                       node.get_second().as_array()));
+            break;
+
+        case NodeKind::ExprStmt:
+            visit_expr_stmt(ast, node, node.get_first());
+            break;
+
+        case NodeKind::ReturnStmt:
+            visit_return_stmt(ast, node, node.get_first());
             break;
     }
 }

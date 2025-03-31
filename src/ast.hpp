@@ -132,6 +132,13 @@ public:
     // Expressions
     // -----------
 
+    auto new_expr_pack(Location loc, std::span<NodeId const> children)
+        -> NodeId {
+        return new_node(NodeKind::ExprPack, loc,
+                        NodeId::from_raw_data(children.size()),
+                        new_ref_array_with(children));
+    }
+
     // ----------
     // Statements
     // ----------
@@ -140,6 +147,14 @@ public:
         return new_node(NodeKind::Block, loc,
                         NodeId::from_raw_data(children.size()),
                         new_ref_array_with(children));
+    }
+
+    auto new_expr_stmt(Location loc, NodeId child) -> NodeId {
+        return new_node(NodeKind::ExprStmt, loc, child, NodeId::invalid());
+    }
+
+    auto new_return_stmt(Location loc, NodeId child) -> NodeId {
+        return new_node(NodeKind::ReturnStmt, loc, child, NodeId::invalid());
     }
 
 public:

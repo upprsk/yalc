@@ -56,6 +56,8 @@ struct JsonVisitor : public Visitor {
         j["value"] = character;
     }
 
+    // ========================================================================
+
     void visit_module(Ast& ast, Node const& /*node*/, std::string_view name,
                       std::span<NodeId const> children) override {
         j["name"] = name;
@@ -138,11 +140,33 @@ struct JsonVisitor : public Visitor {
         j["values"] = arr;
     }
 
+    // ========================================================================
+
+    void visit_expr_pack(Ast&                    ast, Node const& /*node*/,
+                         std::span<NodeId const> children) override {
+        auto arr = json::array();
+        for (auto const& child : children) arr.push_back(ast.fatten(child));
+
+        j["children"] = arr;
+    }
+
+    // ========================================================================
+
     void visit_block(Ast&                    ast, Node const& /*node*/,
                      std::span<NodeId const> children) override {
         auto arr = json::array();
         for (auto const& child : children) arr.push_back(ast.fatten(child));
         j["children"] = arr;
+    }
+
+    void visit_expr_stmt(Ast&   ast, Node const& /*node*/,
+                         NodeId child) override {
+        j["child"] = ast.fatten(child);
+    }
+
+    void visit_return_stmt(Ast&   ast, Node const& /*node*/,
+                           NodeId child) override {
+        if (child.is_valid()) j["child"] = ast.fatten(child);
     }
 
     json& j;
