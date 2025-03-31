@@ -19,7 +19,9 @@ struct Parser {
     }
 
     [[nodiscard]] constexpr auto peek_prev() const -> Token {
-        ASSERT(current > 0);
+        // in case we are at the first token, return EOF. This is safe because
+        // we will always have at least one token in `tokens`, the EOF token.
+        if (current == 0) return tokens[tokens.size() - 1];
         return tokens[current - 1];
     }
 
