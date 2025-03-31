@@ -40,7 +40,7 @@ auto argparse(int argc, char** argv) -> Args {
 
 auto real_main(Args args) -> int {
     TestParams p{.ask_for_updates = args.ask};
-    tokenizer_tests(p);
+    test_tokenizer(p);
 
     return 0;
 }

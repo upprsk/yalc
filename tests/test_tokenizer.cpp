@@ -43,7 +43,7 @@ void run_test(Context& ctx, TestParams const& p, std::string name,
     run_checks_for_test(ctx, p, name, [&]() { return gen_tokens(source); });
 }
 
-auto tokenizer_tests(TestParams const& p) -> std::pair<int, int> {
+auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
     Context ctx;
 
     fmt::println("==============================");
