@@ -1,5 +1,8 @@
 #include "parser.hpp"
 
+#include <algorithm>
+#include <charconv>
+#include <cstdint>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -372,7 +375,7 @@ struct Parser {
 
             case TokenType::Int:
             case TokenType::Hex:
-            case TokenType::Float: return parse_number();
+            case TokenType::Float: return parse_number(t);
 
             case TokenType::DotLbrace: return parse_lit();
             case TokenType::Lbracket: return parse_arr();
@@ -406,7 +409,63 @@ struct Parser {
         return ast.new_id(to_loc(t.span), t.span.str(source));
     }
 
-    auto parse_number() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_number(Token t) -> ast::NodeId {
+        switch (t.type) {
+            case TokenType::Int: {
+                // TODO: do not use replace and a dynamic string here
+                auto s = std::string{t.span.str(source)};
+                s.erase(begin(std::ranges::remove(s, '_')), s.end());
+
+                uint64_t v;
+                auto [ptr, ec] =
+                    std::from_chars(s.data(), s.data() + s.size(), v);
+                if (ec != std::errc{} || ptr != s.data() + s.size()) {
+                    er->report_bug(t.span,
+                                   "invalid integer found in parser: '{}'", s);
+                    return ast.new_err(to_loc(t.span));
+                }
+
+                return ast.new_int(to_loc(t.span), v);
+            } break;
+
+            case TokenType::Hex: {
+                // TODO: do not use replace and a dynamic string here
+                auto s = std::string{t.span.str(source).substr(2)};
+                s.erase(begin(std::ranges::remove(s, '_')), s.end());
+
+                uint64_t v;
+                auto [ptr, ec] =
+                    std::from_chars(s.data(), s.data() + s.size(), v, 16);
+                if (ec != std::errc{} || ptr != s.data() + s.size()) {
+                    er->report_bug(t.span,
+                                   "invalid integer found in parser: '{}'", s);
+                    return ast.new_err(to_loc(t.span));
+                }
+
+                return ast.new_int(to_loc(t.span), v);
+            } break;
+
+            case TokenType::Float: {
+                // TODO: do not use replace and a dynamic string here
+                auto s = std::string{t.span.str(source)};
+                s.erase(begin(std::ranges::remove(s, '_')), s.end());
+
+                char* end = nullptr;
+                auto  v = strtod(s.c_str(), &end);
+                if (end != s.data() + s.size()) {
+                    er->report_bug(t.span,
+                                   "invalid f64 (double) found in parser: '{}'",
+                                   s);
+                    return ast.new_err(to_loc(t.span));
+                }
+
+                return ast.new_double(to_loc(t.span), v);
+            } break;
+
+            default: UNREACHABLE("unexpected token in `parse_number`", t.type);
+        }
+    }
+
     auto parse_lit() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_arr() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_str() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
