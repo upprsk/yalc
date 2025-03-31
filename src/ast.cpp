@@ -7,7 +7,8 @@
 namespace yal::ast {
 
 struct JsonVisitor : public Visitor {
-    explicit constexpr JsonVisitor(json& j) : j{j} {}
+    explicit constexpr JsonVisitor(json& j, bool show_loc)
+        : j{j}, show_loc{show_loc} {}
 
     void visit_before(Ast& /*ast*/, Node const& node) override {
         // fmt::println(stderr, "JsonVisitor(id={}, kind={})", node.get_id(),
@@ -16,8 +17,9 @@ struct JsonVisitor : public Visitor {
         j = json{
             {"kind", fmt::to_string(node.get_kind())},
             {  "id",                   node.get_id()},
-            { "loc",                  node.get_loc()},
         };
+
+        if (show_loc) j["loc"] = node.get_loc();
     }
 
     void visit_err(Ast& ast, Node const& node) override {
@@ -184,6 +186,7 @@ struct JsonVisitor : public Visitor {
     }
 
     json& j;
+    bool  show_loc;
 };
 
 // TODO: print the ast?
@@ -194,7 +197,7 @@ auto FatNodeId::dump_to_ctx(fmt::format_context& ctx) const
 }
 
 void to_json(json& j, FatNodeId const& n) {
-    auto v = JsonVisitor{j};
+    auto v = JsonVisitor{j, true};
     v.visit(*n.ast, n.id);
 }
 
