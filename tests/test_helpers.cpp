@@ -52,7 +52,7 @@ auto run_checks_for_test_output(TestParams const& p, std::string name,
             }
         }
 
-        // error (return 1 (number of errors))
+        // error
         fmt::print(fmt::bg(fmt::color::red), "FAIL");
         fmt::println(" {} has no expectation", name);
         return false;
