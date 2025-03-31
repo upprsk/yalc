@@ -131,6 +131,14 @@ enum class NodeKind : uint16_t {
     /// The `second` array is made of `[{length}, ...]`.
     TopVarDecl,
 
+    /// A top-level (global) constant declaration.
+    ///
+    /// - `first` points to a DefDecl node.
+    /// - `second` points to an array of decorators added to the declaration.
+    ///
+    /// The `second` array is made of `[{length}, ...]`.
+    TopDefDecl,
+
     /// A pack of ids. This is used in function definitions for namespacing and
     /// on variable definitions to allow multiple returns.
     ///
@@ -209,6 +217,16 @@ enum class NodeKind : uint16_t {
     /// Both `types` and `inits` are optional during parsing, so either can be
     /// an invalid id.
     VarDecl,
+
+    /// A constant declaration.
+    ///
+    /// - `first` points to an `IdPack` with all of the declared names.
+    /// - `second` points to an an array with all explicit types and
+    /// initializers as `[{types}, {inits}]`. Each of `types` and `inits` should
+    /// be an `ExprPack`.
+    ///
+    /// `types` is optional, so it can be an invalid id.
+    DefDecl,
 };
 
 class Node {
@@ -278,6 +296,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ModuleDecl: name = "ModuleDecl"; break;
         case NodeKind::FuncDecl: name = "FuncDecl"; break;
         case NodeKind::TopVarDecl: name = "TopVarDecl"; break;
+        case NodeKind::TopDefDecl: name = "TopDefDecl"; break;
         case NodeKind::IdPack: name = "IdPack"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
@@ -286,6 +305,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
         case NodeKind::VarDecl: name = "VarDecl"; break;
+        case NodeKind::DefDecl: name = "DefDecl"; break;
     }
 
     return name;

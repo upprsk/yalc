@@ -75,6 +75,12 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                                node.get_first());
             break;
 
+        case NodeKind::TopDefDecl:
+            visit_top_def_decl(ast, node,
+                               ast.get_array(node.get_second().as_array()),
+                               node.get_first());
+            break;
+
         case NodeKind::IdPack:
             visit_id_pack(ast, node,
                           ast.get_array(node.get_first().as_count(),
@@ -115,6 +121,11 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
         case NodeKind::VarDecl: {
             auto parts = ast.get_array({2}, node.get_second().as_array());
             visit_var_decl(ast, node, node.get_first(), parts[0], parts[1]);
+        } break;
+
+        case NodeKind::DefDecl: {
+            auto parts = ast.get_array({2}, node.get_second().as_array());
+            visit_def_decl(ast, node, node.get_first(), parts[0], parts[1]);
         } break;
     }
 }

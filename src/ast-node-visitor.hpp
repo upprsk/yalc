@@ -107,6 +107,13 @@ struct Visitor {
         visit(ast, child);
     }
 
+    virtual void visit_top_def_decl(Ast& ast, Node const& node,
+                                    std::span<NodeId const> decorators,
+                                    NodeId                  child) {
+        for (auto const& dec : decorators) visit(ast, dec);
+        visit(ast, child);
+    }
+
     // NOTE: each id in `ids` points to an identifier, not an AST node
     virtual void visit_id_pack(Ast& ast, Node const& node,
                                std::span<NodeId const> ids) {}
@@ -157,6 +164,13 @@ struct Visitor {
         visit(ast, ids);
         if (types.is_valid()) visit(ast, types);
         if (inits.is_valid()) visit(ast, inits);
+    }
+
+    virtual void visit_def_decl(Ast& ast, Node const& node, NodeId ids,
+                                NodeId types, NodeId inits) {
+        visit(ast, ids);
+        if (types.is_valid()) visit(ast, types);
+        visit(ast, inits);
     }
 
 #pragma GCC diagnostic pop

@@ -236,7 +236,11 @@ struct Parser {
 
     auto parse_top_def_decl(std::span<ast::NodeId const> decorators)
         -> ast::NodeId {
-        PANIC("NOT IMPLEMENTED");
+        auto start = loc();
+        auto inner = parse_def_decl();
+
+        return ast.new_top_def_decl(start.extend(prev_span()), decorators,
+                                    inner);
     }
 
     // ------------------------------------------------------------------------
@@ -382,6 +386,30 @@ struct Parser {
         try(consume(TokenType::Semi));
 
         return ast.new_var_decl(start.extend(prev_span()), names, tys, inits);
+    }
+
+    auto parse_def_decl() -> ast::NodeId {
+        auto start = loc();
+        try(consume("def"));
+
+        auto names = parse_id_pack();
+        auto tys = ast::NodeId::invalid();
+        if (match(TokenType::Colon)) {
+            tys = parse_expr_pack();
+        }
+
+        auto inits = ast::NodeId::invalid();
+        if (match(TokenType::Equal)) {
+            inits = parse_expr_pack();
+        } else {
+            er->report_error(
+                span(), "constants must have an initializer, but none found");
+            inits = ast.new_err(loc());
+        }
+
+        try(consume(TokenType::Semi));
+
+        return ast.new_def_decl(start.extend(prev_span()), names, tys, inits);
     }
 
     // ========================================================================
