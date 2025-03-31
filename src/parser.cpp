@@ -623,6 +623,7 @@ struct Parser {
     auto parse_stmt() -> ast::NodeId {
         if (check("return")) return parse_return_stmt();
         if (check("var")) return parse_var_decl();
+        if (check("def")) return parse_def_decl();
 
         // expression statement
         auto expr = parse_expr();
