@@ -18,6 +18,7 @@ using json = nlohmann::json;
 
 struct Args {
     bool                     ask = false;
+    bool                     diff = false;
     std::vector<std::string> filters;
 };
 
@@ -36,6 +37,9 @@ void print_help(std::string_view self) {
     println(stderr,
             "    --ask: when a test fails, ask to update the expected value.");
     println(stderr,
+            "    --diff: when a test fails, show a diff between expected value "
+            "and what we got.");
+    println(stderr,
             "    -f,--filter: filter tests by tags or name. This flag can be "
             "passed multiple times to add more filters.");
 }
@@ -52,6 +56,8 @@ auto argparse(int argc, char** argv) -> Args {
     while (it.next(arg)) {
         if (arg == "--ask") {
             args.ask = true;
+        } else if (arg == "--diff") {
+            args.diff = true;
         } else if (arg == "--filter" || arg == "-f") {
             if (!it.next(arg)) {
                 fmt::println(stderr, "error: missing argument to filter");
@@ -80,7 +86,8 @@ auto real_main(Args args) -> int {
     int ok{};
     int failed{};
 
-    TestParams p{.filters = {}, .ask_for_updates = args.ask};
+    TestParams p{
+        .filters = {}, .use_diff = args.diff, .ask_for_updates = args.ask};
     for (auto const& s : args.filters) p.filters.insert(s);
 
     {
