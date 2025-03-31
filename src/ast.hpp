@@ -107,6 +107,12 @@ public:
                                ret, body));
     }
 
+    auto new_top_var_decl(Location loc, std::span<NodeId const> decorators,
+                          NodeId decl) -> NodeId {
+        return new_node(NodeKind::TopVarDecl, loc, decl,
+                        new_ref_array_sized(decorators));
+    }
+
     auto new_id_pack(Location loc, std::span<NodeId const> ids) -> NodeId {
         return new_node(NodeKind::IdPack, loc,
                         NodeId::from_raw_data(ids.size()),
@@ -155,6 +161,12 @@ public:
 
     auto new_return_stmt(Location loc, NodeId child) -> NodeId {
         return new_node(NodeKind::ReturnStmt, loc, child, NodeId::invalid());
+    }
+
+    auto new_var_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
+        -> NodeId {
+        return new_node(NodeKind::VarDecl, loc, ids,
+                        new_ref_array_with(types, inits));
     }
 
 public:
@@ -242,6 +254,8 @@ private:
         return id;
     }
 
+    /// Create a new array where the first element contains the size of the
+    /// array.
     [[nodiscard]] auto new_ref_array_sized(std::span<NodeId const> items)
         -> NodeId {
         return new_ref_array_with(NodeId::from_raw_data(items.size()), items);

@@ -207,7 +207,7 @@ struct Parser {
         auto start = loc();
         try(consume("func"));
 
-        auto name = parse_id_pack();
+        auto name = parse_func_id_pack();
 
         std::vector<ast::NodeId> gargs;
         if (check(TokenType::Lbracket)) gargs = parse_func_gargs();
@@ -221,13 +221,17 @@ struct Parser {
         auto body = ast::NodeId::invalid();
         if (check(TokenType::Lbrace)) body = parse_block();
 
-        return ast.new_func_decl(start.extend(span()), decorators, name, gargs,
-                                 args, ret, body);
+        return ast.new_func_decl(start.extend(prev_span()), decorators, name,
+                                 gargs, args, ret, body);
     }
 
     auto parse_top_var_decl(std::span<ast::NodeId const> decorators)
         -> ast::NodeId {
-        PANIC("NOT IMPLEMENTED");
+        auto start = loc();
+        auto inner = parse_var_decl();
+
+        return ast.new_top_var_decl(start.extend(prev_span()), decorators,
+                                    inner);
     }
 
     auto parse_top_def_decl(std::span<ast::NodeId const> decorators)
@@ -238,6 +242,20 @@ struct Parser {
     // ------------------------------------------------------------------------
 
     auto parse_id_pack() -> ast::NodeId {
+        auto start = loc();
+
+        std::vector<ast::NodeId> names;
+        do {
+            auto name_span = span();
+            try(consume(TokenType::Id));
+
+            names.push_back(ast.new_identifier(name_span.str(source)));
+        } while (match(TokenType::Comma));
+
+        return ast.new_id_pack(start.extend(prev_span()), names);
+    }
+
+    auto parse_func_id_pack() -> ast::NodeId {
         auto start = loc();
 
         std::vector<ast::NodeId> names;
@@ -346,9 +364,41 @@ struct Parser {
         return ast.new_block(start.extend(prev_span()), children);
     }
 
+    auto parse_var_decl() -> ast::NodeId {
+        auto start = loc();
+        try(consume("var"));
+
+        auto names = parse_id_pack();
+        auto tys = ast::NodeId::invalid();
+        if (match(TokenType::Colon)) {
+            tys = parse_expr_pack();
+        }
+
+        auto inits = ast::NodeId::invalid();
+        if (match(TokenType::Equal)) {
+            inits = parse_expr_pack();
+        }
+
+        try(consume(TokenType::Semi));
+
+        return ast.new_var_decl(start.extend(prev_span()), names, tys, inits);
+    }
+
     // ========================================================================
 
     auto parse_expr() -> ast::NodeId { return parse_prec_expr(PREC_NONE); }
+
+    auto parse_expr_pack() -> ast::NodeId {
+        auto start = loc();
+
+        std::vector<ast::NodeId> children;
+
+        do {
+            children.push_back(parse_expr());
+        } while (match(TokenType::Comma));
+
+        return ast.new_expr_pack(start.extend(prev_span()), children);
+    }
 
     // ------------------------------------------------------------------------
 
@@ -522,6 +572,7 @@ struct Parser {
             case TokenType::Carrot:
             case TokenType::Pipe: return PREC_BIT;
 
+#if NOT_REALLY_EXPRESSIONS
             case TokenType::Equal:
             case TokenType::PlusEqual:
             case TokenType::MinusEqual:
@@ -533,6 +584,7 @@ struct Parser {
             case TokenType::AmpersandEqual:
             case TokenType::CarrotEqual:
             case TokenType::PipeEqual: return PREC_ASSIGN;
+#endif
 
             default: return PREC_NONE;
         }
@@ -542,6 +594,7 @@ struct Parser {
 
     auto parse_stmt() -> ast::NodeId {
         if (check("return")) return parse_return_stmt();
+        if (check("var")) return parse_var_decl();
 
         // expression statement
         auto expr = parse_expr();

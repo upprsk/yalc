@@ -123,6 +123,14 @@ enum class NodeKind : uint16_t {
     /// +--------+--....--+--------+--....--+--------+--....--+--------+--------+
     FuncDecl,
 
+    /// A top-level (global) variable declaration.
+    ///
+    /// - `first` points to a VarDecl node.
+    /// - `second` points to an array of decorators added to the function.
+    ///
+    /// The `second` array is made of `[{length}, ...]`.
+    TopVarDecl,
+
     /// A pack of ids. This is used in function definitions for namespacing and
     /// on variable definitions to allow multiple returns.
     ///
@@ -183,6 +191,21 @@ enum class NodeKind : uint16_t {
     /// an ExprPack. When it is a bare return without an expression, child is an
     /// invalid id.
     ReturnStmt,
+
+    /// A variable declaration.
+    ///
+    ///     var a, b: T, U = 1, 2;
+    ///         ^~~^  ^~~^   ^~~^
+    ///         |     |      |
+    ///         |     |      \_ initializers
+    ///         |     \_ types
+    ///         \_ ids
+    ///
+    /// - `first` points to an `IdPack` with all of the declared names.
+    /// - `second` points to an an array with all explicit types and
+    /// initializers as `[{types}, {inits}]`. Each of `types` and `inits` should
+    /// be an `ExprPack`.
+    VarDecl,
 };
 
 class Node {
@@ -251,6 +274,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::SourceFile: name = "SourceFile"; break;
         case NodeKind::ModuleDecl: name = "ModuleDecl"; break;
         case NodeKind::FuncDecl: name = "FuncDecl"; break;
+        case NodeKind::TopVarDecl: name = "TopVarDecl"; break;
         case NodeKind::IdPack: name = "IdPack"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
@@ -258,6 +282,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
+        case NodeKind::VarDecl: name = "VarDecl"; break;
     }
 
     return name;
