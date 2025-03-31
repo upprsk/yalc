@@ -246,7 +246,7 @@ struct Parser {
             try(consume(TokenType::Id));
 
             names.push_back(ast.new_identifier(name_span.str(source)));
-        } while (match(TokenType::Comma));
+        } while (match(TokenType::Dot));
 
         return ast.new_func_id(start.extend(prev_span()), names);
     }
