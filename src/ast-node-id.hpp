@@ -8,14 +8,34 @@
 namespace yal::ast {
 using json = nlohmann::json;
 
-// clang-format off
-struct NodeIdOfRef { uint32_t value; };
-struct NodeIdOfArray { uint32_t value; };
-struct NodeIdOfCount { uint32_t value; };
-struct NodeIdOfId { uint32_t value; };
-struct NodeIdOfBytes { uint32_t value; };
-struct NodeIdOfFile { FileId value; };
-// clang-format on
+struct NodeIdOfRef {
+    uint32_t value;
+};
+
+struct NodeIdOfArray {
+    uint32_t value;
+};
+
+struct NodeIdOfCount {
+    uint32_t value;
+
+    // the array points to key-values (so it needs to be doubled in size).
+    [[nodiscard]] constexpr auto of_kv() const -> NodeIdOfCount {
+        return {value * 2};
+    }
+};
+
+struct NodeIdOfId {
+    uint32_t value;
+};
+
+struct NodeIdOfBytes {
+    uint32_t value;
+};
+
+struct NodeIdOfFile {
+    FileId value;
+};
 
 /// A handle to an AST node. It is a "stable pointer" that is also half the size
 /// on 64bits.
