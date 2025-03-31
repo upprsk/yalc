@@ -86,9 +86,25 @@ func main() (i32, y: i32) {})");
     run_test(ctx, p, "bare return", R"(module f; func f() { return; })");
     run_test(ctx, p, "main function", R"(module main;
 
-    func main() i32 {
-        return 0;
-    })");
+func main() i32 {
+    return 0;
+})");
+    ctx.tags.pop_back();
+
+    ctx.tags.emplace_back("numbers");
+    run_test(ctx, p, "normal integer",
+             R"(module _; func _() { return 12345; })");
+    run_test(ctx, p, "normal integer 2", R"(module _; func _() { 12345; })");
+    run_test(ctx, p, "integer with separators",
+             R"(module _; func _() { return 123_456; })");
+
+    run_test(ctx, p, "normal hex", R"(module _; func _() { 0xDEAD_beaf; })");
+    run_test(ctx, p, "hex with separators",
+             R"(module _; func _() { 0x13_ff_10ae; })");
+
+    run_test(ctx, p, "normal float", R"(module _; func _() { 3.14; })");
+    run_test(ctx, p, "float with separators",
+             R"(module _; func _() { 3.14_159; })");
     ctx.tags.pop_back();
 
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
