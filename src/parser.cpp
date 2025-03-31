@@ -334,7 +334,7 @@ struct Parser {
         try(consume(TokenType::Lbrace));
 
         std::vector<ast::NodeId> children;
-        while (!check(TokenType::Rbrace)) {
+        while (!is_at_end() && !check(TokenType::Rbrace)) {
             children.push_back(parse_stmt());
         }
 
