@@ -77,6 +77,11 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                              ast.get_identifier(node.get_first().as_id()),
                              node.get_second());
             break;
+        case NodeKind::FuncRetPack:
+            visit_func_ret_pack(ast, node,
+                                ast.get_array(node.get_first().as_count().of_kv(),
+                                              node.get_second().as_array()));
+            break;
 
         case NodeKind::Block:
             visit_block(ast, node,

@@ -114,7 +114,8 @@ enum class NodeKind : uint16_t {
     /// - **B...**: Pointers to each generic argument.
     /// - **len(C)**: Number of arguments.
     /// - **C...**: Pointers to each argument.
-    /// - **D?**: Pointer to the return type, if any.
+    /// - **D?**: Pointer to the return type, if any. The function may have
+    /// multiple return values, this is handled by using a FuncRetPack node.
     /// - **E?**: Pointer to the body, if any.
     ///
     /// +--------+--....--+--------+--....--+--------+--....--+--------+--------+
@@ -134,8 +135,21 @@ enum class NodeKind : uint16_t {
     /// A function parameter.
     ///
     /// - `first` has a pointer to the parameter name in identifiers.
-    /// - `second` has a pointer to the type expression.
+    /// - `second` has a pointer to the type expression. A parameter may not
+    /// have an explicit type, so this field may be an invalid id.
     FuncParam,
+
+    /// Used for functions that return multiple values.
+    ///
+    /// Function return values may be named, this is why we store key-value
+    /// pairs in this node. In case the node is not named, then the key is an
+    /// invalid id. This node is used even when the function returns a single
+    /// value.
+    ///
+    /// - `first`: has a count of how many key-value pairs there are.
+    /// - `second`: pointer to array of key-value pairs of the name of the
+    /// return value and type.
+    FuncRetPack,
 
     /// -----------
     /// Expressions
@@ -219,8 +233,9 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ModuleDecl: name = "ModuleDecl"; break;
         case NodeKind::FuncDecl: name = "FuncDecl"; break;
         case NodeKind::FuncId: name = "FuncId"; break;
-        case NodeKind::Block: name = "Block"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
+        case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
+        case NodeKind::Block: name = "Block"; break;
     }
 
     return name;

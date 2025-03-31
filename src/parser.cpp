@@ -1,5 +1,7 @@
 #include "parser.hpp"
 
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "ast-node-id.hpp"
@@ -211,7 +213,7 @@ struct Parser {
 
         auto ret = ast::NodeId::invalid();
         if (!check_oneof(TokenType::Lbrace, TokenType::Semi))
-            ret = parse_expr();
+            ret = parse_func_ret_pack();
 
         auto body = ast::NodeId::invalid();
         if (check(TokenType::Lbrace)) body = parse_block();
@@ -273,12 +275,56 @@ struct Parser {
         auto name = span();
         try(consume(TokenType::Id));
 
-        try(consume(TokenType::Colon));
+        auto end = prev_span();
 
-        auto ty = parse_expr();
+        auto ty = ast::NodeId::invalid();
+        if (match(TokenType::Colon)) {
+            ty = parse_expr();
+            end = ast.get_node_span(ty.as_ref());
+        }
 
-        return ast.new_func_param(start.extend(ast.get_node_span(ty.as_ref())),
-                                  name.str(source), ty);
+        return ast.new_func_param(start.extend(end), name.str(source), ty);
+    }
+
+    auto parse_func_ret_pack() -> ast::NodeId {
+        auto start = loc();
+
+        if (match(TokenType::Lparen)) {
+            std::vector<std::pair<std::string_view, ast::NodeId>> ret;
+
+            do {
+                // named
+                if (check(TokenType::Id) && check_next(TokenType::Colon)) {
+                    auto name = span();
+                    advance();
+
+                    // skip the :
+                    advance();
+
+                    auto type = parse_expr();
+                    ret.emplace_back(name.str(source), type);
+                }
+
+                // not named
+                else {
+                    auto type = parse_expr();
+                    ret.emplace_back("", type);
+                }
+
+                if (check(TokenType::Rparen)) break;
+            } while (match(TokenType::Comma));
+
+            try(consume(TokenType::Rparen));
+
+            // in case it is just a single return without a name, unwrap it
+            if (ret.size() == 1 && ret[0].first.empty()) {
+                return ret[0].second;
+            }
+
+            return ast.new_func_ret_pack(start.extend(prev_span()), ret);
+        }
+
+        return parse_expr();
     }
 
     // ========================================================================

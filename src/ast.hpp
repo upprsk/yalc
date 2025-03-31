@@ -118,6 +118,16 @@ public:
         return new_node(NodeKind::FuncParam, loc, new_identifier(name), type);
     }
 
+    /// Create a new FuncRetPack node. If name is an empty string, then an
+    /// invalid node is used for it.
+    auto new_func_ret_pack(Location                                       loc,
+                           std::span<std::pair<std::string_view, NodeId>> items)
+        -> NodeId {
+        return new_node(NodeKind::FuncRetPack, loc,
+                        NodeId::from_raw_data(items.size()),
+                        new_ref_array_of_idpair(items));
+    }
+
     // -----------
     // Expressions
     // -----------
@@ -225,6 +235,26 @@ private:
     [[nodiscard]] auto new_ref_array_with(auto&&... items) -> NodeId {
         auto sz = refs_array.size();
         push_to_array(items...);
+        return NodeId::from_raw_data(sz);
+    }
+
+    /// Create an array made of pairs of identifiers and regular NodeIds. If the
+    /// string for the id is empty, then an invalid NodeId is added in it's
+    /// place.
+    [[nodiscard]] auto new_ref_array_of_idpair(
+        std::span<std::pair<std::string_view, NodeId> const> items) -> NodeId {
+        auto sz = refs_array.size();
+        for (auto const& [identifier, node] : items) {
+            if (identifier.empty()) {
+                refs_array.push_back(NodeId::invalid());
+                refs_array.push_back(node);
+            } else {
+                auto id = new_identifier(identifier);
+                refs_array.push_back(id);
+                refs_array.push_back(node);
+            }
+        }
+
         return NodeId::from_raw_data(sz);
     }
 

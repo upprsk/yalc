@@ -114,6 +114,28 @@ struct JsonVisitor : public Visitor {
     void visit_func_param(Ast& ast, Node const& /*node*/, std::string_view name,
                           NodeId type) override {
         j["name"] = name;
+        if (type.is_valid()) j["type"] = ast.fatten(type);
+    }
+
+    void visit_func_ret_pack(Ast&                    ast, Node const& /*node*/,
+                             std::span<NodeId const> ret) override {
+        auto arr = json::array();
+
+        ASSERT((ret.size() & 1) == 0);
+        for (size_t i = 0; i < ret.size(); i += 2) {
+            if (ret[i].is_valid()) {
+                arr.push_back(json{
+                    {"name", ast.get_identifier(ret[i].as_id())},
+                    {"type",             ast.fatten(ret[i + 1])},
+                });
+            } else {
+                arr.push_back(json{
+                    {"type", ast.fatten(ret[i + 1])},
+                });
+            }
+        }
+
+        j["values"] = arr;
     }
 
     void visit_block(Ast&                    ast, Node const& /*node*/,
