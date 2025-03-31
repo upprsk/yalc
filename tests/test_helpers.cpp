@@ -45,10 +45,10 @@ auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
         // no expectation for test, ask for it if in preview mode
         if (p.ask_for_updates) {
             if (output.contains("stderr")) {
-                fmt::println("got from tokenizing:\n{}",
+                fmt::println("{} got as output:\n{}", fullname,
                              output.at("stderr").get<std::string_view>());
             } else {
-                fmt::println("got from tokenizing:\n{}", output.dump(2));
+                fmt::println("{} got as output:\n{}", fullname, output.dump(2));
             }
 
             auto gen = ask_for_updates(fullname);
@@ -67,13 +67,19 @@ auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
     // check value
     if (exp != output) {
         if (output.contains("stderr")) {
-            fmt::println("got from tokenizing:\n{}",
+            fmt::println("{} got as output:\n{}", fullname,
                          output.at("stderr").get<std::string_view>());
         } else {
-            fmt::println("got from tokenizing:\n{}", output.dump(2));
+            fmt::println("{} got as output:\n{}", fullname, output.dump(2));
         }
 
-        fmt::println("but expected:\n{}", exp.dump(2));
+        if (output.contains("stderr")) {
+            fmt::println("but expected:\n{}",
+                         output.at("stderr").get<std::string_view>());
+        } else {
+            fmt::println("but expected:\n{}", exp.dump(2));
+        }
+
         fmt::print(fmt::bg(fmt::color::red), "FAIL");
         fmt::println(" got unexpected value", fullname);
 
