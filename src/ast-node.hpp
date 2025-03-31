@@ -205,6 +205,9 @@ enum class NodeKind : uint16_t {
     /// - `second` points to an an array with all explicit types and
     /// initializers as `[{types}, {inits}]`. Each of `types` and `inits` should
     /// be an `ExprPack`.
+    ///
+    /// Both `types` and `inits` are optional during parsing, so either can be
+    /// an invalid id.
     VarDecl,
 };
 
