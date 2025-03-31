@@ -38,73 +38,12 @@ auto gen_tokens(std::string source) -> json {
     return tokens;
 }
 
-auto run_test_impl(Params const& p, std::string name, std::string source)
-    -> bool {
-    auto tokens = gen_tokens(source);
-
-    auto filename = gen_filepath(name);
-    auto exp = load_expectation(filename);
-    if (exp.is_null()) {
-        // no expectation for test, ask for it if in preview mode
-        if (p.ask_for_updates) {
-            if (tokens.contains("stderr")) {
-                fmt::println("got from tokenizing:\n{}",
-                             tokens.at("stderr").get<std::string_view>());
-            } else {
-                fmt::println("got from tokenizing:\n{}", tokens.dump(2));
-            }
-
-            auto gen = ask_for_updates(name);
-            if (gen) {
-                yal::write_file(filename, tokens.dump());
-                return true;
-            }
-        }
-
-        // error (return 1 (number of errors))
-        fmt::print(fmt::bg(fmt::color::red), "FAIL");
-        fmt::println(" {} has no expectation", name);
-        return false;
-    }
-
-    // check value
-    if (exp != tokens) {
-        if (tokens.contains("stderr")) {
-            fmt::println("got from tokenizing:\n{}",
-                         tokens.at("stderr").get<std::string_view>());
-        } else {
-            fmt::println("got from tokenizing:\n{}", tokens.dump(2));
-        }
-
-        fmt::println("but expected:\n{}", exp.dump(2));
-        fmt::print(fmt::bg(fmt::color::red), "FAIL");
-        fmt::println(" got unexpected value", name);
-
-        if (p.ask_for_updates) {
-            auto gen = ask_for_updates(name);
-            if (gen) {
-                yal::write_file(filename, tokens.dump());
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    fmt::print(fmt::bg(fmt::color::green), "OK");
-    fmt::println(" {}", name);
-    return true;
-}
-
-void run_test(Context& ctx, Params const& p, std::string name,
+void run_test(Context& ctx, TestParams const& p, std::string name,
               std::string source) {
-    if (run_test_impl(p, name, source))
-        ctx.ok++;
-    else
-        ctx.failed++;
+    run_checks_for_test(ctx, p, name, [&]() { return gen_tokens(source); });
 }
 
-auto tokenizer_tests(Params const& p) -> std::pair<int, int> {
+auto tokenizer_tests(TestParams const& p) -> std::pair<int, int> {
     Context ctx;
 
     fmt::println("==============================");

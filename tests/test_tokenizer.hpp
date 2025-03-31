@@ -2,8 +2,6 @@
 
 #include <utility>
 
-struct Params {
-    bool ask_for_updates;
-};
+#include "test_helpers.hpp"
 
-auto tokenizer_tests(Params const& p) -> std::pair<int, int>;
+auto tokenizer_tests(TestParams const& p) -> std::pair<int, int>;

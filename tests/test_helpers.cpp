@@ -21,6 +21,7 @@ auto load_expectation(std::string filename) -> json {
 
     return json::parse(*filedata);
 }
+
 auto ask_for_updates(std::string_view name) -> bool {
     fmt::print(fmt::fg(fmt::color::yellow), "Wrong expectation found for ");
     fmt::print("{}", name);
@@ -28,4 +29,60 @@ auto ask_for_updates(std::string_view name) -> bool {
 
     auto c = getchar();
     return c == '\n' || c == 'y' || c == 'Y';
+}
+
+auto run_checks_for_test_output(TestParams const& p, std::string name,
+                                json const& output) -> bool {
+    auto filename = gen_filepath(name);
+    auto exp = load_expectation(filename);
+    if (exp.is_null()) {
+        // no expectation for test, ask for it if in preview mode
+        if (p.ask_for_updates) {
+            if (output.contains("stderr")) {
+                fmt::println("got from tokenizing:\n{}",
+                             output.at("stderr").get<std::string_view>());
+            } else {
+                fmt::println("got from tokenizing:\n{}", output.dump(2));
+            }
+
+            auto gen = ask_for_updates(name);
+            if (gen) {
+                yal::write_file(filename, output.dump());
+                return true;
+            }
+        }
+
+        // error (return 1 (number of errors))
+        fmt::print(fmt::bg(fmt::color::red), "FAIL");
+        fmt::println(" {} has no expectation", name);
+        return false;
+    }
+
+    // check value
+    if (exp != output) {
+        if (output.contains("stderr")) {
+            fmt::println("got from tokenizing:\n{}",
+                         output.at("stderr").get<std::string_view>());
+        } else {
+            fmt::println("got from tokenizing:\n{}", output.dump(2));
+        }
+
+        fmt::println("but expected:\n{}", exp.dump(2));
+        fmt::print(fmt::bg(fmt::color::red), "FAIL");
+        fmt::println(" got unexpected value", name);
+
+        if (p.ask_for_updates) {
+            auto gen = ask_for_updates(name);
+            if (gen) {
+                yal::write_file(filename, output.dump());
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fmt::print(fmt::bg(fmt::color::green), "OK");
+    fmt::println(" {}", name);
+    return true;
 }

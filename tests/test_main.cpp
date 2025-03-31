@@ -8,6 +8,7 @@
 #include "fmt/color.h"
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
+#include "test_helpers.hpp"
 #include "test_tokenizer.hpp"
 #include "tokenizer.hpp"
 #include "utils.hpp"
@@ -38,7 +39,7 @@ auto argparse(int argc, char** argv) -> Args {
 }
 
 auto real_main(Args args) -> int {
-    Params p{.ask_for_updates = args.ask};
+    TestParams p{.ask_for_updates = args.ask};
     tokenizer_tests(p);
 
     return 0;
