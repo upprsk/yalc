@@ -10,13 +10,13 @@ struct JsonVisitor : public Visitor {
     explicit constexpr JsonVisitor(json& j) : j{j} {}
 
     void visit_before(Ast& /*ast*/, Node const& node) override {
-        fmt::println(stderr, "JsonVisitor(id={}, kind={})", node.get_id(),
-                     node.get_kind());
+        // fmt::println(stderr, "JsonVisitor(id={}, kind={})", node.get_id(),
+        //              node.get_kind());
 
         j = json{
             {"kind", fmt::to_string(node.get_kind())},
             {  "id",                   node.get_id()},
-            // { "loc",                  node.get_loc()},
+            { "loc",                  node.get_loc()},
         };
     }
 
@@ -114,7 +114,6 @@ struct JsonVisitor : public Visitor {
     void visit_func_param(Ast& ast, Node const& /*node*/, std::string_view name,
                           NodeId type) override {
         j["name"] = name;
-        j["type"] = ast.fatten(type);
     }
 
     void visit_block(Ast&                    ast, Node const& /*node*/,
