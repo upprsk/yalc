@@ -104,7 +104,7 @@ struct JsonVisitor : public Visitor {
         if (body.is_valid()) j["body"] = ast.fatten(body);
     }
 
-    void visit_func_id(Ast&                    ast, Node const& /*node*/,
+    void visit_id_pack(Ast&                    ast, Node const& /*node*/,
                        std::span<NodeId const> ids) override {
         auto arr = json::array();
         for (auto const& id : ids)

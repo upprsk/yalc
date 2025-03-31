@@ -107,8 +107,8 @@ public:
                                ret, body));
     }
 
-    auto new_func_id(Location loc, std::span<NodeId const> ids) -> NodeId {
-        return new_node(NodeKind::FuncId, loc,
+    auto new_id_pack(Location loc, std::span<NodeId const> ids) -> NodeId {
+        return new_node(NodeKind::IdPack, loc,
                         NodeId::from_raw_data(ids.size()),
                         new_ref_array_with(ids));
     }

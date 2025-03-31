@@ -123,14 +123,15 @@ enum class NodeKind : uint16_t {
     /// +--------+--....--+--------+--....--+--------+--....--+--------+--------+
     FuncDecl,
 
-    /// A function id, which is may namespace the function.
+    /// A pack of ids. This is used in function definitions for namespacing and
+    /// on variable definitions to allow multiple returns.
     ///
     /// - `first`: Number of identifiers.
     /// - `second`: Pointer to array of identifiers (in the identifier list).
     /// The ids are in wrapping order, with the last one having the actual name
     /// of the function and the previous ones containing each of the wrapping
     /// names.
-    FuncId,
+    IdPack,
 
     /// A function parameter.
     ///
@@ -250,7 +251,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::SourceFile: name = "SourceFile"; break;
         case NodeKind::ModuleDecl: name = "ModuleDecl"; break;
         case NodeKind::FuncDecl: name = "FuncDecl"; break;
-        case NodeKind::FuncId: name = "FuncId"; break;
+        case NodeKind::IdPack: name = "IdPack"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
         case NodeKind::ExprPack: name = "ExprPack"; break;

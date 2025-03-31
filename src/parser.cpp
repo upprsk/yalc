@@ -207,7 +207,7 @@ struct Parser {
         auto start = loc();
         try(consume("func"));
 
-        auto name = parse_func_id();
+        auto name = parse_id_pack();
 
         std::vector<ast::NodeId> gargs;
         if (check(TokenType::Lbracket)) gargs = parse_func_gargs();
@@ -237,7 +237,7 @@ struct Parser {
 
     // ------------------------------------------------------------------------
 
-    auto parse_func_id() -> ast::NodeId {
+    auto parse_id_pack() -> ast::NodeId {
         auto start = loc();
 
         std::vector<ast::NodeId> names;
@@ -248,7 +248,7 @@ struct Parser {
             names.push_back(ast.new_identifier(name_span.str(source)));
         } while (match(TokenType::Dot));
 
-        return ast.new_func_id(start.extend(prev_span()), names);
+        return ast.new_id_pack(start.extend(prev_span()), names);
     }
 
     auto parse_func_gargs() -> std::vector<ast::NodeId> {

@@ -101,7 +101,7 @@ struct Visitor {
     // -----------------------------------------------------------------------
 
     // NOTE: each id in `ids` points to an identifier, not an AST node
-    virtual void visit_func_id(Ast& ast, Node const& node,
+    virtual void visit_id_pack(Ast& ast, Node const& node,
                                std::span<NodeId const> ids) {}
 
     virtual void visit_func_param(Ast& ast, Node const& node,

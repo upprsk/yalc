@@ -69,8 +69,8 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                             args, ret, body);
         } break;
 
-        case NodeKind::FuncId:
-            visit_func_id(ast, node,
+        case NodeKind::IdPack:
+            visit_id_pack(ast, node,
                           ast.get_array(node.get_first().as_count(),
                                         node.get_second().as_array()));
             break;
