@@ -534,7 +534,7 @@ struct Parser {
     auto parse_prec_expr(int precedence) -> ast::NodeId {
         auto left = parse_prefix_expr();
         while (get_precedence(peek().type) > precedence)
-            left = parse_infix_expr(left);
+            left = parse_infix_expr(peek(), left);
 
         return left;
     }
@@ -578,8 +578,18 @@ struct Parser {
         return ast.new_err(loc());
     }
 
-    auto parse_infix_expr(ast::NodeId left) -> ast::NodeId {
-        PANIC("NOT IMPLEMENTED", left);
+    auto parse_infix_expr(Token t, ast::NodeId left) -> ast::NodeId {
+        advance();
+
+        switch (t.type) {
+            case TokenType::Less: {
+                auto right = parse_prec_expr(get_precedence(t.type));
+                PANIC("NOT IMPLEMENTED", t, left, right);
+            } break;
+            default: UNREACHABLE("invalid token in infix expr", t);
+        }
+
+        PANIC("NOT IMPLEMENTED", t, left);
     }
 
     // ------------------------------------------------------------------------
