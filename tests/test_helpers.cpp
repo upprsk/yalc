@@ -20,6 +20,7 @@
 auto gen_filepath(std::string name) -> std::string {
     std::filesystem::path path = __FILE__;
     std::ranges::replace(name, ' ', '-');
+    std::ranges::replace(name, '/', '-');
 
     return path.parent_path().append(fmt::format("{}.test.json", name));
 }
