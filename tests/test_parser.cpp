@@ -288,6 +288,81 @@ func test();)");
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("binary operations");
+    ctx.tags.emplace_back("arithmetic");
+
+    run_test(ctx, p, "basic arithmetic",
+             R"(module _; func _() { x + y - 8 / 2 * 2; })");
+    run_test(ctx, p, "basic arithmetic 2",
+             R"(module _; func _() { 10 * ( 1 + 1 ); })");
+    run_test(ctx, p, "basic arithmetic 3",
+             R"(module _; func _() { 10 * 10 % 2; })");
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("bit");
+
+    run_test(ctx, p, "bit operations", R"(module _; func _() { 1 << 1 * 2; })");
+    run_test(ctx, p, "bit operations 2",
+             R"(module _; func _() { 1 << 1 + 2; })");
+    run_test(ctx, p, "bit operations 3",
+             R"(module _; func _() { 0xFF00 >> 4 * (1 + 1); })");
+
+    run_test(ctx, p, "bit operations 4",
+             R"(module _; func _() { 0xFF00 | 0xF << 4 | 0xF; })");
+    run_test(ctx, p, "bit operations 5",
+             R"(module _; func _() { 0b00110000 | 0b0011 & 0x55; })", true);
+    run_test(ctx, p, "bit operations 6",
+             R"(module _; func _() { 15 & 3 | 1; })");
+    run_test(ctx, p, "bit operations 7",
+             R"(module _; func _() { 0x55 ^ 0xF << 4 | 0xF; })");
+    run_test(ctx, p, "bit operations 8",
+             R"(module _; func _() { 0x55 ^ (0xF << 4 | 0xF); })");
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("comparison");
+
+    run_test(ctx, p, "equals", R"(module _; func _() { 10 == 5 + 5; })");
+    run_test(ctx, p, "not equals",
+             R"(module _; func _() { 10 != 1 + 5 * 2; })");
+    run_test(ctx, p, "less", R"(module _; func _() { 50 | 1 < 34 * 2; })");
+    run_test(ctx, p, "less 2", R"(module _; func _() { (50 | 1) < 34 * 2; })");
+    run_test(ctx, p, "less equal", R"(module _; func _() { 50 <= 34 * 2; })");
+    run_test(ctx, p, "greater", R"(module _; func _() { 50 | 1 > 34 * 2; })");
+    run_test(ctx, p, "greater 2",
+             R"(module _; func _() { (50 | 1) > 34 * 2; })");
+    run_test(ctx, p, "greater equal",
+             R"(module _; func _() { 50 >= 34 * 2; })");
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("logic");
+
+    run_test(ctx, p, "and",
+             R"(module _; func _() { 10 + 10 < 33 and 55 > 100 / 2; })");
+    run_test(ctx, p, "and/or",
+             R"(module _; func _() {
+    10 + 10 < 33 and 55 > 100 / 2 or magic_factor == SUPER;
+})");
+    run_test(ctx, p, "and/or 2",
+             R"(module _; func _() {
+    (10 + 10 < 33 and 55 > 100 / 2) or magic_factor == SUPER;
+})");
+    run_test(ctx, p, "and/or 3",
+             R"(module _; func _() {
+    10 + 10 < 33 and (55 > 100 / 2 or magic_factor == SUPER);
+})");
+
+    ctx.tags.pop_back();
+
+    run_test(ctx, p, "basic cast",
+             R"(module _;
+func _() {
+    var x = 10 as usize;
+    var y = 10 as i32;
+    var z = x as i32 + y;
+})");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};

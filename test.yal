@@ -1,12 +1,7 @@
-module test;
+module _;
 
-// @extern
-// func printf(fmt: [*]const u8, ...) i32;
-
-func test() {
-    var x = 0;
-    var y = x < 10;
-    // while x < 10 {
-    //     x += 1;
-    // }
+func _() {
+    var x = 10 as usize;
+    var y = 10 as i32;
+    var z = x as i32 + y;
 }
