@@ -111,6 +111,19 @@ func main() i32 {
              R"(module _; func _() { 3.14_159; })");
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("strings");
+
+    run_test(ctx, p, "simple",
+             R"(module _; func _() { "this is a string!"; })");
+    run_test(ctx, p, "with newline",
+             R"(module _; func _() { "this is\na string!"; })");
+    run_test(ctx, p, "with hex",
+             R"(module _; func _() { "this is\x0Aa string!"; })");
+    run_test(ctx, p, "with unterminated/invalid hex",
+             R"(module _; func _() { "invalid hex: \x1"; })");
+
+    ctx.tags.pop_back();
+
     ctx.tags.emplace_back("top-level var");
     run_test(ctx, p, "simple", R"(module test; var GLOBAL = 10;)");
     run_test(ctx, p, "simple 2",
@@ -244,8 +257,7 @@ func test();)");
              R"(module test;
 
 @extern(link_name="c_test")
-func test();)",
-             true);
+func test();)");
 
     run_test(ctx, p, "multiple decorators 1",
              R"(module test;
@@ -258,8 +270,7 @@ func test();)",
 
 @private(file)
 @extern(link_name="c_test")
-func test();)",
-             true);
+func test();)");
 
     ctx.tags.pop_back();
 
@@ -267,9 +278,9 @@ func test();)",
 
     run_test(ctx, p, "extern var",
              R"(module test; @extern var g_counter: i32;)");
-    run_test(ctx, p, "extern var with name",
-             R"(module test; @extern(link_name="g_counter") var counter: i32;)",
-             true);
+    run_test(
+        ctx, p, "extern var with name",
+        R"(module test; @extern(link_name="g_counter") var counter: i32;)");
 
     run_test(ctx, p, "private def", R"(module test; @private def VALUE = 12;)");
     run_test(ctx, p, "file private def",
