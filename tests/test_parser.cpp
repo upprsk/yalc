@@ -53,7 +53,7 @@ static void run_test(Context& ctx, TestParams const& p, std::string name,
 }
 
 auto test_parser(TestParams const& p) -> std::pair<int, int> {
-    Context ctx{.tags = {"parser"}, .filters = p.filters};
+    Context ctx{.tags = {"parser"}, .filters = p.filters, .tests_ran = {}};
 
     fmt::println("==============================");
 

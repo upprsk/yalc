@@ -15,9 +15,15 @@ using json = nlohmann::json;
 struct Context {
     std::vector<std::string>        tags;
     std::unordered_set<std::string> filters;
+    std::unordered_set<std::string> tests_ran;
 
     int failed{};
     int ok{};
+
+    void           mark_run(std::string name) { tests_ran.insert(name); }
+    constexpr auto has_run(std::string const& name) const -> bool {
+        return tests_ran.contains(name);
+    }
 
     [[nodiscard]] constexpr auto total() const -> int { return ok + failed; }
     constexpr auto should_run(std::string const& name) const -> bool {
@@ -58,7 +64,7 @@ auto ask_for_updates(std::string_view name) -> bool;
 
 /// Given the output of the test, check against expectations. Returns true when
 /// the test case succeeds and false when it fails.
-auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
+auto run_checks_for_test_output(Context& ctx, TestParams const& p,
                                 std::string name, json const& output) -> bool;
 
 /// Run a given test.

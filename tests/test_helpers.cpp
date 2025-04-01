@@ -83,12 +83,21 @@ void show_diff(json const& left, json const& right) {
                       path_of_file(right_file.get()).string()});
 }
 
-auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
+auto run_checks_for_test_output(Context& ctx, TestParams const& p,
                                 std::string name, json const& output) -> bool {
     auto name_with_tags = ctx.tags;
     name_with_tags.push_back(name);
     auto fullname = fmt::to_string(fmt::join(name_with_tags, "-"));
     auto filename = gen_filepath(fullname);
+
+    if (ctx.has_run(fullname)) {
+        fmt::print(fmt::fg(fmt::color::red) | fmt::emphasis::bold,
+                   "duplicate test name:");
+        fmt::println(" {:?}", fullname);
+        return false;
+    }
+
+    ctx.mark_run(fullname);
 
     auto exp = load_expectation(filename);
     if (exp.is_null()) {

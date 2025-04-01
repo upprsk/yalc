@@ -39,7 +39,7 @@ static void run_test(Context& ctx, TestParams const& p, std::string name,
 }
 
 auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
-    Context ctx{.tags = {"tokenizer"}, .filters = p.filters};
+    Context ctx{.tags = {"tokenizer"}, .filters = p.filters, .tests_ran = {}};
 
     fmt::println("==============================");
 
