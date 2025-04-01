@@ -128,6 +128,14 @@ struct Visitor {
     virtual void visit_func_ret_pack(Ast& ast, Node const& node,
                                      std::span<NodeId const> ret) {}
 
+    // NOTE: each id in `params` points to either an identifier or an AST node.
+    // This depends if it is in an even or odd index, as the list contains
+    // key-value pairs. The name may be an invalid id, for when a raw value is
+    // passed. The value may be an invalid id, for when no value is passed.
+    virtual void visit_decorator(Ast& ast, Node const& node,
+                                 std::string_view        name,
+                                 std::span<NodeId const> params) {}
+
     // =======================================================================
 
     virtual void visit_expr_pack(Ast& ast, Node const& node,

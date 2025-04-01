@@ -200,7 +200,40 @@ struct Parser {
 
     auto parse_import() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_part() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
-    auto parse_top_decl_attr() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_top_decl_attr() -> ast::NodeId {
+        auto start = loc();
+        try(consume(TokenType::Decorator));
+
+        std::vector<std::pair<std::string_view, ast::NodeId>> items;
+        if (match(TokenType::Lparen)) {
+            while (!check(TokenType::Rparen)) {
+                auto s = span();
+                if (match(TokenType::Id)) {
+                    if (match(TokenType::Equal)) {
+                        // value and key
+                        auto expr = parse_expr();
+                        items.emplace_back(s.str(source), expr);
+                    } else {
+                        // just key
+                        items.emplace_back(s.str(source),
+                                           ast::NodeId::invalid());
+                    }
+                } else {
+                    // just value, no key
+                    auto expr = parse_expr();
+                    items.emplace_back("", expr);
+                }
+
+                if (check(TokenType::Rparen)) break;
+                if (!consume(TokenType::Comma)) break;
+            }
+
+            try(consume(TokenType::Rparen));
+        }
+
+        return ast.new_decorator(start.extend(prev_span()),
+                                 start.span.str(source).substr(1), items);
+    }
 
     auto parse_func_decl(std::span<ast::NodeId const> decorators)
         -> ast::NodeId {
@@ -219,7 +252,10 @@ struct Parser {
             ret = parse_func_ret_pack();
 
         auto body = ast::NodeId::invalid();
-        if (check(TokenType::Lbrace)) body = parse_block();
+        if (check(TokenType::Lbrace))
+            body = parse_block();
+        else
+            try(consume(TokenType::Semi));
 
         return ast.new_func_decl(start.extend(prev_span()), decorators, name,
                                  gargs, args, ret, body);

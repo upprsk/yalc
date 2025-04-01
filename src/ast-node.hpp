@@ -168,6 +168,32 @@ enum class NodeKind : uint16_t {
     /// return value and type.
     FuncRetPack,
 
+    /// Decorates a top-level declaration to add additional functionality (like
+    /// extern).
+    ///
+    ///     @extern(name="external.value")
+    ///      ^~~~~^ ^~~^ ^~~~~~~~~~~~~~~^
+    ///      |      |     \_ value
+    ///      |      \_ key
+    ///      \_ name
+    ///
+    ///     @something(a, "b", c=1)
+    ///      ^~~~~~~~^ ^  ^~^  ^ ^
+    ///      |         |  |    |  \_ value
+    ///      |         |  |    \_ key
+    ///      |         |  \_ value
+    ///      |         \_ key
+    ///      \_ name
+    ///
+    /// - `first`: points to an identifier for the name of the decorator. Node
+    /// that the starting `@` is removed.
+    /// - `second`: may point to the arguments. In case the decorator is used
+    /// without arguments, then this is an invalid id. When there is both key
+    /// and value, then we have a pair of `[{key, value}]` in the array. When
+    /// there is just a key (an identifier without the `=`), we have `[{key},
+    /// <inval>]`. When there is just a value, we have `[<inval>, {value}]`.
+    Decorator,
+
     /// -----------
     /// Expressions
     /// -----------
@@ -300,6 +326,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::IdPack: name = "IdPack"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
+        case NodeKind::Decorator: name = "Decorator"; break;
         case NodeKind::ExprPack: name = "ExprPack"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;

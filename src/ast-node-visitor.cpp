@@ -97,6 +97,11 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                 ast.get_array(node.get_first().as_count().of_kv(),
                               node.get_second().as_array()));
             break;
+        case NodeKind::Decorator:
+            visit_decorator(ast, node,
+                            ast.get_identifier(node.get_first().as_id()),
+                            ast.get_array_of_kv(node.get_second().as_array()));
+            break;
 
         case NodeKind::ExprPack:
             visit_expr_pack(ast, node,

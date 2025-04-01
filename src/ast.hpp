@@ -140,6 +140,15 @@ public:
                         new_ref_array_of_idpair(items));
     }
 
+    /// Create a new Decorator node. If name is an empty string, then an
+    /// invalid node is used for it.
+    auto new_decorator(Location loc, std::string_view name,
+                       std::span<std::pair<std::string_view, NodeId>> items)
+        -> NodeId {
+        return new_node(NodeKind::Decorator, loc, new_identifier(name),
+                        new_ref_array_of_idpair_with_size(items));
+    }
+
     // -----------
     // Expressions
     // -----------
@@ -222,6 +231,16 @@ public:
         return view.subspan(h.value + 1, length.value);
     }
 
+    // get an array of key-value nodes from the given id. The length is stored
+    // at the first pointed-to location.
+    [[nodiscard]] constexpr auto get_array_of_kv(NodeIdOfArray h) const
+        -> std::span<NodeId const> {
+        auto      length = refs_array.at(h.value).as_count();
+        std::span view = refs_array;
+
+        return view.subspan(h.value + 1, length.of_kv().value);
+    }
+
     // get an array starting at the given id, but without a set size.
     [[nodiscard]] constexpr auto get_array_unbounded(NodeIdOfArray h) const
         -> std::span<NodeId const> {
@@ -285,6 +304,28 @@ private:
     [[nodiscard]] auto new_ref_array_of_idpair(
         std::span<std::pair<std::string_view, NodeId> const> items) -> NodeId {
         auto sz = refs_array.size();
+        for (auto const& [identifier, node] : items) {
+            if (identifier.empty()) {
+                refs_array.push_back(NodeId::invalid());
+                refs_array.push_back(node);
+            } else {
+                auto id = new_identifier(identifier);
+                refs_array.push_back(id);
+                refs_array.push_back(node);
+            }
+        }
+
+        return NodeId::from_raw_data(sz);
+    }
+
+    /// Create an array made of pairs of identifiers and regular NodeIds, but
+    /// add the size as the first element. If the string for the id is empty,
+    /// then an invalid NodeId is added in it's place.
+    [[nodiscard]] auto new_ref_array_of_idpair_with_size(
+        std::span<std::pair<std::string_view, NodeId> const> items) -> NodeId {
+        auto sz = refs_array.size();
+
+        refs_array.push_back(NodeId::from_raw_data(items.size()));
         for (auto const& [identifier, node] : items) {
             if (identifier.empty()) {
                 refs_array.push_back(NodeId::invalid());

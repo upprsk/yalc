@@ -106,6 +106,20 @@ struct JsonVisitor : public Visitor {
         if (body.is_valid()) j["body"] = ast.fatten(body);
     }
 
+    void visit_top_var_decl(Ast&                    ast, Node const& /*node*/,
+                            std::span<NodeId const> decorators,
+                            NodeId                  child) override {
+        j["decorators"] = ast.fatten(decorators);
+        j["child"] = ast.fatten(child);
+    }
+
+    void visit_top_def_decl(Ast&                    ast, Node const& /*node*/,
+                            std::span<NodeId const> decorators,
+                            NodeId                  child) override {
+        j["decorators"] = ast.fatten(decorators);
+        j["child"] = ast.fatten(child);
+    }
+
     void visit_id_pack(Ast&                    ast, Node const& /*node*/,
                        std::span<NodeId const> ids) override {
         auto arr = json::array();
@@ -140,6 +154,30 @@ struct JsonVisitor : public Visitor {
         }
 
         j["values"] = arr;
+    }
+
+    void visit_decorator(Ast& ast, Node const& /*node*/, std::string_view name,
+                         std::span<NodeId const> params) override {
+        j["name"] = name;
+
+        auto arr = json::array();
+
+        ASSERT((params.size() & 1) == 0);
+        for (size_t i = 0; i < params.size(); i += 2) {
+            auto item = json::object();
+
+            if (params[i].is_valid()) {
+                item["key"] = ast.get_identifier(params[i].as_id());
+            }
+
+            if (params[i + 1].is_valid()) {
+                item["value"] = ast.fatten(params[i + 1]);
+            }
+
+            arr.push_back(item);
+        }
+
+        j["params"] = arr;
     }
 
     // ========================================================================
