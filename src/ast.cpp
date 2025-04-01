@@ -231,6 +231,19 @@ struct JsonVisitor : public Visitor {
 
 #undef VISIT_UNARY
 
+    void visit_struct_type(Ast&                    ast, const Node& /*node*/,
+                           std::span<const NodeId> fields) override {
+        j["fields"] = ast.fatten(fields);
+    }
+
+    void visit_struct_field(Ast&             ast, Node const& /*node*/,
+                            std::string_view name, NodeId type,
+                            NodeId init) override {
+        j["name"] = name;
+        j["type"] = ast.fatten(type);
+        if (init.is_valid()) j["init"] = ast.fatten(init);
+    }
+
     // ========================================================================
 
     void visit_block(Ast&                    ast, Node const& /*node*/,

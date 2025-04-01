@@ -236,6 +236,29 @@ enum class NodeKind : uint16_t {
     Bnot,    // ~
     Neg,     // -
 
+    /// A struct type literal
+    ///
+    ///     struct {
+    ///         field_1: type_1,
+    ///         field_2: type_2 = init,
+    ///     }
+    ///
+    /// - `first` contains the number of fields.
+    /// - `second` points to an array of struct fields.
+    StructType,
+
+    /// A struct type field.
+    ///
+    ///     struct {
+    ///         field_1: type_1,
+    ///         field_2: type_2 = init,
+    ///     }
+    ///
+    /// - `first` points to an identifier for the name of the field.
+    /// - `second` points to an array with `[{type}, {init}]`. `init` is
+    /// optional and may be an invalid id.
+    StructField,
+
     /// ----------
     /// Statements
     /// ----------
@@ -383,6 +406,8 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Lnot: name = "Lnot"; break;
         case NodeKind::Bnot: name = "Bnot"; break;
         case NodeKind::Neg: name = "Neg"; break;
+        case NodeKind::StructType: name = "StructType"; break;
+        case NodeKind::StructField: name = "StructField"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;

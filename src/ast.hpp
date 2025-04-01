@@ -169,6 +169,19 @@ public:
         return new_node(kind, loc, child, NodeId::invalid());
     }
 
+    auto new_struct_type(Location loc, std::span<NodeId const> fields)
+        -> NodeId {
+        return new_node(NodeKind::StructType, loc,
+                        NodeId::from_raw_data(fields.size()),
+                        new_ref_array_with(fields));
+    }
+
+    auto new_struct_field(Location loc, std::string_view name, NodeId type,
+                          NodeId init) -> NodeId {
+        return new_node(NodeKind::StructField, loc, new_identifier(name),
+                        new_ref_array_with(type, init));
+    }
+
     // ----------
     // Statements
     // ----------

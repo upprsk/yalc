@@ -184,6 +184,18 @@ struct Visitor {
 
 #undef VISIT_UNARY
 
+    virtual void visit_struct_type(Ast& ast, Node const& node,
+                                   std::span<NodeId const> fields) {
+        for (auto const& field : fields) visit(ast, field);
+    }
+
+    virtual void visit_struct_field(Ast& ast, Node const& node,
+                                    std::string_view name, NodeId type,
+                                    NodeId init) {
+        visit(ast, type);
+        if (init.is_valid()) visit(ast, init);
+    }
+
     // =======================================================================
 
     virtual void visit_block(Ast& ast, Node const& node,

@@ -190,6 +190,18 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
         case NodeKind::Bnot: visit_bnot(ast, node, node.get_first()); break;
         case NodeKind::Neg: visit_neg(ast, node, node.get_first()); break;
 
+        case NodeKind::StructType:
+            visit_struct_type(ast, node,
+                              ast.get_array(node.get_first().as_count(),
+                                            node.get_second().as_array()));
+            break;
+        case NodeKind::StructField: {
+            auto parts = ast.get_array({2}, node.get_second().as_array());
+            visit_struct_field(ast, node,
+                               ast.get_identifier(node.get_first().as_id()),
+                               parts[0], parts[1]);
+        } break;
+
         case NodeKind::Block:
             visit_block(ast, node,
                         ast.get_array(node.get_first().as_count(),

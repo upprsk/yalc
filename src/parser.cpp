@@ -551,7 +551,7 @@ struct Parser {
             } break;
 
             case TokenType::Id:
-                if (check("struct")) return parse_struct();
+                if (t.span.str(source) == "struct") return parse_struct();
                 return parse_id(t);
 
             case TokenType::Int:
@@ -703,7 +703,45 @@ struct Parser {
     }
 
     auto parse_char() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
-    auto parse_struct() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+
+    auto parse_struct() -> ast::NodeId {
+        auto start = prev_loc();
+        try(consume(TokenType::Lbrace));
+
+        auto fields = parse_struct_fields();
+
+        try(consume(TokenType::Rbrace));
+
+        return ast.new_struct_type(start.extend(prev_span()), fields);
+    }
+
+    auto parse_struct_fields() -> std::vector<ast::NodeId> {
+        std::vector<ast::NodeId> fields;
+        while (!check(TokenType::Rbrace)) {
+            fields.push_back(parse_struct_field());
+
+            if (check(TokenType::Rbrace)) break;
+            if (!consume(TokenType::Comma)) break;
+        }
+
+        return fields;
+    }
+
+    auto parse_struct_field() -> ast::NodeId {
+        auto name = span();
+        try(consume(TokenType::Id));
+        try(consume(TokenType::Colon));
+
+        auto type = parse_expr();
+        auto init = ast::NodeId::invalid();
+
+        if (match(TokenType::Equal)) {
+            init = parse_expr();
+        }
+
+        return ast.new_struct_field(to_loc(name.extend(prev_span())),
+                                    name.str(source), type, init);
+    }
 
     auto parse_unary(Token t) -> ast::NodeId {
         auto kind = ast::NodeKind::Err;
