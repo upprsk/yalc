@@ -11,7 +11,7 @@ namespace yal {
 
 void ErrorReporterForFile::report(Span s, std::string_view prefix,
                                   fmt::text_style color, fmt::string_view fmt,
-                                  fmt::format_args args) {
+                                  fmt::format_args args, uint32_t context) {
     auto [row, col] = find_rowcol(s);
 
     fmt::print(out, "{}:{}:{}: ", source_path, row, col, prefix);
@@ -30,16 +30,41 @@ void ErrorReporterForFile::report(Span s, std::string_view prefix,
 
     std::string_view source = this->source;
     auto [ls, le] = find_linestart(s);
-    fmt::println(out, "{:04} | {}", row, source.substr(ls, le - ls));
+
+    // print `context` lines from before the line with the error
+    auto ils = ls;
+    for (size_t i = 0; i < context && ils > 1; i++) {
+        auto [pls, ple] = find_linestart(ils - 2);
+        ils = pls;
+
+        fmt::println(out, "  {:04} | {}", row - i - 1,
+                     source.substr(pls, ple - pls));
+    }
 
     if (isatty(fd)) {
-        fmt::print(out, color, "{0: <{1}}{0:^<{2}}", "", 4 + 3 + s.begin - ls,
-                   std::min(s.end, le) - s.begin);
+        fmt::print(out, color, ">");
+        fmt::println(out, " {:04} | {}", row, source.substr(ls, le - ls));
     } else {
-        fmt::print(out, "{0: <{1}}{0:^<{2}}", "", 4 + 3 + s.begin - ls,
+        fmt::println(out, "> {:04} | {}", row, source.substr(ls, le - ls));
+    }
+
+    if (isatty(fd)) {
+        fmt::print(out, color, "{0: <{1}}{0:^<{2}}", "",
+                   2 + 4 + 3 + s.begin - ls, std::min(s.end, le) - s.begin);
+    } else {
+        fmt::print(out, "{0: <{1}}{0:^<{2}}", "", 2 + 4 + 3 + s.begin - ls,
                    std::min(s.end, le) - s.begin);
     }
 
     fmt::println(out, "");
+
+    auto ile = le;
+    for (size_t i = 0; i < context && ile < source.size(); i++) {
+        auto [pls, ple] = find_linestart(ile + 1);
+        ile = ple;
+
+        fmt::println(out, "  {:04} | {}", row + i + 1,
+                     source.substr(pls, ple - pls));
+    }
 }
 }  // namespace yal

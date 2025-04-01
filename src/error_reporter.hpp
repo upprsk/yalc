@@ -75,7 +75,8 @@ public:
     }
 
     void report(Span s, std::string_view prefix, fmt::text_style color,
-                fmt::string_view fmt, fmt::format_args args);
+                fmt::string_view fmt, fmt::format_args args,
+                uint32_t context = 1);
 
     // -----------------------------------------------------------------------
 
@@ -113,28 +114,38 @@ private:
             }
         }
 
-        return {row, col};
+        // need to adjust rows to be one based
+        return {row + 1, col};
     }
 
-    [[nodiscard]] constexpr auto find_linestart(Span s) const -> Span {
+    [[nodiscard]] constexpr auto find_linestart(uint32_t begin) const -> Span {
         uint32_t line_start{};
         uint32_t line_end = source.length();
 
-        for (ssize_t i = s.begin; i >= 0; i--) {
+        for (ssize_t i = begin; i >= 0; i--) {
             if (source[i] == '\n') {
                 line_start = i + 1;
                 break;
             }
         }
 
-        for (size_t i = s.begin; i < source.length(); i++) {
+        for (size_t i = begin; i < source.length(); i++) {
             if (source[i] == '\n') {
                 line_end = i;
                 break;
             }
         }
 
+        // the line is made of a single '\n'
+        if (line_end == line_start - 1) {
+            line_end = line_start;
+        }
+
         return {.begin = line_start, .end = line_end};
+    }
+
+    [[nodiscard]] constexpr auto find_linestart(Span s) const -> Span {
+        return find_linestart(s.begin);
     }
 
     // -----------------------------------------------------------------------
