@@ -377,6 +377,26 @@ func _() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("struct type");
+
+    run_test(ctx, p, "rather complete", R"(
+module main;
+
+def Struct = struct {
+    happy:  i32,
+    hungry: i32  = 10,
+    yay:    bool = false
+};
+
+func main() i32 {
+    var s: Struct;
+
+    return 0;
+}
+)");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};

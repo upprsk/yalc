@@ -1,7 +1,13 @@
 module main;
 
+def Struct = struct {
+    happy:  i32,
+    hungry: i32  = 10,
+    yay:    bool = false
+};
+
 func main() i32 {
-    x + 0
-    "test";
+    var s: Struct;
+
     return 0;
 }
