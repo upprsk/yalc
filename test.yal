@@ -1,7 +1,1 @@
-module _;
-
-func _() {
-    var x = 10 as usize;
-    var y = 10 as i32;
-    var z = x as i32 + y;
-}
+module _; func _() { +x >> 1; }

@@ -363,6 +363,20 @@ func _() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("unary operations");
+
+    run_test(ctx, p, "neg", R"(module _; func _() { -x + 1; })");
+    run_test(ctx, p, "neg 2", R"(module _; func _() { x - -1; })");
+    run_test(ctx, p, "addr of",
+             R"(module _; func _() { var x = 0; var y = &x; })");
+    run_test(ctx, p, "addr of 2",
+             R"(module _; func _() { var x = 0; var y = &x + 4; })");
+    run_test(ctx, p, "not",
+             R"(module _; func _() { !true and !false or ~x + 1; })");
+    run_test(ctx, p, "plus", R"(module _; func _() { +x >> 1; })");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
