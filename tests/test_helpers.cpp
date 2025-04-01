@@ -75,7 +75,7 @@ auto get_tmp_file(std::string_view initial_contents)
     return f;
 }
 
-void show_diff(std::string_view name, json const& left, json const& right) {
+void show_diff(json const& left, json const& right) {
     auto left_file = get_tmp_file(json_to_pretty_string(left));
     auto right_file = get_tmp_file(json_to_pretty_string(right));
     subprocess::call({"git", "--no-pager", "diff", "--no-index",
@@ -113,7 +113,7 @@ auto run_checks_for_test_output(Context const& ctx, TestParams const& p,
     // check value
     if (exp != output) {
         if (p.use_diff) {
-            show_diff(fullname, exp, output);
+            show_diff(exp, output);
         } else {
             fmt::println("{} got as output:\n{}", fullname,
                          json_to_pretty_string(output));
