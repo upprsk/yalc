@@ -16,6 +16,7 @@ namespace yal {
 
 class ErrorReporterForFile {
     static constexpr auto const error_style = fmt::fg(fmt::color::red);
+    static constexpr auto const warn_style = fmt::fg(fmt::color::yellow);
     static constexpr auto const note_style = fmt::fg(fmt::color::cyan);
     static constexpr auto const debug_style =
         fmt::fg(fmt::color::medium_purple);
@@ -38,6 +39,15 @@ public:
     void vreport_error(Span s, fmt::string_view fmt, fmt::format_args args) {
         error_count++;
         report(s, "error", error_style, fmt, args);
+    }
+
+    template <typename... T>
+    void report_warn(Span s, fmt::format_string<T...> fmt, T&&... args) {
+        vreport_warn(s, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_warn(Span s, fmt::string_view fmt, fmt::format_args args) {
+        report(s, "warn", warn_style, fmt, args);
     }
 
     template <typename... T>
