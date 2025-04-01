@@ -26,6 +26,14 @@ struct Span {
         return {.begin = begin, .end = o.end};
     }
 
+    [[nodiscard]] constexpr auto offset(uint32_t off) const -> Span {
+        return {.begin = begin + off, .end = end};
+    }
+
+    [[nodiscard]] constexpr auto trim_to_size(uint32_t sz) const -> Span {
+        return {.begin = begin, .end = begin + sz};
+    }
+
     constexpr auto operator==(Span const &o) const -> bool = default;
 };
 
