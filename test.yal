@@ -1,1 +1,7 @@
-module _; func _() { +x >> 1; }
+module main;
+
+func main() i32 {
+    x + 0
+    "test";
+    return 0;
+}

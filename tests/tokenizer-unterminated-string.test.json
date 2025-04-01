@@ -1,1 +1,1 @@
-{"stderr":":memory::0:0: error: unterminated string\n0000 | \"unterminated string\n       ^^^^^^^^^^^^^^^^^^^^\n"}
+{"stderr":":memory::1:0: error: unterminated string\n> 0001 | \"unterminated string\n         ^^^^^^^^^^^^^^^^^^^^\n"}
