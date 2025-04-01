@@ -228,6 +228,14 @@ enum class NodeKind : uint16_t {
     Lor,           // or
     Cast,          // as
 
+    /// Generic unary operation expressions.
+    ///
+    /// - `first` points to the child.
+    AddrOf,  // &
+    Lnot,    // !
+    Bnot,    // ~
+    Neg,     // -
+
     /// ----------
     /// Statements
     /// ----------
@@ -371,6 +379,10 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Land: name = "Land"; break;
         case NodeKind::Lor: name = "Lor"; break;
         case NodeKind::Cast: name = "Cast"; break;
+        case NodeKind::AddrOf: name = "AddrOf"; break;
+        case NodeKind::Lnot: name = "Lnot"; break;
+        case NodeKind::Bnot: name = "Bnot"; break;
+        case NodeKind::Neg: name = "Neg"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;

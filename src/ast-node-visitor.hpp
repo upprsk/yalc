@@ -172,6 +172,18 @@ struct Visitor {
 
 #undef VISIT_BIN
 
+#define VISIT_UNARY(name)                                               \
+    virtual void visit_##name(Ast& ast, Node const& node, NodeId lhs) { \
+        visit(ast, lhs);                                                \
+    }
+
+    VISIT_UNARY(addrof);
+    VISIT_UNARY(lnot);
+    VISIT_UNARY(bnot);
+    VISIT_UNARY(neg);
+
+#undef VISIT_UNARY
+
     // =======================================================================
 
     virtual void visit_block(Ast& ast, Node const& node,

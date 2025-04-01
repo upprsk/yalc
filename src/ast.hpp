@@ -165,6 +165,10 @@ public:
         return new_node(kind, loc, left, right);
     }
 
+    auto new_unary_expr(Location loc, NodeKind kind, NodeId child) -> NodeId {
+        return new_node(kind, loc, child, NodeId::invalid());
+    }
+
     // ----------
     // Statements
     // ----------

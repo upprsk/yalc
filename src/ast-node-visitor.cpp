@@ -185,6 +185,11 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
             visit_cast(ast, node, node.get_first(), node.get_second());
             break;
 
+        case NodeKind::AddrOf: visit_addrof(ast, node, node.get_first()); break;
+        case NodeKind::Lnot: visit_lnot(ast, node, node.get_first()); break;
+        case NodeKind::Bnot: visit_bnot(ast, node, node.get_first()); break;
+        case NodeKind::Neg: visit_neg(ast, node, node.get_first()); break;
+
         case NodeKind::Block:
             visit_block(ast, node,
                         ast.get_array(node.get_first().as_count(),

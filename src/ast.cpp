@@ -219,6 +219,18 @@ struct JsonVisitor : public Visitor {
 
 #undef VISIT_BIN
 
+#define VISIT_UNARY(name)                                                      \
+    void visit_##name(Ast& ast, Node const& /*node*/, NodeId child) override { \
+        j["child"] = ast.fatten(child);                                        \
+    }
+
+    VISIT_UNARY(addrof);
+    VISIT_UNARY(lnot);
+    VISIT_UNARY(bnot);
+    VISIT_UNARY(neg);
+
+#undef VISIT_UNARY
+
     // ========================================================================
 
     void visit_block(Ast&                    ast, Node const& /*node*/,

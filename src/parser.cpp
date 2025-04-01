@@ -569,7 +569,7 @@ struct Parser {
             case TokenType::Minus:
             case TokenType::Plus:
             case TokenType::Star:
-            case TokenType::Question: return parse_unary();
+            case TokenType::Question: return parse_unary(t);
 
             default: break;
         }
@@ -704,7 +704,26 @@ struct Parser {
 
     auto parse_char() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_struct() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
-    auto parse_unary() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+
+    auto parse_unary(Token t) -> ast::NodeId {
+        auto kind = ast::NodeKind::Err;
+        auto child = parse_prec_expr(PREC_UNARY);
+
+        switch (t.type) {
+            case TokenType::Ampersand: kind = ast::NodeKind::AddrOf; break;
+            case TokenType::Bang: kind = ast::NodeKind::Lnot; break;
+            case TokenType::Tilde: kind = ast::NodeKind::Bnot; break;
+            case TokenType::Minus: kind = ast::NodeKind::Neg; break;
+            case TokenType::Plus:
+                // this is literally a nop, just return the child
+                return child;
+            default: UNREACHABLE("invalid token in infix expr", t);
+        }
+
+        return ast.new_unary_expr(
+            to_loc(t.span.extend(ast.get_node_span(child.as_ref()))), kind,
+            child);
+    }
 
     // ------------------------------------------------------------------------
 
