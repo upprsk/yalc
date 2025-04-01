@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
+#include <expected>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -14,6 +15,70 @@
 #include "tokenizer.hpp"
 
 namespace yal {
+
+constexpr auto is_hex_char(char c) -> bool {
+    return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') ||
+           (c >= '0' && c <= '9');
+}
+
+constexpr auto parse_hex_escape(char first, char second) -> uint8_t {
+    std::array digits{first, second};
+
+    uint8_t byte;
+    auto [ptr, ec] =
+        std::from_chars(digits.data(), digits.data() + digits.size(), byte, 16);
+    ASSERT(ec == std::errc{});
+    ASSERT(ptr == (digits.data() + digits.size()));
+
+    return byte;
+}
+
+auto escape_string(ErrorReporterForFile& er, Span span, std::string_view s)
+    -> std::string {
+    std::string result;
+
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == '\\') {
+            i++;
+
+            if (!(i < s.size())) {
+                er.report_error(span, "unterminated escape sequence");
+                return result;
+            }
+
+            switch (s[i]) {
+                case '0': result.push_back('\0'); break;
+                case 'a': result.push_back('\a'); break;
+                case 'b': result.push_back('\b'); break;
+                case 't': result.push_back('\t'); break;
+                case 'n': result.push_back('\n'); break;
+                case 'v': result.push_back('\v'); break;
+                case 'f': result.push_back('\f'); break;
+                case 'r': result.push_back('\r'); break;
+
+                case 'x': {
+                    if (i + 2 < s.size() && is_hex_char(s[i + 1]) &&
+                        is_hex_char(s[i + 2])) {
+                        result.push_back(parse_hex_escape(s[i + 1], s[i + 2]));
+                        i += 2;
+                    } else {
+                        result.push_back('\\');
+                        result.push_back('x');
+                    }
+                } break;
+
+                default:
+                    er.report_warn(span.offset(i).trim_to_size(2),
+                                   "unknown escape sequence: '\\{:c}'", s[i]);
+                    result.push_back(s[i]);
+            }
+        } else {
+            result.push_back(s[i]);
+        }
+    }
+
+    return result;
+}
 
 #define try(...) \
     if (!(__VA_ARGS__)) return ast.new_err(prev_loc())
@@ -493,7 +558,7 @@ struct Parser {
 
             case TokenType::DotLbrace: return parse_lit();
             case TokenType::Lbracket: return parse_arr();
-            case TokenType::Str: return parse_str();
+            case TokenType::Str: return parse_str(t);
             case TokenType::Char: return parse_char();
 
             case TokenType::Ampersand:
@@ -582,7 +647,15 @@ struct Parser {
 
     auto parse_lit() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_arr() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
-    auto parse_str() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+
+    auto parse_str(Token t) -> ast::NodeId {
+        auto s = t.span.str(source);
+        s = s.substr(1, s.size() - 2);
+
+        auto result = escape_string(*er, t.span, s);
+        return ast.new_str(to_loc(t.span), result);
+    }
+
     auto parse_char() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_struct() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
     auto parse_unary() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }

@@ -1,5 +1,17 @@
 module test;
 
-func test() {
-    var x = 0;
+func main() {
+    "\0\a\b\t\n\v\f\r \xFF\x0a\i";
 }
+
+// module test;
+// 
+// @extern
+// func printf(fmt: [*]const u8, ...) i32;
+// 
+// func test() {
+//     var x = 0;
+//     // while x < 10 {
+//     //     x += 1;
+//     // }
+// }
