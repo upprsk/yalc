@@ -225,6 +225,58 @@ func test() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("decorated functions");
+
+    run_test(ctx, p, "extern",
+             R"(module test;
+
+@extern
+func test();)");
+
+    run_test(ctx, p, "something with args",
+             R"(module test; @something(arg_1=1) func test();)");
+    run_test(ctx, p, "something with args 2",
+             R"(module test; @something(arg_1=1, arg_2) func test();)");
+    run_test(ctx, p, "something with args 3",
+             R"(module test; @something(arg_1=1, arg_2, 3) func test();)");
+
+    run_test(ctx, p, "extern with args",
+             R"(module test;
+
+@extern(link_name="c_test")
+func test();)",
+             true);
+
+    run_test(ctx, p, "multiple decorators 1",
+             R"(module test;
+
+@private(file)
+@something() func test();)");
+
+    run_test(ctx, p, "multiple decorators",
+             R"(module test;
+
+@private(file)
+@extern(link_name="c_test")
+func test();)",
+             true);
+
+    ctx.tags.pop_back();
+
+    ctx.tags.emplace_back("decorated decls");
+
+    run_test(ctx, p, "extern var",
+             R"(module test; @extern var g_counter: i32;)");
+    run_test(ctx, p, "extern var with name",
+             R"(module test; @extern(link_name="g_counter") var counter: i32;)",
+             true);
+
+    run_test(ctx, p, "private def", R"(module test; @private def VALUE = 12;)");
+    run_test(ctx, p, "file private def",
+             R"(module test; @private(file) def THING: u64 = 69;)");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
