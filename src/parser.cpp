@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "ast-node-id.hpp"
+#include "ast-node.hpp"
 #include "error_reporter.hpp"
 #include "file-store.hpp"
 #include "libassert/assert.hpp"
+#include "nlohmann/json.hpp"
 #include "tokenizer.hpp"
 
 namespace yal {
@@ -533,8 +535,8 @@ struct Parser {
 
     auto parse_prec_expr(int precedence) -> ast::NodeId {
         auto left = parse_prefix_expr();
-        while (get_precedence(peek().type) > precedence)
-            left = parse_infix_expr(peek(), left);
+        while (get_precedence(peek()) > precedence)
+            left = parse_infix_expr(left);
 
         return left;
     }
@@ -578,18 +580,52 @@ struct Parser {
         return ast.new_err(loc());
     }
 
-    auto parse_infix_expr(Token t, ast::NodeId left) -> ast::NodeId {
-        advance();
+    auto parse_infix_expr(ast::NodeId left) -> ast::NodeId {
+        auto t = peek_and_advance();
+        auto kind = ast::NodeKind::Err;
+        auto right = parse_prec_expr(get_precedence(t));
 
         switch (t.type) {
-            case TokenType::Less: {
-                auto right = parse_prec_expr(get_precedence(t.type));
-                PANIC("NOT IMPLEMENTED", t, left, right);
-            } break;
+            case TokenType::Plus: kind = ast::NodeKind::Add; break;
+            case TokenType::Minus: kind = ast::NodeKind::Sub; break;
+            case TokenType::Star: kind = ast::NodeKind::Mul; break;
+            case TokenType::Slash: kind = ast::NodeKind::Div; break;
+            case TokenType::Percent: kind = ast::NodeKind::Mod; break;
+            case TokenType::LessLess: kind = ast::NodeKind::LeftShift; break;
+            case TokenType::GreaterGreater:
+                kind = ast::NodeKind::RightShift;
+                break;
+            case TokenType::EqualEqual: kind = ast::NodeKind::Equal; break;
+            case TokenType::BangEqual: kind = ast::NodeKind::NotEqual; break;
+            case TokenType::Less: kind = ast::NodeKind::Less; break;
+            case TokenType::LessEqual: kind = ast::NodeKind::LessEqual; break;
+            case TokenType::Greater: kind = ast::NodeKind::Greater; break;
+            case TokenType::GreaterEqual:
+                kind = ast::NodeKind::GreaterEqual;
+                break;
+            case TokenType::Ampersand: kind = ast::NodeKind::Band; break;
+            case TokenType::Pipe: kind = ast::NodeKind::Bor; break;
+            case TokenType::Carrot: kind = ast::NodeKind::Bxor; break;
+
+            case TokenType::Id:
+                if (t.span.str(source) == "and")
+                    kind = ast::NodeKind::Land;
+                else if (t.span.str(source) == "or")
+                    kind = ast::NodeKind::Lor;
+                else if (t.span.str(source) == "as")
+                    kind = ast::NodeKind::Cast;
+                else
+                    UNREACHABLE("invalid id in `parse_infix_expression`", t,
+                                t.span.str(source));
+                break;
+
             default: UNREACHABLE("invalid token in infix expr", t);
         }
 
-        PANIC("NOT IMPLEMENTED", t, left);
+        return ast.new_binary_expr(
+            ast.get_node_loc(left.as_ref())
+                .extend(ast.get_node_span(right.as_ref())),
+            kind, left, right);
     }
 
     // ------------------------------------------------------------------------
@@ -684,15 +720,8 @@ struct Parser {
     constexpr static auto const PREC_ASSIGN = 1;
     constexpr static auto const PREC_NONE = 0;
 
-    static constexpr auto get_precedence(std::string_view kw) -> int {
-        if (kw == "as") return PREC_CAST;
-        if (kw == "or" || kw == "and") return PREC_LOGIC;
-
-        return PREC_NONE;
-    }
-
-    static constexpr auto get_precedence(TokenType tt) -> int {
-        switch (tt) {
+    [[nodiscard]] constexpr auto get_precedence(Token t) const -> int {
+        switch (t.type) {
             case TokenType::Lparen:
             case TokenType::Dot: return PREC_CALL;
             case TokenType::Question:
@@ -718,6 +747,14 @@ struct Parser {
             case TokenType::Ampersand:
             case TokenType::Carrot:
             case TokenType::Pipe: return PREC_BIT;
+
+            case TokenType::Id: {
+                auto kw = t.span.str(source);
+                if (kw == "as") return PREC_CAST;
+                if (kw == "or" || kw == "and") return PREC_LOGIC;
+
+                return PREC_NONE;
+            }
 
 #if NOT_REALLY_EXPRESSIONS
             case TokenType::Equal:

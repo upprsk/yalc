@@ -109,6 +109,82 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                                           node.get_second().as_array()));
             break;
 
+        case NodeKind::Add:
+            visit_add(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Sub:
+            visit_sub(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Mul:
+            visit_mul(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Div:
+            visit_div(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Mod:
+            visit_mod(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::LeftShift:
+            visit_left_shift(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::RightShift:
+            visit_right_shift(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Equal:
+            visit_equal(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::NotEqual:
+            visit_not_equal(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Less:
+            visit_less(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::LessEqual:
+            visit_less_equal(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Greater:
+            visit_greater(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::GreaterEqual:
+            visit_greater_equal(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Band:
+            visit_band(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Bor:
+            visit_bor(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Bxor:
+            visit_bxor(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Land:
+            visit_land(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Lor:
+            visit_lor(ast, node, node.get_first(), node.get_second());
+            break;
+
+        case NodeKind::Cast:
+            visit_cast(ast, node, node.get_first(), node.get_second());
+            break;
+
         case NodeKind::Block:
             visit_block(ast, node,
                         ast.get_array(node.get_first().as_count(),

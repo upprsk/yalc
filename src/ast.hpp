@@ -160,6 +160,11 @@ public:
                         new_ref_array_with(children));
     }
 
+    auto new_binary_expr(Location loc, NodeKind kind, NodeId left, NodeId right)
+        -> NodeId {
+        return new_node(kind, loc, left, right);
+    }
+
     // ----------
     // Statements
     // ----------

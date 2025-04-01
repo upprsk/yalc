@@ -143,6 +143,35 @@ struct Visitor {
         for (auto const& child : children) visit(ast, child);
     }
 
+#define VISIT_BIN(name)                                               \
+    virtual void visit_##name(Ast& ast, Node const& node, NodeId lhs, \
+                              NodeId rhs) {                           \
+        visit(ast, lhs);                                              \
+        visit(ast, rhs);                                              \
+    }
+
+    VISIT_BIN(add);
+    VISIT_BIN(sub);
+    VISIT_BIN(mul);
+    VISIT_BIN(div);
+    VISIT_BIN(mod);
+    VISIT_BIN(left_shift);
+    VISIT_BIN(right_shift);
+    VISIT_BIN(equal);
+    VISIT_BIN(not_equal);
+    VISIT_BIN(less);
+    VISIT_BIN(less_equal);
+    VISIT_BIN(greater);
+    VISIT_BIN(greater_equal);
+    VISIT_BIN(band);
+    VISIT_BIN(bor);
+    VISIT_BIN(bxor);
+    VISIT_BIN(land);
+    VISIT_BIN(lor);
+    VISIT_BIN(cast);
+
+#undef VISIT_BIN
+
     // =======================================================================
 
     virtual void visit_block(Ast& ast, Node const& node,

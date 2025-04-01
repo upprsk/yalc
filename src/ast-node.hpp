@@ -204,6 +204,30 @@ enum class NodeKind : uint16_t {
     /// - `second` pointer to array of children.
     ExprPack,
 
+    /// Generic binary operation expressions.
+    ///
+    /// - `first` has the left side of the operation.
+    /// - `second` has the right side of the operation.
+    Add,           // +
+    Sub,           // -
+    Mul,           // *
+    Div,           // /
+    Mod,           // %
+    LeftShift,     // <<
+    RightShift,    // >>
+    Equal,         // ==
+    NotEqual,      // !=
+    Less,          // <
+    LessEqual,     // <=
+    Greater,       // >
+    GreaterEqual,  // >=
+    Band,          // &
+    Bor,           // |
+    Bxor,          // ^
+    Land,          // and
+    Lor,           // or
+    Cast,          // as
+
     /// ----------
     /// Statements
     /// ----------
@@ -328,6 +352,25 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
         case NodeKind::Decorator: name = "Decorator"; break;
         case NodeKind::ExprPack: name = "ExprPack"; break;
+        case NodeKind::Add: name = "Add"; break;
+        case NodeKind::Sub: name = "Sub"; break;
+        case NodeKind::Mul: name = "Mul"; break;
+        case NodeKind::Div: name = "Div"; break;
+        case NodeKind::Mod: name = "Mod"; break;
+        case NodeKind::LeftShift: name = "LeftShift"; break;
+        case NodeKind::RightShift: name = "RightShift"; break;
+        case NodeKind::Equal: name = "Equal"; break;
+        case NodeKind::NotEqual: name = "NotEqual"; break;
+        case NodeKind::Less: name = "Less"; break;
+        case NodeKind::LessEqual: name = "LessEqual"; break;
+        case NodeKind::Greater: name = "Greater"; break;
+        case NodeKind::GreaterEqual: name = "GreaterEqual"; break;
+        case NodeKind::Band: name = "Band"; break;
+        case NodeKind::Bor: name = "Bor"; break;
+        case NodeKind::Bxor: name = "Bxor"; break;
+        case NodeKind::Land: name = "Land"; break;
+        case NodeKind::Lor: name = "Lor"; break;
+        case NodeKind::Cast: name = "Cast"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
