@@ -66,11 +66,11 @@ public:
     }
 
     auto new_str(Location loc, std::string s) -> NodeId {
-        return new_node(NodeKind::Id, loc, new_bytes(s), NodeId::invalid());
+        return new_node(NodeKind::Str, loc, new_bytes(s), NodeId::invalid());
     }
 
     auto new_char(Location loc, uint32_t c) -> NodeId {
-        return new_node(NodeKind::Int, loc, NodeId::from_raw_data(c),
+        return new_node(NodeKind::Char, loc, NodeId::from_raw_data(c),
                         NodeId::invalid());
     }
 
