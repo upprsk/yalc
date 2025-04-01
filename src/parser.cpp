@@ -24,7 +24,7 @@ constexpr auto is_hex_char(char c) -> bool {
 constexpr auto parse_hex_escape(char first, char second) -> uint8_t {
     std::array digits{first, second};
 
-    uint8_t byte;
+    uint8_t byte{};
     auto [ptr, ec] =
         std::from_chars(digits.data(), digits.data() + digits.size(), byte, 16);
     ASSERT(ec == std::errc{});
