@@ -381,6 +381,12 @@ enum class NodeKind : uint16_t {
     /// - `second` has the body.
     WhileStmt,
 
+    /// Break statement.
+    Break,
+
+    /// Continue statement.
+    Continue,
+
     /// A variable declaration.
     ///
     ///     var a, b: T, U = 1, 2;
@@ -530,6 +536,8 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::IfStmt: name = "IfStmt"; break;
         case NodeKind::IfStmtWithElse: name = "IfStmtWithElse"; break;
         case NodeKind::WhileStmt: name = "WhileStmt"; break;
+        case NodeKind::Break: name = "Break"; break;
+        case NodeKind::Continue: name = "Continue"; break;
         case NodeKind::VarDecl: name = "VarDecl"; break;
         case NodeKind::DefDecl: name = "DefDecl"; break;
     }

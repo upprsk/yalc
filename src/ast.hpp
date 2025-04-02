@@ -264,6 +264,16 @@ public:
         return new_node(NodeKind::WhileStmt, loc, cond, body);
     }
 
+    auto new_break(Location loc) -> NodeId {
+        return new_node(NodeKind::Break, loc, NodeId::invalid(),
+                        NodeId::invalid());
+    }
+
+    auto new_continue(Location loc) -> NodeId {
+        return new_node(NodeKind::Continue, loc, NodeId::invalid(),
+                        NodeId::invalid());
+    }
+
     auto new_var_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
         -> NodeId {
         return new_node(NodeKind::VarDecl, loc, ids,

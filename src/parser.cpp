@@ -992,6 +992,20 @@ struct Parser {
         if (check("if")) return parse_if_stmt();
         if (check("while")) return parse_while_stmt();
 
+        if (match("break")) {
+            auto start = prev_loc();
+            try(consume(TokenType::Semi));
+
+            return ast.new_break(start.extend(prev_span()));
+        }
+
+        if (match("continue")) {
+            auto start = prev_loc();
+            try(consume(TokenType::Semi));
+
+            return ast.new_continue(start.extend(prev_span()));
+        }
+
         // expression statement
         auto expr = parse_expr();
         try(consume(TokenType::Semi));

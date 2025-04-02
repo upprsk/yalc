@@ -285,6 +285,9 @@ struct Visitor {
         visit(ast, body);
     }
 
+    virtual void visit_break(Ast& ast, Node const& node) {}
+    virtual void visit_continue(Ast& ast, Node const& node) {}
+
     virtual void visit_var_decl(Ast& ast, Node const& node, NodeId ids,
                                 NodeId types, NodeId inits) {
         visit(ast, ids);
