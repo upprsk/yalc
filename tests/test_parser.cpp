@@ -468,6 +468,74 @@ def S = struct {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("lit");
+
+    run_test(ctx, p, "rather complete", R"(
+module main;
+
+def Counter = struct {
+    cnt: i32 = 0,
+    total: i32,
+};
+
+func main() {
+    var c: Counter = .{ .total = 10 };
+}
+)");
+
+    run_test(ctx, p, "init array", R"(
+module test;
+func test() {
+    var c: [5]u8 = .{ 1, 2, 3, 4, 5 };
+}
+)");
+
+    run_test(ctx, p, "init struct with array", R"(
+module main;
+def macaddr_t = struct { mac: [6]u8 };
+func main() {
+    var mac: macaddr_t = .{ .mac = .{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} };
+}
+)");
+
+    run_test(ctx, p, "init struct with array and call", R"(
+module main;
+
+def macaddr_t = struct { mac: [6]u8 };
+func dump_mac(addr: macaddr_t) {
+    // ...
+}
+
+func main() {
+    var mac: macaddr_t = .{ .mac = .{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} };
+    dump_mac(mac);
+}
+)",
+             true);
+
+    run_test(ctx, p, "init struct with array in call", R"(
+module main;
+
+def macaddr_t = struct { mac: [6]u8 };
+func dump_mac(addr: macaddr_t) {
+    // ...
+}
+
+func main() {
+    dump_mac(.{ .mac = .{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} });
+}
+)",
+             true);
+
+    run_test(ctx, p, "mixed init", R"(
+module test;
+func test() {
+    .{ .a = v0, .b = v1, .c, 0 };
+}
+)");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};

@@ -1,5 +1,4 @@
 module test;
-
-def S = struct {
-    items: []S,
-};
+func test() {
+    .{ .a = v0, .b = v1, .c, 0 };
+}
