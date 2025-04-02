@@ -77,6 +77,9 @@ auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
     run_test(ctx, p, "int dot", R"~~(123.)~~");
     run_test(ctx, p, "int methods", R"~~(123.test())~~");
 
+    run_test(ctx, p, "shbang", R"(#!/usr/local/bin/yalc
+yay!)");
+
     fmt::println("tokenizer tests, {} tests, {} success, {} failed",
                  ctx.total(), ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};

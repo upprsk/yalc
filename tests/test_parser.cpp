@@ -700,6 +700,18 @@ func main() {
 }
 )");
 
+    run_test(ctx, p, "hello world libc with shbang", R"(
+#!/usr/local/bin/yalc run
+module main;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+func main() {
+    c_printf("Hello, %s!\n", "World");
+}
+)");
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
