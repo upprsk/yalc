@@ -536,6 +536,73 @@ func test() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("if stmt");
+
+    run_test(ctx, p, "minimal if", R"(
+module test;
+func test() {
+    if false {}
+}
+)");
+
+    run_test(ctx, p, "minimal if with else", R"(
+module test;
+func test() {
+    if false {} else {}
+}
+)");
+
+    run_test(ctx, p, "minimal if with else if", R"(
+module test;
+func test() {
+    if false {} else if false {}
+}
+)");
+
+    run_test(ctx, p, "minimal if with else if else", R"(
+module test;
+func test() {
+    if false {} else if false {} else {}
+}
+)");
+
+    run_test(ctx, p, "if with else", R"(
+module test;
+func test() {
+    if false {
+        var x = 1;
+    } else {
+        var x = 2;
+    }
+}
+)");
+
+    run_test(ctx, p, "if with else if", R"(
+module test;
+func test() {
+    if false {
+        var x = 1;
+    } else if false {
+        var x = 2;
+    }
+}
+)");
+
+    run_test(ctx, p, "if with else if else", R"(
+module test;
+func test() {
+    if false {
+        var x = 1;
+    } else if false {
+        var x = 2;
+    } else {
+        var x = 3;
+    }
+}
+)");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
