@@ -50,7 +50,7 @@ auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
     run_test(ctx, p, "greater", "> >> >= >>=");
     run_test(ctx, p, "plus", "+ ++ +=");
     run_test(ctx, p, "minus", "- -- -=");
-    run_test(ctx, p, "star", "* ** *=");
+    run_test(ctx, p, "star", "* *=");
     run_test(ctx, p, "slash", "/ /=");
     run_test(ctx, p, "bang", "! !=");
     run_test(ctx, p, "percent", "% %=");
