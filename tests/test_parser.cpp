@@ -367,6 +367,21 @@ func _() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("block");
+
+    run_test(ctx, p, "basic cast",
+             R"(module _;
+func _() {
+    var x = 10 as usize;
+    {
+        var y = 10 as i32;
+    }
+
+    var z = x as i32 + y;
+})");
+
+    ctx.tags.pop_back();
+
     ctx.tags.emplace_back("unary operations");
 
     run_test(ctx, p, "neg", R"(module _; func _() { -x + 1; })");
