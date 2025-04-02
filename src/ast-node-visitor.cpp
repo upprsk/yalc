@@ -274,6 +274,11 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                                     node.get_second().as_array()));
             break;
 
+        case NodeKind::Call:
+            visit_call(ast, node, node.get_first(),
+                       ast.get_array(node.get_second().as_array()));
+            break;
+
         case NodeKind::Block:
             visit_block(ast, node,
                         ast.get_array(node.get_first().as_count(),

@@ -593,6 +593,8 @@ struct Parser {
 
     auto parse_infix_expr(ast::NodeId left) -> ast::NodeId {
         auto t = peek_and_advance();
+        if (t.type == TokenType::Lparen) return parse_call(left);
+
         auto kind = ast::NodeKind::Err;
         auto right = parse_prec_expr(get_precedence(t));
 
@@ -887,6 +889,20 @@ struct Parser {
         return ast.new_unary_expr(
             to_loc(t.span.extend(ast.get_node_span(child.as_ref()))), kind,
             child);
+    }
+
+    auto parse_call(ast::NodeId left) -> ast::NodeId {
+        std::vector<ast::NodeId> args;
+        while (!check(TokenType::Rparen)) {
+            args.push_back(parse_expr());
+
+            if (check(TokenType::Rparen)) break;
+            if (!consume(TokenType::Comma)) break;
+        }
+
+        try(consume(TokenType::Rparen));
+        return ast.new_call(ast.get_node_loc(left.as_ref()).extend(prev_span()),
+                            left, args);
     }
 
     // ------------------------------------------------------------------------

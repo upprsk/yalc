@@ -303,6 +303,14 @@ struct JsonVisitor : public Visitor {
         j["items"] = arr;
     }
 
+    void visit_call(Ast& ast, Node const& /*node*/, NodeId callee,
+                    std::span<NodeId const> args) override {
+        auto arr = json::array();
+        for (auto const& arg : args) arr.push_back(ast.fatten(arg));
+        j["callee"] = ast.fatten(callee);
+        j["args"] = arr;
+    }
+
     // ========================================================================
 
     void visit_block(Ast&                    ast, Node const& /*node*/,

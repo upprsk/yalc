@@ -236,6 +236,12 @@ struct Visitor {
         for (auto const& item : items) visit(ast, item);
     }
 
+    virtual void visit_call(Ast& ast, Node const& node, NodeId callee,
+                            std::span<NodeId const> args) {
+        visit(ast, callee);
+        for (auto const& arg : args) visit(ast, arg);
+    }
+
     // =======================================================================
 
     virtual void visit_block(Ast& ast, Node const& node,

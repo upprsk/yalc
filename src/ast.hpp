@@ -223,6 +223,11 @@ public:
                         new_ref_array_with(items));
     }
 
+    auto new_call(Location loc, NodeId callee, std::span<NodeId const> args)
+        -> NodeId {
+        return new_node(NodeKind::Call, loc, callee, new_ref_array_sized(args));
+    }
+
     // ----------
     // Statements
     // ----------

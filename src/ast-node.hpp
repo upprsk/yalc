@@ -326,6 +326,14 @@ enum class NodeKind : uint16_t {
     ///     +----+----+----+----+----+----+----+----+
     Lit,
 
+    /// A function call.
+    ///
+    /// - `first` contains the callee.
+    /// - `second` points to an array of arguments.
+    ///
+    /// The `second` array is made of `[{length}, ...]`.
+    Call,
+
     /// ----------
     /// Statements
     /// ----------
@@ -508,6 +516,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ArrayType: name = "ArrayType"; break;
         case NodeKind::Array: name = "Array"; break;
         case NodeKind::Lit: name = "Lit"; break;
+        case NodeKind::Call: name = "Call"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
