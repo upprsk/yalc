@@ -1000,6 +1000,8 @@ struct Parser {
         if (check("if")) return parse_if_stmt();
         if (check("while")) return parse_while_stmt();
 
+        if (check(TokenType::Lbrace)) return parse_block();
+
         if (match("break")) {
             auto start = prev_loc();
             try(consume(TokenType::Semi));
