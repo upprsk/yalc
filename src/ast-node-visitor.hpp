@@ -268,6 +268,12 @@ struct Visitor {
         if (wf.is_valid()) visit(ast, wf);
     }
 
+    virtual void visit_while_stmt(Ast& ast, Node const& node, NodeId cond,
+                                  NodeId body) {
+        visit(ast, cond);
+        visit(ast, body);
+    }
+
     virtual void visit_var_decl(Ast& ast, Node const& node, NodeId ids,
                                 NodeId types, NodeId inits) {
         visit(ast, ids);

@@ -329,6 +329,12 @@ struct JsonVisitor : public Visitor {
         if (wf.is_valid()) j["wf"] = ast.fatten(wf);
     }
 
+    void visit_while_stmt(Ast& ast, Node const& /*node*/, NodeId cond,
+                          NodeId body) override {
+        j["cond"] = ast.fatten(cond);
+        j["body"] = ast.fatten(body);
+    }
+
     void visit_var_decl(Ast& ast, Node const& /*node*/, NodeId ids,
                         NodeId types, NodeId inits) override {
         j["ids"] = ast.fatten(ids);

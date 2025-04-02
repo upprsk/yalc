@@ -361,6 +361,12 @@ enum class NodeKind : uint16_t {
     /// the format `[{then}, {else}]`.
     IfStmtWithElse,
 
+    /// A while statement.
+    ///
+    /// - `first` has the condition expression.
+    /// - `second` has the body.
+    WhileStmt,
+
     /// A variable declaration.
     ///
     ///     var a, b: T, U = 1, 2;
@@ -507,6 +513,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
         case NodeKind::IfStmt: name = "IfStmt"; break;
         case NodeKind::IfStmtWithElse: name = "IfStmtWithElse"; break;
+        case NodeKind::WhileStmt: name = "WhileStmt"; break;
         case NodeKind::VarDecl: name = "VarDecl"; break;
         case NodeKind::DefDecl: name = "DefDecl"; break;
     }

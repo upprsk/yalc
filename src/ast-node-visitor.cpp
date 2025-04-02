@@ -298,6 +298,10 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
             visit_if_stmt(ast, node, node.get_first(), second[0], second[1]);
         } break;
 
+        case NodeKind::WhileStmt:
+            visit_while_stmt(ast, node, node.get_first(), node.get_second());
+            break;
+
         case NodeKind::VarDecl: {
             auto parts = ast.get_array({2}, node.get_second().as_array());
             visit_var_decl(ast, node, node.get_first(), parts[0], parts[1]);

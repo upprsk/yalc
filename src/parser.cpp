@@ -964,6 +964,7 @@ struct Parser {
         if (check("var")) return parse_var_decl();
         if (check("def")) return parse_def_decl();
         if (check("if")) return parse_if_stmt();
+        if (check("while")) return parse_while_stmt();
 
         // expression statement
         auto expr = parse_expr();
@@ -1000,6 +1001,16 @@ struct Parser {
         }
 
         return ast.new_if_stmt(start.extend(prev_span()), cond, wt, wf);
+    }
+
+    auto parse_while_stmt() -> ast::NodeId {
+        auto start = loc();
+        try(consume("while"));
+
+        auto cond = parse_expr();
+        auto body = parse_block();
+
+        return ast.new_while_stmt(start.extend(prev_span()), cond, body);
     }
 
     // ------------------------------------------------------------------------

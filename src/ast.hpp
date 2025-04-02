@@ -250,6 +250,10 @@ public:
         return new_node(NodeKind::IfStmt, loc, cond, wt);
     }
 
+    auto new_while_stmt(Location loc, NodeId cond, NodeId body) -> NodeId {
+        return new_node(NodeKind::WhileStmt, loc, cond, body);
+    }
+
     auto new_var_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
         -> NodeId {
         return new_node(NodeKind::VarDecl, loc, ids,
