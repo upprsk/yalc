@@ -510,8 +510,7 @@ func main() {
     var mac: macaddr_t = .{ .mac = .{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} };
     dump_mac(mac);
 }
-)",
-             true);
+)");
 
     run_test(ctx, p, "init struct with array in call", R"(
 module main;
@@ -524,8 +523,7 @@ func dump_mac(addr: macaddr_t) {
 func main() {
     dump_mac(.{ .mac = .{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} });
 }
-)",
-             true);
+)");
 
     run_test(ctx, p, "mixed init", R"(
 module test;
@@ -615,6 +613,48 @@ func test() {
 )");
 
     ctx.tags.pop_back();
+
+    ctx.tags.emplace_back("calls");
+
+    run_test(ctx, p, "minimal", R"(
+module test;
+func test() {
+    var x = f();
+}
+
+func f() i32 { return 42; }
+)");
+
+    run_test(ctx, p, "with args", R"(
+module test;
+func test() {
+    var x = add(1, 2);
+}
+
+func add(x: i32, y: i32) i32 { return x + y; }
+)");
+
+    run_test(ctx, p, "with args and trailing comma", R"(
+module test;
+func test() {
+    var x = add(1, 2);
+}
+
+func add(x: i32, y: i32) i32 { return x + y; }
+)");
+
+    ctx.tags.pop_back();
+
+    run_test(ctx, p, "hello world libc", R"(
+module main;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+func main() {
+    printf("Hello, %s!\n", "World");
+}
+)");
 
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);

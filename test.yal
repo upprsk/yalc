@@ -1,6 +1,8 @@
-module test;
-func test() {
-    while true {
-        var x = 10;
-    }
+module main;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+func main() {
+    printf("Hello, %s!\n", "World");
 }
