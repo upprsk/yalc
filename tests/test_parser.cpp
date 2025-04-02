@@ -71,6 +71,8 @@ func f() {})");
 func f() {})");
     run_test(ctx, p, "with parameter", R"(module main;
 func main(a: i32) i32 {})");
+    run_test(ctx, p, "with parameter and trailing comma", R"(module main;
+func main(a: i32,) i32 {})");
     run_test(ctx, p, "with parameters", R"(module main;
 func main(a: i32, b: i32) i32 {})");
     run_test(ctx, p, "with parameter with no type", R"(module main;
