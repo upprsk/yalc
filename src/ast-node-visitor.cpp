@@ -324,6 +324,42 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
             auto parts = ast.get_array({2}, node.get_second().as_array());
             visit_def_decl(ast, node, node.get_first(), parts[0], parts[1]);
         } break;
+
+        case NodeKind::Assign:
+            visit_assign(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignAdd:
+            visit_assign_add(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignSub:
+            visit_assign_sub(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignMul:
+            visit_assign_mul(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignDiv:
+            visit_assign_div(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignMod:
+            visit_assign_mod(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignShiftLeft:
+            visit_assign_left_shift(ast, node, node.get_first(),
+                                    node.get_second());
+            break;
+        case NodeKind::AssignShiftRight:
+            visit_assign_right_shift(ast, node, node.get_first(),
+                                     node.get_second());
+            break;
+        case NodeKind::AssignBand:
+            visit_assign_band(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignBxor:
+            visit_assign_bxor(ast, node, node.get_first(), node.get_second());
+            break;
+        case NodeKind::AssignBor:
+            visit_assign_bor(ast, node, node.get_first(), node.get_second());
+            break;
     }
 }
 

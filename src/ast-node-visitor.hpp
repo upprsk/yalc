@@ -302,6 +302,27 @@ struct Visitor {
         visit(ast, inits);
     }
 
+#define VISIT_ASSIGN(name)                                            \
+    virtual void visit_##name(Ast& ast, Node const& node, NodeId lhs, \
+                              NodeId rhs) {                           \
+        visit(ast, lhs);                                              \
+        visit(ast, rhs);                                              \
+    }
+
+    VISIT_ASSIGN(assign);
+    VISIT_ASSIGN(assign_add);
+    VISIT_ASSIGN(assign_sub);
+    VISIT_ASSIGN(assign_mul);
+    VISIT_ASSIGN(assign_div);
+    VISIT_ASSIGN(assign_mod);
+    VISIT_ASSIGN(assign_left_shift);
+    VISIT_ASSIGN(assign_right_shift);
+    VISIT_ASSIGN(assign_band);
+    VISIT_ASSIGN(assign_bxor);
+    VISIT_ASSIGN(assign_bor);
+
+#undef VISIT_ASSIGN
+
 #pragma GCC diagnostic pop
 };
 

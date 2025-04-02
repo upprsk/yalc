@@ -414,6 +414,22 @@ enum class NodeKind : uint16_t {
     ///
     /// `types` is optional, so it can be an invalid id.
     DefDecl,
+
+    /// Assigment statements.
+    ///
+    /// - `first` points to the left hand side of the assigment.
+    /// - `second` points to the right hand side of the assgment.
+    Assign,
+    AssignAdd,
+    AssignSub,
+    AssignMul,
+    AssignDiv,
+    AssignMod,
+    AssignShiftLeft,
+    AssignShiftRight,
+    AssignBand,
+    AssignBxor,
+    AssignBor,
 };
 
 class Node {
@@ -540,6 +556,17 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Continue: name = "Continue"; break;
         case NodeKind::VarDecl: name = "VarDecl"; break;
         case NodeKind::DefDecl: name = "DefDecl"; break;
+        case NodeKind::Assign: name = "Assign"; break;
+        case NodeKind::AssignAdd: name = "AssignAdd"; break;
+        case NodeKind::AssignSub: name = "AssignSub"; break;
+        case NodeKind::AssignMul: name = "AssignMul"; break;
+        case NodeKind::AssignDiv: name = "AssignDiv"; break;
+        case NodeKind::AssignMod: name = "AssignMod"; break;
+        case NodeKind::AssignShiftLeft: name = "AssignShiftLeft"; break;
+        case NodeKind::AssignShiftRight: name = "AssignShiftRight"; break;
+        case NodeKind::AssignBand: name = "AssignBand"; break;
+        case NodeKind::AssignBxor: name = "AssignBxor"; break;
+        case NodeKind::AssignBor: name = "AssignBor"; break;
     }
 
     return name;

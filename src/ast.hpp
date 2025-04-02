@@ -286,6 +286,11 @@ public:
                         new_ref_array_with(types, inits));
     }
 
+    auto new_assign_stmt(Location loc, NodeKind kind, NodeId left, NodeId right)
+        -> NodeId {
+        return new_node(kind, loc, left, right);
+    }
+
 public:
     [[nodiscard]] constexpr auto fatten(NodeId id) -> FatNodeId;
     [[nodiscard]] constexpr auto fatten(std::span<NodeId const> ids)

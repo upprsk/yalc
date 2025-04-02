@@ -1016,6 +1016,60 @@ struct Parser {
 
         // expression statement
         auto expr = parse_expr();
+
+        // handle assigment
+        if (match_oneof(
+                TokenType::Equal, TokenType::PlusEqual, TokenType::MinusEqual,
+                TokenType::StarEqual, TokenType::SlashEqual,
+                TokenType::PercentEqual, TokenType::LessLessEqual,
+                TokenType::GreaterGreaterEqual, TokenType::AmpersandEqual,
+                TokenType::CarrotEqual, TokenType::PipeEqual)) {
+            auto kind = ast::NodeKind::Err;
+            switch (peek_prev().type) {
+                case TokenType::Equal: kind = ast::NodeKind::Assign; break;
+                case TokenType::PlusEqual:
+                    kind = ast::NodeKind::AssignAdd;
+                    break;
+                case TokenType::MinusEqual:
+                    kind = ast::NodeKind::AssignSub;
+                    break;
+                case TokenType::StarEqual:
+                    kind = ast::NodeKind::AssignMul;
+                    break;
+                case TokenType::SlashEqual:
+                    kind = ast::NodeKind::AssignDiv;
+                    break;
+                case TokenType::PercentEqual:
+                    kind = ast::NodeKind::AssignMod;
+                    break;
+                case TokenType::LessLessEqual:
+                    kind = ast::NodeKind::AssignShiftLeft;
+                    break;
+                case TokenType::GreaterGreaterEqual:
+                    kind = ast::NodeKind::AssignShiftRight;
+                    break;
+                case TokenType::AmpersandEqual:
+                    kind = ast::NodeKind::AssignBand;
+                    break;
+                case TokenType::CarrotEqual:
+                    kind = ast::NodeKind::AssignBxor;
+                    break;
+                case TokenType::PipeEqual:
+                    kind = ast::NodeKind::AssignBor;
+                    break;
+                default:
+                    UNREACHABLE("invalid token type when parsing assign",
+                                peek_prev());
+            }
+
+            auto rhs = parse_expr();
+            try(consume(TokenType::Semi));
+
+            return ast.new_assign_stmt(
+                ast.get_node_loc(expr.as_ref()).extend(prev_span()), kind, expr,
+                rhs);
+        }
+
         try(consume(TokenType::Semi));
 
         return ast.new_expr_stmt(

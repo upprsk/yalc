@@ -363,6 +363,27 @@ struct JsonVisitor : public Visitor {
         j["inits"] = ast.fatten(inits);
     }
 
+#define VISIT_ASSIGN(name)                                                    \
+    void visit_##name(Ast& ast, Node const& /*node*/, NodeId lhs, NodeId rhs) \
+        override {                                                            \
+        j["lhs"] = ast.fatten(lhs);                                           \
+        j["rhs"] = ast.fatten(rhs);                                           \
+    }
+
+    VISIT_ASSIGN(assign);
+    VISIT_ASSIGN(assign_add);
+    VISIT_ASSIGN(assign_sub);
+    VISIT_ASSIGN(assign_mul);
+    VISIT_ASSIGN(assign_div);
+    VISIT_ASSIGN(assign_mod);
+    VISIT_ASSIGN(assign_left_shift);
+    VISIT_ASSIGN(assign_right_shift);
+    VISIT_ASSIGN(assign_band);
+    VISIT_ASSIGN(assign_bor);
+    VISIT_ASSIGN(assign_bxor);
+
+#undef VISIT_ASSIGN
+
     json& j;
     bool  show_loc;
 };
