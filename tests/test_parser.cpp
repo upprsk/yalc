@@ -544,6 +544,23 @@ func test() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("assignment");
+
+    run_test(ctx, p, "normal", R"(module test; func test() { a = 13; })");
+    run_test(ctx, p, "add", R"(module test; func test() { a += 13; })");
+    run_test(ctx, p, "minus", R"(module test; func test() { a -= 13; })");
+    run_test(ctx, p, "mul", R"(module test; func test() { a *= 13; })");
+    run_test(ctx, p, "div", R"(module test; func test() { a /= 13; })");
+    run_test(ctx, p, "mod", R"(module test; func test() { a %= 13; })");
+    run_test(ctx, p, "shift left", R"(module test; func test() { a <<= 13; })");
+    run_test(ctx, p, "shift right",
+             R"(module test; func test() { a >>= 13; })");
+    run_test(ctx, p, "bin and", R"(module test; func test() { a &= 13; })");
+    run_test(ctx, p, "bin xor", R"(module test; func test() { a ^= 13; })");
+    run_test(ctx, p, "bin or", R"(module test; func test() { a |= 13; })");
+
+    ctx.tags.pop_back();
+
     ctx.tags.emplace_back("if stmt");
 
     run_test(ctx, p, "minimal if", R"(
@@ -720,6 +737,38 @@ func c_printf(fmt: [*]const u8, ...);
 func main() {
     c_printf("Hello, %s!\n", "World");
 }
+)");
+
+    run_test(ctx, p, "counter example", R"(
+module main;
+
+def Counter = struct { cnt: i32 = 0, total: i32 };
+func Counter.next(
+    c: *Counter,
+) (i32, bool) {
+    if c.cnt == c.total {
+        return c.cnt, false;
+    }
+
+    var v = c.cnt;
+    c.cnt += 1;
+    return v, true;
+}
+
+func main() {
+    var c: Counter = .{ .total = 10 };
+    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
+
+    while true {
+        var it, ok = c.next();
+        if !ok { break; }
+
+        c_printf("it=%d\n", it);
+    }
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
 )");
 
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
