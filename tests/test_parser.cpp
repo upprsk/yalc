@@ -399,6 +399,75 @@ func main() i32 {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("pointer-ish types");
+
+    run_test(ctx, p, "printf", R"(
+module main;
+
+@extern
+func printf(fmt: [*]const u8, ...) i32;
+)");
+
+    run_test(ctx, p, "memcpy", R"(
+module main;
+
+@extern
+func memcpy(dst: [*]u8, src: [*]const u8, sz: usize);
+)");
+
+    run_test(ctx, p, "struct with array type field", R"(
+module test;
+
+def macaddr_t = struct { mac: [6]u8 };
+)");
+
+    run_test(ctx, p, "function with const array param", R"(
+module test;
+
+func dump_mac(mac: [6]const u8) {
+    // ...
+}
+)");
+
+    run_test(ctx, p, "array literal", R"(
+module test;
+func test() {
+    var arr = [2]i32{10, 12};
+}
+)");
+
+    run_test(ctx, p, "array literal with trailing comma", R"(
+module test;
+func test() {
+    var arr = [2]i32{10, 12,};
+}
+)");
+
+    run_test(ctx, p, "array literal with inferred size", R"(
+module test;
+func test() {
+    var arr = [_]i32{1, 2, 3, 4, 5, 6, 7, 8, 9};
+}
+)");
+
+    run_test(ctx, p, "struct with slice type field", R"(
+module test;
+
+def S = struct {
+    items: []const S,
+};
+)");
+
+    run_test(ctx, p, "struct with slice type field 2", R"(
+module test;
+
+def S = struct {
+    items: []S,
+};
+)");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
