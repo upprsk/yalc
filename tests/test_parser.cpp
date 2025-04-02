@@ -652,7 +652,7 @@ module main;
 func c_printf(fmt: [*]const u8, ...);
 
 func main() {
-    printf("Hello, %s!\n", "World");
+    c_printf("Hello, %s!\n", "World");
 }
 )");
 
