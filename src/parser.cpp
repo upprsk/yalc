@@ -1019,7 +1019,7 @@ struct Parser {
         try(consume("return"));
 
         auto expr = ast::NodeId::invalid();
-        if (!check(TokenType::Semi)) expr = parse_expr();
+        if (!check(TokenType::Semi)) expr = parse_expr_pack();
         try(consume(TokenType::Semi));
 
         return ast.new_return_stmt(start.extend(prev_span()), expr);
