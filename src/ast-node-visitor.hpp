@@ -242,6 +242,11 @@ struct Visitor {
         for (auto const& arg : args) visit(ast, arg);
     }
 
+    virtual void visit_field(Ast& ast, Node const& node, NodeId receiver,
+                             std::string_view name) {
+        visit(ast, receiver);
+    }
+
     // =======================================================================
 
     virtual void visit_block(Ast& ast, Node const& node,

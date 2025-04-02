@@ -311,6 +311,12 @@ struct JsonVisitor : public Visitor {
         j["args"] = arr;
     }
 
+    void visit_field(Ast& ast, Node const& /*node*/, NodeId receiver,
+                     std::string_view name) override {
+        j["name"] = name;
+        j["receiver"] = ast.fatten(receiver);
+    }
+
     // ========================================================================
 
     void visit_block(Ast&                    ast, Node const& /*node*/,

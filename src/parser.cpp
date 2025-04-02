@@ -594,6 +594,7 @@ struct Parser {
     auto parse_infix_expr(ast::NodeId left) -> ast::NodeId {
         auto t = peek_and_advance();
         if (t.type == TokenType::Lparen) return parse_call(left);
+        if (t.type == TokenType::Dot) return parse_field(left);
 
         auto kind = ast::NodeKind::Err;
         auto right = parse_prec_expr(get_precedence(t));
@@ -903,6 +904,15 @@ struct Parser {
         try(consume(TokenType::Rparen));
         return ast.new_call(ast.get_node_loc(left.as_ref()).extend(prev_span()),
                             left, args);
+    }
+
+    auto parse_field(ast::NodeId left) -> ast::NodeId {
+        auto name = span();
+        try(consume(TokenType::Id));
+
+        return ast.new_field(
+            ast.get_node_loc(left.as_ref()).extend(prev_span()), left,
+            name.str(source));
     }
 
     // ------------------------------------------------------------------------

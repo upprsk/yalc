@@ -228,6 +228,11 @@ public:
         return new_node(NodeKind::Call, loc, callee, new_ref_array_sized(args));
     }
 
+    auto new_field(Location loc, NodeId receiver, std::string_view name)
+        -> NodeId {
+        return new_node(NodeKind::Field, loc, receiver, new_identifier(name));
+    }
+
     // ----------
     // Statements
     // ----------

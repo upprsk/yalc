@@ -334,6 +334,12 @@ enum class NodeKind : uint16_t {
     /// The `second` array is made of `[{length}, ...]`.
     Call,
 
+    /// A field access.
+    ///
+    /// - `first` points to the receiver.
+    /// - `second` points to the field name (identifier).
+    Field,
+
     /// ----------
     /// Statements
     /// ----------
@@ -517,6 +523,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Array: name = "Array"; break;
         case NodeKind::Lit: name = "Lit"; break;
         case NodeKind::Call: name = "Call"; break;
+        case NodeKind::Field: name = "Field"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
