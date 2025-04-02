@@ -46,6 +46,8 @@ struct Tokenizer {
     auto tokenize_all() -> std::vector<Token> {
         std::vector<Token> tokens;
 
+        skip_shbang();
+
         while (true) {
             auto t = tokenize_one();
             tokens.push_back(t);
@@ -212,6 +214,12 @@ struct Tokenizer {
 
     constexpr void skip_whitespace() {
         while (is_whitespace(peek())) advance();
+    }
+
+    constexpr void skip_shbang() {
+        if (source.starts_with("#!")) {
+            while (!is_at_end() && peek() != '\n') advance();
+        }
     }
 
     // ------------------------------------------------------------------------
