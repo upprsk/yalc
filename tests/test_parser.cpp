@@ -81,6 +81,8 @@ func main(a, b: i32) {})");
 func main(a: i32, b: i32) (r: i32) {})");
     run_test(ctx, p, "with multiple return values", R"(module main;
 func main(a: i32, b: i32) (i32, i32) {})");
+    run_test(ctx, p, "with multiple return values 2", R"(module main;
+func main(a: i32, b: i32) (i32, i32) { return a, b; })");
     run_test(ctx, p, "with multiple named return values", R"(module main;
 func main(a: i32, b: i32) (x: i32, y: i32) {})");
     run_test(ctx, p, "with mixed return values", R"(module main;
