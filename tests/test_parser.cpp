@@ -645,6 +645,41 @@ func add(x: i32, y: i32) i32 { return x + y; }
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("fields");
+
+    run_test(ctx, p, "field access", R"(
+module main;
+
+def Counter = struct { cnt: i32 = 0, total: i32 };
+func main() {
+    var c: Counter = .{ .total = 10 };
+    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "a method", R"(
+module main;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+def num = i32;
+func num.print(n: num) {
+    c_printf("%d", n);
+}
+
+func main() {
+    var n = 0 as num;
+    n.print();
+    c_printf("\n");
+}
+)");
+
+    ctx.tags.pop_back();
+
     run_test(ctx, p, "hello world libc", R"(
 module main;
 

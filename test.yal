@@ -1,8 +1,10 @@
 module main;
 
+def Counter = struct { cnt: i32 = 0, total: i32 };
+func main() {
+    var c: Counter = .{ .total = 10 };
+    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
+}
+
 @extern(link_name="printf")
 func c_printf(fmt: [*]const u8, ...);
-
-func main() {
-    printf("Hello, %s!\n", "World");
-}
