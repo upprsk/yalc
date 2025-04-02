@@ -680,6 +680,15 @@ func main() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("break/continue");
+
+    run_test(ctx, p, "break", R"(module test;
+func test() { break; })");
+    run_test(ctx, p, "continue", R"(module test;
+func test() { continue; })");
+
+    ctx.tags.pop_back();
+
     run_test(ctx, p, "hello world libc", R"(
 module main;
 
