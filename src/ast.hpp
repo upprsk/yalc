@@ -97,10 +97,11 @@ public:
 
     auto new_func_decl(Location loc, std::span<NodeId const> decorators,
                        NodeId name, std::span<NodeId const> gargs,
-                       std::span<NodeId const> args, NodeId ret, NodeId body)
-        -> NodeId {
+                       std::span<NodeId const> args, NodeId ret, NodeId body,
+                       bool is_c_varags) -> NodeId {
         return new_node(
-            NodeKind::FuncDecl, loc, name,
+            is_c_varags ? NodeKind::FuncDeclWithCVarArgs : NodeKind::FuncDecl,
+            loc, name,
             new_ref_array_with(NodeId::from_raw_data(decorators.size()),
                                decorators, NodeId::from_raw_data(gargs.size()),
                                gargs, NodeId::from_raw_data(args.size()), args,

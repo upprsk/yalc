@@ -66,7 +66,32 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
             auto body = second[idx++];
 
             visit_func_decl(ast, node, decorators, node.get_first(), gargs,
-                            args, ret, body);
+                            args, ret, body, false);
+        } break;
+
+        case NodeKind::FuncDeclWithCVarArgs: {
+            auto second = ast.get_array_unbounded(node.get_second().as_array());
+            uint32_t idx{};
+
+            // NOTE: no bounds check because of span missing the `.at`
+            // method. :(
+            auto dlen = second[idx++].as_count().value;
+            auto decorators = second.subspan(idx, dlen);
+            idx += dlen;
+
+            auto glen = second[idx++].as_count().value;
+            auto gargs = second.subspan(idx, glen);
+            idx += glen;
+
+            auto alen = second[idx++].as_count().value;
+            auto args = second.subspan(idx, alen);
+            idx += alen;
+
+            auto ret = second[idx++];
+            auto body = second[idx++];
+
+            visit_func_decl(ast, node, decorators, node.get_first(), gargs,
+                            args, ret, body, true);
         } break;
 
         case NodeKind::TopVarDecl:

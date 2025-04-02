@@ -70,9 +70,9 @@ struct Visitor {
                                  std::span<NodeId const> decorators,
                                  NodeId name, std::span<NodeId const> gargs,
                                  std::span<NodeId const> args, NodeId ret,
-                                 NodeId body) {
+                                 NodeId body, bool is_c_varargs) {
         visit_before_func_decl(ast, node, decorators, name, gargs, args, ret,
-                               body);
+                               body, is_c_varargs);
 
         for (auto const& dec : decorators) visit(ast, dec);
         visit(ast, name);
@@ -82,7 +82,7 @@ struct Visitor {
         if (body.is_valid()) visit(ast, body);
 
         visit_after_func_decl(ast, node, decorators, name, gargs, args, ret,
-                              body);
+                              body, is_c_varargs);
     }
 
     virtual void visit_before_func_decl(Ast& ast, Node const& node,
@@ -90,13 +90,14 @@ struct Visitor {
                                         NodeId                  name,
                                         std::span<NodeId const> gargs,
                                         std::span<NodeId const> args,
-                                        NodeId ret, NodeId body) {}
+                                        NodeId ret, NodeId body,
+                                        bool is_c_varargs) {}
     virtual void visit_after_func_decl(Ast& ast, Node const& node,
                                        std::span<NodeId const> decorators,
                                        NodeId                  name,
                                        std::span<NodeId const> gargs,
                                        std::span<NodeId const> args, NodeId ret,
-                                       NodeId body) {}
+                                       NodeId body, bool is_c_varargs) {}
 
     // -----------------------------------------------------------------------
 

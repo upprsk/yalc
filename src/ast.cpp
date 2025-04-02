@@ -87,8 +87,8 @@ struct JsonVisitor : public Visitor {
     void visit_func_decl(Ast&                    ast, Node const& /*node*/,
                          std::span<NodeId const> decorators, NodeId name,
                          std::span<NodeId const> gargs,
-                         std::span<NodeId const> args, NodeId ret,
-                         NodeId body) override {
+                         std::span<NodeId const> args, NodeId ret, NodeId body,
+                         bool is_c_varargs) override {
         auto buf = json::array();
         for (auto const& dec : decorators) buf.push_back(ast.fatten(dec));
         j["decorators"] = buf;
@@ -100,6 +100,7 @@ struct JsonVisitor : public Visitor {
         buf = json::array();
         for (auto const& arg : args) buf.push_back(ast.fatten(arg));
         j["args"] = buf;
+        j["is_c_varargs"] = is_c_varargs;
 
         j["name"] = ast.fatten(name);
         if (ret.is_valid()) j["ret"] = ast.fatten(ret);

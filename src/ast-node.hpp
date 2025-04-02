@@ -122,6 +122,7 @@ enum class NodeKind : uint16_t {
     /// | len(A) |  A...  | len(B) |  B...  | len(C) |  C...  |   D?   |   E? |
     /// +--------+--....--+--------+--....--+--------+--....--+--------+--------+
     FuncDecl,
+    FuncDeclWithCVarArgs,
 
     /// A top-level (global) variable declaration.
     ///
@@ -376,6 +377,9 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::SourceFile: name = "SourceFile"; break;
         case NodeKind::ModuleDecl: name = "ModuleDecl"; break;
         case NodeKind::FuncDecl: name = "FuncDecl"; break;
+        case NodeKind::FuncDeclWithCVarArgs:
+            name = "FuncDeclWithCVarArgs";
+            break;
         case NodeKind::TopVarDecl: name = "TopVarDecl"; break;
         case NodeKind::TopDefDecl: name = "TopDefDecl"; break;
         case NodeKind::IdPack: name = "IdPack"; break;

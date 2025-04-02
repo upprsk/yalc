@@ -312,7 +312,7 @@ struct Parser {
         std::vector<ast::NodeId> gargs;
         if (check(TokenType::Lbracket)) gargs = parse_func_gargs();
 
-        auto args = parse_func_args();
+        auto [args, is_c_varargs] = parse_func_args();
 
         auto ret = ast::NodeId::invalid();
         if (!check_oneof(TokenType::Lbrace, TokenType::Semi))
@@ -325,7 +325,7 @@ struct Parser {
             try(consume(TokenType::Semi));
 
         return ast.new_func_decl(start.extend(prev_span()), decorators, name,
-                                 gargs, args, ret, body);
+                                 gargs, args, ret, body, is_c_varargs);
     }
 
     auto parse_top_var_decl(std::span<ast::NodeId const> decorators)
@@ -380,22 +380,31 @@ struct Parser {
         PANIC("NOT IMPLEMENTED");
     }
 
-    auto parse_func_args() -> std::vector<ast::NodeId> {
+    auto parse_func_args() -> std::pair<std::vector<ast::NodeId>, bool> {
         std::vector<ast::NodeId> args;
-        if (!consume(TokenType::Lparen)) return args;
+        if (!consume(TokenType::Lparen)) return std::make_pair(args, false);
 
         while (!check(TokenType::Rparen)) {
+            if (check(TokenType::DotDotDot)) break;
+
             args.push_back(parse_func_arg());
 
             if (check(TokenType::Rparen)) break;
             if (!consume(TokenType::Comma)) break;
         }
 
-        if (check(TokenType::DotDotDot))
-            PANIC("c varargs have not been implemented");
+        auto is_c_varargs = false;
+        if (match(TokenType::DotDotDot)) {
+            is_c_varargs = true;
 
-        if (!consume(TokenType::Rparen)) return args;
-        return args;
+            // we allow a trailing comma, but don't really care for it as it has
+            // no semantic meaning.
+            (void)match(TokenType::Comma);
+        }
+
+        if (!consume(TokenType::Rparen))
+            return std::make_pair(args, is_c_varargs);
+        return std::make_pair(args, is_c_varargs);
     }
 
     auto parse_func_arg() -> ast::NodeId {
