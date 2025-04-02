@@ -348,6 +348,19 @@ enum class NodeKind : uint16_t {
     /// invalid id.
     ReturnStmt,
 
+    /// An if statement without an else.
+    ///
+    /// - `first` has the condition expression.
+    /// - `second` has the _then_ block.
+    IfStmt,
+
+    /// An if statement with an else.
+    ///
+    /// - `first` has the condition expression.
+    /// - `second` points to an array with the _then_ and _else_ branches (in
+    /// the format `[{then}, {else}]`.
+    IfStmtWithElse,
+
     /// A variable declaration.
     ///
     ///     var a, b: T, U = 1, 2;
@@ -492,6 +505,8 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
+        case NodeKind::IfStmt: name = "IfStmt"; break;
+        case NodeKind::IfStmtWithElse: name = "IfStmtWithElse"; break;
         case NodeKind::VarDecl: name = "VarDecl"; break;
         case NodeKind::DefDecl: name = "DefDecl"; break;
     }

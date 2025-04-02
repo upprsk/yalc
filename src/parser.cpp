@@ -963,6 +963,7 @@ struct Parser {
         if (check("return")) return parse_return_stmt();
         if (check("var")) return parse_var_decl();
         if (check("def")) return parse_def_decl();
+        if (check("if")) return parse_if_stmt();
 
         // expression statement
         auto expr = parse_expr();
@@ -981,6 +982,24 @@ struct Parser {
         try(consume(TokenType::Semi));
 
         return ast.new_return_stmt(start.extend(prev_span()), expr);
+    }
+
+    auto parse_if_stmt() -> ast::NodeId {
+        auto start = loc();
+        try(consume("if"));
+
+        auto cond = parse_expr();
+        auto wt = parse_block();
+        auto wf = ast::NodeId::invalid();
+
+        if (match("else")) {
+            if (check("if"))
+                wf = parse_if_stmt();
+            else
+                wf = parse_block();
+        }
+
+        return ast.new_if_stmt(start.extend(prev_span()), cond, wt, wf);
     }
 
     // ------------------------------------------------------------------------

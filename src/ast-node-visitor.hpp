@@ -260,6 +260,14 @@ struct Visitor {
         if (child.is_valid()) visit(ast, child);
     }
 
+    // NOTE: `wf` may be an invalid id in case the if does not have an else
+    virtual void visit_if_stmt(Ast& ast, Node const& node, NodeId cond,
+                               NodeId wt, NodeId wf) {
+        visit(ast, cond);
+        visit(ast, wt);
+        if (wf.is_valid()) visit(ast, wf);
+    }
+
     virtual void visit_var_decl(Ast& ast, Node const& node, NodeId ids,
                                 NodeId types, NodeId inits) {
         visit(ast, ids);

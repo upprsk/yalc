@@ -288,6 +288,16 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
             visit_return_stmt(ast, node, node.get_first());
             break;
 
+        case NodeKind::IfStmt:
+            visit_if_stmt(ast, node, node.get_first(), node.get_second(),
+                          NodeId::invalid());
+            break;
+
+        case NodeKind::IfStmtWithElse: {
+            auto second = ast.get_array({2}, node.get_second().as_array());
+            visit_if_stmt(ast, node, node.get_first(), second[0], second[1]);
+        } break;
+
         case NodeKind::VarDecl: {
             auto parts = ast.get_array({2}, node.get_second().as_array());
             visit_var_decl(ast, node, node.get_first(), parts[0], parts[1]);

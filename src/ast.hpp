@@ -241,6 +241,15 @@ public:
         return new_node(NodeKind::ReturnStmt, loc, child, NodeId::invalid());
     }
 
+    auto new_if_stmt(Location loc, NodeId cond, NodeId wt, NodeId wf)
+        -> NodeId {
+        if (wf.is_valid())
+            return new_node(NodeKind::IfStmtWithElse, loc, cond,
+                            new_ref_array_with(wt, wf));
+
+        return new_node(NodeKind::IfStmt, loc, cond, wt);
+    }
+
     auto new_var_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
         -> NodeId {
         return new_node(NodeKind::VarDecl, loc, ids,
