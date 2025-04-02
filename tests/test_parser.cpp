@@ -603,6 +603,19 @@ func test() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("while stmt");
+
+    run_test(ctx, p, "minimal", R"(
+module test;
+func test() {
+    while true {
+        var x = 10;
+    }
+}
+)");
+
+    ctx.tags.pop_back();
+
     fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};

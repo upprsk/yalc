@@ -1,10 +1,6 @@
 module test;
 func test() {
-    if false {
-        var x = 1;
-    } else if false {
-        var x = 2;
-    } else {
-        var x = 3;
+    while true {
+        var x = 10;
     }
 }
