@@ -217,7 +217,8 @@ struct Tokenizer {
     }
 
     constexpr void skip_shbang() {
-        if (source.starts_with("#!")) {
+        skip_whitespace();
+        if (source.substr(current).starts_with("#!")) {
             while (!is_at_end() && peek() != '\n') advance();
         }
     }
