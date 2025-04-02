@@ -563,6 +563,8 @@ struct Parser {
                 if (t.span.str(source) == "struct") return parse_struct();
                 return parse_id(t);
 
+            case TokenType::Dot: return parse_kw_lit();
+
             case TokenType::Int:
             case TokenType::Hex:
             case TokenType::Float: return parse_number(t);
@@ -700,7 +702,37 @@ struct Parser {
         }
     }
 
-    auto parse_lit() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_lit() -> ast::NodeId {
+        auto start = prev_loc();
+
+        std::vector<std::pair<ast::NodeId, ast::NodeId>> items;
+        while (!check(TokenType::Rbrace)) {
+            auto item = parse_lit_item();
+            items.push_back(item);
+
+            if (check(TokenType::Rbrace)) break;
+            if (!consume(TokenType::Comma)) break;
+        }
+
+        try(consume(TokenType::Rbrace));
+        return ast.new_lit(start.extend(prev_span()), items);
+    }
+
+    auto parse_lit_item() -> std::pair<ast::NodeId, ast::NodeId> {
+        // key-value pair
+        if (match(TokenType::Dot)) {
+            auto kw = parse_kw_lit();
+            if (match(TokenType::Equal)) {
+                auto v = parse_expr();
+                return std::make_pair(kw, v);
+            }
+
+            return std::make_pair(ast::NodeId::invalid(), kw);
+        }
+
+        auto v = parse_expr();
+        return std::make_pair(ast::NodeId::invalid(), v);
+    }
 
     auto parse_arr() -> ast::NodeId {
         auto start = prev_loc();
@@ -799,6 +831,14 @@ struct Parser {
         try(consume(TokenType::Rbrace));
 
         return ast.new_struct_type(start.extend(prev_span()), fields);
+    }
+
+    auto parse_kw_lit() -> ast::NodeId {
+        auto start = prev_loc();
+        auto name = span();
+        try(consume(TokenType::Id));
+
+        return ast.new_kw_lit(start.extend(prev_span()), name.str(source));
     }
 
     auto parse_struct_fields() -> std::vector<ast::NodeId> {

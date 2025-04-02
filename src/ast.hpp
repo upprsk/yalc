@@ -46,6 +46,11 @@ public:
                         NodeId::invalid());
     }
 
+    auto new_kw_lit(Location loc, std::string_view s) -> NodeId {
+        return new_node(NodeKind::KwLit, loc, new_identifier(s),
+                        NodeId::invalid());
+    }
+
     auto new_int(Location loc, uint64_t v) -> NodeId {
         auto hi = NodeId::from_raw_data(v >> 32);
         auto lo = NodeId::from_raw_data(v);
@@ -210,6 +215,12 @@ public:
         return new_node(NodeKind::Array, loc, inner,
                         new_ref_array_with(
                             size, NodeId::from_raw_data(items.size()), items));
+    }
+
+    auto new_lit(Location loc, std::span<std::pair<NodeId, NodeId> const> items)
+        -> NodeId {
+        return new_node(NodeKind::Lit, loc, NodeId::from_raw_data(items.size()),
+                        new_ref_array_with(items));
     }
 
     // ----------
@@ -406,6 +417,16 @@ private:
 
     void push_to_array(std::span<NodeId const> items, auto&&... rest) {
         refs_array.insert(refs_array.end(), items.begin(), items.end());
+        push_to_array(rest...);
+    }
+
+    void push_to_array(std::span<std::pair<NodeId, NodeId> const> items,
+                       auto&&... rest) {
+        for (auto const& [first, second] : items) {
+            refs_array.push_back(first);
+            refs_array.push_back(second);
+        }
+
         push_to_array(rest...);
     }
 

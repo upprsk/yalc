@@ -25,6 +25,9 @@ enum class NodeKind : uint16_t {
     /// - `first` points to the identifier in the store.
     Id,
 
+    /// A keyword literal (`.id`)
+    KwLit,
+
     /// An integer.
     //
     /// - `first` and `second` form a 64bit unsigned integer.
@@ -308,6 +311,21 @@ enum class NodeKind : uint16_t {
     /// size in inferred (`_`), then `size` is an invalid id.
     Array,
 
+    /// A struct or array literal, with inferred/auto type.
+    ///
+    ///     .{.a = v1, .b = v2}
+    ///     .{1, 2, 3}
+    ///
+    /// - `first` contains the number of initializer item pairs.
+    /// - `second` contains a list of key-value pairs. In case there is no key,
+    /// then it has an invalid id in it's place.
+    ///
+    /// For example: `.{.a = v1, .b = v2, .c, 1}`
+    ///     +----+----+----+----+----+----+----+----+
+    ///     | .a | v1 | .b | v2 | -- | .c | -- |  1 |
+    ///     +----+----+----+----+----+----+----+----+
+    Lit,
+
     /// ----------
     /// Statements
     /// ----------
@@ -416,6 +434,7 @@ constexpr auto format_as(NodeKind kind) {
     switch (kind) {
         case NodeKind::Err: name = "Err"; break;
         case NodeKind::Id: name = "Id"; break;
+        case NodeKind::KwLit: name = "KwLit"; break;
         case NodeKind::Int: name = "Int"; break;
         case NodeKind::Double: name = "Double"; break;
         case NodeKind::Float: name = "Float"; break;
@@ -469,6 +488,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ArrayTypeConst: name = "ArrayTypeConst"; break;
         case NodeKind::ArrayType: name = "ArrayType"; break;
         case NodeKind::Array: name = "Array"; break;
+        case NodeKind::Lit: name = "Lit"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;

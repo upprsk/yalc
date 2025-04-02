@@ -16,6 +16,10 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
         case NodeKind::Id:
             visit_id(ast, node, ast.get_identifier(node.get_first().as_id()));
             break;
+        case NodeKind::KwLit:
+            visit_kw_lit(ast, node,
+                         ast.get_identifier(node.get_first().as_id()));
+            break;
         case NodeKind::Int: visit_int(ast, node, node.cast_u64()); break;
         case NodeKind::Double:
             visit_double(ast, node, node.cast_double());
@@ -263,6 +267,12 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
             auto items = second.subspan(2, second[1].as_count().value);
             visit_array(ast, node, size, node.get_first(), items);
         } break;
+
+        case NodeKind::Lit:
+            visit_lit(ast, node,
+                      ast.get_array(node.get_first().as_count().of_kv(),
+                                    node.get_second().as_array()));
+            break;
 
         case NodeKind::Block:
             visit_block(ast, node,

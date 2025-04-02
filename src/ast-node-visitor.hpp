@@ -21,6 +21,8 @@ struct Visitor {
 
     virtual void visit_err(Ast& ast, Node const& node) {}
     virtual void visit_id(Ast& ast, Node const& node, std::string_view id) {}
+    virtual void visit_kw_lit(Ast& ast, Node const& node, std::string_view id) {
+    }
     virtual void visit_int(Ast& ast, Node const& node, uint64_t value) {}
     virtual void visit_double(Ast& ast, Node const& node, double value) {}
     virtual void visit_float(Ast& ast, Node const& node, float value) {}
@@ -222,6 +224,15 @@ struct Visitor {
                              NodeId inner, std::span<NodeId const> items) {
         visit(ast, size);
         visit(ast, inner);
+        for (auto const& item : items) visit(ast, item);
+    }
+
+    // NOTE: each id in `params` points to either the key or the value AST node.
+    // This depends if it is in an even or odd index, as the list contains
+    // key-value pairs. The key may be an invalid id, for when a value is given
+    // without a key.
+    virtual void visit_lit(Ast& ast, Node const& node,
+                           std::span<NodeId const> items) {
         for (auto const& item : items) visit(ast, item);
     }
 

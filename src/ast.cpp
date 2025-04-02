@@ -34,6 +34,11 @@ struct JsonVisitor : public Visitor {
         j["value"] = id;
     }
 
+    void visit_kw_lit(Ast& /*ast*/, Node const& /*node*/,
+                      std::string_view id) override {
+        j["value"] = id;
+    }
+
     void visit_int(Ast& /*ast*/, Node const& /*node*/,
                    uint64_t value) override {
         j["value"] = value;
@@ -275,6 +280,27 @@ struct JsonVisitor : public Visitor {
         if (size.is_valid()) j["size"] = ast.fatten(size);
         j["inner"] = ast.fatten(inner);
         j["items"] = ast.fatten(items);
+    }
+
+    void visit_lit(Ast&                    ast, Node const& /*node*/,
+                   std::span<NodeId const> items) override {
+        auto arr = json::array();
+
+        ASSERT((items.size() & 1) == 0);
+        for (size_t i = 0; i < items.size(); i += 2) {
+            if (items[i].is_valid()) {
+                arr.push_back(json{
+                    { "name",     ast.fatten(items[i])},
+                    {"value", ast.fatten(items[i + 1])},
+                });
+            } else {
+                arr.push_back(json{
+                    {"value", ast.fatten(items[i + 1])},
+                });
+            }
+        }
+
+        j["items"] = arr;
     }
 
     // ========================================================================
