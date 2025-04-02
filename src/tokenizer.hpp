@@ -28,7 +28,6 @@ enum class TokenType : uint8_t {
     MinusMinus,
     MinusEqual,
     Star,
-    StarStar,
     StarEqual,
     Slash,
     SlashEqual,
@@ -103,7 +102,8 @@ struct Token {
     constexpr auto operator==(Token const& o) const -> bool = default;
 };
 
-auto tokenize(std::string_view source, ErrorReporterForFile& er) -> std::vector<Token>;
+auto tokenize(std::string_view source, ErrorReporterForFile& er)
+    -> std::vector<Token>;
 
 void to_json(json& j, TokenType const& n);
 void to_json(json& j, Token const& t);

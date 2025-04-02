@@ -95,7 +95,6 @@ struct Tokenizer {
                 return mkt(TokenType::Minus);
             case '*':
                 if (match('=')) return mkt(TokenType::StarEqual);
-                if (match('*')) return mkt(TokenType::StarStar);
                 return mkt(TokenType::Star);
             case '/':
                 if (match('=')) return mkt(TokenType::SlashEqual);
@@ -295,7 +294,6 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType  t,
         case yal::TokenType::MinusMinus: name = "MinusMinus"; break;
         case yal::TokenType::MinusEqual: name = "MinusEqual"; break;
         case yal::TokenType::Star: name = "Star"; break;
-        case yal::TokenType::StarStar: name = "StarStar"; break;
         case yal::TokenType::StarEqual: name = "StarEqual"; break;
         case yal::TokenType::Slash: name = "Slash"; break;
         case yal::TokenType::SlashEqual: name = "SlashEqual"; break;
