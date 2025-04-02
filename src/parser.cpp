@@ -887,9 +887,8 @@ struct Parser {
             default: UNREACHABLE("invalid token in infix expr", t);
         }
 
-        return ast.new_unary_expr(
-            to_loc(t.span.extend(ast.get_node_span(child.as_ref()))), kind,
-            child);
+        return ast.new_unary_expr(to_loc(t.span.extend(prev_span())), kind,
+                                  child);
     }
 
     auto parse_call(ast::NodeId left) -> ast::NodeId {
