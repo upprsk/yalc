@@ -403,6 +403,14 @@ func main() i32 {
 
     ctx.tags.emplace_back("pointer-ish types");
 
+    run_test(ctx, p, "ptr", R"(module test;
+func test(v: *i32);)");
+    run_test(ctx, p, "ptr const", R"(module test;
+func test(v: * const i32);)");
+
+    run_test(ctx, p, "ptr ptr", R"(module test;
+func test(v: **i32);)");
+
     run_test(ctx, p, "printf", R"(
 module main;
 
