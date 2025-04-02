@@ -183,6 +183,35 @@ public:
                         new_ref_array_with(type, init));
     }
 
+    auto new_ptr(Location loc, bool is_const, NodeId inner) -> NodeId {
+        return new_node(is_const ? NodeKind::PtrConst : NodeKind::Ptr, loc,
+                        inner, NodeId::invalid());
+    }
+
+    auto new_mptr(Location loc, bool is_const, NodeId inner) -> NodeId {
+        return new_node(is_const ? NodeKind::MultiPtrConst : NodeKind::MultiPtr,
+                        loc, inner, NodeId::invalid());
+    }
+
+    auto new_slice(Location loc, bool is_const, NodeId inner) -> NodeId {
+        return new_node(is_const ? NodeKind::SliceConst : NodeKind::Slice, loc,
+                        inner, NodeId::invalid());
+    }
+
+    auto new_array_type(Location loc, bool is_const, NodeId size, NodeId inner)
+        -> NodeId {
+        return new_node(
+            is_const ? NodeKind::ArrayTypeConst : NodeKind::ArrayType, loc,
+            inner, size);
+    }
+
+    auto new_array(Location loc, NodeId size, NodeId inner,
+                   std::span<NodeId const> items) -> NodeId {
+        return new_node(NodeKind::Array, loc, inner,
+                        new_ref_array_with(
+                            size, NodeId::from_raw_data(items.size()), items));
+    }
+
     // ----------
     // Statements
     // ----------

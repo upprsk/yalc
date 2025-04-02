@@ -260,6 +260,54 @@ enum class NodeKind : uint16_t {
     /// optional and may be an invalid id.
     StructField,
 
+    /// A pointer type literal.
+    ///
+    ///     *const i32
+    ///     *f32
+    ///
+    /// - `first` points to the inner type.
+    PtrConst,
+    Ptr,
+
+    /// A multi-pointer type literal.
+    ///
+    ///     [*]const u8
+    ///     [*]i32
+    ///
+    /// - `first` points to the inner type.
+    MultiPtrConst,
+    MultiPtr,
+
+    /// A slice type literal.
+    ///
+    ///     []const u8
+    ///     []i16
+    ///
+    /// - `first` points to the inner type.
+    SliceConst,
+    Slice,
+
+    /// An array type literal.
+    ///
+    ///     [23]const i32
+    ///     [6 + 6]u8
+    ///
+    /// - `first` points to the inner type.
+    /// - `second` points to the size.
+    ArrayTypeConst,
+    ArrayType,
+
+    /// An array literal.
+    ///
+    ///     [5]i32{0, 1, 2, 3, 4, 5}
+    ///     [_]u8{'h', 'i', '!', 0}
+    ///
+    /// - `first` points to the inner type.
+    /// - `second` points to an array with size expression and list of
+    /// initializer items in the format: `[{inner}, {length}, ...]`. In case the
+    /// size in inferred (`_`), then `size` is an invalid id.
+    Array,
+
     /// ----------
     /// Statements
     /// ----------
@@ -412,6 +460,15 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Neg: name = "Neg"; break;
         case NodeKind::StructType: name = "StructType"; break;
         case NodeKind::StructField: name = "StructField"; break;
+        case NodeKind::PtrConst: name = "PtrConst"; break;
+        case NodeKind::Ptr: name = "Ptr"; break;
+        case NodeKind::MultiPtrConst: name = "MultiPtrConst"; break;
+        case NodeKind::MultiPtr: name = "MultiPtr"; break;
+        case NodeKind::SliceConst: name = "SliceConst"; break;
+        case NodeKind::Slice: name = "Slice"; break;
+        case NodeKind::ArrayTypeConst: name = "ArrayTypeConst"; break;
+        case NodeKind::ArrayType: name = "ArrayType"; break;
+        case NodeKind::Array: name = "Array"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;

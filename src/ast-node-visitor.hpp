@@ -197,6 +197,34 @@ struct Visitor {
         if (init.is_valid()) visit(ast, init);
     }
 
+    virtual void visit_ptr(Ast& ast, Node const& node, bool is_const,
+                           NodeId inner) {
+        visit(ast, inner);
+    }
+
+    virtual void visit_mptr(Ast& ast, Node const& node, bool is_const,
+                            NodeId inner) {
+        visit(ast, inner);
+    }
+
+    virtual void visit_slice(Ast& ast, Node const& node, bool is_const,
+                             NodeId inner) {
+        visit(ast, inner);
+    }
+
+    virtual void visit_array_type(Ast& ast, Node const& node, bool is_const,
+                                  NodeId size, NodeId inner) {
+        visit(ast, size);
+        visit(ast, inner);
+    }
+
+    virtual void visit_array(Ast& ast, Node const& node, NodeId size,
+                             NodeId inner, std::span<NodeId const> items) {
+        visit(ast, size);
+        visit(ast, inner);
+        for (auto const& item : items) visit(ast, item);
+    }
+
     // =======================================================================
 
     virtual void visit_block(Ast& ast, Node const& node,

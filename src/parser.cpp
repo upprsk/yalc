@@ -701,7 +701,84 @@ struct Parser {
     }
 
     auto parse_lit() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
-    auto parse_arr() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+
+    auto parse_arr() -> ast::NodeId {
+        auto start = prev_loc();
+
+        if (match(TokenType::Star)) {
+            // multi pointer
+            try(consume(TokenType::Rbracket));
+
+            auto is_const = false;
+            if (match("const")) is_const = true;
+
+            auto inner = parse_prec_expr(PREC_UNARY);
+            return ast.new_mptr(start.extend(prev_span()), is_const, inner);
+        }
+
+        if (match(TokenType::Rbracket)) {
+            // slice
+            auto is_const = false;
+            if (match("const")) is_const = true;
+
+            auto inner = parse_prec_expr(PREC_UNARY);
+            return ast.new_slice(start.extend(prev_span()), is_const, inner);
+        }
+
+        // array type or literal
+
+        // if we have inferred length, then this can't be a type.
+        if (match("_")) {
+            try(consume(TokenType::Rbracket));
+
+            auto type = parse_prec_expr(PREC_UNARY);
+            auto items = parse_array_items();
+            return ast.new_array(start.extend(prev_span()),
+                                 ast::NodeId::invalid(), type, items);
+        }
+
+        auto size = parse_expr();
+
+        try(consume(TokenType::Rbracket));
+
+        // if we have a const, this is an array type and we cant use this as a
+        // literal
+        if (match("const")) {
+            auto type = parse_prec_expr(PREC_UNARY);
+            return ast.new_array_type(start.extend(prev_span()), true, size,
+                                      type);
+        }
+
+        auto type = parse_prec_expr(PREC_UNARY);
+
+        // if we have a '{', then this is an array literal, otherwise it is a
+        // type
+        if (!check(TokenType::Lbrace)) {
+            return ast.new_array_type(start.extend(prev_span()), false, size,
+                                      type);
+        }
+
+        // got '{', then array literal
+        auto items = parse_array_items();
+        return ast.new_array(start.extend(prev_span()), size, type, items);
+    }
+
+    auto parse_array_items() -> std::vector<ast::NodeId> {
+        std::vector<ast::NodeId> items;
+
+        if (!consume(TokenType::Lbrace)) return items;
+
+        while (!check(TokenType::Rbrace)) {
+            items.push_back(parse_expr());
+
+            if (check(TokenType::Rbrace)) break;
+            if (!consume(TokenType::Comma)) break;
+        }
+
+        if (!consume(TokenType::Rbrace)) return items;
+
+        return items;
+    }
 
     auto parse_str(Token t) -> ast::NodeId {
         auto s = t.span.str(source);

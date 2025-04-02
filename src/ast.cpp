@@ -245,6 +245,38 @@ struct JsonVisitor : public Visitor {
         if (init.is_valid()) j["init"] = ast.fatten(init);
     }
 
+    void visit_ptr(Ast& ast, Node const& /*node*/, bool is_const,
+                   NodeId inner) override {
+        j["is_const"] = is_const;
+        j["inner"] = ast.fatten(inner);
+    }
+
+    void visit_mptr(Ast& ast, Node const& /*node*/, bool is_const,
+                    NodeId inner) override {
+        j["is_const"] = is_const;
+        j["inner"] = ast.fatten(inner);
+    }
+
+    void visit_slice(Ast& ast, Node const& /*node*/, bool is_const,
+                     NodeId inner) override {
+        j["is_const"] = is_const;
+        j["inner"] = ast.fatten(inner);
+    }
+
+    void visit_array_type(Ast& ast, Node const& /*node*/, bool is_const,
+                          NodeId size, NodeId inner) override {
+        j["is_const"] = is_const;
+        j["size"] = ast.fatten(size);
+        j["inner"] = ast.fatten(inner);
+    }
+
+    void visit_array(Ast& ast, Node const& /*node*/, NodeId size, NodeId inner,
+                     std::span<NodeId const> items) override {
+        if (size.is_valid()) j["size"] = ast.fatten(size);
+        j["inner"] = ast.fatten(inner);
+        j["items"] = ast.fatten(items);
+    }
+
     // ========================================================================
 
     void visit_block(Ast&                    ast, Node const& /*node*/,

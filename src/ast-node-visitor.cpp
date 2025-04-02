@@ -227,6 +227,43 @@ void Visitor::visit(Ast& ast, NodeId node_id) {
                                parts[0], parts[1]);
         } break;
 
+        case NodeKind::PtrConst:
+            visit_ptr(ast, node, true, node.get_first());
+            break;
+        case NodeKind::Ptr:
+            visit_ptr(ast, node, false, node.get_first());
+            break;
+
+        case NodeKind::MultiPtrConst:
+            visit_mptr(ast, node, true, node.get_first());
+            break;
+        case NodeKind::MultiPtr:
+            visit_mptr(ast, node, false, node.get_first());
+            break;
+
+        case NodeKind::SliceConst:
+            visit_slice(ast, node, true, node.get_first());
+            break;
+        case NodeKind::Slice:
+            visit_slice(ast, node, false, node.get_first());
+            break;
+
+        case NodeKind::ArrayTypeConst:
+            visit_array_type(ast, node, true, node.get_second(),
+                             node.get_first());
+            break;
+        case NodeKind::ArrayType:
+            visit_array_type(ast, node, false, node.get_second(),
+                             node.get_first());
+            break;
+
+        case NodeKind::Array: {
+            auto second = ast.get_array_unbounded(node.get_second().as_array());
+            auto size = second[0];
+            auto items = second.subspan(2, second[1].as_count().value);
+            visit_array(ast, node, size, node.get_first(), items);
+        } break;
+
         case NodeKind::Block:
             visit_block(ast, node,
                         ast.get_array(node.get_first().as_count(),
