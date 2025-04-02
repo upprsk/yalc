@@ -873,6 +873,15 @@ struct Parser {
     }
 
     auto parse_unary(Token t) -> ast::NodeId {
+        if (t.type == TokenType::Star) {
+            auto is_const = false;
+            if (match("const")) is_const = true;
+
+            auto inner = parse_prec_expr(PREC_UNARY);
+            return ast.new_ptr(to_loc(t.span.extend(prev_span())), is_const,
+                               inner);
+        }
+
         auto kind = ast::NodeKind::Err;
         auto child = parse_prec_expr(PREC_UNARY);
 
