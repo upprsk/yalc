@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <filesystem>
 #include <iterator>
 #include <ranges>
 #include <string_view>
@@ -14,13 +15,47 @@
 #include "ast-node-visitor.hpp"
 #include "ast-node.hpp"
 #include "error_reporter.hpp"
+#include "file-store.hpp"
 #include "libassert/assert.hpp"
+#include "yal.hpp"
 
 namespace yal {
 using ast::Ast;
 using ast::Node;
 using ast::NodeId;
 namespace conv = ast::conv;
+
+static constexpr inline auto YAL_EXTENSION = ".yal";
+
+void do_the_thing(FileStore& fs, ErrorReporter& er, Location const& from,
+                  std::string_view path) {
+    namespace sfs = std::filesystem;
+
+    sfs::path from_filepath = fs.get_filename(from.fileid);
+    auto      import_path = sfs::absolute(from_filepath).parent_path() / path;
+
+    er.report_note(from, "import of {:?} from {:?} (full path: {:?})", path,
+                   from_filepath.string(), import_path.string());
+    if (sfs::is_directory(import_path)) {
+        for (auto const& item : sfs::directory_iterator{import_path}) {
+            if (!item.is_regular_file()) continue;
+
+            auto const& item_path = item.path();
+            if (!item_path.filename().string().ends_with(YAL_EXTENSION))
+                continue;
+
+            er.report_note(from, "import of {:?} found file {:?}", path,
+                           item_path.string());
+        }
+    }
+
+    else if (sfs::is_regular_file(import_path)) {
+        er.report_bug(from,
+                      "importing from single files has not been implemented "
+                      "(trying to import {:?})",
+                      import_path.string());
+    }
+}
 
 struct DependsVisitor : public ast::Visitor<> {
     using Dag = std::unordered_map<NodeId, std::unordered_set<NodeId>>;
@@ -30,82 +65,102 @@ struct DependsVisitor : public ast::Visitor<> {
         size_t           level;
     };
 
-    explicit DependsVisitor(Ast const& ast, ErrorReporter* er)
-        : ast::Visitor<>{ast}, er{er} {}
+    explicit DependsVisitor(Ast const& ast, ErrorReporter* er, FileStore* fs)
+        : ast::Visitor<>{ast}, er{er}, fs{fs} {}
 
     // ========================================================================
 
-    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    void visit_before_source_file(Node const& /*node*/,
-                                  conv::SourceFile const& data) override {
-        for (auto source_file_child : data.children) {
-            auto node = ast->get_node(source_file_child.as_ref());
-            if (node.get_kind() == ast::NodeKind::TopVarDecl) {
-                auto names = conv::top_var_decl_names(*ast, node);
-                for (auto id : names.ids) {
-                    define_top(ast->get_identifier(id.as_id()),
-                               source_file_child);
+    void visit_before_module(Node const& /*node*/,
+                             conv::Module const& data) override {
+        for (auto source_file : data.children) {
+            auto node = ast->get_node(source_file.as_ref());
+            ASSERT(node.get_kind() == ast::NodeKind::SourceFile);
+
+            auto source_file_data = conv::source_file(*ast, node);
+            for (auto source_file_child : source_file_data.children) {
+                auto node = ast->get_node(source_file_child.as_ref());
+                if (node.get_kind() == ast::NodeKind::TopVarDecl) {
+                    auto names = conv::top_var_decl_names(*ast, node);
+                    for (auto id : names.ids) {
+                        define_top(ast->get_identifier(id.as_id()),
+                                   source_file_child);
+                    }
                 }
-            }
 
-            else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
-                auto names = ast::conv::top_def_decl_names(*ast, node);
+                else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
+                    auto names = ast::conv::top_def_decl_names(*ast, node);
 
-                for (auto id : names.ids) {
-                    define_top(ast->get_identifier(id.as_id()),
-                               source_file_child);
+                    for (auto id : names.ids) {
+                        define_top(ast->get_identifier(id.as_id()),
+                                   source_file_child);
+                    }
                 }
-            }
 
-            else if (node.get_kind() == ast::NodeKind::FuncDecl ||
-                     node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
-                auto names = conv::func_decl_name(*ast, node);
+                else if (node.get_kind() == ast::NodeKind::FuncDecl ||
+                         node.get_kind() ==
+                             ast::NodeKind::FuncDeclWithCVarArgs) {
+                    auto names = conv::func_decl_name(*ast, node);
 
-                // if we have just one id, then this is not namespaced. We take
-                // care of namespaced functions on another pass.
-                if (names.ids.size() == 1) {
-                    define_top(ast->get_identifier(names.ids[0].as_id()),
-                               source_file_child);
+                    // if we have just one id, then this is not namespaced. We
+                    // take care of namespaced functions on another pass.
+                    if (names.ids.size() == 1) {
+                        define_top(ast->get_identifier(names.ids[0].as_id()),
+                                   source_file_child);
+                    }
                 }
-            }
 
-            else {
-                PANIC(
-                    "received top-level kind was not implemented in name "
-                    "resolution",
-                    node.get_kind());
+                else if (node.get_kind() == ast::NodeKind::ImportStmt) {
+                    // in order to know what is the name that the import
+                    // statement declares, we need to do the full thing for the
+                    // imported module.
+                    auto import_stmt = conv::import_stmt(*ast, node);
+                    do_the_thing(*fs, *er, node.get_loc(), import_stmt.path);
+                }
+
+                else {
+                    PANIC(
+                        "received top-level kind was not implemented in name "
+                        "resolution",
+                        node.get_kind());
+                }
             }
         }
     }
 
-    void visit_after_source_file(Node const& /*node*/,
-                                 conv::SourceFile const& data) override {
+    void visit_after_module(Node const&         node,
+                            conv::Module const& data) override {
         auto rev_dag = build_reverse_dag();
 
-        for (auto source_file_child : data.children) {
-            auto node = ast->get_node(source_file_child.as_ref());
+        for (auto source_file : data.children) {
+            auto node = ast->get_node(source_file.as_ref());
+            ASSERT(node.get_kind() == ast::NodeKind::SourceFile);
 
-            if (node.get_kind() == ast::NodeKind::FuncDecl ||
-                node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
-                auto names = conv::func_decl_name(*ast, node);
+            auto source_file_data = conv::source_file(*ast, node);
+            for (auto source_file_child : source_file_data.children) {
+                auto node = ast->get_node(source_file_child.as_ref());
 
-                // namespaced function, this means that everyone that depends on
-                // the wrapped type also possibly depends on the namespaced
-                // functions.
-                if (names.ids.size() != 1) {
-                    // find what is the type that is beeing wrapped
-                    auto ty =
-                        lookup_top(ast->get_identifier(names.ids[0].as_id()));
-                    if (!ty.is_valid()) break;
+                if (node.get_kind() == ast::NodeKind::FuncDecl ||
+                    node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
+                    auto names = conv::func_decl_name(*ast, node);
 
-                    // find all things that depend on the wrapped type
-                    auto it = rev_dag.find(ty);
-                    if (it == end(rev_dag)) break;
+                    // namespaced function, this means that everyone that
+                    // depends on the wrapped type also possibly depends on the
+                    // namespaced functions.
+                    if (names.ids.size() != 1) {
+                        // find what is the type that is beeing wrapped
+                        auto ty = lookup_top(
+                            ast->get_identifier(names.ids[0].as_id()));
+                        if (!ty.is_valid()) break;
 
-                    for (auto const dep_on_ty : it->second) {
-                        if (dep_on_ty != source_file_child) {
-                            // make it depend on the namespaced function
-                            dag[dep_on_ty].insert(source_file_child);
+                        // find all things that depend on the wrapped type
+                        auto it = rev_dag.find(ty);
+                        if (it == end(rev_dag)) break;
+
+                        for (auto const dep_on_ty : it->second) {
+                            if (dep_on_ty != source_file_child) {
+                                // make it depend on the namespaced function
+                                dag[dep_on_ty].insert(source_file_child);
+                            }
                         }
                     }
                 }
@@ -229,6 +284,7 @@ struct DependsVisitor : public ast::Visitor<> {
 
     NodeId         current_decl = NodeId::invalid();
     ErrorReporter* er;
+    FileStore*     fs;
 };
 
 struct TopoSorter {
@@ -295,20 +351,84 @@ auto topo_sort(Ast const& ast, ErrorReporter& er,
     return ts.sorted;
 }
 
-auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er)
-    -> ast::NodeId {
+auto find_all_source_files(std::filesystem::path const& root_filepath)
+    -> std::vector<std::filesystem::path> {
+    namespace fs = std::filesystem;
+    namespace rv = std::ranges::views;
+
+    auto is_relative = root_filepath.is_relative();
+
+    return fs::directory_iterator{fs::absolute(root_filepath).parent_path()} |
+           rv::filter([](auto it) { return it.is_regular_file(); }) |
+           rv::transform([](auto it) { return it.path(); }) |
+           rv::transform(
+               [&](auto it) { return is_relative ? fs::relative(it) : it; }) |
+           rv::filter([](auto it) {
+               return it.filename().string().ends_with(YAL_EXTENSION);
+           }) |
+           std::ranges::to<std::vector>();
+}
+
+auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
+                                    Node const& mod_decl, ast::Ast& ast,
+                                    FileStore& fs, ErrorReporter& er,
+                                    Options const& opt) -> NodeId {
+    auto src_file = load_and_parse_into_ast(fs, er, filepath, ast, opt);
+    if (!src_file.is_valid()) {
+        er.report_bug(mod_decl.get_loc(),
+                      "when scanning for module files, failed to get {}",
+                      filepath.string());
+        return NodeId::invalid();
+    }
+
+    auto n = ast.get_node(src_file.as_ref());
+    auto mod_found = ast.get_node(conv::source_file(ast, n).mod.as_ref());
+    auto mod_found_name = conv::module_decl(ast, mod_found).name;
+
+    auto mod_name = conv::module_decl(ast, mod_decl).name;
+    if (mod_found_name != mod_name) {
+        er.report_bug(mod_found.get_loc(),
+                      "found mixed module name declarations in directory. "
+                      "Want {:?} but found {:?}",
+                      mod_name, mod_found_name);
+        return NodeId::invalid();
+    }
+
+    return src_file;
+}
+
+auto parse_all_files_into_module(ast::Ast& ast, ast::Node const& start_node,
+                                 Node const& mod_decl, FileStore& fs,
+                                 ErrorReporter& er, Options const& opt) {
+    auto start_filename = fs.get_filename(start_node.get_loc().fileid);
+    auto all_files = find_all_source_files(start_filename);
+
+    std::vector<NodeId> files{start_node.get_id()};
+    for (auto const& filepath : all_files) {
+        // don't re-parse ourselves
+        if (std::filesystem::equivalent(filepath, start_filename)) continue;
+
+        auto src_file = parse_and_load_module_into_ast(filepath, mod_decl, ast,
+                                                       fs, er, opt);
+        if (src_file.is_valid()) files.push_back(src_file);
+    }
+
+    auto mod_name = conv::module_decl(ast, mod_decl).name;
+    return ast.new_module(start_node.get_loc(), mod_name, files);
+}
+
+auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
+                   FileStore& fs, Options const& opt) -> ast::NodeId {
     auto node = ast.get_node(root.as_ref());
     ASSERT(node.get_kind() == ast::NodeKind::SourceFile);
 
     auto mod_decl = ast.get_node(node.get_first().as_ref());
     ASSERT(mod_decl.get_kind() == ast::NodeKind::ModuleDecl);
 
-    auto mod_name = ast.get_identifier(mod_decl.get_first().as_id());
-    auto mod =
-        ast.new_module(node.get_loc(), mod_name, std::array{node.get_id()});
+    auto mod = parse_all_files_into_module(ast, node, mod_decl, fs, er, opt);
 
-    auto dv = DependsVisitor{ast, &er};
-    dv.visit(root);
+    auto dv = DependsVisitor{ast, &er, &fs};
+    dv.visit(mod);
 
     auto order = topo_sort(ast, er, dv.dag);
     for (auto const& n : order) {

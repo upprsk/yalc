@@ -1,5 +1,9 @@
 module main;
 
+// import expression
+// def c = import "libc";
+
+// import statement
 import "libc";
 
 func main() int {
@@ -8,5 +12,5 @@ func main() int {
     defer libc.free(buf);
 
     _ = libc.snprintf(buf, sz, "Hello, %s!", "World");
-    _ = libc.printf("%s\n", buf);
+    print_string(buf);
 }

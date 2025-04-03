@@ -83,7 +83,7 @@ public:
     // Top-Level
     // ---------
 
-    auto new_module(Location loc, std::string name,
+    auto new_module(Location loc, std::string_view name,
                     std::span<NodeId const> children) -> NodeId {
         auto second = new_ref_array_sized(children);
         return new_node(NodeKind::Module, loc, new_identifier(name), second);

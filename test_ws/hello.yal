@@ -1,0 +1,5 @@
+module main;
+
+func print_string(s: [*]const u8) {
+    _ = libc.printf("%s\n", s);
+}

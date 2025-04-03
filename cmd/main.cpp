@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <filesystem>
 #include <memory>
 #include <optional>
 
@@ -52,7 +53,10 @@ auto real_main(yalc::Args const& args) -> int {
         fmt::println("{}", j.dump());
     }
 
-    yal::resolve_names(ast, ast_root, er);
+    yal::resolve_names(ast, ast_root, er, fs,
+                       {.dump_tokens = args.dump_tokens,
+                        .dump_ast = args.dump_ast,
+                        .dump_ast_json = args.dump_ast_json});
 
     return er.had_error() ? 1 : 0;
 }

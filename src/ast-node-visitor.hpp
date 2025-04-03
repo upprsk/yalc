@@ -53,8 +53,7 @@ struct Visitor {
                 break;
 
             case NodeKind::ModuleDecl:
-                visit_module_decl(
-                    node, ast->get_identifier(node.get_first().as_id()));
+                visit_module_decl(node, conv::module_decl(*ast, node).name);
                 break;
 
             case NodeKind::FuncDecl:

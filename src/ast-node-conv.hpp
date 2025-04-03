@@ -18,6 +18,10 @@ struct SourceFile {
     std::span<NodeId const> children;
 };
 
+struct ModuleDecl {
+    std::string_view name;
+};
+
 struct FuncDecl {
     std::span<NodeId const> decorators;
     std::span<NodeId const> gargs;
@@ -189,6 +193,11 @@ struct Assign {
         .mod = n.get_first(),
         .children = ast.get_array(n.get_second().as_array()),
     };
+}
+
+[[nodiscard]] constexpr auto module_decl(Ast const& ast, Node const& n)
+    -> ModuleDecl {
+    return {.name = ast.get_identifier(n.get_first().as_id())};
 }
 
 [[nodiscard]] constexpr auto func_decl(Ast const& ast, Node const& n)
