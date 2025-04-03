@@ -432,7 +432,7 @@ auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
     auto node = ast.get_node(root.as_ref());
     ASSERT(node.get_kind() == ast::NodeKind::SourceFile);
 
-    auto mod_decl = ast.get_node(node.get_first().as_ref());
+    auto mod_decl = ast.get_node(conv::source_file(ast, node).mod.as_ref());
     ASSERT(mod_decl.get_kind() == ast::NodeKind::ModuleDecl);
 
     auto mod = parse_all_files_into_module(ast, node, mod_decl, fs, er, opt);
