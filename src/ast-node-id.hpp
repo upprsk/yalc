@@ -122,3 +122,10 @@ struct fmt::formatter<yal::ast::NodeId> : formatter<string_view> {
     auto format(yal::ast::NodeId nid, format_context &ctx) const
         -> format_context::iterator;
 };
+
+template <>
+struct std::hash<yal::ast::NodeId> {
+    auto operator()(yal::ast::NodeId const &k) const -> std::size_t {
+        return std::hash<uint32_t>{}(k.value());
+    }
+};

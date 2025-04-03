@@ -106,16 +106,40 @@ struct Visitor {
     virtual void visit_top_var_decl(Ast& ast, Node const& node,
                                     std::span<NodeId const> decorators,
                                     NodeId                  child) {
+        visit_before_top_var_decl(ast, node, decorators, child);
         for (auto const& dec : decorators) visit(ast, dec);
         visit(ast, child);
+        visit_after_top_var_decl(ast, node, decorators, child);
     }
+
+    virtual void visit_before_top_var_decl(Ast& ast, Node const& node,
+                                           std::span<NodeId const> decorators,
+                                           NodeId                  child) {}
+
+    virtual void visit_after_top_var_decl(Ast& ast, Node const& node,
+                                          std::span<NodeId const> decorators,
+                                          NodeId                  child) {}
+
+    // -----------------------------------------------------------------------
 
     virtual void visit_top_def_decl(Ast& ast, Node const& node,
                                     std::span<NodeId const> decorators,
                                     NodeId                  child) {
+        visit_before_top_def_decl(ast, node, decorators, child);
         for (auto const& dec : decorators) visit(ast, dec);
         visit(ast, child);
+        visit_after_top_def_decl(ast, node, decorators, child);
     }
+
+    virtual void visit_before_top_def_decl(Ast& ast, Node const& node,
+                                           std::span<NodeId const> decorators,
+                                           NodeId                  child) {}
+
+    virtual void visit_after_top_def_decl(Ast& ast, Node const& node,
+                                          std::span<NodeId const> decorators,
+                                          NodeId                  child) {}
+
+    // -----------------------------------------------------------------------
 
     // NOTE: each id in `ids` points to an identifier, not an AST node
     virtual void visit_id_pack(Ast& ast, Node const& node,

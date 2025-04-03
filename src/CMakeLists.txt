@@ -9,6 +9,8 @@ add_library(yal
     error_reporter.hpp
     file-store.cpp
     file-store.hpp
+    name-res.cpp
+    name-res.hpp
     parser.cpp
     parser.hpp
     span.cpp

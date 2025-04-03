@@ -9,6 +9,7 @@
 #include "fmt/base.h"
 #include "fmt/color.h"
 #include "fmt/ranges.h"
+#include "name-res.hpp"
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
@@ -50,6 +51,8 @@ auto real_main(yalc::Args const& args) -> int {
         json j = ast.fatten(ast_root);
         fmt::println("{}", j.dump());
     }
+
+    yal::resolve_names(ast, ast_root, er);
 
     return er.had_error() ? 1 : 0;
 }

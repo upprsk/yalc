@@ -71,7 +71,11 @@ public:
     template <typename... T>
     void report_bug(Span s, fmt::format_string<T...> fmt, T&&... args) {
         error_count++;
-        report(s, "BUG", bug_style, fmt, fmt::make_format_args(args...));
+        vreport_bug(s, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_bug(Span s, fmt::string_view fmt, fmt::format_args args) {
+        report(s, "debug", debug_style, fmt, args);
     }
 
     void report(Span s, std::string_view prefix, fmt::text_style color,
@@ -162,6 +166,11 @@ class ErrorReporter {
 public:
     constexpr ErrorReporter(FileStore& fs, FILE* out) : fs{&fs}, out{out} {}
 
+    [[nodiscard]] auto for_file(Location const& loc) const
+        -> ErrorReporterForFile {
+        return for_file(loc.fileid);
+    }
+
     [[nodiscard]] auto for_file(FileId id) const -> ErrorReporterForFile {
         return ErrorReporterForFile{
             id,
@@ -169,6 +178,61 @@ public:
             fs->get_filename(id),
             out,
         };
+    }
+
+    template <typename... T>
+    void report_error(Location const& loc, fmt::format_string<T...> fmt,
+                      T&&... args) const {
+        vreport_error(loc, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_error(Location const& loc, fmt::string_view fmt,
+                       fmt::format_args args) const {
+        for_file(loc).vreport_error(loc.span, fmt, args);
+    }
+
+    template <typename... T>
+    void report_warn(Location const& loc, fmt::format_string<T...> fmt,
+                     T&&... args) const {
+        vreport_warn(loc, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_warn(Location const& loc, fmt::string_view fmt,
+                      fmt::format_args args) const {
+        for_file(loc).vreport_warn(loc.span, fmt, args);
+    }
+
+    template <typename... T>
+    void report_note(Location const& loc, fmt::format_string<T...> fmt,
+                     T&&... args) const {
+        vreport_note(loc, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_note(Location const& loc, fmt::string_view fmt,
+                      fmt::format_args args) const {
+        for_file(loc).vreport_note(loc.span, fmt, args);
+    }
+
+    template <typename... T>
+    void report_debug(Location const& loc, fmt::format_string<T...> fmt,
+                      T&&... args) const {
+        vreport_debug(loc, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_debug(Location const& loc, fmt::string_view fmt,
+                       fmt::format_args args) const {
+        for_file(loc).vreport_debug(loc.span, fmt, args);
+    }
+
+    template <typename... T>
+    void report_bug(Location const& loc, fmt::format_string<T...> fmt,
+                    T&&... args) const {
+        vreport_bug(loc, fmt, fmt::make_format_args(args...));
+    }
+
+    void vreport_bug(Location const& loc, fmt::string_view fmt,
+                     fmt::format_args args) const {
+        for_file(loc).vreport_bug(loc.span, fmt, args);
     }
 
     [[nodiscard]] constexpr auto had_error() const -> bool {
