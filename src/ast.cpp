@@ -1,5 +1,6 @@
 #include "ast.hpp"
 
+#include "ast-node-conv.hpp"
 #include "ast-node-visitor.hpp"
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
@@ -59,22 +60,22 @@ struct JsonVisitor : public Visitor<> {
 
     // ========================================================================
 
-    void visit_module(Node const& /*node*/, std::string_view name,
-                      std::span<NodeId const> children) override {
-        j["name"] = name;
+    void visit_module(Node const& /*node*/, conv::Module const& data) override {
+        j["name"] = data.name;
 
         auto arr = json::array();
-        for (auto const& child : children) {
+        for (auto const& child : data.children) {
             arr.push_back(ast->fatten(child));
         }
     }
 
-    void visit_source_file(Node const& /*node*/, NodeId mod,
-                           std::span<NodeId const> children) override {
+    void visit_source_file(Node const& /*node*/,
+                           conv::SourceFile const& data) override {
         auto arr = json::array();
-        for (auto const& child : children) arr.push_back(ast->fatten(child));
+        for (auto const& child : data.children)
+            arr.push_back(ast->fatten(child));
 
-        j["mod"] = ast->fatten(mod);
+        j["mod"] = ast->fatten(data.mod);
         j["children"] = arr;
     }
 
@@ -84,59 +85,55 @@ struct JsonVisitor : public Visitor<> {
     }
 
     void visit_func_decl(Node const& /*node*/,
-                         std::span<NodeId const> decorators, NodeId name,
-                         std::span<NodeId const> gargs,
-                         std::span<NodeId const> args, NodeId ret, NodeId body,
-                         bool is_c_varargs) override {
+                         conv::FuncDecl const& data) override {
         auto buf = json::array();
-        for (auto const& dec : decorators) buf.push_back(ast->fatten(dec));
+        for (auto const& dec : data.decorators) buf.push_back(ast->fatten(dec));
         j["decorators"] = buf;
 
         buf = json::array();
-        for (auto const& garg : gargs) buf.push_back(ast->fatten(garg));
+        for (auto const& garg : data.gargs) buf.push_back(ast->fatten(garg));
         j["gargs"] = buf;
 
         buf = json::array();
-        for (auto const& arg : args) buf.push_back(ast->fatten(arg));
+        for (auto const& arg : data.args) buf.push_back(ast->fatten(arg));
         j["args"] = buf;
-        j["is_c_varargs"] = is_c_varargs;
+        j["is_c_varargs"] = data.is_c_varargs;
 
-        j["name"] = ast->fatten(name);
-        if (ret.is_valid()) j["ret"] = ast->fatten(ret);
-        if (body.is_valid()) j["body"] = ast->fatten(body);
+        j["name"] = ast->fatten(data.name);
+        if (data.ret.is_valid()) j["ret"] = ast->fatten(data.ret);
+        if (data.body.is_valid()) j["body"] = ast->fatten(data.body);
     }
 
     void visit_top_var_decl(Node const& /*node*/,
-                            std::span<NodeId const> decorators,
-                            NodeId                  child) override {
-        j["decorators"] = ast->fatten(decorators);
-        j["child"] = ast->fatten(child);
+                            conv::TopVarDecl const& data) override {
+        j["decorators"] = ast->fatten(data.decorators);
+        j["child"] = ast->fatten(data.decl);
     }
 
     void visit_top_def_decl(Node const& /*node*/,
-                            std::span<NodeId const> decorators,
-                            NodeId                  child) override {
-        j["decorators"] = ast->fatten(decorators);
-        j["child"] = ast->fatten(child);
+                            conv::TopDefDecl const& data) override {
+        j["decorators"] = ast->fatten(data.decorators);
+        j["child"] = ast->fatten(data.decl);
     }
 
     void visit_id_pack(Node const& /*node*/,
-                       std::span<NodeId const> ids) override {
+                       conv::IdPack const& data) override {
         auto arr = json::array();
-        for (auto const& id : ids)
+        for (auto const& id : data.ids)
             arr.push_back(ast->get_identifier(id.as_id()));
 
         j["names"] = arr;
     }
 
-    void visit_func_param(Node const& /*node*/, std::string_view name,
-                          NodeId type) override {
-        j["name"] = name;
-        if (type.is_valid()) j["type"] = ast->fatten(type);
+    void visit_func_param(Node const& /*node*/,
+                          conv::FuncParam const& data) override {
+        j["name"] = data.name;
+        if (data.type.is_valid()) j["type"] = ast->fatten(data.type);
     }
 
     void visit_func_ret_pack(Node const& /*node*/,
-                             std::span<NodeId const> ret) override {
+                             conv::RetPack const& data) override {
+        auto ret = data.ret;
         auto arr = json::array();
 
         ASSERT((ret.size() & 1) == 0);
@@ -156,9 +153,9 @@ struct JsonVisitor : public Visitor<> {
         j["values"] = arr;
     }
 
-    void visit_decorator(Node const& /*node*/, std::string_view name,
-                         std::span<NodeId const> params) override {
-        j["name"] = name;
+    void visit_decorator(Node const& /*node*/,
+                         conv::Decorator const& data) override {
+        auto params = data.params;
 
         auto arr = json::array();
 
@@ -177,23 +174,25 @@ struct JsonVisitor : public Visitor<> {
             arr.push_back(item);
         }
 
+        j["name"] = data.name;
         j["params"] = arr;
     }
 
     // ========================================================================
 
     void visit_expr_pack(Node const& /*node*/,
-                         std::span<NodeId const> children) override {
+                         conv::ExprPack const& data) override {
         auto arr = json::array();
-        for (auto const& child : children) arr.push_back(ast->fatten(child));
+        for (auto const& child : data.items) arr.push_back(ast->fatten(child));
 
         j["children"] = arr;
     }
 
-#define VISIT_BIN(name)                                                        \
-    void visit_##name(Node const& /*node*/, NodeId lhs, NodeId rhs) override { \
-        j["left"] = ast->fatten(lhs);                                          \
-        j["right"] = ast->fatten(rhs);                                         \
+#define VISIT_BIN(name)                                               \
+    void visit_##name(Node const& /*node*/, conv::Binary const& data) \
+        override {                                                    \
+        j["left"] = ast->fatten(data.lhs);                            \
+        j["right"] = ast->fatten(data.rhs);                           \
     }
 
     VISIT_BIN(add);
@@ -219,8 +218,9 @@ struct JsonVisitor : public Visitor<> {
 #undef VISIT_BIN
 
 #define VISIT_UNARY(name)                                            \
-    void visit_##name(Node const& /*node*/, NodeId child) override { \
-        j["child"] = ast->fatten(child);                             \
+    void visit_##name(Node const& /*node*/, conv::Unary const& data) \
+        override {                                                   \
+        j["child"] = ast->fatten(data.child);                        \
     }
 
     VISIT_UNARY(addrof);
@@ -230,51 +230,48 @@ struct JsonVisitor : public Visitor<> {
 
 #undef VISIT_UNARY
 
-    void visit_struct_type(const Node& /*node*/,
-                           std::span<const NodeId> fields) override {
-        j["fields"] = ast->fatten(fields);
+    void visit_struct_type(Node const& /*node*/,
+                           conv::StructType const& data) override {
+        j["fields"] = ast->fatten(data.fields);
     }
 
-    void visit_struct_field(Node const& /*node*/, std::string_view name,
-                            NodeId type, NodeId init) override {
-        j["name"] = name;
-        j["type"] = ast->fatten(type);
-        if (init.is_valid()) j["init"] = ast->fatten(init);
+    void visit_struct_field(Node const& /*node*/,
+                            conv::StructField const& data) override {
+        j["name"] = data.name;
+        j["type"] = ast->fatten(data.type);
+        if (data.init.is_valid()) j["init"] = ast->fatten(data.init);
     }
 
-    void visit_ptr(Node const& /*node*/, bool is_const, NodeId inner) override {
-        j["is_const"] = is_const;
-        j["inner"] = ast->fatten(inner);
+    void visit_ptr(Node const& /*node*/, conv::Ptr const& data) override {
+        j["is_const"] = data.is_const;
+        j["inner"] = ast->fatten(data.inner);
     }
 
-    void visit_mptr(Node const& /*node*/, bool is_const,
-                    NodeId inner) override {
-        j["is_const"] = is_const;
-        j["inner"] = ast->fatten(inner);
+    void visit_mptr(Node const& /*node*/, conv::MultiPtr const& data) override {
+        j["is_const"] = data.is_const;
+        j["inner"] = ast->fatten(data.inner);
     }
 
-    void visit_slice(Node const& /*node*/, bool is_const,
-                     NodeId inner) override {
-        j["is_const"] = is_const;
-        j["inner"] = ast->fatten(inner);
+    void visit_slice(Node const& /*node*/, conv::Slice const& data) override {
+        j["is_const"] = data.is_const;
+        j["inner"] = ast->fatten(data.inner);
     }
 
-    void visit_array_type(Node const& /*node*/, bool is_const, NodeId size,
-                          NodeId inner) override {
-        j["is_const"] = is_const;
-        j["size"] = ast->fatten(size);
-        j["inner"] = ast->fatten(inner);
+    void visit_array_type(Node const& /*node*/,
+                          conv::ArrayType const& data) override {
+        j["is_const"] = data.is_const;
+        j["size"] = ast->fatten(data.size);
+        j["inner"] = ast->fatten(data.inner);
     }
 
-    void visit_array(Node const& /*node*/, NodeId size, NodeId inner,
-                     std::span<NodeId const> items) override {
-        if (size.is_valid()) j["size"] = ast->fatten(size);
-        j["inner"] = ast->fatten(inner);
-        j["items"] = ast->fatten(items);
+    void visit_array(Node const& /*node*/, conv::Array const& data) override {
+        if (data.size.is_valid()) j["size"] = ast->fatten(data.size);
+        j["inner"] = ast->fatten(data.inner);
+        j["items"] = ast->fatten(data.items);
     }
 
-    void visit_lit(Node const& /*node*/,
-                   std::span<NodeId const> items) override {
+    void visit_lit(Node const& /*node*/, conv::Lit const& data) override {
+        auto items = data.items;
         auto arr = json::array();
 
         ASSERT((items.size() & 1) == 0);
@@ -294,68 +291,68 @@ struct JsonVisitor : public Visitor<> {
         j["items"] = arr;
     }
 
-    void visit_call(Node const& /*node*/, NodeId callee,
-                    std::span<NodeId const> args) override {
+    void visit_call(Node const& /*node*/, conv::Call const& data) override {
         auto arr = json::array();
-        for (auto const& arg : args) arr.push_back(ast->fatten(arg));
-        j["callee"] = ast->fatten(callee);
+        for (auto const& arg : data.args) arr.push_back(ast->fatten(arg));
+        j["callee"] = ast->fatten(data.callee);
         j["args"] = arr;
     }
 
-    void visit_field(Node const& /*node*/, NodeId receiver,
-                     std::string_view name) override {
-        j["name"] = name;
-        j["receiver"] = ast->fatten(receiver);
+    void visit_field(Node const& /*node*/, conv::Field const& data) override {
+        j["name"] = data.name;
+        j["receiver"] = ast->fatten(data.receiver);
     }
 
     // ========================================================================
 
-    void visit_block(Node const& /*node*/,
-                     std::span<NodeId const> children) override {
+    void visit_block(Node const& /*node*/, conv::Block const& data) override {
         auto arr = json::array();
-        for (auto const& child : children) arr.push_back(ast->fatten(child));
+        for (auto const& child : data.items) arr.push_back(ast->fatten(child));
         j["children"] = arr;
     }
 
-    void visit_expr_stmt(Node const& /*node*/, NodeId child) override {
-        j["child"] = ast->fatten(child);
+    void visit_expr_stmt(Node const& /*node*/,
+                         conv::Unary const& data) override {
+        j["child"] = ast->fatten(data.child);
     }
 
-    void visit_return_stmt(Node const& /*node*/, NodeId child) override {
-        if (child.is_valid()) j["child"] = ast->fatten(child);
+    void visit_return_stmt(Node const& /*node*/,
+                           conv::Unary const& data) override {
+        if (data.child.is_valid()) j["child"] = ast->fatten(data.child);
     }
 
-    void visit_if_stmt(Node const& /*node*/, NodeId cond, NodeId wt,
-                       NodeId wf) override {
-        j["cond"] = ast->fatten(cond);
-        j["wt"] = ast->fatten(wt);
-        if (wf.is_valid()) j["wf"] = ast->fatten(wf);
+    void visit_if_stmt(Node const& /*node*/,
+                       conv::IfStmt const& data) override {
+        j["cond"] = ast->fatten(data.cond);
+        j["wt"] = ast->fatten(data.wt);
+        if (data.wf.is_valid()) j["wf"] = ast->fatten(data.wf);
     }
 
-    void visit_while_stmt(Node const& /*node*/, NodeId cond,
-                          NodeId body) override {
-        j["cond"] = ast->fatten(cond);
-        j["body"] = ast->fatten(body);
+    void visit_while_stmt(Node const& /*node*/,
+                          conv::WhileStmt const& data) override {
+        j["cond"] = ast->fatten(data.cond);
+        j["body"] = ast->fatten(data.body);
     }
 
-    void visit_var_decl(Node const& /*node*/, NodeId ids, NodeId types,
-                        NodeId inits) override {
-        j["ids"] = ast->fatten(ids);
-        if (types.is_valid()) j["types"] = ast->fatten(types);
-        if (inits.is_valid()) j["inits"] = ast->fatten(inits);
+    void visit_var_decl(Node const& /*node*/,
+                        conv::VarDecl const& data) override {
+        j["ids"] = ast->fatten(data.ids);
+        if (data.types.is_valid()) j["types"] = ast->fatten(data.types);
+        if (data.inits.is_valid()) j["inits"] = ast->fatten(data.inits);
     }
 
-    void visit_def_decl(Node const& /*node*/, NodeId ids, NodeId types,
-                        NodeId inits) override {
-        j["ids"] = ast->fatten(ids);
-        if (types.is_valid()) j["types"] = ast->fatten(types);
-        j["inits"] = ast->fatten(inits);
+    void visit_def_decl(Node const& /*node*/,
+                        conv::DefDecl const& data) override {
+        j["ids"] = ast->fatten(data.ids);
+        if (data.types.is_valid()) j["types"] = ast->fatten(data.types);
+        j["inits"] = ast->fatten(data.inits);
     }
 
-#define VISIT_ASSIGN(name)                                                     \
-    void visit_##name(Node const& /*node*/, NodeId lhs, NodeId rhs) override { \
-        j["lhs"] = ast->fatten(lhs);                                           \
-        j["rhs"] = ast->fatten(rhs);                                           \
+#define VISIT_ASSIGN(name)                                            \
+    void visit_##name(Node const& /*node*/, conv::Assign const& data) \
+        override {                                                    \
+        j["lhs"] = ast->fatten(data.lhs);                             \
+        j["rhs"] = ast->fatten(data.rhs);                             \
     }
 
     VISIT_ASSIGN(assign);

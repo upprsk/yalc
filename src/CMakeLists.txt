@@ -1,4 +1,6 @@
 add_library(yal
+    ast-node-conv.cpp
+    ast-node-conv.hpp
     ast-node-id.cpp
     ast-node-id.hpp
     ast-node-visitor.cpp

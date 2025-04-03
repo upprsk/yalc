@@ -4,6 +4,7 @@
 #include <span>
 #include <string_view>
 
+#include "ast-node-conv.hpp"
 #include "ast-node-id.hpp"
 #include "ast.hpp"
 #include "file-store.hpp"
@@ -45,13 +46,10 @@ struct Visitor {
             case NodeKind::Char: visit_char(node, node.cast_u32()); break;
 
             case NodeKind::Module:
-                visit_module(node,
-                             ast->get_identifier(node.get_first().as_id()),
-                             ast->get_array(node.get_second().as_array()));
+                visit_module(node, conv::module(*ast, node));
                 break;
             case NodeKind::SourceFile:
-                visit_source_file(node, node.get_first(),
-                                  ast->get_array(node.get_second().as_array()));
+                visit_source_file(node, conv::source_file(*ast, node));
                 break;
 
             case NodeKind::ModuleDecl:
@@ -59,316 +57,226 @@ struct Visitor {
                     node, ast->get_identifier(node.get_first().as_id()));
                 break;
 
-            case NodeKind::FuncDecl: {
-                auto second =
-                    ast->get_array_unbounded(node.get_second().as_array());
-                uint32_t idx{};
-
-                // NOTE: no bounds check because of span missing the `.at`
-                // method. :(
-                auto dlen = second[idx++].as_count().value;
-                auto decorators = second.subspan(idx, dlen);
-                idx += dlen;
-
-                auto glen = second[idx++].as_count().value;
-                auto gargs = second.subspan(idx, glen);
-                idx += glen;
-
-                auto alen = second[idx++].as_count().value;
-                auto args = second.subspan(idx, alen);
-                idx += alen;
-
-                auto ret = second[idx++];
-                auto body = second[idx++];
-
-                visit_func_decl(node, decorators, node.get_first(), gargs, args,
-                                ret, body, false);
-            } break;
-
-            case NodeKind::FuncDeclWithCVarArgs: {
-                auto second =
-                    ast->get_array_unbounded(node.get_second().as_array());
-                uint32_t idx{};
-
-                // NOTE: no bounds check because of span missing the `.at`
-                // method. :(
-                auto dlen = second[idx++].as_count().value;
-                auto decorators = second.subspan(idx, dlen);
-                idx += dlen;
-
-                auto glen = second[idx++].as_count().value;
-                auto gargs = second.subspan(idx, glen);
-                idx += glen;
-
-                auto alen = second[idx++].as_count().value;
-                auto args = second.subspan(idx, alen);
-                idx += alen;
-
-                auto ret = second[idx++];
-                auto body = second[idx++];
-
-                visit_func_decl(node, decorators, node.get_first(), gargs, args,
-                                ret, body, true);
-            } break;
+            case NodeKind::FuncDecl:
+            case NodeKind::FuncDeclWithCVarArgs:
+                visit_func_decl(node, conv::func_decl(*ast, node));
+                break;
 
             case NodeKind::TopVarDecl:
-                visit_top_var_decl(node,
-                                   ast->get_array(node.get_second().as_array()),
-                                   node.get_first());
+                visit_top_var_decl(node, conv::top_var_decl(*ast, node));
                 break;
 
             case NodeKind::TopDefDecl:
-                visit_top_def_decl(node,
-                                   ast->get_array(node.get_second().as_array()),
-                                   node.get_first());
+                visit_top_def_decl(node, conv::top_def_decl(*ast, node));
                 break;
 
             case NodeKind::IdPack:
-                visit_id_pack(node,
-                              ast->get_array(node.get_first().as_count(),
-                                             node.get_second().as_array()));
+                visit_id_pack(node, conv::id_pack(*ast, node));
                 break;
             case NodeKind::FuncParam:
-                visit_func_param(node,
-                                 ast->get_identifier(node.get_first().as_id()),
-                                 node.get_second());
+                visit_func_param(node, conv::func_param(*ast, node));
                 break;
             case NodeKind::FuncRetPack:
-                visit_func_ret_pack(
-                    node, ast->get_array(node.get_first().as_count().of_kv(),
-                                         node.get_second().as_array()));
+                visit_func_ret_pack(node, conv::ret_pack(*ast, node));
                 break;
             case NodeKind::Decorator:
-                visit_decorator(
-                    node, ast->get_identifier(node.get_first().as_id()),
-                    ast->get_array_of_kv(node.get_second().as_array()));
+                visit_decorator(node, conv::decorator(*ast, node));
                 break;
 
             case NodeKind::ExprPack:
-                visit_expr_pack(node,
-                                ast->get_array(node.get_first().as_count(),
-                                               node.get_second().as_array()));
+                visit_expr_pack(node, conv::expr_pack(*ast, node));
                 break;
 
             case NodeKind::Add:
-                visit_add(node, node.get_first(), node.get_second());
+                visit_add(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Sub:
-                visit_sub(node, node.get_first(), node.get_second());
+                visit_sub(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Mul:
-                visit_mul(node, node.get_first(), node.get_second());
+                visit_mul(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Div:
-                visit_div(node, node.get_first(), node.get_second());
+                visit_div(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Mod:
-                visit_mod(node, node.get_first(), node.get_second());
+                visit_mod(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::LeftShift:
-                visit_left_shift(node, node.get_first(), node.get_second());
+                visit_left_shift(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::RightShift:
-                visit_right_shift(node, node.get_first(), node.get_second());
+                visit_right_shift(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Equal:
-                visit_equal(node, node.get_first(), node.get_second());
+                visit_equal(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::NotEqual:
-                visit_not_equal(node, node.get_first(), node.get_second());
+                visit_not_equal(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Less:
-                visit_less(node, node.get_first(), node.get_second());
+                visit_less(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::LessEqual:
-                visit_less_equal(node, node.get_first(), node.get_second());
+                visit_less_equal(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Greater:
-                visit_greater(node, node.get_first(), node.get_second());
+                visit_greater(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::GreaterEqual:
-                visit_greater_equal(node, node.get_first(), node.get_second());
+                visit_greater_equal(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Band:
-                visit_band(node, node.get_first(), node.get_second());
+                visit_band(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Bor:
-                visit_bor(node, node.get_first(), node.get_second());
+                visit_bor(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Bxor:
-                visit_bxor(node, node.get_first(), node.get_second());
+                visit_bxor(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Land:
-                visit_land(node, node.get_first(), node.get_second());
+                visit_land(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Lor:
-                visit_lor(node, node.get_first(), node.get_second());
+                visit_lor(node, conv::binary(*ast, node));
                 break;
 
             case NodeKind::Cast:
-                visit_cast(node, node.get_first(), node.get_second());
+                visit_cast(node, conv::binary(*ast, node));
                 break;
 
-            case NodeKind::AddrOf: visit_addrof(node, node.get_first()); break;
-            case NodeKind::Lnot: visit_lnot(node, node.get_first()); break;
-            case NodeKind::Bnot: visit_bnot(node, node.get_first()); break;
-            case NodeKind::Neg: visit_neg(node, node.get_first()); break;
+            case NodeKind::AddrOf:
+                visit_addrof(node, conv::unary(*ast, node));
+                break;
+            case NodeKind::Lnot:
+                visit_lnot(node, conv::unary(*ast, node));
+                break;
+            case NodeKind::Bnot:
+                visit_bnot(node, conv::unary(*ast, node));
+                break;
+            case NodeKind::Neg: visit_neg(node, conv::unary(*ast, node)); break;
 
             case NodeKind::StructType:
-                visit_struct_type(node,
-                                  ast->get_array(node.get_first().as_count(),
-                                                 node.get_second().as_array()));
+                visit_struct_type(node, conv::struct_type(*ast, node));
                 break;
-            case NodeKind::StructField: {
-                auto parts = ast->get_array({2}, node.get_second().as_array());
-                visit_struct_field(
-                    node, ast->get_identifier(node.get_first().as_id()),
-                    parts[0], parts[1]);
-            } break;
+            case NodeKind::StructField:
+                visit_struct_field(node, conv::struct_field(*ast, node));
+                break;
 
             case NodeKind::PtrConst:
-                visit_ptr(node, true, node.get_first());
-                break;
-            case NodeKind::Ptr: visit_ptr(node, false, node.get_first()); break;
+            case NodeKind::Ptr: visit_ptr(node, conv::ptr(*ast, node)); break;
 
             case NodeKind::MultiPtrConst:
-                visit_mptr(node, true, node.get_first());
-                break;
             case NodeKind::MultiPtr:
-                visit_mptr(node, false, node.get_first());
+                visit_mptr(node, conv::mptr(*ast, node));
                 break;
 
             case NodeKind::SliceConst:
-                visit_slice(node, true, node.get_first());
-                break;
             case NodeKind::Slice:
-                visit_slice(node, false, node.get_first());
+                visit_slice(node, conv::slice(*ast, node));
                 break;
 
             case NodeKind::ArrayTypeConst:
-                visit_array_type(node, true, node.get_second(),
-                                 node.get_first());
-                break;
             case NodeKind::ArrayType:
-                visit_array_type(node, false, node.get_second(),
-                                 node.get_first());
+                visit_array_type(node, conv::array_type(*ast, node));
                 break;
 
-            case NodeKind::Array: {
-                auto second =
-                    ast->get_array_unbounded(node.get_second().as_array());
-                auto size = second[0];
-                auto items = second.subspan(2, second[1].as_count().value);
-                visit_array(node, size, node.get_first(), items);
-            } break;
-
-            case NodeKind::Lit:
-                visit_lit(node,
-                          ast->get_array(node.get_first().as_count().of_kv(),
-                                         node.get_second().as_array()));
+            case NodeKind::Array:
+                visit_array(node, conv::array(*ast, node));
                 break;
+
+            case NodeKind::Lit: visit_lit(node, conv::lit(*ast, node)); break;
 
             case NodeKind::Call:
-                visit_call(node, node.get_first(),
-                           ast->get_array(node.get_second().as_array()));
+                visit_call(node, conv::call(*ast, node));
                 break;
 
             case NodeKind::Field:
-                visit_field(node, node.get_first(),
-                            ast->get_identifier(node.get_second().as_id()));
+                visit_field(node, conv::field(*ast, node));
                 break;
 
             case NodeKind::Block:
-                visit_block(node, ast->get_array(node.get_first().as_count(),
-                                                 node.get_second().as_array()));
+                visit_block(node, conv::block(*ast, node));
                 break;
 
             case NodeKind::ExprStmt:
-                visit_expr_stmt(node, node.get_first());
+                visit_expr_stmt(node, conv::unary(*ast, node));
                 break;
 
             case NodeKind::ReturnStmt:
-                visit_return_stmt(node, node.get_first());
+                visit_return_stmt(node, conv::unary(*ast, node));
                 break;
 
             case NodeKind::IfStmt:
-                visit_if_stmt(node, node.get_first(), node.get_second(),
-                              NodeId::invalid());
+            case NodeKind::IfStmtWithElse:
+                visit_if_stmt(node, conv::if_stmt(*ast, node));
                 break;
 
-            case NodeKind::IfStmtWithElse: {
-                auto second = ast->get_array({2}, node.get_second().as_array());
-                visit_if_stmt(node, node.get_first(), second[0], second[1]);
-            } break;
-
             case NodeKind::WhileStmt:
-                visit_while_stmt(node, node.get_first(), node.get_second());
+                visit_while_stmt(node, conv::while_stmt(*ast, node));
                 break;
 
             case NodeKind::Break: visit_break(node); break;
             case NodeKind::Continue: visit_continue(node); break;
 
-            case NodeKind::VarDecl: {
-                auto parts = ast->get_array({2}, node.get_second().as_array());
-                visit_var_decl(node, node.get_first(), parts[0], parts[1]);
-            } break;
+            case NodeKind::VarDecl:
+                visit_var_decl(node, conv::var_decl(*ast, node));
+                break;
 
-            case NodeKind::DefDecl: {
-                auto parts = ast->get_array({2}, node.get_second().as_array());
-                visit_def_decl(node, node.get_first(), parts[0], parts[1]);
-            } break;
+            case NodeKind::DefDecl:
+                visit_def_decl(node, conv::def_decl(*ast, node));
+                break;
 
             case NodeKind::Assign:
-                visit_assign(node, node.get_first(), node.get_second());
+                visit_assign(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignAdd:
-                visit_assign_add(node, node.get_first(), node.get_second());
+                visit_assign_add(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignSub:
-                visit_assign_sub(node, node.get_first(), node.get_second());
+                visit_assign_sub(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignMul:
-                visit_assign_mul(node, node.get_first(), node.get_second());
+                visit_assign_mul(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignDiv:
-                visit_assign_div(node, node.get_first(), node.get_second());
+                visit_assign_div(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignMod:
-                visit_assign_mod(node, node.get_first(), node.get_second());
+                visit_assign_mod(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignShiftLeft:
-                visit_assign_left_shift(node, node.get_first(),
-                                        node.get_second());
+                visit_assign_left_shift(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignShiftRight:
-                visit_assign_right_shift(node, node.get_first(),
-                                         node.get_second());
+                visit_assign_right_shift(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignBand:
-                visit_assign_band(node, node.get_first(), node.get_second());
+                visit_assign_band(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignBxor:
-                visit_assign_bxor(node, node.get_first(), node.get_second());
+                visit_assign_bxor(node, conv::assign(*ast, node));
                 break;
             case NodeKind::AssignBor:
-                visit_assign_bor(node, node.get_first(), node.get_second());
+                visit_assign_bor(node, conv::assign(*ast, node));
                 break;
         }
     }
@@ -389,32 +297,31 @@ struct Visitor {
 
     // -----------------------------------------------------------------------
 
-    virtual void visit_module(Node const& node, std::string_view name,
-                              std::span<NodeId const> children) {
-        visit_before_module(node, name, children);
-        for (auto const& child : children) visit(child);
-        visit_after_module(node, name, children);
+    virtual void visit_module(Node const& node, conv::Module const& data) {
+        visit_before_module(node, data);
+        for (auto const& child : data.children) visit(child);
+        visit_after_module(node, data);
     }
 
-    virtual void visit_before_module(Node const& node, std::string_view name,
-                                     std::span<NodeId const> children) {}
-    virtual void visit_after_module(Node const& node, std::string_view name,
-                                    std::span<NodeId const> children) {}
+    virtual void visit_before_module(Node const&         node,
+                                     conv::Module const& data) {}
+    virtual void visit_after_module(Node const&         node,
+                                    conv::Module const& data) {}
 
     // -----------------------------------------------------------------------
 
-    virtual void visit_source_file(Node const& node, NodeId mod,
-                                   std::span<NodeId const> children) {
-        visit_before_source_file(node, mod, children);
-        visit(mod);
-        for (auto const& child : children) visit(child);
-        visit_after_source_file(node, mod, children);
+    virtual void visit_source_file(Node const&             node,
+                                   conv::SourceFile const& data) {
+        visit_before_source_file(node, data);
+        visit(data.mod);
+        for (auto const& child : data.children) visit(child);
+        visit_after_source_file(node, data);
     }
 
-    virtual void visit_before_source_file(Node const& node, NodeId mod,
-                                          std::span<NodeId const> children) {}
-    virtual void visit_after_source_file(Node const& node, NodeId mod,
-                                         std::span<NodeId const> children) {}
+    virtual void visit_before_source_file(Node const&             node,
+                                          conv::SourceFile const& data) {}
+    virtual void visit_after_source_file(Node const&             node,
+                                         conv::SourceFile const& data) {}
 
     // -----------------------------------------------------------------------
 
@@ -422,107 +329,77 @@ struct Visitor {
 
     // -----------------------------------------------------------------------
 
-    virtual void visit_func_decl(Node const&             node,
-                                 std::span<NodeId const> decorators,
-                                 NodeId name, std::span<NodeId const> gargs,
-                                 std::span<NodeId const> args, NodeId ret,
-                                 NodeId body, bool is_c_varargs) {
-        visit_before_func_decl(node, decorators, name, gargs, args, ret, body,
-                               is_c_varargs);
+    virtual void visit_func_decl(Node const& node, conv::FuncDecl const& data) {
+        visit_before_func_decl(node, data);
 
-        for (auto const& dec : decorators) visit(dec);
-        visit(name);
-        for (auto const& garg : gargs) visit(garg);
-        for (auto const& arg : args) visit(arg);
-        if (ret.is_valid()) visit(ret);
-        if (body.is_valid()) visit(body);
+        for (auto const& dec : data.decorators) visit(dec);
+        visit(data.name);
+        for (auto const& garg : data.gargs) visit(garg);
+        for (auto const& arg : data.args) visit(arg);
+        if (data.ret.is_valid()) visit(data.ret);
+        if (data.body.is_valid()) visit(data.body);
 
-        visit_after_func_decl(node, decorators, name, gargs, args, ret, body,
-                              is_c_varargs);
+        visit_after_func_decl(node, data);
     }
 
-    virtual void visit_before_func_decl(
-        Node const& node, std::span<NodeId const> decorators, NodeId name,
-        std::span<NodeId const> gargs, std::span<NodeId const> args, NodeId ret,
-        NodeId body, bool is_c_varargs) {}
-    virtual void visit_after_func_decl(Node const&             node,
-                                       std::span<NodeId const> decorators,
-                                       NodeId                  name,
-                                       std::span<NodeId const> gargs,
-                                       std::span<NodeId const> args, NodeId ret,
-                                       NodeId body, bool is_c_varargs) {}
+    virtual void visit_before_func_decl(Node const&           node,
+                                        conv::FuncDecl const& data) {}
+    virtual void visit_after_func_decl(Node const&           node,
+                                       conv::FuncDecl const& data) {}
 
     // -----------------------------------------------------------------------
 
     virtual void visit_top_var_decl(Node const&             node,
-                                    std::span<NodeId const> decorators,
-                                    NodeId                  child) {
-        visit_before_top_var_decl(node, decorators, child);
-        for (auto const& dec : decorators) visit(dec);
-        visit(child);
-        visit_after_top_var_decl(node, decorators, child);
+                                    conv::TopVarDecl const& data) {
+        visit_before_top_var_decl(node, data);
+        for (auto const& dec : data.decorators) visit(dec);
+        visit(data.decl);
+        visit_after_top_var_decl(node, data);
     }
 
     virtual void visit_before_top_var_decl(Node const&             node,
-                                           std::span<NodeId const> decorators,
-                                           NodeId                  child) {}
-
+                                           conv::TopVarDecl const& data) {}
     virtual void visit_after_top_var_decl(Node const&             node,
-                                          std::span<NodeId const> decorators,
-                                          NodeId                  child) {}
+                                          conv::TopVarDecl const& data) {}
 
     // -----------------------------------------------------------------------
 
     virtual void visit_top_def_decl(Node const&             node,
-                                    std::span<NodeId const> decorators,
-                                    NodeId                  child) {
-        visit_before_top_def_decl(node, decorators, child);
-        for (auto const& dec : decorators) visit(dec);
-        visit(child);
-        visit_after_top_def_decl(node, decorators, child);
+                                    conv::TopDefDecl const& data) {
+        visit_before_top_def_decl(node, data);
+        for (auto const& dec : data.decorators) visit(dec);
+        visit(data.decl);
+        visit_after_top_def_decl(node, data);
     }
 
     virtual void visit_before_top_def_decl(Node const&             node,
-                                           std::span<NodeId const> decorators,
-                                           NodeId                  child) {}
-
+                                           conv::TopDefDecl const& data) {}
     virtual void visit_after_top_def_decl(Node const&             node,
-                                          std::span<NodeId const> decorators,
-                                          NodeId                  child) {}
+                                          conv::TopDefDecl const& data) {}
 
     // -----------------------------------------------------------------------
 
-    // NOTE: each id in `ids` points to an identifier, not an AST node
-    virtual void visit_id_pack(Node const& node, std::span<NodeId const> ids) {}
+    virtual void visit_id_pack(Node const& node, conv::IdPack const& data) {}
 
-    virtual void visit_func_param(Node const& node, std::string_view name,
-                                  NodeId type) {}
+    virtual void visit_func_param(Node const&            node,
+                                  conv::FuncParam const& data) {}
 
-    // NOTE: each id in `ret` points to either an identifier or an AST node.
-    // This depends if it is in an even or odd index, as the list contains
-    // key-value pairs of return value name and type. The name may be an invalid
-    // id, for when the return value is not named.
-    virtual void visit_func_ret_pack(Node const&             node,
-                                     std::span<NodeId const> ret) {}
+    virtual void visit_func_ret_pack(Node const&          node,
+                                     conv::RetPack const& data) {}
 
-    // NOTE: each id in `params` points to either an identifier or an AST node.
-    // This depends if it is in an even or odd index, as the list contains
-    // key-value pairs. The name may be an invalid id, for when a raw value is
-    // passed. The value may be an invalid id, for when no value is passed.
-    virtual void visit_decorator(Node const& node, std::string_view name,
-                                 std::span<NodeId const> params) {}
+    virtual void visit_decorator(Node const&            node,
+                                 conv::Decorator const& data) {}
 
     // =======================================================================
 
-    virtual void visit_expr_pack(Node const&             node,
-                                 std::span<NodeId const> children) {
-        for (auto const& child : children) visit(child);
+    virtual void visit_expr_pack(Node const& node, conv::ExprPack const& data) {
+        for (auto const& child : data.items) visit(child);
     }
 
-#define VISIT_BIN(name)                                                   \
-    virtual void visit_##name(Node const& node, NodeId lhs, NodeId rhs) { \
-        visit(lhs);                                                       \
-        visit(rhs);                                                       \
+#define VISIT_BIN(name)                                                     \
+    virtual void visit_##name(Node const& node, conv::Binary const& data) { \
+        visit(data.lhs);                                                    \
+        visit(data.rhs);                                                    \
     }
 
     VISIT_BIN(add);
@@ -547,8 +424,10 @@ struct Visitor {
 
 #undef VISIT_BIN
 
-#define VISIT_UNARY(name) \
-    virtual void visit_##name(Node const& node, NodeId lhs) { visit(lhs); }
+#define VISIT_UNARY(name)                                                  \
+    virtual void visit_##name(Node const& node, conv::Unary const& data) { \
+        visit(data.child);                                                 \
+    }
 
     VISIT_UNARY(addrof);
     VISIT_UNARY(lnot);
@@ -558,118 +437,106 @@ struct Visitor {
 #undef VISIT_UNARY
 
     virtual void visit_struct_type(Node const&             node,
-                                   std::span<NodeId const> fields) {
-        for (auto const& field : fields) visit(field);
+                                   conv::StructType const& data) {
+        for (auto const& field : data.fields) visit(field);
     }
 
-    virtual void visit_struct_field(Node const& node, std::string_view name,
-                                    NodeId type, NodeId init) {
-        visit(type);
-        if (init.is_valid()) visit(init);
+    virtual void visit_struct_field(Node const&              node,
+                                    conv::StructField const& data) {
+        visit(data.type);
+        if (data.init.is_valid()) visit(data.init);
     }
 
-    virtual void visit_ptr(Node const& node, bool is_const, NodeId inner) {
-        visit(inner);
+    virtual void visit_ptr(Node const& node, conv::Ptr const& data) {
+        visit(data.inner);
     }
 
-    virtual void visit_mptr(Node const& node, bool is_const, NodeId inner) {
-        visit(inner);
+    virtual void visit_mptr(Node const& node, conv::MultiPtr const& data) {
+        visit(data.inner);
     }
 
-    virtual void visit_slice(Node const& node, bool is_const, NodeId inner) {
-        visit(inner);
+    virtual void visit_slice(Node const& node, conv::Slice const& data) {
+        visit(data.inner);
     }
 
-    virtual void visit_array_type(Node const& node, bool is_const, NodeId size,
-                                  NodeId inner) {
-        visit(size);
-        visit(inner);
+    virtual void visit_array_type(Node const&            node,
+                                  conv::ArrayType const& data) {
+        visit(data.size);
+        visit(data.inner);
     }
 
-    virtual void visit_array(Node const& node, NodeId size, NodeId inner,
-                             std::span<NodeId const> items) {
-        visit(size);
-        visit(inner);
-        for (auto const& item : items) visit(item);
+    virtual void visit_array(Node const& node, conv::Array const& data) {
+        visit(data.size);
+        visit(data.inner);
+        for (auto const& item : data.items) visit(item);
     }
 
-    // NOTE: each id in `params` points to either the key or the value AST node.
-    // This depends if it is in an even or odd index, as the list contains
-    // key-value pairs. The key may be an invalid id, for when a value is given
-    // without a key.
-    virtual void visit_lit(Node const& node, std::span<NodeId const> items) {
-        for (auto const& item : items) visit(item);
+    virtual void visit_lit(Node const& node, conv::Lit const& data) {
+        for (auto const& item : data.items) visit(item);
     }
 
-    virtual void visit_call(Node const& node, NodeId callee,
-                            std::span<NodeId const> args) {
-        visit(callee);
-        for (auto const& arg : args) visit(arg);
+    virtual void visit_call(Node const& node, conv::Call const& data) {
+        visit(data.callee);
+        for (auto const& arg : data.args) visit(arg);
     }
 
-    virtual void visit_field(Node const& node, NodeId receiver,
-                             std::string_view name) {
-        visit(receiver);
+    virtual void visit_field(Node const& node, conv::Field const& data) {
+        visit(data.receiver);
     }
 
     // =======================================================================
 
-    virtual void visit_block(Node const&             node,
-                             std::span<NodeId const> children) {
-        visit_before_block(node, children);
-        for (auto const& child : children) visit(child);
-        visit_after_block(node, children);
+    virtual void visit_block(Node const& node, conv::Block const& data) {
+        visit_before_block(node, data);
+        for (auto const& child : data.items) visit(child);
+        visit_after_block(node, data);
     }
 
-    virtual void visit_before_block(Node const&             node,
-                                    std::span<NodeId const> children) {}
-    virtual void visit_after_block(Node const&             node,
-                                   std::span<NodeId const> children) {}
+    virtual void visit_before_block(Node const& node, conv::Block const& data) {
+    }
+    virtual void visit_after_block(Node const& node, conv::Block const& data) {}
 
     // -----------------------------------------------------------------------
 
-    virtual void visit_expr_stmt(Node const& node, NodeId child) {
-        visit(child);
+    virtual void visit_expr_stmt(Node const& node, conv::Unary const& data) {
+        visit(data.child);
     }
 
-    virtual void visit_return_stmt(Node const& node, NodeId child) {
-        if (child.is_valid()) visit(child);
+    virtual void visit_return_stmt(Node const& node, conv::Unary const& data) {
+        if (data.child.is_valid()) visit(data.child);
     }
 
-    // NOTE: `wf` may be an invalid id in case the if does not have an else
-    virtual void visit_if_stmt(Node const& node, NodeId cond, NodeId wt,
-                               NodeId wf) {
-        visit(cond);
-        visit(wt);
-        if (wf.is_valid()) visit(wf);
+    virtual void visit_if_stmt(Node const& node, conv::IfStmt const& data) {
+        visit(data.cond);
+        visit(data.wt);
+        if (data.wf.is_valid()) visit(data.wf);
     }
 
-    virtual void visit_while_stmt(Node const& node, NodeId cond, NodeId body) {
-        visit(cond);
-        visit(body);
+    virtual void visit_while_stmt(Node const&            node,
+                                  conv::WhileStmt const& data) {
+        visit(data.cond);
+        visit(data.body);
     }
 
     virtual void visit_break(Node const& node) {}
     virtual void visit_continue(Node const& node) {}
 
-    virtual void visit_var_decl(Node const& node, NodeId ids, NodeId types,
-                                NodeId inits) {
-        visit(ids);
-        if (types.is_valid()) visit(types);
-        if (inits.is_valid()) visit(inits);
+    virtual void visit_var_decl(Node const& node, conv::VarDecl const& data) {
+        visit(data.ids);
+        if (data.types.is_valid()) visit(data.types);
+        if (data.inits.is_valid()) visit(data.inits);
     }
 
-    virtual void visit_def_decl(Node const& node, NodeId ids, NodeId types,
-                                NodeId inits) {
-        visit(ids);
-        if (types.is_valid()) visit(types);
-        visit(inits);
+    virtual void visit_def_decl(Node const& node, conv::DefDecl const& data) {
+        visit(data.ids);
+        if (data.types.is_valid()) visit(data.types);
+        visit(data.inits);
     }
 
-#define VISIT_ASSIGN(name)                                                \
-    virtual void visit_##name(Node const& node, NodeId lhs, NodeId rhs) { \
-        visit(lhs);                                                       \
-        visit(rhs);                                                       \
+#define VISIT_ASSIGN(name)                                                  \
+    virtual void visit_##name(Node const& node, conv::Assign const& data) { \
+        visit(data.lhs);                                                    \
+        visit(data.rhs);                                                    \
     }
 
     VISIT_ASSIGN(assign);

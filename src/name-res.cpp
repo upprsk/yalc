@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "ast-node-conv.hpp"
 #include "ast-node-id.hpp"
 #include "ast-node-visitor.hpp"
 #include "ast-node.hpp"
@@ -19,6 +20,7 @@ namespace yal {
 using ast::Ast;
 using ast::Node;
 using ast::NodeId;
+namespace conv = ast::conv;
 
 struct DependsVisitor : public ast::Visitor<> {
     struct Local {
@@ -32,54 +34,35 @@ struct DependsVisitor : public ast::Visitor<> {
     // ========================================================================
 
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    void visit_before_source_file(Node const& /*node*/, NodeId /*mod*/,
-                                  std::span<NodeId const> children) override {
-        for (auto source_file_child : children) {
+    void visit_before_source_file(Node const& /*node*/,
+                                  conv::SourceFile const& data) override {
+        for (auto source_file_child : data.children) {
             auto node = ast->get_node(source_file_child.as_ref());
             if (node.get_kind() == ast::NodeKind::TopVarDecl) {
-                auto child = ast->get_node(node.get_first().as_ref());
-                ASSERT(child.get_kind() == ast::NodeKind::VarDecl);
-
-                auto ids = ast->get_node(child.get_first().as_ref());
-                ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
-
-                auto names = ast->get_array(ids.get_first().as_count(),
-                                            ids.get_second().as_array());
-
-                for (auto id : names) {
+                auto names = conv::top_var_decl_names(*ast, node);
+                for (auto id : names.ids) {
                     define_top(ast->get_identifier(id.as_id()),
                                source_file_child);
                 }
             }
 
             else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
-                auto child = ast->get_node(node.get_first().as_ref());
-                ASSERT(child.get_kind() == ast::NodeKind::DefDecl);
+                auto names = ast::conv::top_def_decl_names(*ast, node);
 
-                auto ids = ast->get_node(child.get_first().as_ref());
-                ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
-
-                auto names = ast->get_array(ids.get_first().as_count(),
-                                            ids.get_second().as_array());
-
-                for (auto id : names) {
+                for (auto id : names.ids) {
                     define_top(ast->get_identifier(id.as_id()),
                                source_file_child);
                 }
             }
 
             else if (node.get_kind() == ast::NodeKind::FuncDecl) {
-                auto ids = ast->get_node(node.get_first().as_ref());
-                ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
-
-                auto names = ast->get_array(ids.get_first().as_count(),
-                                            ids.get_second().as_array());
+                auto names = conv::func_decl_name(*ast, node);
 
                 // we only want to add a function name to the top-level if it is
                 // not namespaced (since namespaced things are not a problem for
                 // name resolution.
-                if (names.size() == 1) {
-                    define_top(ast->get_identifier(names[0].as_id()),
+                if (names.ids.size() == 1) {
+                    define_top(ast->get_identifier(names.ids[0].as_id()),
                                source_file_child);
                 }
             }
@@ -94,75 +77,56 @@ struct DependsVisitor : public ast::Visitor<> {
     }
 
     void visit_before_func_decl(Node const& node,
-                                std::span<NodeId const> /*decorators*/,
-                                NodeId /*name*/,
-                                std::span<NodeId const> /*gargs*/,
-                                std::span<NodeId const> /*args*/,
-                                NodeId /*ret*/, NodeId /*body*/,
-                                bool /*is_c_varargs*/) override {
+                                conv::FuncDecl const& /*data*/) override {
         current_decl = node.get_id();
     }
 
     void visit_after_func_decl(Node const& /*node*/,
-                               std::span<NodeId const> /*decorators*/,
-                               NodeId /*name*/,
-                               std::span<NodeId const> /*gargs*/,
-                               std::span<NodeId const> /*args*/, NodeId /*ret*/,
-                               NodeId /*body*/,
-                               bool /*is_c_varargs*/) override {
+                               conv::FuncDecl const& /*data*/) override {
         current_decl = NodeId::invalid();
     }
 
     void visit_before_top_var_decl(Node const& node,
-                                   std::span<NodeId const> /*decorators*/,
-                                   NodeId /*child*/) override {
+                                   conv::TopVarDecl const& /*data*/) override {
         current_decl = node.get_id();
     }
 
     void visit_after_top_var_decl(Node const& /*node*/,
-                                  std::span<NodeId const> /*decorators*/,
-                                  NodeId /*child*/) override {
+                                  conv::TopVarDecl const& /*data*/) override {
         current_decl = NodeId::invalid();
     }
 
     void visit_before_top_def_decl(Node const& node,
-                                   std::span<NodeId const> /*decorators*/,
-                                   NodeId /*child*/) override {
+                                   conv::TopDefDecl const& /*data*/) override {
         current_decl = node.get_id();
     }
 
     void visit_after_top_def_decl(Node const& /*node*/,
-                                  std::span<NodeId const> /*decorators*/,
-                                  NodeId /*child*/) override {
+                                  conv::TopDefDecl const& /*data*/) override {
         current_decl = NodeId::invalid();
     }
 
     void visit_before_block(Node const& /*node*/,
-                            std::span<NodeId const> /*children*/) override {
+                            conv::Block const& /*data*/) override {
         level++;
     }
 
     void visit_after_block(Node const& /*node*/,
-                           std::span<NodeId const> /*children*/) override {
+                           conv::Block const& /*data*/) override {
         ASSERT(level > 0);
 
         clean_level();
         level--;
     }
 
-    void visit_var_decl(Node const& /*node*/, NodeId ids, NodeId types,
-                        NodeId inits) override {
-        if (types.is_valid()) visit(types);
-        if (inits.is_valid()) visit(inits);
+    void visit_var_decl(Node const& /*node*/,
+                        conv::VarDecl const& data) override {
+        if (data.types.is_valid()) visit(data.types);
+        if (data.inits.is_valid()) visit(data.inits);
 
         if (level > 0) {
-            auto id_pack = ast->get_node(ids.as_ref());
-            ASSERT(id_pack.get_kind() == ast::NodeKind::IdPack);
-
-            auto names = ast->get_array(id_pack.get_first().as_count(),
-                                        id_pack.get_second().as_array());
-
-            for (auto id : names) {
+            auto names = conv::id_pack(*ast, ast->get_node(data.ids.as_ref()));
+            for (auto id : names.ids) {
                 add_local(ast->get_identifier(id.as_id()));
             }
         }
