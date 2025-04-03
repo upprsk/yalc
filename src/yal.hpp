@@ -16,8 +16,7 @@ struct Options {
 };
 
 auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
-                                std::filesystem::path filepath,
-                                ast::Ast& dst_ast, Options const& opt)
-    -> ast::NodeId;
+                             std::filesystem::path filepath, ast::Ast& dst_ast,
+                             Options const& opt) -> ast::NodeId;
 
 }  // namespace yal
