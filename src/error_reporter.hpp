@@ -75,7 +75,7 @@ public:
     }
 
     void vreport_bug(Span s, fmt::string_view fmt, fmt::format_args args) {
-        report(s, "debug", debug_style, fmt, args);
+        report(s, "bug", bug_style, fmt, args);
     }
 
     void report(Span s, std::string_view prefix, fmt::text_style color,
