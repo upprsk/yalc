@@ -30,8 +30,7 @@ auto real_main(yalc::Args const& args) -> int {
                             .dump_ast = args.dump_ast,
                             .dump_ast_json = args.dump_ast_json};
 
-    yal::ast::Ast ast;
-    auto root = yal::load_and_parse_into_ast(fs, er, args.program, ast, opt);
+    auto [ast, root] = yal::load_and_parse(fs, er, args.program, opt);
 
     yal::resolve_names(ast, root, er, fs, opt);
 
