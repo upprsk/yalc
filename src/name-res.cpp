@@ -78,56 +78,12 @@ struct DependsVisitor : public ast::Visitor<> {
 
             auto source_file_data = conv::source_file(*ast, node);
             for (auto source_file_child : source_file_data.children) {
-                auto node = ast->get_node(source_file_child.as_ref());
-                if (node.get_kind() == ast::NodeKind::TopVarDecl) {
-                    auto names = conv::top_var_decl_names(*ast, node);
-                    for (auto id : names.ids) {
-                        define_top(ast->get_identifier(id.as_id()),
-                                   source_file_child);
-                    }
-                }
-
-                else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
-                    auto names = ast::conv::top_def_decl_names(*ast, node);
-
-                    for (auto id : names.ids) {
-                        define_top(ast->get_identifier(id.as_id()),
-                                   source_file_child);
-                    }
-                }
-
-                else if (node.get_kind() == ast::NodeKind::FuncDecl ||
-                         node.get_kind() ==
-                             ast::NodeKind::FuncDeclWithCVarArgs) {
-                    auto names = conv::func_decl_name(*ast, node);
-
-                    // if we have just one id, then this is not namespaced. We
-                    // take care of namespaced functions on another pass.
-                    if (names.ids.size() == 1) {
-                        define_top(ast->get_identifier(names.ids[0].as_id()),
-                                   source_file_child);
-                    }
-                }
-
-                else if (node.get_kind() == ast::NodeKind::ImportStmt) {
-                    // in order to know what is the name that the import
-                    // statement declares, we need to do the full thing for the
-                    // imported module.
-                    auto import_stmt = conv::import_stmt(*ast, node);
-                    do_the_thing(*fs, *er, node.get_loc(), import_stmt.path);
-                }
-
-                else {
-                    PANIC(
-                        "received top-level kind was not implemented in name "
-                        "resolution",
-                        node.get_kind());
-                }
+                hoist_top_decl(source_file_child);
             }
         }
     }
 
-    void visit_after_module(Node const&         node,
+    void visit_after_module(Node const& /*node*/,
                             conv::Module const& data) override {
         auto rev_dag = build_reverse_dag();
 
@@ -141,32 +97,83 @@ struct DependsVisitor : public ast::Visitor<> {
 
                 if (node.get_kind() == ast::NodeKind::FuncDecl ||
                     node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
-                    auto names = conv::func_decl_name(*ast, node);
-
-                    // namespaced function, this means that everyone that
-                    // depends on the wrapped type also possibly depends on the
-                    // namespaced functions.
-                    if (names.ids.size() != 1) {
-                        // find what is the type that is beeing wrapped
-                        auto ty = lookup_top(
-                            ast->get_identifier(names.ids[0].as_id()));
-                        if (!ty.is_valid()) break;
-
-                        // find all things that depend on the wrapped type
-                        auto it = rev_dag.find(ty);
-                        if (it == end(rev_dag)) break;
-
-                        for (auto const dep_on_ty : it->second) {
-                            if (dep_on_ty != source_file_child) {
-                                // make it depend on the namespaced function
-                                dag[dep_on_ty].insert(source_file_child);
-                            }
-                        }
-                    }
+                    fixup_namespaced_function(source_file_child, node, rev_dag);
                 }
             }
         }
     }
+
+    // ------------------------------------------------------------------------
+
+    void hoist_top_decl(NodeId top_decl) {
+        auto node = ast->get_node(top_decl.as_ref());
+        if (node.get_kind() == ast::NodeKind::TopVarDecl) {
+            auto names = conv::top_var_decl_names(*ast, node);
+            for (auto id : names.ids) {
+                define_top(ast->get_identifier(id.as_id()), top_decl);
+            }
+        }
+
+        else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
+            auto names = ast::conv::top_def_decl_names(*ast, node);
+
+            for (auto id : names.ids) {
+                define_top(ast->get_identifier(id.as_id()), top_decl);
+            }
+        }
+
+        else if (node.get_kind() == ast::NodeKind::FuncDecl ||
+                 node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
+            auto names = conv::func_decl_name(*ast, node);
+
+            // if we have just one id, then this is not namespaced. We
+            // take care of namespaced functions on another pass.
+            if (names.ids.size() == 1) {
+                define_top(ast->get_identifier(names.ids[0].as_id()), top_decl);
+            }
+        }
+
+        else if (node.get_kind() == ast::NodeKind::ImportStmt) {
+            // in order to know what is the name that the import
+            // statement declares, we need to do the full thing for the
+            // imported module.
+            auto import_stmt = conv::import_stmt(*ast, node);
+            do_the_thing(*fs, *er, node.get_loc(), import_stmt.path);
+        }
+
+        else {
+            PANIC(
+                "top-level kind not implemented in hoisting of name resolution",
+                node.get_kind());
+        }
+    }
+
+    void fixup_namespaced_function(NodeId top_decl, Node func_node,
+                                   Dag const& rev_dag) {
+        auto names = conv::func_decl_name(*ast, func_node);
+
+        // namespaced function, this means that everyone that
+        // depends on the wrapped type also possibly depends on the
+        // namespaced functions.
+        if (names.ids.size() != 1) {
+            // find what is the type that is beeing wrapped
+            auto ty = lookup_top(ast->get_identifier(names.ids[0].as_id()));
+            if (!ty.is_valid()) return;
+
+            // find all things that depend on the wrapped type
+            auto it = rev_dag.find(ty);
+            if (it == end(rev_dag)) return;
+
+            for (auto const dep_on_ty : it->second) {
+                if (dep_on_ty != top_decl) {
+                    // make it depend on the namespaced function
+                    dag[dep_on_ty].insert(top_decl);
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
 
     void visit_before_func_decl(Node const& node,
                                 conv::FuncDecl const& /*data*/) override {
