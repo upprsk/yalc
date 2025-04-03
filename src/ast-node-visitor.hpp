@@ -382,13 +382,27 @@ struct Visitor {
     virtual void visit_id_pack(Node const& node, conv::IdPack const& data) {}
 
     virtual void visit_func_param(Node const&            node,
-                                  conv::FuncParam const& data) {}
+                                  conv::FuncParam const& data) {
+        if (data.type.is_valid()) visit(data.type);
+    }
 
     virtual void visit_func_ret_pack(Node const&          node,
-                                     conv::RetPack const& data) {}
+                                     conv::RetPack const& data) {
+        auto ret = data.ret;
+        ASSERT((ret.size() & 1) == 0);
+        for (size_t i = 0; i < ret.size(); i += 2) {
+            visit(ret[i + 1]);
+        }
+    }
 
     virtual void visit_decorator(Node const&            node,
-                                 conv::Decorator const& data) {}
+                                 conv::Decorator const& data) {
+        auto params = data.params;
+        ASSERT((params.size() & 1) == 0);
+        for (size_t i = 0; i < params.size(); i += 2) {
+            if (params[i + 1].is_valid()) visit(params[i + 1]);
+        }
+    }
 
     // =======================================================================
 
