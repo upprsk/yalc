@@ -6,11 +6,11 @@
 
 namespace yal::ast {
 
-struct JsonVisitor : public Visitor {
-    explicit constexpr JsonVisitor(json& j, bool show_loc)
-        : j{j}, show_loc{show_loc} {}
+struct JsonVisitor : public Visitor<> {
+    explicit constexpr JsonVisitor(Ast const& ast, json& j, bool show_loc)
+        : Visitor<>{ast}, j{j}, show_loc{show_loc} {}
 
-    void visit_before(Ast& /*ast*/, Node const& node) override {
+    void visit_before(Node const& node) override {
         // fmt::println(stderr, "JsonVisitor(id={}, kind={})", node.get_id(),
         //              node.get_kind());
 
@@ -22,126 +22,120 @@ struct JsonVisitor : public Visitor {
         if (show_loc) j["loc"] = node.get_loc();
     }
 
-    void visit_err(Ast& ast, Node const& node) override {
+    void visit_err(Node const& node) override {
         if (node.get_first().is_valid()) {
             j["error"] =
-                ast.get_bytes_as_string_view(node.get_first().as_bytes());
+                ast->get_bytes_as_string_view(node.get_first().as_bytes());
         }
     }
 
-    void visit_id(Ast& /*ast*/, Node const& /*node*/,
-                  std::string_view id) override {
+    void visit_id(Node const& /*node*/, std::string_view id) override {
         j["value"] = id;
     }
 
-    void visit_kw_lit(Ast& /*ast*/, Node const& /*node*/,
-                      std::string_view id) override {
+    void visit_kw_lit(Node const& /*node*/, std::string_view id) override {
         j["value"] = id;
     }
 
-    void visit_int(Ast& /*ast*/, Node const& /*node*/,
-                   uint64_t value) override {
+    void visit_int(Node const& /*node*/, uint64_t value) override {
         j["value"] = value;
     }
 
-    void visit_double(Ast& /*ast*/, Node const& /*node*/,
-                      double value) override {
+    void visit_double(Node const& /*node*/, double value) override {
         j["value"] = value;
     }
 
-    void visit_float(Ast& /*ast*/, Node const& /*node*/, float value) override {
+    void visit_float(Node const& /*node*/, float value) override {
         j["value"] = value;
     }
 
-    void visit_str(Ast& /*ast*/, Node const& /*node*/,
-                   std::string_view bytes) override {
+    void visit_str(Node const& /*node*/, std::string_view bytes) override {
         j["value"] = bytes;
     }
 
-    void visit_char(Ast& /*ast*/, Node const& /*node*/,
-                    uint32_t character) override {
+    void visit_char(Node const& /*node*/, uint32_t character) override {
         j["value"] = character;
     }
 
     // ========================================================================
 
-    void visit_module(Ast& ast, Node const& /*node*/, std::string_view name,
+    void visit_module(Node const& /*node*/, std::string_view name,
                       std::span<NodeId const> children) override {
         j["name"] = name;
 
         auto arr = json::array();
         for (auto const& child : children) {
-            arr.push_back(ast.fatten(child));
+            arr.push_back(ast->fatten(child));
         }
     }
 
-    void visit_source_file(Ast& ast, Node const& /*node*/, NodeId mod,
+    void visit_source_file(Node const& /*node*/, NodeId mod,
                            std::span<NodeId const> children) override {
         auto arr = json::array();
-        for (auto const& child : children) arr.push_back(ast.fatten(child));
+        for (auto const& child : children) arr.push_back(ast->fatten(child));
 
-        j["mod"] = ast.fatten(mod);
+        j["mod"] = ast->fatten(mod);
         j["children"] = arr;
     }
 
-    void visit_module_decl(Ast& /*ast*/, Node const& /*node*/,
+    void visit_module_decl(Node const& /*node*/,
                            std::string_view name) override {
         j["name"] = name;
     }
 
-    void visit_func_decl(Ast&                    ast, Node const& /*node*/,
+    void visit_func_decl(Node const& /*node*/,
                          std::span<NodeId const> decorators, NodeId name,
                          std::span<NodeId const> gargs,
                          std::span<NodeId const> args, NodeId ret, NodeId body,
                          bool is_c_varargs) override {
         auto buf = json::array();
-        for (auto const& dec : decorators) buf.push_back(ast.fatten(dec));
+        for (auto const& dec : decorators) buf.push_back(ast->fatten(dec));
         j["decorators"] = buf;
 
         buf = json::array();
-        for (auto const& garg : gargs) buf.push_back(ast.fatten(garg));
+        for (auto const& garg : gargs) buf.push_back(ast->fatten(garg));
         j["gargs"] = buf;
 
         buf = json::array();
-        for (auto const& arg : args) buf.push_back(ast.fatten(arg));
+        for (auto const& arg : args) buf.push_back(ast->fatten(arg));
         j["args"] = buf;
         j["is_c_varargs"] = is_c_varargs;
 
-        j["name"] = ast.fatten(name);
-        if (ret.is_valid()) j["ret"] = ast.fatten(ret);
-        if (body.is_valid()) j["body"] = ast.fatten(body);
+        j["name"] = ast->fatten(name);
+        if (ret.is_valid()) j["ret"] = ast->fatten(ret);
+        if (body.is_valid()) j["body"] = ast->fatten(body);
     }
 
-    void visit_top_var_decl(Ast&                    ast, Node const& /*node*/,
+    void visit_top_var_decl(Node const& /*node*/,
                             std::span<NodeId const> decorators,
                             NodeId                  child) override {
-        j["decorators"] = ast.fatten(decorators);
-        j["child"] = ast.fatten(child);
+        j["decorators"] = ast->fatten(decorators);
+        j["child"] = ast->fatten(child);
     }
 
-    void visit_top_def_decl(Ast&                    ast, Node const& /*node*/,
+    void visit_top_def_decl(Node const& /*node*/,
                             std::span<NodeId const> decorators,
                             NodeId                  child) override {
-        j["decorators"] = ast.fatten(decorators);
-        j["child"] = ast.fatten(child);
+        j["decorators"] = ast->fatten(decorators);
+        j["child"] = ast->fatten(child);
     }
 
-    void visit_id_pack(Ast&                    ast, Node const& /*node*/,
+    void visit_id_pack(Node const& /*node*/,
                        std::span<NodeId const> ids) override {
         auto arr = json::array();
         for (auto const& id : ids)
-            arr.push_back(ast.get_identifier(id.as_id()));
+            arr.push_back(ast->get_identifier(id.as_id()));
 
         j["names"] = arr;
     }
 
-    void visit_func_param(Ast& ast, Node const& /*node*/, std::string_view name,
+    void visit_func_param(Node const& /*node*/, std::string_view name,
                           NodeId type) override {
         j["name"] = name;
-        if (type.is_valid()) j["type"] = ast.fatten(type);
+        if (type.is_valid()) j["type"] = ast->fatten(type);
     }
 
-    void visit_func_ret_pack(Ast&                    ast, Node const& /*node*/,
+    void visit_func_ret_pack(Node const& /*node*/,
                              std::span<NodeId const> ret) override {
         auto arr = json::array();
 
@@ -149,12 +143,12 @@ struct JsonVisitor : public Visitor {
         for (size_t i = 0; i < ret.size(); i += 2) {
             if (ret[i].is_valid()) {
                 arr.push_back(json{
-                    {"name", ast.get_identifier(ret[i].as_id())},
-                    {"type",             ast.fatten(ret[i + 1])},
+                    {"name", ast->get_identifier(ret[i].as_id())},
+                    {"type",             ast->fatten(ret[i + 1])},
                 });
             } else {
                 arr.push_back(json{
-                    {"type", ast.fatten(ret[i + 1])},
+                    {"type", ast->fatten(ret[i + 1])},
                 });
             }
         }
@@ -162,7 +156,7 @@ struct JsonVisitor : public Visitor {
         j["values"] = arr;
     }
 
-    void visit_decorator(Ast& ast, Node const& /*node*/, std::string_view name,
+    void visit_decorator(Node const& /*node*/, std::string_view name,
                          std::span<NodeId const> params) override {
         j["name"] = name;
 
@@ -173,11 +167,11 @@ struct JsonVisitor : public Visitor {
             auto item = json::object();
 
             if (params[i].is_valid()) {
-                item["key"] = ast.get_identifier(params[i].as_id());
+                item["key"] = ast->get_identifier(params[i].as_id());
             }
 
             if (params[i + 1].is_valid()) {
-                item["value"] = ast.fatten(params[i + 1]);
+                item["value"] = ast->fatten(params[i + 1]);
             }
 
             arr.push_back(item);
@@ -188,19 +182,18 @@ struct JsonVisitor : public Visitor {
 
     // ========================================================================
 
-    void visit_expr_pack(Ast&                    ast, Node const& /*node*/,
+    void visit_expr_pack(Node const& /*node*/,
                          std::span<NodeId const> children) override {
         auto arr = json::array();
-        for (auto const& child : children) arr.push_back(ast.fatten(child));
+        for (auto const& child : children) arr.push_back(ast->fatten(child));
 
         j["children"] = arr;
     }
 
-#define VISIT_BIN(name)                                                       \
-    void visit_##name(Ast& ast, Node const& /*node*/, NodeId lhs, NodeId rhs) \
-        override {                                                            \
-        j["left"] = ast.fatten(lhs);                                          \
-        j["right"] = ast.fatten(rhs);                                         \
+#define VISIT_BIN(name)                                                        \
+    void visit_##name(Node const& /*node*/, NodeId lhs, NodeId rhs) override { \
+        j["left"] = ast->fatten(lhs);                                          \
+        j["right"] = ast->fatten(rhs);                                         \
     }
 
     VISIT_BIN(add);
@@ -225,9 +218,9 @@ struct JsonVisitor : public Visitor {
 
 #undef VISIT_BIN
 
-#define VISIT_UNARY(name)                                                      \
-    void visit_##name(Ast& ast, Node const& /*node*/, NodeId child) override { \
-        j["child"] = ast.fatten(child);                                        \
+#define VISIT_UNARY(name)                                            \
+    void visit_##name(Node const& /*node*/, NodeId child) override { \
+        j["child"] = ast->fatten(child);                             \
     }
 
     VISIT_UNARY(addrof);
@@ -237,52 +230,50 @@ struct JsonVisitor : public Visitor {
 
 #undef VISIT_UNARY
 
-    void visit_struct_type(Ast&                    ast, const Node& /*node*/,
+    void visit_struct_type(const Node& /*node*/,
                            std::span<const NodeId> fields) override {
-        j["fields"] = ast.fatten(fields);
+        j["fields"] = ast->fatten(fields);
     }
 
-    void visit_struct_field(Ast&             ast, Node const& /*node*/,
-                            std::string_view name, NodeId type,
-                            NodeId init) override {
+    void visit_struct_field(Node const& /*node*/, std::string_view name,
+                            NodeId type, NodeId init) override {
         j["name"] = name;
-        j["type"] = ast.fatten(type);
-        if (init.is_valid()) j["init"] = ast.fatten(init);
+        j["type"] = ast->fatten(type);
+        if (init.is_valid()) j["init"] = ast->fatten(init);
     }
 
-    void visit_ptr(Ast& ast, Node const& /*node*/, bool is_const,
-                   NodeId inner) override {
+    void visit_ptr(Node const& /*node*/, bool is_const, NodeId inner) override {
         j["is_const"] = is_const;
-        j["inner"] = ast.fatten(inner);
+        j["inner"] = ast->fatten(inner);
     }
 
-    void visit_mptr(Ast& ast, Node const& /*node*/, bool is_const,
+    void visit_mptr(Node const& /*node*/, bool is_const,
                     NodeId inner) override {
         j["is_const"] = is_const;
-        j["inner"] = ast.fatten(inner);
+        j["inner"] = ast->fatten(inner);
     }
 
-    void visit_slice(Ast& ast, Node const& /*node*/, bool is_const,
+    void visit_slice(Node const& /*node*/, bool is_const,
                      NodeId inner) override {
         j["is_const"] = is_const;
-        j["inner"] = ast.fatten(inner);
+        j["inner"] = ast->fatten(inner);
     }
 
-    void visit_array_type(Ast& ast, Node const& /*node*/, bool is_const,
-                          NodeId size, NodeId inner) override {
+    void visit_array_type(Node const& /*node*/, bool is_const, NodeId size,
+                          NodeId inner) override {
         j["is_const"] = is_const;
-        j["size"] = ast.fatten(size);
-        j["inner"] = ast.fatten(inner);
+        j["size"] = ast->fatten(size);
+        j["inner"] = ast->fatten(inner);
     }
 
-    void visit_array(Ast& ast, Node const& /*node*/, NodeId size, NodeId inner,
+    void visit_array(Node const& /*node*/, NodeId size, NodeId inner,
                      std::span<NodeId const> items) override {
-        if (size.is_valid()) j["size"] = ast.fatten(size);
-        j["inner"] = ast.fatten(inner);
-        j["items"] = ast.fatten(items);
+        if (size.is_valid()) j["size"] = ast->fatten(size);
+        j["inner"] = ast->fatten(inner);
+        j["items"] = ast->fatten(items);
     }
 
-    void visit_lit(Ast&                    ast, Node const& /*node*/,
+    void visit_lit(Node const& /*node*/,
                    std::span<NodeId const> items) override {
         auto arr = json::array();
 
@@ -290,12 +281,12 @@ struct JsonVisitor : public Visitor {
         for (size_t i = 0; i < items.size(); i += 2) {
             if (items[i].is_valid()) {
                 arr.push_back(json{
-                    { "name",     ast.fatten(items[i])},
-                    {"value", ast.fatten(items[i + 1])},
+                    { "name",     ast->fatten(items[i])},
+                    {"value", ast->fatten(items[i + 1])},
                 });
             } else {
                 arr.push_back(json{
-                    {"value", ast.fatten(items[i + 1])},
+                    {"value", ast->fatten(items[i + 1])},
                 });
             }
         }
@@ -303,71 +294,68 @@ struct JsonVisitor : public Visitor {
         j["items"] = arr;
     }
 
-    void visit_call(Ast& ast, Node const& /*node*/, NodeId callee,
+    void visit_call(Node const& /*node*/, NodeId callee,
                     std::span<NodeId const> args) override {
         auto arr = json::array();
-        for (auto const& arg : args) arr.push_back(ast.fatten(arg));
-        j["callee"] = ast.fatten(callee);
+        for (auto const& arg : args) arr.push_back(ast->fatten(arg));
+        j["callee"] = ast->fatten(callee);
         j["args"] = arr;
     }
 
-    void visit_field(Ast& ast, Node const& /*node*/, NodeId receiver,
+    void visit_field(Node const& /*node*/, NodeId receiver,
                      std::string_view name) override {
         j["name"] = name;
-        j["receiver"] = ast.fatten(receiver);
+        j["receiver"] = ast->fatten(receiver);
     }
 
     // ========================================================================
 
-    void visit_block(Ast&                    ast, Node const& /*node*/,
+    void visit_block(Node const& /*node*/,
                      std::span<NodeId const> children) override {
         auto arr = json::array();
-        for (auto const& child : children) arr.push_back(ast.fatten(child));
+        for (auto const& child : children) arr.push_back(ast->fatten(child));
         j["children"] = arr;
     }
 
-    void visit_expr_stmt(Ast&   ast, Node const& /*node*/,
-                         NodeId child) override {
-        j["child"] = ast.fatten(child);
+    void visit_expr_stmt(Node const& /*node*/, NodeId child) override {
+        j["child"] = ast->fatten(child);
     }
 
-    void visit_return_stmt(Ast&   ast, Node const& /*node*/,
-                           NodeId child) override {
-        if (child.is_valid()) j["child"] = ast.fatten(child);
+    void visit_return_stmt(Node const& /*node*/, NodeId child) override {
+        if (child.is_valid()) j["child"] = ast->fatten(child);
     }
 
-    void visit_if_stmt(Ast& ast, Node const& /*node*/, NodeId cond, NodeId wt,
+    void visit_if_stmt(Node const& /*node*/, NodeId cond, NodeId wt,
                        NodeId wf) override {
-        j["cond"] = ast.fatten(cond);
-        j["wt"] = ast.fatten(wt);
-        if (wf.is_valid()) j["wf"] = ast.fatten(wf);
+        j["cond"] = ast->fatten(cond);
+        j["wt"] = ast->fatten(wt);
+        if (wf.is_valid()) j["wf"] = ast->fatten(wf);
     }
 
-    void visit_while_stmt(Ast& ast, Node const& /*node*/, NodeId cond,
+    void visit_while_stmt(Node const& /*node*/, NodeId cond,
                           NodeId body) override {
-        j["cond"] = ast.fatten(cond);
-        j["body"] = ast.fatten(body);
+        j["cond"] = ast->fatten(cond);
+        j["body"] = ast->fatten(body);
     }
 
-    void visit_var_decl(Ast& ast, Node const& /*node*/, NodeId ids,
-                        NodeId types, NodeId inits) override {
-        j["ids"] = ast.fatten(ids);
-        if (types.is_valid()) j["types"] = ast.fatten(types);
-        if (inits.is_valid()) j["inits"] = ast.fatten(inits);
+    void visit_var_decl(Node const& /*node*/, NodeId ids, NodeId types,
+                        NodeId inits) override {
+        j["ids"] = ast->fatten(ids);
+        if (types.is_valid()) j["types"] = ast->fatten(types);
+        if (inits.is_valid()) j["inits"] = ast->fatten(inits);
     }
 
-    void visit_def_decl(Ast& ast, Node const& /*node*/, NodeId ids,
-                        NodeId types, NodeId inits) override {
-        j["ids"] = ast.fatten(ids);
-        if (types.is_valid()) j["types"] = ast.fatten(types);
-        j["inits"] = ast.fatten(inits);
+    void visit_def_decl(Node const& /*node*/, NodeId ids, NodeId types,
+                        NodeId inits) override {
+        j["ids"] = ast->fatten(ids);
+        if (types.is_valid()) j["types"] = ast->fatten(types);
+        j["inits"] = ast->fatten(inits);
     }
 
-#define VISIT_ASSIGN(name)                                                    \
-    void visit_##name(Ast& ast, Node const& /*node*/, NodeId lhs, NodeId rhs) \
-        override {                                                            \
-        j["lhs"] = ast.fatten(lhs);                                           \
-        j["rhs"] = ast.fatten(rhs);                                           \
+#define VISIT_ASSIGN(name)                                                     \
+    void visit_##name(Node const& /*node*/, NodeId lhs, NodeId rhs) override { \
+        j["lhs"] = ast->fatten(lhs);                                           \
+        j["rhs"] = ast->fatten(rhs);                                           \
     }
 
     VISIT_ASSIGN(assign);
@@ -396,8 +384,8 @@ auto FatNodeId::dump_to_ctx(fmt::format_context& ctx) const
 }
 
 void to_json(json& j, FatNodeId const& n) {
-    auto v = JsonVisitor{j, true};
-    v.visit(*n.ast, n.id);
+    auto v = JsonVisitor{*n.ast, j, true};
+    v.visit(n.id);
 }
 
 void to_json(json& j, FatNodeArray const& n) {

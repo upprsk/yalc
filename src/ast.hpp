@@ -292,8 +292,8 @@ public:
     }
 
 public:
-    [[nodiscard]] constexpr auto fatten(NodeId id) -> FatNodeId;
-    [[nodiscard]] constexpr auto fatten(std::span<NodeId const> ids)
+    [[nodiscard]] constexpr auto fatten(NodeId id) const -> FatNodeId;
+    [[nodiscard]] constexpr auto fatten(std::span<NodeId const> ids) const
         -> FatNodeArray;
 
 public:
@@ -480,23 +480,23 @@ private:
 };
 
 struct FatNodeId {
-    Ast*   ast;
-    NodeId id;
+    Ast const* ast;
+    NodeId     id;
 
     auto dump_to_ctx(fmt::format_context& ctx) const
         -> fmt::format_context::iterator;
 };
 
 struct FatNodeArray {
-    Ast*                    ast;
+    Ast const*              ast;
     std::span<NodeId const> ids;
 };
 
-constexpr auto Ast::fatten(NodeId id) -> FatNodeId {
+constexpr auto Ast::fatten(NodeId id) const -> FatNodeId {
     return {.ast = this, .id = id};
 }
 
-constexpr auto Ast::fatten(std::span<NodeId const> ids) -> FatNodeArray {
+constexpr auto Ast::fatten(std::span<NodeId const> ids) const -> FatNodeArray {
     return {.ast = this, .ids = ids};
 }
 

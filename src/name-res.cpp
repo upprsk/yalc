@@ -20,66 +20,66 @@ using ast::Ast;
 using ast::Node;
 using ast::NodeId;
 
-struct DependsVisitor : public ast::Visitor {
+struct DependsVisitor : public ast::Visitor<> {
     struct Local {
         std::string_view name;
         size_t           level;
     };
 
-    explicit DependsVisitor(ErrorReporter* er) : er{er} {}
+    explicit DependsVisitor(Ast const& ast, ErrorReporter* er)
+        : ast::Visitor<>{ast}, er{er} {}
 
     // ========================================================================
 
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    void visit_before_source_file(Ast& ast, Node const& /*node*/,
-                                  NodeId /*mod*/,
+    void visit_before_source_file(Node const& /*node*/, NodeId /*mod*/,
                                   std::span<NodeId const> children) override {
         for (auto source_file_child : children) {
-            auto node = ast.get_node(source_file_child.as_ref());
+            auto node = ast->get_node(source_file_child.as_ref());
             if (node.get_kind() == ast::NodeKind::TopVarDecl) {
-                auto child = ast.get_node(node.get_first().as_ref());
+                auto child = ast->get_node(node.get_first().as_ref());
                 ASSERT(child.get_kind() == ast::NodeKind::VarDecl);
 
-                auto ids = ast.get_node(child.get_first().as_ref());
+                auto ids = ast->get_node(child.get_first().as_ref());
                 ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
 
-                auto names = ast.get_array(ids.get_first().as_count(),
-                                           ids.get_second().as_array());
+                auto names = ast->get_array(ids.get_first().as_count(),
+                                            ids.get_second().as_array());
 
                 for (auto id : names) {
-                    define_top(ast.get_identifier(id.as_id()),
+                    define_top(ast->get_identifier(id.as_id()),
                                source_file_child);
                 }
             }
 
             else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
-                auto child = ast.get_node(node.get_first().as_ref());
+                auto child = ast->get_node(node.get_first().as_ref());
                 ASSERT(child.get_kind() == ast::NodeKind::DefDecl);
 
-                auto ids = ast.get_node(child.get_first().as_ref());
+                auto ids = ast->get_node(child.get_first().as_ref());
                 ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
 
-                auto names = ast.get_array(ids.get_first().as_count(),
-                                           ids.get_second().as_array());
+                auto names = ast->get_array(ids.get_first().as_count(),
+                                            ids.get_second().as_array());
 
                 for (auto id : names) {
-                    define_top(ast.get_identifier(id.as_id()),
+                    define_top(ast->get_identifier(id.as_id()),
                                source_file_child);
                 }
             }
 
             else if (node.get_kind() == ast::NodeKind::FuncDecl) {
-                auto ids = ast.get_node(node.get_first().as_ref());
+                auto ids = ast->get_node(node.get_first().as_ref());
                 ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
 
-                auto names = ast.get_array(ids.get_first().as_count(),
-                                           ids.get_second().as_array());
+                auto names = ast->get_array(ids.get_first().as_count(),
+                                            ids.get_second().as_array());
 
                 // we only want to add a function name to the top-level if it is
                 // not namespaced (since namespaced things are not a problem for
                 // name resolution.
                 if (names.size() == 1) {
-                    define_top(ast.get_identifier(names[0].as_id()),
+                    define_top(ast->get_identifier(names[0].as_id()),
                                source_file_child);
                 }
             }
@@ -93,7 +93,7 @@ struct DependsVisitor : public ast::Visitor {
         }
     }
 
-    void visit_before_func_decl(Ast& /*ast*/, Node const& node,
+    void visit_before_func_decl(Node const& node,
                                 std::span<NodeId const> /*decorators*/,
                                 NodeId /*name*/,
                                 std::span<NodeId const> /*gargs*/,
@@ -103,7 +103,7 @@ struct DependsVisitor : public ast::Visitor {
         current_decl = node.get_id();
     }
 
-    void visit_after_func_decl(Ast& /*ast*/, Node const& /*node*/,
+    void visit_after_func_decl(Node const& /*node*/,
                                std::span<NodeId const> /*decorators*/,
                                NodeId /*name*/,
                                std::span<NodeId const> /*gargs*/,
@@ -113,36 +113,36 @@ struct DependsVisitor : public ast::Visitor {
         current_decl = NodeId::invalid();
     }
 
-    void visit_before_top_var_decl(Ast& /*ast*/, Node const& node,
+    void visit_before_top_var_decl(Node const& node,
                                    std::span<NodeId const> /*decorators*/,
                                    NodeId /*child*/) override {
         current_decl = node.get_id();
     }
 
-    void visit_after_top_var_decl(Ast& /*ast*/, Node const& /*node*/,
+    void visit_after_top_var_decl(Node const& /*node*/,
                                   std::span<NodeId const> /*decorators*/,
                                   NodeId /*child*/) override {
         current_decl = NodeId::invalid();
     }
 
-    void visit_before_top_def_decl(Ast& /*ast*/, Node const& node,
+    void visit_before_top_def_decl(Node const& node,
                                    std::span<NodeId const> /*decorators*/,
                                    NodeId /*child*/) override {
         current_decl = node.get_id();
     }
 
-    void visit_after_top_def_decl(Ast& /*ast*/, Node const& /*node*/,
+    void visit_after_top_def_decl(Node const& /*node*/,
                                   std::span<NodeId const> /*decorators*/,
                                   NodeId /*child*/) override {
         current_decl = NodeId::invalid();
     }
 
-    void visit_before_block(Ast& /*ast*/, Node const& /*node*/,
+    void visit_before_block(Node const& /*node*/,
                             std::span<NodeId const> /*children*/) override {
         level++;
     }
 
-    void visit_after_block(Ast& /*ast*/, Node const& /*node*/,
+    void visit_after_block(Node const& /*node*/,
                            std::span<NodeId const> /*children*/) override {
         ASSERT(level > 0);
 
@@ -150,26 +150,25 @@ struct DependsVisitor : public ast::Visitor {
         level--;
     }
 
-    void visit_var_decl(Ast& ast, Node const& /*node*/, NodeId ids,
-                        NodeId types, NodeId inits) override {
-        if (types.is_valid()) visit(ast, types);
-        if (inits.is_valid()) visit(ast, inits);
+    void visit_var_decl(Node const& /*node*/, NodeId ids, NodeId types,
+                        NodeId inits) override {
+        if (types.is_valid()) visit(types);
+        if (inits.is_valid()) visit(inits);
 
         if (level > 0) {
-            auto id_pack = ast.get_node(ids.as_ref());
+            auto id_pack = ast->get_node(ids.as_ref());
             ASSERT(id_pack.get_kind() == ast::NodeKind::IdPack);
 
-            auto names = ast.get_array(id_pack.get_first().as_count(),
-                                       id_pack.get_second().as_array());
+            auto names = ast->get_array(id_pack.get_first().as_count(),
+                                        id_pack.get_second().as_array());
 
             for (auto id : names) {
-                add_local(ast.get_identifier(id.as_id()));
+                add_local(ast->get_identifier(id.as_id()));
             }
         }
     }
 
-    void visit_id(Ast& /*ast*/, Node const& /*node*/,
-                  std::string_view id) override {
+    void visit_id(Node const& /*node*/, std::string_view id) override {
         if (is_local(id)) return;
 
         auto top = lookup_top(id);
@@ -300,8 +299,8 @@ auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er)
     auto mod =
         ast.new_module(node.get_loc(), mod_name, std::array{node.get_id()});
 
-    auto dv = DependsVisitor{&er};
-    dv.visit(ast, root);
+    auto dv = DependsVisitor{ast, &er};
+    dv.visit(root);
 
     auto order = topo_sort(ast, er, dv.dag);
     for (auto const& n : order) {
