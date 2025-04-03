@@ -280,6 +280,10 @@ public:
                         NodeId::invalid());
     }
 
+    auto new_defer_stmt(Location loc, NodeId stmt) -> NodeId {
+        return new_node(NodeKind::DeferStmt, loc, stmt, NodeId::invalid());
+    }
+
     auto new_var_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
         -> NodeId {
         return new_node(NodeKind::VarDecl, loc, ids,

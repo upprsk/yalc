@@ -153,6 +153,10 @@ struct WhileStmt {
     NodeId body;
 };
 
+struct DeferStmt {
+    NodeId stmt;
+};
+
 struct VarDecl {
     NodeId ids;
     NodeId types;
@@ -363,6 +367,10 @@ constexpr auto if_stmt(Ast const& ast, Node const& n) -> IfStmt {
 
 constexpr auto while_stmt(Ast const& /*unused*/, Node const& n) -> WhileStmt {
     return {.cond = n.get_first(), .body = n.get_second()};
+}
+
+constexpr auto defer_stmt(Ast const& /*unused*/, Node const& n) -> DeferStmt {
+    return {.stmt = n.get_first()};
 }
 
 constexpr auto var_decl(Ast const& ast, Node const& n) -> VarDecl {

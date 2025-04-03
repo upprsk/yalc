@@ -392,6 +392,9 @@ enum class NodeKind : uint16_t {
     /// Continue statement.
     Continue,
 
+    /// Defer statement.
+    DeferStmt,
+
     /// A variable declaration.
     ///
     ///     var a, b: T, U = 1, 2;
@@ -560,6 +563,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::WhileStmt: name = "WhileStmt"; break;
         case NodeKind::Break: name = "Break"; break;
         case NodeKind::Continue: name = "Continue"; break;
+        case NodeKind::DeferStmt: name = "DeferStmt"; break;
         case NodeKind::VarDecl: name = "VarDecl"; break;
         case NodeKind::DefDecl: name = "DefDecl"; break;
         case NodeKind::Assign: name = "Assign"; break;

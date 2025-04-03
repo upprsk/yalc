@@ -339,6 +339,11 @@ struct JsonVisitor : public Visitor<> {
         j["body"] = ast->fatten(data.body);
     }
 
+    void visit_defer_stmt(Node const& /*node*/,
+                          conv::DeferStmt const& data) override {
+        j["stmt"] = ast->fatten(data.stmt);
+    }
+
     void visit_var_decl(Node const& /*node*/,
                         conv::VarDecl const& data) override {
         j["ids"] = ast->fatten(data.ids);

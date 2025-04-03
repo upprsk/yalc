@@ -1013,6 +1013,7 @@ struct Parser {
         if (check("def")) return parse_def_decl();
         if (check("if")) return parse_if_stmt();
         if (check("while")) return parse_while_stmt();
+        if (check("defer")) return parse_defer_stmt();
 
         if (check(TokenType::Lbrace)) return parse_block();
 
@@ -1129,6 +1130,14 @@ struct Parser {
         auto body = parse_block();
 
         return ast.new_while_stmt(start.extend(prev_span()), cond, body);
+    }
+
+    auto parse_defer_stmt() -> ast::NodeId {
+        auto start = loc();
+        try(consume("defer"));
+
+        auto stmt = parse_stmt();
+        return ast.new_defer_stmt(start.extend(prev_span()), stmt);
     }
 
     // ------------------------------------------------------------------------

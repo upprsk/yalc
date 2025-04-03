@@ -241,6 +241,10 @@ struct Visitor {
             case NodeKind::Break: visit_break(node); break;
             case NodeKind::Continue: visit_continue(node); break;
 
+            case NodeKind::DeferStmt:
+                visit_defer_stmt(node, conv::defer_stmt(*ast, node));
+                break;
+
             case NodeKind::VarDecl:
                 visit_var_decl(node, conv::var_decl(*ast, node));
                 break;
@@ -541,6 +545,11 @@ struct Visitor {
 
     virtual void visit_break(Node const& node) {}
     virtual void visit_continue(Node const& node) {}
+
+    virtual void visit_defer_stmt(Node const&            node,
+                                  conv::DeferStmt const& data) {
+        visit(data.stmt);
+    }
 
     virtual void visit_var_decl(Node const& node, conv::VarDecl const& data) {
         visit(data.ids);
