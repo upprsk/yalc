@@ -176,21 +176,23 @@ struct Assign {
 
 // ------------------------------------------------------------------
 
-constexpr auto module(Ast const& ast, Node const& n) -> Module {
+[[nodiscard]] constexpr auto module(Ast const& ast, Node const& n) -> Module {
     return {
         .name = ast.get_identifier(n.get_first().as_id()),
         .children = ast.get_array(n.get_second().as_array()),
     };
 }
 
-constexpr auto source_file(Ast const& ast, Node const& n) -> SourceFile {
+[[nodiscard]] constexpr auto source_file(Ast const& ast, Node const& n)
+    -> SourceFile {
     return {
         .mod = n.get_first(),
         .children = ast.get_array(n.get_second().as_array()),
     };
 }
 
-constexpr auto func_decl(Ast const& ast, Node const& n) -> FuncDecl {
+[[nodiscard]] constexpr auto func_decl(Ast const& ast, Node const& n)
+    -> FuncDecl {
     auto     second = ast.get_array_unbounded(n.get_second().as_array());
     uint32_t idx{};
 
@@ -222,65 +224,76 @@ constexpr auto func_decl(Ast const& ast, Node const& n) -> FuncDecl {
     };
 }
 
-constexpr auto top_var_decl(Ast const& ast, Node const& n) -> TopVarDecl {
+[[nodiscard]] constexpr auto top_var_decl(Ast const& ast, Node const& n)
+    -> TopVarDecl {
     return {
         .decorators = ast.get_array(n.get_second().as_array()),
         .decl = n.get_first(),
     };
 }
 
-constexpr auto top_def_decl(Ast const& ast, Node const& n) -> TopDefDecl {
+[[nodiscard]] constexpr auto top_def_decl(Ast const& ast, Node const& n)
+    -> TopDefDecl {
     return {
         .decorators = ast.get_array(n.get_second().as_array()),
         .decl = n.get_first(),
     };
 }
 
-constexpr auto id_pack(Ast const& ast, Node const& n) -> IdPack {
+[[nodiscard]] constexpr auto id_pack(Ast const& ast, Node const& n) -> IdPack {
     return {.ids = ast.get_array(n.get_first().as_count(),
                                  n.get_second().as_array())};
 }
 
-constexpr auto func_param(Ast const& ast, Node const& n) -> FuncParam {
+[[nodiscard]] constexpr auto func_param(Ast const& ast, Node const& n)
+    -> FuncParam {
     return {.name = ast.get_identifier(n.get_first().as_id()),
             .type = n.get_second()};
 }
 
-constexpr auto ret_pack(Ast const& ast, Node const& n) -> RetPack {
+[[nodiscard]] constexpr auto ret_pack(Ast const& ast, Node const& n)
+    -> RetPack {
     return {.ret = ast.get_array(n.get_first().as_count().of_kv(),
                                  n.get_second().as_array())};
 }
 
-constexpr auto decorator(Ast const& ast, Node const& n) -> Decorator {
+[[nodiscard]] constexpr auto decorator(Ast const& ast, Node const& n)
+    -> Decorator {
     return {
         .params = ast.get_array_of_kv(n.get_second().as_array()),
         .name = ast.get_identifier(n.get_first().as_id()),
     };
 }
 
-constexpr auto import_stmt(Ast const& ast, Node const& n) -> ImportStmt {
+[[nodiscard]] constexpr auto import_stmt(Ast const& ast, Node const& n)
+    -> ImportStmt {
     return {.path = ast.get_bytes_as_string_view(n.get_first().as_bytes())};
 }
 
-constexpr auto expr_pack(Ast const& ast, Node const& n) -> ExprPack {
+[[nodiscard]] constexpr auto expr_pack(Ast const& ast, Node const& n)
+    -> ExprPack {
     return {.items = ast.get_array(n.get_first().as_count(),
                                    n.get_second().as_array())};
 }
 
-constexpr auto binary(Ast const& /*unused*/, Node const& n) -> Binary {
+[[nodiscard]] constexpr auto binary(Ast const& /*unused*/, Node const& n)
+    -> Binary {
     return {.lhs = n.get_first(), .rhs = n.get_second()};
 }
 
-constexpr auto unary(Ast const& /*unused*/, Node const& n) -> Unary {
+[[nodiscard]] constexpr auto unary(Ast const& /*unused*/, Node const& n)
+    -> Unary {
     return {.child = n.get_first()};
 }
 
-constexpr auto struct_type(Ast const& ast, Node const& n) -> StructType {
+[[nodiscard]] constexpr auto struct_type(Ast const& ast, Node const& n)
+    -> StructType {
     return {.fields = ast.get_array(n.get_first().as_count(),
                                     n.get_second().as_array())};
 }
 
-constexpr auto struct_field(Ast const& ast, Node const& n) -> StructField {
+[[nodiscard]] constexpr auto struct_field(Ast const& ast, Node const& n)
+    -> StructField {
     auto parts = ast.get_array({2}, n.get_second().as_array());
     return {
         .name = ast.get_identifier(n.get_first().as_id()),
@@ -289,28 +302,31 @@ constexpr auto struct_field(Ast const& ast, Node const& n) -> StructField {
     };
 }
 
-constexpr auto ptr(Ast const& /*unused*/, Node const& n) -> Ptr {
+[[nodiscard]] constexpr auto ptr(Ast const& /*unused*/, Node const& n) -> Ptr {
     return {
         .inner = n.get_first(),
         .is_const = n.get_kind() == NodeKind::PtrConst,
     };
 }
 
-constexpr auto mptr(Ast const& /*unused*/, Node const& n) -> MultiPtr {
+[[nodiscard]] constexpr auto mptr(Ast const& /*unused*/, Node const& n)
+    -> MultiPtr {
     return {
         .inner = n.get_first(),
         .is_const = n.get_kind() == NodeKind::MultiPtrConst,
     };
 }
 
-constexpr auto slice(Ast const& /*unused*/, Node const& n) -> Slice {
+[[nodiscard]] constexpr auto slice(Ast const& /*unused*/, Node const& n)
+    -> Slice {
     return {
         .inner = n.get_first(),
         .is_const = n.get_kind() == NodeKind::SliceConst,
     };
 }
 
-constexpr auto array_type(Ast const& /*unused*/, Node const& n) -> ArrayType {
+[[nodiscard]] constexpr auto array_type(Ast const& /*unused*/, Node const& n)
+    -> ArrayType {
     return {
         .size = n.get_second(),
         .inner = n.get_first(),
@@ -318,7 +334,7 @@ constexpr auto array_type(Ast const& /*unused*/, Node const& n) -> ArrayType {
     };
 }
 
-constexpr auto array(Ast const& ast, Node const& n) -> Array {
+[[nodiscard]] constexpr auto array(Ast const& ast, Node const& n) -> Array {
     auto second = ast.get_array_unbounded(n.get_second().as_array());
     auto size = second[0];
     auto items = second.subspan(2, second[1].as_count().value);
@@ -330,31 +346,31 @@ constexpr auto array(Ast const& ast, Node const& n) -> Array {
     };
 }
 
-constexpr auto lit(Ast const& ast, Node const& n) -> Lit {
+[[nodiscard]] constexpr auto lit(Ast const& ast, Node const& n) -> Lit {
     return {.items = ast.get_array(n.get_first().as_count().of_kv(),
                                    n.get_second().as_array())};
 }
 
-constexpr auto call(Ast const& ast, Node const& n) -> Call {
+[[nodiscard]] constexpr auto call(Ast const& ast, Node const& n) -> Call {
     return {
         .callee = n.get_first(),
         .args = ast.get_array(n.get_second().as_array()),
     };
 }
 
-constexpr auto field(Ast const& ast, Node const& n) -> Field {
+[[nodiscard]] constexpr auto field(Ast const& ast, Node const& n) -> Field {
     return {
         .name = ast.get_identifier(n.get_second().as_id()),
         .receiver = n.get_first(),
     };
 }
 
-constexpr auto block(Ast const& ast, Node const& n) -> Block {
+[[nodiscard]] constexpr auto block(Ast const& ast, Node const& n) -> Block {
     return {.items = ast.get_array(n.get_first().as_count(),
                                    n.get_second().as_array())};
 }
 
-constexpr auto if_stmt(Ast const& ast, Node const& n) -> IfStmt {
+[[nodiscard]] constexpr auto if_stmt(Ast const& ast, Node const& n) -> IfStmt {
     if (n.get_kind() == NodeKind::IfStmt)
         return {.cond = n.get_first(),
                 .wt = n.get_second(),
@@ -365,37 +381,43 @@ constexpr auto if_stmt(Ast const& ast, Node const& n) -> IfStmt {
     return {.cond = n.get_first(), .wt = second[0], .wf = second[1]};
 }
 
-constexpr auto while_stmt(Ast const& /*unused*/, Node const& n) -> WhileStmt {
+[[nodiscard]] constexpr auto while_stmt(Ast const& /*unused*/, Node const& n)
+    -> WhileStmt {
     return {.cond = n.get_first(), .body = n.get_second()};
 }
 
-constexpr auto defer_stmt(Ast const& /*unused*/, Node const& n) -> DeferStmt {
+[[nodiscard]] constexpr auto defer_stmt(Ast const& /*unused*/, Node const& n)
+    -> DeferStmt {
     return {.stmt = n.get_first()};
 }
 
-constexpr auto var_decl(Ast const& ast, Node const& n) -> VarDecl {
+[[nodiscard]] constexpr auto var_decl(Ast const& ast, Node const& n)
+    -> VarDecl {
     auto second = ast.get_array({2}, n.get_second().as_array());
     return {.ids = n.get_first(), .types = second[0], .inits = second[1]};
 }
 
-constexpr auto def_decl(Ast const& ast, Node const& n) -> DefDecl {
+[[nodiscard]] constexpr auto def_decl(Ast const& ast, Node const& n)
+    -> DefDecl {
     auto second = ast.get_array({2}, n.get_second().as_array());
     return {.ids = n.get_first(), .types = second[0], .inits = second[1]};
 }
 
-constexpr auto assign(Ast const& /*unused*/, Node const& n) -> Assign {
+[[nodiscard]] constexpr auto assign(Ast const& /*unused*/, Node const& n)
+    -> Assign {
     return {.lhs = n.get_first(), .rhs = n.get_second()};
 }
 
 // ------------------------------------------------------------------
 
 /// Get the inner `IdPack` of a func-decl
-constexpr auto func_decl_id_pack(Node const& n) -> NodeId {
+[[nodiscard]] constexpr auto func_decl_id_pack(Node const& n) -> NodeId {
     return n.get_first();
 }
 
 /// Get the names of the inner `IdPack` of a func-decl
-constexpr auto func_decl_name(Ast const& ast, Node const& n) -> IdPack {
+[[nodiscard]] constexpr auto func_decl_name(Ast const& ast, Node const& n)
+    -> IdPack {
     auto ids = ast.get_node(func_decl_id_pack(n).as_ref());
     ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
 
@@ -403,7 +425,8 @@ constexpr auto func_decl_name(Ast const& ast, Node const& n) -> IdPack {
 }
 
 /// Get the inner `IdPack` for the given top-var-decl
-constexpr auto top_var_decl_id_pack(Ast const& ast, Node const& n) -> NodeId {
+[[nodiscard]] constexpr auto top_var_decl_id_pack(Ast const& ast, Node const& n)
+    -> NodeId {
     auto child = ast.get_node(n.get_first().as_ref());
     ASSERT(child.get_kind() == ast::NodeKind::VarDecl);
 
@@ -411,7 +434,8 @@ constexpr auto top_var_decl_id_pack(Ast const& ast, Node const& n) -> NodeId {
 }
 
 /// Get the names of the inner `IdPack` for the given top-var-decl
-constexpr auto top_var_decl_names(Ast const& ast, Node const& n) -> IdPack {
+[[nodiscard]] constexpr auto top_var_decl_names(Ast const& ast, Node const& n)
+    -> IdPack {
     auto ids = ast.get_node(top_var_decl_id_pack(ast, n).as_ref());
     ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
 
@@ -419,7 +443,8 @@ constexpr auto top_var_decl_names(Ast const& ast, Node const& n) -> IdPack {
 }
 
 /// Get the inner `IdPack` for the given top-def-decl
-constexpr auto top_def_decl_id_pack(Ast const& ast, Node const& n) -> NodeId {
+[[nodiscard]] constexpr auto top_def_decl_id_pack(Ast const& ast, Node const& n)
+    -> NodeId {
     auto child = ast.get_node(n.get_first().as_ref());
     ASSERT(child.get_kind() == ast::NodeKind::DefDecl);
 
@@ -427,7 +452,8 @@ constexpr auto top_def_decl_id_pack(Ast const& ast, Node const& n) -> NodeId {
 }
 
 /// Get the names of the inner `IdPack` for the given top-def-decl
-constexpr auto top_def_decl_names(Ast const& ast, Node const& n) -> IdPack {
+[[nodiscard]] constexpr auto top_def_decl_names(Ast const& ast, Node const& n)
+    -> IdPack {
     auto ids = ast.get_node(top_def_decl_id_pack(ast, n).as_ref());
     ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
 
