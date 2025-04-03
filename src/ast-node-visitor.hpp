@@ -45,10 +45,9 @@ struct Visitor {
             case NodeKind::Char: visit_char(node, node.cast_u32()); break;
 
             case NodeKind::Module:
-                visit_module(
-                    node,
-                    ast->get_bytes_as_string_view(node.get_first().as_bytes()),
-                    ast->get_array(node.get_second().as_array()));
+                visit_module(node,
+                             ast->get_identifier(node.get_first().as_id()),
+                             ast->get_array(node.get_second().as_array()));
                 break;
             case NodeKind::SourceFile:
                 visit_source_file(node, node.get_first(),
