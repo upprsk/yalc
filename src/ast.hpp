@@ -266,6 +266,7 @@ public:
     }
 
     auto new_while_stmt(Location loc, NodeId cond, NodeId body) -> NodeId {
+        // NOLINTNEXTLINE(readability-suspicious-call-argument)
         return new_node(NodeKind::WhileStmt, loc, cond, body);
     }
 
