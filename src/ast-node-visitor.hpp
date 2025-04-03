@@ -83,6 +83,10 @@ struct Visitor {
                 visit_decorator(node, conv::decorator(*ast, node));
                 break;
 
+            case NodeKind::ImportStmt:
+                visit_import_stmt(node, conv::import_stmt(*ast, node));
+                break;
+
             case NodeKind::ExprPack:
                 visit_expr_pack(node, conv::expr_pack(*ast, node));
                 break;
@@ -403,6 +407,9 @@ struct Visitor {
             if (params[i + 1].is_valid()) visit(params[i + 1]);
         }
     }
+
+    virtual void visit_import_stmt(Node const&             node,
+                                   conv::ImportStmt const& data) {}
 
     // =======================================================================
 

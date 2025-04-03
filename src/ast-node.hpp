@@ -198,6 +198,11 @@ enum class NodeKind : uint16_t {
     /// <inval>]`. When there is just a value, we have `[<inval>, {value}]`.
     Decorator,
 
+    /// Import statement.
+    ///
+    /// - `first` points to the library import path string.
+    ImportStmt,
+
     /// -----------
     /// Expressions
     /// -----------
@@ -508,6 +513,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
         case NodeKind::Decorator: name = "Decorator"; break;
+        case NodeKind::ImportStmt: name = "ImportStmt"; break;
         case NodeKind::ExprPack: name = "ExprPack"; break;
         case NodeKind::Add: name = "Add"; break;
         case NodeKind::Sub: name = "Sub"; break;

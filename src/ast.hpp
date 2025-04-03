@@ -155,6 +155,11 @@ public:
                         new_ref_array_of_idpair_with_size(items));
     }
 
+    auto new_import_stmt(Location loc, std::string_view path) -> NodeId {
+        return new_node(NodeKind::ImportStmt, loc, new_bytes(path),
+                        NodeId ::invalid());
+    }
+
     // -----------
     // Expressions
     // -----------

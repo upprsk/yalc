@@ -265,8 +265,22 @@ struct Parser {
         return ast.new_err(prev_loc());
     }
 
-    auto parse_import() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_import() -> ast::NodeId {
+        auto start = loc();
+        try(consume("import"));
+
+        auto path = span();
+        try(consume(TokenType::Str));
+        try(consume(TokenType::Semi));
+
+        auto s = path.str(source);
+        s = s.substr(1, s.size() - 2);
+        auto result = escape_string(*er, path, s);
+        return ast.new_import_stmt(start.extend(prev_span()), result);
+    }
+
     auto parse_part() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+
     auto parse_top_decl_attr() -> ast::NodeId {
         auto start = loc();
         try(consume(TokenType::Decorator));

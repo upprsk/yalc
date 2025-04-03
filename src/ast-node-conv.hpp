@@ -65,6 +65,10 @@ struct Decorator {
     std::string_view        name;
 };
 
+struct ImportStmt {
+    std::string_view path;
+};
+
 struct ExprPack {
     std::span<NodeId const> items;
 };
@@ -248,6 +252,10 @@ constexpr auto decorator(Ast const& ast, Node const& n) -> Decorator {
         .params = ast.get_array_of_kv(n.get_second().as_array()),
         .name = ast.get_identifier(n.get_first().as_id()),
     };
+}
+
+constexpr auto import_stmt(Ast const& ast, Node const& n) -> ImportStmt {
+    return {.path = ast.get_bytes_as_string_view(n.get_first().as_bytes())};
 }
 
 constexpr auto expr_pack(Ast const& ast, Node const& n) -> ExprPack {

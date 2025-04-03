@@ -178,6 +178,11 @@ struct JsonVisitor : public Visitor<> {
         j["params"] = arr;
     }
 
+    void visit_import_stmt(Node const& /*node*/,
+                           conv::ImportStmt const& data) override {
+        j["path"] = data.path;
+    }
+
     // ========================================================================
 
     void visit_expr_pack(Node const& /*node*/,
