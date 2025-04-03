@@ -23,6 +23,8 @@ using ast::NodeId;
 namespace conv = ast::conv;
 
 struct DependsVisitor : public ast::Visitor<> {
+    using Dag = std::unordered_map<NodeId, std::unordered_set<NodeId>>;
+
     struct Local {
         std::string_view name;
         size_t           level;
@@ -55,12 +57,12 @@ struct DependsVisitor : public ast::Visitor<> {
                 }
             }
 
-            else if (node.get_kind() == ast::NodeKind::FuncDecl) {
+            else if (node.get_kind() == ast::NodeKind::FuncDecl ||
+                     node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
                 auto names = conv::func_decl_name(*ast, node);
 
-                // we only want to add a function name to the top-level if it is
-                // not namespaced (since namespaced things are not a problem for
-                // name resolution.
+                // if we have just one id, then this is not namespaced. We take
+                // care of namespaced functions on another pass.
                 if (names.ids.size() == 1) {
                     define_top(ast->get_identifier(names.ids[0].as_id()),
                                source_file_child);
@@ -72,6 +74,41 @@ struct DependsVisitor : public ast::Visitor<> {
                     "received top-level kind was not implemented in name "
                     "resolution",
                     node.get_kind());
+            }
+        }
+    }
+
+    void visit_after_source_file(Node const& /*node*/,
+                                 conv::SourceFile const& data) override {
+        auto rev_dag = build_reverse_dag();
+
+        for (auto source_file_child : data.children) {
+            auto node = ast->get_node(source_file_child.as_ref());
+
+            if (node.get_kind() == ast::NodeKind::FuncDecl ||
+                node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
+                auto names = conv::func_decl_name(*ast, node);
+
+                // namespaced function, this means that everyone that depends on
+                // the wrapped type also possibly depends on the namespaced
+                // functions.
+                if (names.ids.size() != 1) {
+                    // find what is the type that is beeing wrapped
+                    auto ty =
+                        lookup_top(ast->get_identifier(names.ids[0].as_id()));
+                    if (!ty.is_valid()) break;
+
+                    // find all things that depend on the wrapped type
+                    auto it = rev_dag.find(ty);
+                    if (it == end(rev_dag)) break;
+
+                    for (auto const dep_on_ty : it->second) {
+                        if (dep_on_ty != source_file_child) {
+                            // make it depend on the namespaced function
+                            dag[dep_on_ty].insert(source_file_child);
+                        }
+                    }
+                }
             }
         }
     }
@@ -156,6 +193,15 @@ struct DependsVisitor : public ast::Visitor<> {
         return it->second;
     }
 
+    constexpr auto build_reverse_dag() const -> Dag {
+        Dag rev_dag;
+        for (auto const& [key, deps_on] : dag) {
+            for (auto const& dep_on : deps_on) rev_dag[dep_on].insert(key);
+        }
+
+        return rev_dag;
+    }
+
     // ========================================================================
 
     constexpr void clean_level() {
@@ -176,10 +222,10 @@ struct DependsVisitor : public ast::Visitor<> {
         return it != end(v);
     }
 
-    std::unordered_map<NodeId, std::unordered_set<NodeId>> dag;
-    std::unordered_map<std::string_view, NodeId>           tops;
-    std::vector<Local>                                     env;
-    size_t                                                 level = 0;
+    Dag                                          dag;
+    std::unordered_map<std::string_view, NodeId> tops;
+    std::vector<Local>                           env;
+    size_t                                       level = 0;
 
     NodeId         current_decl = NodeId::invalid();
     ErrorReporter* er;
@@ -214,7 +260,7 @@ struct TopoSorter {
         sorted.push_back(n);
     }
 
-    std::unordered_map<NodeId, std::unordered_set<NodeId>> const* dag;
+    DependsVisitor::Dag const* dag;
 
     std::vector<NodeId>        sorted;
     std::unordered_set<NodeId> temp;
@@ -227,10 +273,8 @@ struct TopoSorter {
     bool should_stop = false;
 };
 
-auto topo_sort(
-    Ast const& ast, ErrorReporter& er,
-    std::unordered_map<NodeId, std::unordered_set<NodeId>> const& dag)
-    -> std::vector<NodeId> {
+auto topo_sort(Ast const& ast, ErrorReporter& er,
+               DependsVisitor::Dag const& dag) -> std::vector<NodeId> {
     std::vector<NodeId> unmarked;
     for (auto const& [n, _] : dag) {
         unmarked.push_back(n);
