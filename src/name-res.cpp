@@ -34,8 +34,11 @@ void do_the_thing(FileStore& fs, ErrorReporter& er, Location const& from,
     sfs::path from_filepath = fs.get_filename(from.fileid);
     auto      import_path = sfs::absolute(from_filepath).parent_path() / path;
 
-    er.report_note(from, "import of {:?} from {:?} (full path: {:?})", path,
-                   from_filepath.string(), import_path.string());
+    er.report_bug(
+        from, "importing has not been implemented, showing some debug info");
+
+    er.report_debug(from, "import of {:?} from {:?} (full path: {:?})", path,
+                    from_filepath.string(), import_path.string());
     if (sfs::is_directory(import_path)) {
         for (auto const& item : sfs::directory_iterator{import_path}) {
             if (!item.is_regular_file()) continue;
@@ -44,8 +47,8 @@ void do_the_thing(FileStore& fs, ErrorReporter& er, Location const& from,
             if (!item_path.filename().string().ends_with(YAL_EXTENSION))
                 continue;
 
-            er.report_note(from, "import of {:?} found file {:?}", path,
-                           item_path.string());
+            er.report_debug(from, "import of {:?} found file {:?}", path,
+                            item_path.string());
         }
     }
 
