@@ -20,8 +20,9 @@ class ErrorReporterForFile {
     static constexpr auto const note_style = fmt::fg(fmt::color::cyan);
     static constexpr auto const debug_style =
         fmt::fg(fmt::color::medium_purple);
-    static constexpr auto const bug_style =
-        fmt::fg(fmt::color::crimson) | fmt::emphasis::bold;
+    static constexpr auto const bug_style = fmt::bg(fmt::color::crimson) |
+                                            fmt::fg(fmt::color::white) |
+                                            fmt::emphasis::bold;
 
 public:
     constexpr ErrorReporterForFile(FileId fileid, std::string source,

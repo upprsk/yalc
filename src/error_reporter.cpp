@@ -49,7 +49,7 @@ void ErrorReporterForFile::report(Span s, std::string_view prefix,
     }
 
     if (isatty(fd)) {
-        fmt::print(out, color, "{0: <{1}}{0:^<{2}}", "",
+        fmt::print(out, "{0: <{2}}{1:^<{3}}", "", fmt::styled("", color),
                    2 + 4 + 3 + s.begin - ls, std::min(s.end, le) - s.begin);
     } else {
         fmt::print(out, "{0: <{1}}{0:^<{2}}", "", 2 + 4 + 3 + s.begin - ls,
