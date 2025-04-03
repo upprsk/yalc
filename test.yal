@@ -1,30 +1,4 @@
-module main;
-
-def Counter = struct { cnt: i32 = 0, total: i32 };
-func Counter.next(
-    c: *Counter,
-) (i32, bool) {
-    if c.cnt == c.total {
-        return c.cnt, false;
-    }
-
-    var v = c.cnt;
-    c.cnt += 1;
-    return v, true;
+module test;
+func test() {
+    defer cleanup();
 }
-
-func main() {
-    var c: Counter = .{ .total = 10 };
-    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
-
-    while true {
-        var it, ok = c.next();
-        if !ok { break; }
-
-        c_printf("it=%d\n", it);
-    }
-}
-
-@extern(link_name="printf")
-func c_printf(fmt: cstring, ...);
-def cstring = [*]const u8;

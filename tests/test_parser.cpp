@@ -664,6 +664,31 @@ func test() {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("defer stmt");
+
+    run_test(ctx, p, "minimal", R"(
+module test;
+func test() {
+    defer magic;
+}
+)");
+
+    run_test(ctx, p, "with if", R"(
+module test;
+func test() {
+    defer if do_it != nil { free(do_it); }
+}
+)");
+
+    run_test(ctx, p, "with call", R"(
+module test;
+func test() {
+    defer cleanup();
+}
+)");
+
+    ctx.tags.pop_back();
+
     ctx.tags.emplace_back("calls");
 
     run_test(ctx, p, "minimal", R"(
