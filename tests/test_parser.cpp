@@ -128,6 +128,14 @@ func main() i32 {
 
     ctx.tags.pop_back();
 
+    ctx.tags.emplace_back("imports");
+
+    run_test(ctx, p, "import statement", R"(module test; import "some_lib";)");
+    run_test(ctx, p, "import expression/def",
+             R"(module test; def slib = import "some_lib";)", true);
+
+    ctx.tags.pop_back();
+
     ctx.tags.emplace_back("top-level var");
     run_test(ctx, p, "simple", R"(module test; var GLOBAL = 10;)");
     run_test(ctx, p, "simple 2",
