@@ -11,10 +11,10 @@
 namespace yal {
 
 struct Options {
-    bool dump_tokens;
-    bool dump_ast;
-    bool dump_each_ast_json;
-    bool single_file;
+    bool dump_tokens = false;
+    bool dump_ast = false;
+    bool dump_each_ast_json = false;
+    bool single_file = false;
 };
 
 auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
