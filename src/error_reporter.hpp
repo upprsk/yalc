@@ -71,11 +71,11 @@ public:
 
     template <typename... T>
     void report_bug(Span s, fmt::format_string<T...> fmt, T&&... args) {
-        error_count++;
         vreport_bug(s, fmt, fmt::make_format_args(args...));
     }
 
     void vreport_bug(Span s, fmt::string_view fmt, fmt::format_args args) {
+        error_count++;
         report(s, "bug", bug_style, fmt, args);
     }
 
@@ -183,12 +183,13 @@ public:
 
     template <typename... T>
     void report_error(Location const& loc, fmt::format_string<T...> fmt,
-                      T&&... args) const {
+                      T&&... args) {
         vreport_error(loc, fmt, fmt::make_format_args(args...));
     }
 
     void vreport_error(Location const& loc, fmt::string_view fmt,
-                       fmt::format_args args) const {
+                       fmt::format_args args) {
+        error_count++;
         for_file(loc).vreport_error(loc.span, fmt, args);
     }
 
@@ -227,12 +228,13 @@ public:
 
     template <typename... T>
     void report_bug(Location const& loc, fmt::format_string<T...> fmt,
-                    T&&... args) const {
+                    T&&... args) {
         vreport_bug(loc, fmt, fmt::make_format_args(args...));
     }
 
     void vreport_bug(Location const& loc, fmt::string_view fmt,
-                     fmt::format_args args) const {
+                     fmt::format_args args) {
+        error_count++;
         for_file(loc).vreport_bug(loc.span, fmt, args);
     }
 
