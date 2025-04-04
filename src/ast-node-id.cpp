@@ -6,7 +6,13 @@
 
 namespace yal::ast {
 
-void to_json(json &j, NodeId const &n) { j = n.value(); }
+void to_json(json &j, NodeId const &n) {
+    if (n.is_valid())
+        j = n.value();
+    else
+        j = {};  // null
+}
+
 void from_json(json const &j, NodeId &n) {
     n = NodeId::from_raw_data(j.get<uint32_t>());
 }
