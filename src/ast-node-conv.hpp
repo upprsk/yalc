@@ -5,8 +5,14 @@
 
 #include "ast-node-id.hpp"
 #include "ast.hpp"
+#include "decl-store.hpp"
 
 namespace yal::ast::conv {
+
+struct Id {
+    std::string_view name;
+    DeclId           to;
+};
 
 struct Module {
     std::string_view        name;
@@ -184,6 +190,13 @@ struct Assign {
 };
 
 // ------------------------------------------------------------------
+
+[[nodiscard]] constexpr auto id(Ast const& ast, Node const& n) -> Id {
+    return {
+        .name = ast.get_identifier(n.get_first().as_id()),
+        .to = n.get_second().as_declref().value,
+    };
+}
 
 [[nodiscard]] constexpr auto module(Ast const& ast, Node const& n) -> Module {
     return {

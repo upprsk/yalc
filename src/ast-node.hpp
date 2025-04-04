@@ -23,6 +23,9 @@ enum class NodeKind : uint16_t {
     /// An identifier.
     //
     /// - `first` points to the identifier in the store.
+    /// - `second` points to the declaration for the id. This will be invalid
+    /// before name resolution, and may remain invalid if the name is not
+    /// defined.
     Id,
 
     /// A keyword literal (`.id`)
@@ -482,6 +485,10 @@ public:
     [[nodiscard]] constexpr auto cast_float() const -> float {
         return std::bit_cast<float>(first.value());
     }
+
+    // ------------------------------------------------------------------------
+
+    constexpr void set_second(NodeId v) { second = v; }
 
 private:
     NodeKind kind;

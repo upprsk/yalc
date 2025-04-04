@@ -27,9 +27,7 @@ struct Visitor {
         switch (node.get_kind()) {
             case NodeKind::Err: visit_err(node); break;
 
-            case NodeKind::Id:
-                visit_id(node, ast->get_identifier(node.get_first().as_id()));
-                break;
+            case NodeKind::Id: visit_id(node, conv::id(*ast, node)); break;
             case NodeKind::KwLit:
                 visit_kw_lit(node,
                              ast->get_identifier(node.get_first().as_id()));
@@ -294,7 +292,7 @@ struct Visitor {
     virtual void visit_before(Node const& node) {}
 
     virtual void visit_err(Node const& node) {}
-    virtual void visit_id(Node const& node, std::string_view id) {}
+    virtual void visit_id(Node const& node, conv::Id const& id) {}
     virtual void visit_kw_lit(Node const& node, std::string_view id) {}
     virtual void visit_int(Node const& node, uint64_t value) {}
     virtual void visit_double(Node const& node, double value) {}

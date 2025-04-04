@@ -30,8 +30,9 @@ struct JsonVisitor : public Visitor<> {
         }
     }
 
-    void visit_id(Node const& /*node*/, std::string_view id) override {
-        j["value"] = id;
+    void visit_id(Node const& /*node*/, conv::Id const& id) override {
+        j["value"] = id.name;
+        j["to"] = id.to;
     }
 
     void visit_kw_lit(Node const& /*node*/, std::string_view id) override {
@@ -61,12 +62,13 @@ struct JsonVisitor : public Visitor<> {
     // ========================================================================
 
     void visit_module(Node const& /*node*/, conv::Module const& data) override {
-        j["name"] = data.name;
-
         auto arr = json::array();
         for (auto const& child : data.children) {
             arr.push_back(ast->fatten(child));
         }
+
+        j["name"] = data.name;
+        j["files"] = arr;
     }
 
     void visit_source_file(Node const& /*node*/,

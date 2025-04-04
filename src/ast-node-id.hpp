@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "decl-id.hpp"
 #include "file-store.hpp"
 #include "nlohmann/json_fwd.hpp"
 
@@ -37,6 +38,10 @@ struct NodeIdOfFile {
     FileId value;
 };
 
+struct NodeIdOfDeclRef {
+    DeclId value;
+};
+
 /// A handle to an AST node. It is a "stable pointer" that is also half the size
 /// on 64bits.
 ///
@@ -47,6 +52,7 @@ struct NodeIdOfFile {
 /// - A count (for how many nodes in the array for example).
 /// - An identifier.
 /// - A file id in the file store.
+/// - A declaration id in the decl store.
 /// - Raw bytes (for strings and such).
 /// - An arbitrary 64bit integer by joining 2 handles.
 /// - An arbitrary 64bit floating point number by joining 2 handles.
@@ -94,6 +100,7 @@ public:
     [[nodiscard]] constexpr auto as_count() const -> NodeIdOfCount { return {data}; }
     [[nodiscard]] constexpr auto as_id() const -> NodeIdOfId { return {data}; }
     [[nodiscard]] constexpr auto as_file() const -> NodeIdOfFile { return {FileId::from_raw_data(data)}; }
+    [[nodiscard]] constexpr auto as_declref() const -> NodeIdOfDeclRef { return {DeclId::from_raw_data(data)}; }
     [[nodiscard]] constexpr auto as_bytes() const -> NodeIdOfBytes { return {data}; }
     // clang-format on
 

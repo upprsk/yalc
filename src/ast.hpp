@@ -324,6 +324,15 @@ public:
         return nodes.at(h.value);
     }
 
+    [[nodiscard]] constexpr auto get_node_ref(NodeIdOfRef h) const
+        -> Node const& {
+        return nodes.at(h.value);
+    }
+
+    [[nodiscard]] constexpr auto get_node_ref(NodeIdOfRef h) -> Node& {
+        return nodes.at(h.value);
+    }
+
     // get an array of nodes from the given length and id.
     [[nodiscard]] constexpr auto get_array(NodeIdOfCount length,
                                            NodeIdOfArray h) const

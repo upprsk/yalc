@@ -240,10 +240,10 @@ struct DependsVisitor : public ast::Visitor<> {
         }
     }
 
-    void visit_id(Node const& /*node*/, std::string_view id) override {
-        if (is_local(id)) return;
+    void visit_id(Node const& /*node*/, conv::Id const& id) override {
+        if (is_local(id.name)) return;
 
-        auto top = lookup_top(id);
+        auto top = lookup_top(id.name);
         if (!top.is_valid()) return;
 
         ASSERT(current_decl.is_valid());
@@ -566,23 +566,27 @@ struct NameSolver : public ast::Visitor<Ast> {
 
     // ------------------------------------------------------------------------
 
-    void visit_id(Node const& node, std::string_view id) override {
-        auto decl_id = lookup_name(std::string{id});
+    void visit_id(Node const& node, conv::Id const& id) override {
+        auto decl_id = lookup_name(std::string{id.name});
         if (!decl_id.is_valid()) {
-            er->report_error(node.get_loc(), "undefined identifier {:?}", id);
+            er->report_error(node.get_loc(), "undefined identifier {:?}",
+                             id.name);
             return;
         }
 
-        auto const& decl = ds.get_decl(decl_id);
+        auto& ref = ast->get_node_ref(node.get_id().as_ref());
+        ref.set_second(NodeId::from_raw_data(decl_id.value()));
 
-        if (decl.node.is_valid()) {
-            er->report_note(
-                node.get_loc(),
-                "found decl for id {:?}: {}: local_name={}, name={}, node={}",
-                id, decl_id, decl.local_name, decl.name, decl.node);
-            er->report_debug(ast->get_node_loc(decl.node.as_ref()),
-                             "defined here");
-        }
+        // auto const& decl = ds.get_decl(decl_id);
+        // if (decl.node.is_valid()) {
+        //     er->report_note(
+        //         node.get_loc(),
+        //         "found decl for id {:?}: {}: local_name={}, name={},
+        //         node={}", id.name, decl_id, decl.local_name, decl.name,
+        //         decl.node);
+        //     er->report_debug(ast->get_node_loc(decl.node.as_ref()),
+        //                      "defined here");
+        // }
     }
 
     // ========================================================================
