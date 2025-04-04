@@ -121,6 +121,13 @@ struct DependsVisitor : public ast::Visitor<> {
             if (names.ids.size() == 1) {
                 define_top(ast->get_identifier(names.ids[0].as_id()), top_decl);
             }
+
+            // the dependencies should come from what we namespaced over, but if
+            // the thing we wrap is not defined, then it does not end-up in the
+            // DAG. So we dummy-define the thing we wrap
+            else {
+                dag[top_decl] = {};
+            }
         }
 
         else if (node.get_kind() == ast::NodeKind::ImportStmt) {
@@ -195,6 +202,29 @@ struct DependsVisitor : public ast::Visitor<> {
         current_decl = NodeId::invalid();
     }
 
+    // NOTE: this is basically a copy of the default implementation in Visitor<>
+    void visit_func_decl(Node const&           node,
+                         conv::FuncDecl const& data) override {
+        visit_before_func_decl(node, data);
+
+        for (auto const& dec : data.decorators) visit(dec);
+        visit(data.name);
+
+        // open a scope for the arguments and returns
+        level++;
+
+        for (auto const& garg : data.gargs) visit(garg);
+        for (auto const& arg : data.args) visit(arg);
+        if (data.ret.is_valid()) visit(data.ret);
+        if (data.body.is_valid()) visit(data.body);
+
+        visit_after_func_decl(node, data);
+
+        // close the scope (could put this in visit_after_func_decl, but putting
+        // it in another function would mean that I would forget it).
+        level--;
+    }
+
     void visit_before_block(Node const& /*node*/,
                             conv::Block const& /*data*/) override {
         level++;
@@ -208,6 +238,31 @@ struct DependsVisitor : public ast::Visitor<> {
         level--;
     }
 
+    void visit_after_ret_pack(Node const& /*node*/,
+                              conv::RetPack const& data) override {
+        auto ret = data.ret;
+        ASSERT((ret.size() & 1) == 0);
+
+        for (size_t i = 0; i < ret.size(); i += 2) {
+            if (ret[i].is_valid()) {
+                add_local(ast->get_identifier(ret[i].as_id()));
+            }
+        }
+    }
+
+    void visit_def_decl(Node const& /*node*/,
+                        conv::DefDecl const& data) override {
+        if (data.types.is_valid()) visit(data.types);
+        if (data.inits.is_valid()) visit(data.inits);
+
+        if (level > 0) {
+            auto names = conv::id_pack(*ast, ast->get_node(data.ids.as_ref()));
+            for (auto id : names.ids) {
+                add_local(ast->get_identifier(id.as_id()));
+            }
+        }
+    }
+
     void visit_var_decl(Node const& /*node*/,
                         conv::VarDecl const& data) override {
         if (data.types.is_valid()) visit(data.types);
@@ -219,6 +274,11 @@ struct DependsVisitor : public ast::Visitor<> {
                 add_local(ast->get_identifier(id.as_id()));
             }
         }
+    }
+
+    void visit_after_func_param(Node const& /*node*/,
+                                conv::FuncParam const& data) override {
+        add_local(data.name);
     }
 
     void visit_id(Node const& /*node*/, conv::Id const& id) override {

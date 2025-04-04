@@ -195,6 +195,17 @@ struct NameSolver : public ast::Visitor<Ast> {
         if (names.ids.size() == 1) {
             auto name = ast->get_identifier(names.ids[0].as_id());
             define_at_mod(std::string{name}, node.get_id());
+        } else {
+            // this is namespaced, check that what we namespace under exists
+            auto const& name = ast->get_identifier(names.ids[0].as_id());
+            auto        decl_id = lookup_name(name);
+            if (!decl_id.is_valid()) {
+                er->report_error(node.get_loc(), "undefined identifier {:?}",
+                                 name);
+                return;
+            }
+
+            // TODO: store the namespace in the func decl
         }
 
         for (auto const& id : names.ids) {
