@@ -237,7 +237,10 @@ struct NameSolver : public ast::Visitor<Ast> {
         ASSERT((ret.size() & 1) == 0);
 
         for (size_t i = 0; i < ret.size(); i += 2) {
-            define_at_top(ast->get_identifier(ret[i].as_id()), node.get_id());
+            if (ret[i].is_valid()) {
+                define_at_top(ast->get_identifier(ret[i].as_id()),
+                              node.get_id());
+            }
         }
     }
 
