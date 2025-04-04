@@ -9,6 +9,7 @@
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
 #include "test_helpers.hpp"
+#include "test_name_res.hpp"
 #include "test_parser.hpp"
 #include "test_tokenizer.hpp"
 #include "tokenizer.hpp"
@@ -98,6 +99,12 @@ auto real_main(Args args) -> int {
 
     {
         auto [tok, tfailed] = test_parser(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
+    {
+        auto [tok, tfailed] = test_name_res(p);
         ok += tok;
         failed += tfailed;
     }

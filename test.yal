@@ -1,10 +1,21 @@
 module main;
 
+def Counter = struct { cnt: i32 = 0, total: i32 };
+func Counter.next(
+    c: *Counter,
+) (i32, bool) {
+    if c.cnt == c.total {
+        return c.cnt, false;
+    }
+
+    var v = c.cnt;
+    c.cnt += 1;
+    return v, true;
+}
+
 func main() {
     var c: Counter = .{ .total = 10 };
     c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
-
-    start;
 
     while true {
         var it, ok = c.next();

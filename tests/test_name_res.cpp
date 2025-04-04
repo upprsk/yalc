@@ -2,6 +2,7 @@
 
 #include "error_reporter.hpp"
 #include "file-store.hpp"
+#include "name-res.hpp"
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
 #include "test_helpers.hpp"
@@ -9,7 +10,7 @@
 
 using json = nlohmann::json;
 
-auto gen_ast(std::string source) -> json {
+auto gen_ast_resolved(std::string source) -> json {
     char*  buf = nullptr;
     size_t bufsize = 0;
 
@@ -39,7 +40,17 @@ auto gen_ast(std::string source) -> json {
         };
     }
 
-    return ast.fatten(ast_root);
+    auto prj_root =
+        yal::resolve_names(ast, ast_root, er, fs, {.single_file = true});
+    fflush(f.get());
+
+    if (er.had_error()) {
+        return json{
+            {"stderr", std::string_view{buf, bufsize}}
+        };
+    }
+
+    return ast.fatten(prj_root);
 }
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,
@@ -50,5 +61,75 @@ static void run_test(Context& ctx, TestParams const& p, std::string name,
         return;
     }
 
-    run_checks_for_test(ctx, p, name, [&]() { return gen_ast(source); });
+    run_checks_for_test(ctx, p, name,
+                        [&]() { return gen_ast_resolved(source); });
+}
+
+auto test_name_res(TestParams const& p) -> std::pair<int, int> {
+    Context ctx{
+        .tags = {"name resolution"}, .filters = p.filters, .tests_ran = {}};
+
+    fmt::println("==============================");
+
+    run_test(ctx, p, "empty file", "");
+    run_test(ctx, p, "minimal", "module main;");
+
+    run_test(ctx, p, "hello world libc", R"(
+module main;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+func main() {
+    c_printf("Hello, %s!\n", "World");
+}
+)");
+
+    run_test(ctx, p, "hello world libc with shbang", R"(
+#!/usr/local/bin/yalc run
+module main;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+func main() {
+    c_printf("Hello, %s!\n", "World");
+}
+)");
+
+    run_test(ctx, p, "counter example", R"(
+module main;
+
+def Counter = struct { cnt: i32 = 0, total: i32 };
+func Counter.next(
+    c: *Counter,
+) (i32, bool) {
+    if c.cnt == c.total {
+        return c.cnt, false;
+    }
+
+    var v = c.cnt;
+    c.cnt += 1;
+    return v, true;
+}
+
+func main() {
+    var c: Counter = .{ .total = 10 };
+    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
+
+    while true {
+        var it, ok = c.next();
+        if !ok { break; }
+
+        c_printf("it=%d\n", it);
+    }
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    fmt::println("name resolver tests, {} tests, {} success, {} failed",
+                 ctx.total(), ctx.ok, ctx.failed);
+    return {ctx.ok, ctx.failed};
 }

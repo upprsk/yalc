@@ -3,6 +3,8 @@ add_executable(tests
     test_helpers.cpp
     test_helpers.hpp
     test_main.cpp
+    test_name_res.cpp
+    test_name_res.hpp
     test_parser.cpp
     test_parser.hpp
     test_tokenizer.cpp
