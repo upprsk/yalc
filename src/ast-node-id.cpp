@@ -16,5 +16,6 @@ void from_json(json const &j, NodeId &n) {
 auto fmt::formatter<yal::ast::NodeId>::format(yal::ast::NodeId nid,
                                               format_context  &ctx) const
     -> format_context::iterator {
+    if (!nid.is_valid()) return fmt::format_to(ctx.out(), "NodeId(<invalid>)");
     return fmt::format_to(ctx.out(), "NodeId({})", nid.value());
 }
