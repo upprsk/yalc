@@ -380,6 +380,17 @@ public:
 
     // -----------------------------------------------------------------------
 
+    // get an array of nodes from the given id. The length is stored at the
+    // first pointed-to location.
+    [[nodiscard]] constexpr auto get_array_mut(NodeIdOfArray h)
+        -> std::span<NodeId> {
+        auto      length = refs_array.at(h.value).as_count();
+        std::span view = refs_array;
+
+        return view.subspan(h.value + 1, length.value);
+    }
+    // -----------------------------------------------------------------------
+
     // allocate a new identifier from `identifiers`
     [[nodiscard]] auto new_identifier(std::string_view s) -> NodeId {
         auto sz = identifiers.size();
