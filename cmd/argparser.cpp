@@ -20,6 +20,7 @@ void print_help(std::string_view self) {
     println(stderr, "options:");
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
+    println(stderr, "    --single-file: single file compilation mode.");
     println(stderr, "    --dump-tokens: dump tokenization result.");
     println(stderr, "    --dump-ast: dump parsed AST.");
     println(stderr, "    --dump-ast-json: dump parsed AST as json.");
@@ -46,7 +47,9 @@ auto argparse(int argc, char** argv) -> Args {
             exit(0);
         }
 
-        if (arg == "--dump-tokens") {
+        if (arg == "--single-file") {
+            args.single_file = true;
+        } else if (arg == "--dump-tokens") {
             args.dump_tokens = true;
         } else if (arg == "--dump-ast") {
             args.dump_ast = true;

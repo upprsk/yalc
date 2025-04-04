@@ -28,7 +28,8 @@ auto real_main(yalc::Args const& args) -> int {
 
     auto opt = yal::Options{.dump_tokens = args.dump_tokens,
                             .dump_ast = args.dump_ast,
-                            .dump_ast_json = args.dump_ast_json};
+                            .dump_ast_json = args.dump_ast_json,
+                            .single_file = args.single_file};
 
     auto [ast, root] = yal::load_and_parse(fs, er, args.program, opt);
 
