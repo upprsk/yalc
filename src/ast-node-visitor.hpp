@@ -400,12 +400,21 @@ struct Visitor {
 
     virtual void visit_func_ret_pack(Node const&          node,
                                      conv::RetPack const& data) {
+        visit_before_ret_pack(node, data);
+
         auto ret = data.ret;
         ASSERT((ret.size() & 1) == 0);
         for (size_t i = 0; i < ret.size(); i += 2) {
             visit(ret[i + 1]);
         }
+
+        visit_after_ret_pack(node, data);
     }
+
+    virtual void visit_before_ret_pack(Node const&          node,
+                                       conv::RetPack const& data) {}
+    virtual void visit_after_ret_pack(Node const&          node,
+                                      conv::RetPack const& data) {}
 
     virtual void visit_decorator(Node const&            node,
                                  conv::Decorator const& data) {

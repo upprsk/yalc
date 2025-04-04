@@ -231,6 +231,16 @@ struct NameSolver : public ast::Visitor<Ast> {
         define_at_top(std::string{data.name}, node.get_id());
     }
 
+    void visit_after_ret_pack(Node const&          node,
+                              conv::RetPack const& data) override {
+        auto ret = data.ret;
+        ASSERT((ret.size() & 1) == 0);
+
+        for (size_t i = 0; i < ret.size(); i += 2) {
+            define_at_top(ast->get_identifier(ret[i].as_id()), node.get_id());
+        }
+    }
+
     // ------------------------------------------------------------------------
 
     void visit_id(Node const& node, conv::Id const& id) override {
