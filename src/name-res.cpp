@@ -416,6 +416,13 @@ auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
 auto parse_all_files_into_module(ast::Ast& ast, ast::Node const& start_node,
                                  Node const& mod_decl, FileStore& fs,
                                  ErrorReporter& er, Options const& opt) {
+    // when in single file mode, ignore scanning the directory
+    if (opt.single_file) {
+        auto mod_name = conv::module_decl(ast, mod_decl).name;
+        return ast.new_module(start_node.get_loc(), mod_name,
+                              std::array{start_node.get_id()});
+    }
+
     auto start_filename = fs.get_filename(start_node.get_loc().fileid);
     auto all_files = find_all_source_files(start_filename);
 

@@ -14,6 +14,7 @@ struct Options {
     bool dump_tokens;
     bool dump_ast;
     bool dump_ast_json;
+    bool single_file;
 };
 
 auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
