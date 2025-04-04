@@ -15,6 +15,8 @@ add_library(yal
     error_reporter.hpp
     file-store.cpp
     file-store.hpp
+    name-order.cpp
+    name-order.hpp
     name-res.cpp
     name-res.hpp
     parser.cpp
