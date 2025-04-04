@@ -85,6 +85,43 @@ func main() {
 }
 )");
 
+    ctx.tags.emplace_back("simple functions");
+    run_test(ctx, p, "void function 1", R"(module f; func f() {})");
+    run_test(ctx, p, "void function 2", R"(module f;
+
+func f() {})");
+    run_test(ctx, p, "void function with comment", R"(module f;
+
+// hello! this is a test function
+func f() {})");
+    run_test(ctx, p, "with parameter", R"(module main;
+func main(a: i32) i32 {})");
+    run_test(ctx, p, "with parameters", R"(module main;
+func main(a: i32, b: i32) i32 {})");
+    run_test(ctx, p, "with parameter with no type", R"(module main;
+func main(a, b: i32) {})");
+    run_test(ctx, p, "with named return", R"(module main;
+func main(a: i32, b: i32) (r: i32) { r = a + b; })");
+    run_test(ctx, p, "with multiple return values", R"(module main;
+func main(a: i32, b: i32) (i32, i32) {})");
+    run_test(ctx, p, "with multiple return values 2", R"(module main;
+func main(a: i32, b: i32) (i32, i32) { return a, b; })");
+    run_test(ctx, p, "with multiple named return values", R"(module main;
+func main(a: i32, b: i32) (x: i32, y: i32) {})");
+    run_test(ctx, p, "with mixed return values", R"(module main;
+func main() (i32, y: i32) {})");
+    run_test(ctx, p, "bare return", R"(module f; func f() { return; })");
+    run_test(ctx, p, "main function", R"(module main;
+
+func main() i32 {
+    return 0;
+})");
+    run_test(ctx, p, "namespaced", R"(module f; func g.f() {})");
+    run_test(ctx, p, "namespaced 2", R"(module f; func g.f(a) b {})");
+    run_test(ctx, p, "namespaced 3",
+             R"(module f; func f.g(a, b: int) (c: int) {})");
+    ctx.tags.pop_back();
+
     run_test(ctx, p, "hello world libc with shbang", R"(
 #!/usr/local/bin/yalc run
 module main;
