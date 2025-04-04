@@ -1,3 +1,2 @@
-module f;
-
-func f.g(a, b: int) (c: int) {}
+module main;
+func main(a: i32, b: i32) (r: i32) {}
