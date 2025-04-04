@@ -7,6 +7,8 @@ add_library(yal
     ast-node-visitor.hpp
     ast.cpp
     ast.hpp
+    decl-store.cpp
+    decl-store.hpp
     error_reporter.cpp
     error_reporter.hpp
     file-store.cpp

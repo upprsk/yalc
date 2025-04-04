@@ -4,6 +4,8 @@ func main() {
     var c: Counter = .{ .total = 10 };
     c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
 
+    start;
+
     while true {
         var it, ok = c.next();
         if !ok { break; }

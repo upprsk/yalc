@@ -390,8 +390,15 @@ struct Visitor {
 
     virtual void visit_func_param(Node const&            node,
                                   conv::FuncParam const& data) {
+        visit_before_func_param(node, data);
         if (data.type.is_valid()) visit(data.type);
+        visit_after_func_param(node, data);
     }
+
+    virtual void visit_before_func_param(Node const&            node,
+                                         conv::FuncParam const& data) {}
+    virtual void visit_after_func_param(Node const&            node,
+                                        conv::FuncParam const& data) {}
 
     virtual void visit_func_ret_pack(Node const&          node,
                                      conv::RetPack const& data) {
@@ -551,16 +558,30 @@ struct Visitor {
     }
 
     virtual void visit_var_decl(Node const& node, conv::VarDecl const& data) {
+        visit_before_var_decl(node, data);
         visit(data.ids);
         if (data.types.is_valid()) visit(data.types);
         if (data.inits.is_valid()) visit(data.inits);
+        visit_after_var_decl(node, data);
     }
 
+    virtual void visit_before_var_decl(Node const&          node,
+                                       conv::VarDecl const& data) {}
+    virtual void visit_after_var_decl(Node const&          node,
+                                      conv::VarDecl const& data) {}
+
     virtual void visit_def_decl(Node const& node, conv::DefDecl const& data) {
+        visit_before_def_decl(node, data);
         visit(data.ids);
         if (data.types.is_valid()) visit(data.types);
         visit(data.inits);
+        visit_after_def_decl(node, data);
     }
+
+    virtual void visit_before_def_decl(Node const&          node,
+                                       conv::DefDecl const& data) {}
+    virtual void visit_after_def_decl(Node const&          node,
+                                      conv::DefDecl const& data) {}
 
 #define VISIT_ASSIGN(name)                                                  \
     virtual void visit_##name(Node const& node, conv::Assign const& data) { \

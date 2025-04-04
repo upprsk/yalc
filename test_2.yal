@@ -14,4 +14,3 @@ func Counter.next( c: *Counter) (i32, bool) {
     c.cnt += 1;
     return v, true;
 }
-

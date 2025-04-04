@@ -4,18 +4,24 @@
 #include <cstddef>
 #include <filesystem>
 #include <iterator>
+#include <numeric>
 #include <ranges>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 #include "ast-node-conv.hpp"
 #include "ast-node-id.hpp"
 #include "ast-node-visitor.hpp"
 #include "ast-node.hpp"
+#include "decl-store.hpp"
 #include "error_reporter.hpp"
 #include "file-store.hpp"
+#include "fmt/color.h"
+#include "fmt/format.h"
+#include "fmt/ranges.h"
 #include "libassert/assert.hpp"
 #include "yal.hpp"
 
@@ -427,6 +433,280 @@ auto parse_all_files_into_module(ast::Ast& ast, ast::Node const& start_node,
     return ast.new_module(start_node.get_loc(), mod_name, files);
 }
 
+// ============================================================================
+
+struct NameSolver : public ast::Visitor<Ast> {
+    explicit NameSolver(FileStore& fs, ErrorReporter& er, Ast& ast)
+        : ast::Visitor<Ast>{ast}, er{&er}, fs{&fs} {
+        define_buitins();
+    }
+
+    void define_buitins() {
+        // push the root scope
+        push_env();
+
+        // FIXME: how do we reference back to this?
+        define_at_top("usize", NodeId::invalid());
+        define_at_top("isize", NodeId::invalid());
+
+        define_at_top("i64", NodeId::invalid());
+        define_at_top("u64", NodeId::invalid());
+        define_at_top("i32", NodeId::invalid());
+        define_at_top("u32", NodeId::invalid());
+        define_at_top("i16", NodeId::invalid());
+        define_at_top("u16", NodeId::invalid());
+        define_at_top("i8", NodeId::invalid());
+        define_at_top("u8", NodeId::invalid());
+
+        define_at_top("f32", NodeId::invalid());
+        define_at_top("f64", NodeId::invalid());
+
+        define_at_top("bool", NodeId::invalid());
+
+        define_at_top("true", NodeId::invalid());
+        define_at_top("false", NodeId::invalid());
+
+        define_at_top("nil", NodeId::invalid());
+    }
+
+    struct Env {
+        constexpr void set(std::string const& name, DeclId id) {
+            items[name] = id;
+        }
+
+        constexpr auto get(std::string const& name) const -> DeclId {
+            if (auto it = items.find(name); it != end(items)) return it->second;
+            return DeclId::invalid();
+        }
+
+        std::string                             scope_name;
+        std::unordered_map<std::string, DeclId> items;
+    };
+
+    // ========================================================================
+
+    void open_file(NodeId source_file) { push_env_of(source_file); }
+
+    void close_file(NodeId source_file) { pop_env_into(source_file); }
+
+    // ========================================================================
+
+    void visit_before_module(Node const& /*node*/,
+                             conv::Module const& data) override {
+        push_env(std::string{data.name});
+    }
+
+    void visit_after_module(Node const& /*node*/,
+                            conv::Module const& /*data*/) override {
+        pop_env();
+    }
+
+    // ------------------------------------------------------------------------
+
+    void visit_before_block(Node const& /*node*/,
+                            conv::Block const& /*data*/) override {
+        push_env();
+    }
+
+    void visit_after_block(Node const& /*node*/,
+                           conv::Block const& /*data*/) override {
+        pop_env();
+    }
+
+    // ------------------------------------------------------------------------
+
+    void visit_before_func_decl(Node const&           node,
+                                conv::FuncDecl const& data) override {
+        auto names = conv::id_pack(*ast, ast->get_node(data.name.as_ref()));
+        if (names.ids.size() == 1) {
+            auto name = ast->get_identifier(names.ids[0].as_id());
+            define_at_mod(std::string{name}, node.get_id());
+        }
+
+        for (auto const& id : names.ids) {
+            push_env(std::string{ast->get_identifier(id.as_id())});
+        }
+    }
+
+    void visit_after_func_decl(Node const& /*node*/,
+                               conv::FuncDecl const& data) override {
+        auto names = conv::id_pack(*ast, ast->get_node(data.name.as_ref()));
+        pop_env(names.ids.size());
+    }
+
+    void visit_after_var_decl(Node const&          node,
+                              conv::VarDecl const& data) override {
+        auto names = conv::id_pack(*ast, ast->get_node(data.ids.as_ref()));
+        for (auto nid : names.ids) {
+            auto const& name = ast->get_identifier(nid.as_id());
+            define_at_top(name, node.get_id());
+        }
+    }
+
+    void visit_after_def_decl(Node const&          node,
+                              conv::DefDecl const& data) override {
+        auto names = conv::id_pack(*ast, ast->get_node(data.ids.as_ref()));
+        for (auto nid : names.ids) {
+            auto const& name = ast->get_identifier(nid.as_id());
+            define_at_top(name, node.get_id());
+        }
+    }
+
+    void visit_after_func_param(Node const&            node,
+                                conv::FuncParam const& data) override {
+        define_at_top(std::string{data.name}, node.get_id());
+    }
+
+    // ------------------------------------------------------------------------
+
+    void visit_id(Node const& node, std::string_view id) override {
+        auto decl_id = lookup_name(std::string{id});
+        if (!decl_id.is_valid()) {
+            er->report_error(node.get_loc(), "undefined identifier {:?}", id);
+            return;
+        }
+
+        auto const& decl = ds.get_decl(decl_id);
+
+        if (decl.node.is_valid()) {
+            er->report_note(
+                node.get_loc(),
+                "found decl for id {:?}: {}: local_name={}, name={}, node={}",
+                id, decl_id, decl.local_name, decl.name, decl.node);
+            er->report_debug(ast->get_node_loc(decl.node.as_ref()),
+                             "defined here");
+        }
+    }
+
+    // ========================================================================
+
+    [[nodiscard]] constexpr auto lookup_name(std::string const& name) const
+        -> DeclId {
+        for (auto const& env : envs | std::ranges::views::reverse) {
+            if (auto id = env.get(name); id.is_valid()) return id;
+        }
+
+        return DeclId::invalid();
+    }
+
+    auto gen_name(std::string const& local_name) -> std::string {
+        namespace rv = std::ranges::views;
+
+        auto s = fmt::to_string(
+            fmt::join(envs | rv::filter([](Env const& env) {
+                          return !env.scope_name.empty();
+                      }) | rv::transform([](Env const& env) {
+                          return static_cast<std::string_view>(env.scope_name);
+                      }),
+                      "."));
+        if (s.empty()) return local_name;
+        return fmt::format("{}.{}", s, local_name);
+    }
+
+    constexpr auto define_at_file(std::string const& name, NodeId node)
+        -> DeclId {
+        return define_at(*get_file_env(), name, node);
+    }
+
+    constexpr auto define_at_mod(std::string const& name, NodeId node)
+        -> DeclId {
+        return define_at(*get_mod_env(), name, node);
+    }
+
+    constexpr auto define_at_top(std::string const& name, NodeId node)
+        -> DeclId {
+        return define_at(*get_top_env(), name, node);
+    }
+
+    constexpr auto define_at(Env& env, std::string const& name, NodeId node)
+        -> DeclId {
+        if (auto prev = lookup_name(name); prev.is_valid()) {
+            er->report_error(ast->get_node_loc(node.as_ref()),
+                             "redefinition of identifier '{}'", name);
+            er->report_note(ast->get_node_loc(ds.get_decl(prev).node.as_ref()),
+                            "previous value defined here");
+            return DeclId::invalid();
+        }
+
+        auto decl = ds.gen_decl({.name = gen_name(name),
+                                 .local_name = name,
+                                 .node = node,
+                                 .flags = {}});
+
+        env.set(name, decl);
+
+        return decl;
+    }
+
+    constexpr void push_env(std::string name = "") {
+        envs.push_back({.scope_name = name, .items = {}});
+    }
+
+    constexpr void push_env_of(NodeId source_id) {
+        push_env();
+        auto top = get_top_env();
+        for (auto const& [k, v] : file_envs[source_id].items) {
+            top->set(k, v);
+        }
+    }
+
+    constexpr void pop_env_into(NodeId source_id) {
+        auto& dst = file_envs[source_id].items;
+        auto  top = get_top_env();
+        for (auto const& [k, v] : top->items) {
+            dst[k] = v;
+        }
+    }
+
+    constexpr void pop_env() { envs.pop_back(); }
+    constexpr void pop_env(size_t cnt) {
+        for (size_t i = 0; i < cnt; i++) {
+            envs.pop_back();
+        }
+    }
+
+    constexpr auto get_top_env() -> Env* { return &envs.at(envs.size() - 1); }
+    constexpr auto get_root_env() -> Env* { return &envs.at(0); }
+    constexpr auto get_mod_env() -> Env* { return &envs.at(1); }
+    constexpr auto get_file_env() -> Env* { return &envs.at(2); }
+
+    // ------------------------------------------------------------------------
+
+    DeclStore ds;
+
+    // Env                             mod_env;
+    std::unordered_map<NodeId, Env> file_envs;
+    std::vector<Env>                envs;
+
+    ErrorReporter* er;
+    FileStore*     fs;
+};
+
+// ============================================================================
+
+auto make_map_of_decl_to_source_file(Ast const& ast, NodeId mod)
+    -> std::unordered_map<NodeId, NodeId> {
+    std::unordered_map<NodeId, NodeId> decl_to_source_file;
+
+    auto mod_node = ast.get_node(mod.as_ref());
+    ASSERT(mod_node.get_kind() == ast::NodeKind::Module);
+
+    for (auto source_file : conv::module(ast, mod_node).children) {
+        auto node = ast.get_node(source_file.as_ref());
+        ASSERT(node.get_kind() == ast::NodeKind::SourceFile);
+
+        // sort children based on order
+        auto children = conv::source_file(ast, node).children;
+        for (auto child : children) {
+            decl_to_source_file[child] = source_file;
+        }
+    }
+
+    return decl_to_source_file;
+}
+
+// ============================================================================
+
 auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
                    FileStore& fs, Options const& opt) -> ast::NodeId {
     auto node = ast.get_node(root.as_ref());
@@ -441,10 +721,27 @@ auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
     dv.visit(mod);
 
     auto order = topo_sort(ast, er, dv.dag);
-    for (auto const& n : order) {
-        auto node = ast.get_node(n.as_ref());
-        er.report_warn(node.get_loc(), "should run {}", n);
+    // for (auto const& n : order) {
+    //     auto node = ast.get_node(n.as_ref());
+    //     er.report_debug(node.get_loc(), "should run {}", n);
+    // }
+
+    auto source_file_to_decls = make_map_of_decl_to_source_file(ast, mod);
+
+    auto ns = NameSolver{fs, er, ast};
+
+    ns.visit_before_module(ast.get_node(mod.as_ref()),
+                           conv::module(ast, ast.get_node(mod.as_ref())));
+
+    for (auto const& ordered : order) {
+        auto source_file = source_file_to_decls[ordered];
+        ns.open_file(source_file);
+        ns.visit(ordered);
+        ns.close_file(source_file);
     }
+
+    ns.visit_after_module(ast.get_node(mod.as_ref()),
+                          conv::module(ast, ast.get_node(mod.as_ref())));
 
     return mod;
 }
