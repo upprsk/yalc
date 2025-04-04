@@ -11,6 +11,7 @@
 
 #include "ast-node-id.hpp"
 #include "ast-node.hpp"
+#include "decl-store.hpp"
 #include "file-store.hpp"
 #include "fmt/base.h"
 #include "nlohmann/json_fwd.hpp"
@@ -306,6 +307,12 @@ public:
     [[nodiscard]] constexpr auto fatten(std::span<NodeId const> ids) const
         -> FatNodeArray;
 
+    [[nodiscard]] constexpr auto get_decl_store() const -> DeclStore const* {
+        return &ds;
+    }
+
+    [[nodiscard]] constexpr auto get_decl_store() -> DeclStore* { return &ds; }
+
 public:
     [[nodiscard]] constexpr auto get_node_kind(NodeIdOfRef h) const
         -> NodeKind {
@@ -507,6 +514,8 @@ private:
     // NOTE: Should use a more efficient storage for strings
     std::vector<std::string>       identifiers;
     std::vector<std::vector<char>> bytes;
+
+    DeclStore ds;
 };
 
 struct FatNodeId {

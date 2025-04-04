@@ -69,6 +69,10 @@ struct JsonVisitor : public Visitor<> {
 
         j["name"] = data.name;
         j["files"] = arr;
+
+        if (auto ds = ast->get_decl_store(); ds->get_all_decls().size() > 0) {
+            j["ds"] = *ds;
+        }
     }
 
     void visit_source_file(Node const& /*node*/,

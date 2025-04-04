@@ -301,15 +301,16 @@ struct NameSolver : public ast::Visitor<Ast> {
         if (auto prev = lookup_name(name); prev.is_valid()) {
             er->report_error(ast->get_node_loc(node.as_ref()),
                              "redefinition of identifier '{}'", name);
-            er->report_note(ast->get_node_loc(ds.get_decl(prev).node.as_ref()),
-                            "previous value defined here");
+            er->report_note(
+                ast->get_node_loc(get_ds().get_decl(prev).node.as_ref()),
+                "previous value defined here");
             return DeclId::invalid();
         }
 
-        auto decl = ds.gen_decl({.name = gen_name(name),
-                                 .local_name = name,
-                                 .node = node,
-                                 .flags = {}});
+        auto decl = get_ds().gen_decl({.name = gen_name(name),
+                                       .local_name = name,
+                                       .node = node,
+                                       .flags = {}});
 
         env.set(name, decl);
 
@@ -348,9 +349,11 @@ struct NameSolver : public ast::Visitor<Ast> {
     constexpr auto get_mod_env() -> Env* { return &envs.at(1); }
     constexpr auto get_file_env() -> Env* { return &envs.at(2); }
 
-    // ------------------------------------------------------------------------
+    constexpr auto get_ds() const -> DeclStore& {
+        return *ast->get_decl_store();
+    }
 
-    DeclStore ds;
+    // ------------------------------------------------------------------------
 
     // Env                             mod_env;
     std::unordered_map<NodeId, Env> file_envs;
