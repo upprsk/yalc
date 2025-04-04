@@ -18,6 +18,11 @@ struct SourceFile {
     std::span<NodeId const> children;
 };
 
+struct SourceFileMut {
+    NodeId            mod;
+    std::span<NodeId> children;
+};
+
 struct ModuleDecl {
     std::string_view name;
 };
@@ -192,6 +197,14 @@ struct Assign {
     return {
         .mod = n.get_first(),
         .children = ast.get_array(n.get_second().as_array()),
+    };
+}
+
+[[nodiscard]] constexpr auto source_file_mut(Ast& ast, Node const& n)
+    -> SourceFileMut {
+    return {
+        .mod = n.get_first(),
+        .children = ast.get_array_mut(n.get_second().as_array()),
     };
 }
 
