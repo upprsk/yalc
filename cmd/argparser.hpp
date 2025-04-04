@@ -12,6 +12,7 @@ struct Args {
     bool dump_tokens = false;
     bool dump_ast = false;
     bool dump_ast_json = false;
+    bool dump_individual_ast_json = false;
     bool dump_ast_dot = false;
 };
 

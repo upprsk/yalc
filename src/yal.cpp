@@ -36,7 +36,7 @@ auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
         fmt::println("{}", dst_ast.fatten(file_root));
     }
 
-    if (opt.dump_ast_json) {
+    if (opt.dump_each_ast_json) {
         json j = dst_ast.fatten(file_root);
         fmt::println("{}", j.dump());
     }

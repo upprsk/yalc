@@ -13,7 +13,7 @@ namespace yal {
 struct Options {
     bool dump_tokens;
     bool dump_ast;
-    bool dump_ast_json;
+    bool dump_each_ast_json;
     bool single_file;
 };
 
