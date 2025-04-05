@@ -1,0 +1,3 @@
+module test; // second
+var x = 0;
+var y = x;

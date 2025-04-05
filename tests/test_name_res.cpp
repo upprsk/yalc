@@ -1,5 +1,9 @@
 #include "test_name_res.hpp"
 
+#include <cstdint>
+#include <ranges>
+#include <string_view>
+
 #include "error_reporter.hpp"
 #include "file-store.hpp"
 #include "name-res.hpp"
@@ -53,6 +57,56 @@ auto gen_ast_resolved(std::string source) -> json {
     return ast.fatten(prj_root);
 }
 
+auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
+    char*  buf = nullptr;
+    size_t bufsize = 0;
+
+    std::unique_ptr<FILE, void (*)(FILE*)> f = {open_memstream(&buf, &bufsize),
+                                                [](auto f) { fclose(f); }};
+
+    auto fs = yal::FileStore{};
+    auto er = yal::ErrorReporter{fs, f.get()};
+
+    std::unordered_set<yal::FileId> filenames;
+    for (uint32_t idx = 0; auto const& source : sources) {
+        filenames.insert(fs.add(fmt::format(":memory-{}:", idx), source));
+        idx++;
+    }
+
+    (void)fs.add_dir(":memory-dir:", filenames);
+
+    auto root = fs.add(":memory-0:");
+    auto fer = er.for_file(root);
+    auto tokens = yal::tokenize(fer.get_source(), fer);
+    fflush(f.get());
+
+    if (fer.had_error()) {
+        return json{
+            {"stderr", std::string_view{buf, bufsize}}
+        };
+    }
+
+    auto [ast, ast_root] = yal::parse(tokens, fer);
+    fflush(f.get());
+
+    if (fer.had_error()) {
+        return json{
+            {"stderr", std::string_view{buf, bufsize}}
+        };
+    }
+
+    auto prj_root = yal::resolve_names(ast, ast_root, er, fs, {});
+    fflush(f.get());
+
+    if (er.had_error()) {
+        return json{
+            {"stderr", std::string_view{buf, bufsize}}
+        };
+    }
+
+    return ast.fatten(prj_root);
+}
+
 static void run_test(Context& ctx, TestParams const& p, std::string name,
                      std::string source, bool skip = false) {
     if (skip) {
@@ -63,6 +117,18 @@ static void run_test(Context& ctx, TestParams const& p, std::string name,
 
     run_checks_for_test(ctx, p, name,
                         [&]() { return gen_ast_resolved(source); });
+}
+
+static void run_test(Context& ctx, TestParams const& p, std::string name,
+                     std::vector<std::string> source, bool skip = false) {
+    if (skip) {
+        fmt::print(fmt::bg(fmt::color::orange), "SKIP");
+        fmt::println(" '{}' skipped", name);
+        return;
+    }
+
+    run_checks_for_test(ctx, p, name,
+                        [&]() { return gen_ast_resolved_many(source); });
 }
 
 auto test_name_res(TestParams const& p) -> std::pair<int, int> {
@@ -165,6 +231,134 @@ func main() {
 @extern(link_name="printf")
 func c_printf(fmt: [*]const u8, ...);
 )");
+
+    ctx.tags.emplace_back("multi-file");
+
+    run_test(ctx, p, "multi-file 1",
+             std::vector<std::string>{
+                 R"()",
+                 R"()",
+             });
+
+    run_test(ctx, p, "multi-file 2",
+             std::vector<std::string>{
+                 R"(module test;)",
+                 R"()",
+             });
+
+    run_test(ctx, p, "multi-file 3",
+             std::vector<std::string>{
+                 R"()",
+                 R"(module test;)",
+             });
+
+    run_test(ctx, p, "multi-file 4",
+             std::vector<std::string>{
+                 R"(module test;)",
+                 R"(module test;)",
+             });
+
+    run_test(ctx, p, "multi-file 5",
+             std::vector<std::string>{
+                 R"(module test;
+
+             func a() { b(); }
+             )",
+                 R"(module test;
+
+             func b() {}
+             )",
+             });
+
+    run_test(ctx, p, "function namespacing",
+             std::vector<std::string>{
+                 R"(module test;
+
+             def Foo = struct {};
+
+             func Foo.bar(f: *Foo) {}
+             )",
+                 R"(module test;
+
+             func test() {
+                var f: Foo = .{};
+                f.bar();
+             }
+             )",
+             });
+
+    run_test(ctx, p, "function namespacing 2",
+             std::vector<std::string>{
+                 R"(module test;
+
+             func Foo.bar(f: *Foo) {}
+             )",
+                 R"(module test;
+
+             func test() {
+                var f: Foo = .{};
+                f.bar();
+             }
+             )",
+             });
+
+    run_test(ctx, p, "named returns",
+             std::vector<std::string>{
+                 R"(module test;
+
+             def int = i32;
+
+             func foo() (r: int) { r = 12; }
+             )",
+                 R"(module test;
+
+             var r = 0;
+             )",
+             });
+
+    run_test(ctx, p, "parameters",
+             std::vector<std::string>{
+                 R"(module test;
+
+             def int = i32;
+
+             func foo(a, b, c: int) (r: int) {
+                r = c.add(int.add(a, b));
+             }
+             )",
+                 R"(module test;
+
+             func int.add(a, b: int) int {
+                return a + b;
+             }
+             )",
+             });
+
+    run_test(ctx, p, "duplicate names",
+             std::vector<std::string>{
+                 R"(module test;
+             // first
+             var x = 0;)",
+                 R"(module test;
+             // second
+             var x = 0;)",
+             });
+
+    run_test(ctx, p, "private names",
+             std::vector<std::string>{
+                 R"(module test; // first
+             @private(file)
+             var x = 0;
+             var y = x + 2;
+             )",
+                 R"(module test; // second
+             var x = 0;
+             var y = x;
+             )",
+             },
+             true);
+
+    ctx.tags.pop_back();
 
     fmt::println("name resolver tests, {} tests, {} success, {} failed",
                  ctx.total(), ctx.ok, ctx.failed);

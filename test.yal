@@ -1,2 +1,4 @@
-module main;
-func main(a: i32, b: i32) (r: i32) {}
+module test; // first
+@private(file)
+var x = 0;
+var y = x + 2;
