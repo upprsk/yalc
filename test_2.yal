@@ -1,3 +1,6 @@
-module test; // second
-var x = 0;
-var y = x;
+module test;
+
+func test() {
+    var f: Foo = .{};
+    f.bar();
+}

@@ -1,0 +1,1 @@
+{"stderr":":memory-1::3:14: error: redefinition of identifier 'y'\n  0002 |              var x = 0;\n> 0003 |              var y = x;\n                      ^^^^^^^^^^\n  0004 |              \n:memory-0::4:14: note: previous value defined here\n  0003 |              var x = 0;\n> 0004 |              var y = x + 2;\n                      ^^^^^^^^^^^^^^\n  0005 |              \n"}

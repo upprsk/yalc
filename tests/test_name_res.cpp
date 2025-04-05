@@ -355,8 +355,53 @@ func c_printf(fmt: [*]const u8, ...);
              var x = 0;
              var y = x;
              )",
-             },
-             true);
+             });
+
+    run_test(ctx, p, "private names 2",
+             std::vector<std::string>{
+                 R"(module test; // first
+             @private(file)
+             var x = 0;
+             var x2 = x + 2;
+             )",
+                 R"(module test; // second
+             var x = 0;
+             var xx = x;
+             )",
+             });
+
+    run_test(ctx, p, "private names 3",
+             std::vector<std::string>{
+                 R"(module test; // first
+             @private(file)
+             var x = 0;
+             var x2 = x + 2;
+             )",
+                 R"(module test; // second
+             var x = 0;
+             var xx = x;
+             )",
+                 R"(module test; // third
+             var z = x;
+             )",
+             });
+
+    run_test(ctx, p, "private names 4",
+             std::vector<std::string>{
+                 R"(module test; // first
+             @private(file)
+             func getx() i32 { return 0; }
+
+             var x2 = getx() + 2;
+             )",
+                 R"(module test; // second
+             var getx = 0;
+             var xx = getx;
+             )",
+                 R"(module test; // third
+             var z = getx;
+             )",
+             });
 
     ctx.tags.pop_back();
 
