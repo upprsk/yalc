@@ -145,11 +145,12 @@ private:
     std::vector<std::string> filenames;
 
     // The contents of each file are also stored here. In case we need it, there
-    // could be some off-loading to disk to use less memory.
-    //
-    // > Even big codebases only don't go into more than some MB in size (it's
-    // just text). That is very little next to the AST for the exact same code.
-    // As such this is FINE.
+    /// The contents of each file are also stored here. In case we need it, there
+    /// could be some off-loading to disk to use less memory.
+    ///
+    /// > Even big codebases only don't go into more than some MB in size (it's
+    /// just text). That is very little next to the AST for the exact same code.
+    /// As such this is FINE.
     std::vector<std::string> file_contents;
 
     // TODO: use a better hashmap implementation
