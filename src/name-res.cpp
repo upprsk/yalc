@@ -32,26 +32,6 @@ using ast::Node;
 using ast::NodeId;
 namespace conv = ast::conv;
 
-static constexpr inline auto YAL_EXTENSION = ".yal";
-
-auto find_all_source_files(std::filesystem::path const& root_filepath)
-    -> std::vector<std::filesystem::path> {
-    namespace fs = std::filesystem;
-    namespace rv = std::ranges::views;
-
-    auto is_relative = root_filepath.is_relative();
-
-    return fs::directory_iterator{fs::absolute(root_filepath).parent_path()} |
-           rv::filter([](auto it) { return it.is_regular_file(); }) |
-           rv::transform([](auto it) { return it.path(); }) |
-           rv::transform(
-               [&](auto it) { return is_relative ? fs::relative(it) : it; }) |
-           rv::filter([](auto it) {
-               return it.filename().string().ends_with(YAL_EXTENSION);
-           }) |
-           std::ranges::to<std::vector>();
-}
-
 auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
                                     Node const& mod_decl, ast::Ast& ast,
                                     FileStore& fs, ErrorReporter& er,
@@ -90,16 +70,18 @@ auto parse_all_files_into_module(ast::Ast& ast, ast::Node const& start_node,
                               std::array{start_node.get_id()});
     }
 
-    auto start_filename = fs.get_filename(start_node.get_loc().fileid);
-    auto all_files = find_all_source_files(start_filename);
+    auto start_file = start_node.get_loc().fileid;
+    auto dir = fs.add_dir_for(start_file);
+    auto all_files = fs.get_files_in_dir(dir);
 
     std::vector<NodeId> files{start_node.get_id()};
-    for (auto const& filepath : all_files) {
+    for (auto const& file : all_files) {
         // don't re-parse ourselves
-        if (std::filesystem::equivalent(filepath, start_filename)) continue;
+        if (start_file == file) continue;
 
-        auto src_file = parse_and_load_module_into_ast(filepath, mod_decl, ast,
-                                                       fs, er, opt);
+        // FIXME: use the file id and not the filename for this function
+        auto src_file = parse_and_load_module_into_ast(
+            fs.get_filename(file), mod_decl, ast, fs, er, opt);
         if (src_file.is_valid()) files.push_back(src_file);
     }
 

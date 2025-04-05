@@ -1,11 +1,41 @@
 #include "file-store.hpp"
 
+#include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <ranges>
 
+#include "fmt/ranges.h"
 #include "nlohmann/json.hpp"
 #include "utils.hpp"
 
 namespace yal {
+
+namespace rv = std::ranges::views;
+namespace fs = std::filesystem;
+
+static constexpr inline auto YAL_EXTENSION = ".yal";
+
+/// Scan the directory containing the given path, returning a list of all source
+/// files contained in it.
+auto scan_dir_of_file(std::filesystem::path const &filepath)
+    -> std::vector<std::filesystem::path> {
+    // if relative paths are in use, we want to preserve the use of relative
+    // paths. So, record if the given file has a relative path.
+    auto is_relative = filepath.is_relative();
+
+    return fs::directory_iterator{fs::absolute(filepath).parent_path()} |
+           rv::filter([](auto it) { return it.is_regular_file(); }) |
+           rv::transform([&](auto it) -> fs::path {
+               return is_relative ? fs::relative(it) : it;
+           }) |
+           rv::filter([](auto it) {
+               return it.filename().string().ends_with(YAL_EXTENSION);
+           }) |
+           std::ranges::to<std::vector>();
+}
+
+// ----------------------------------------------------------------------------
 
 auto FileStore::add(std::string path) -> FileId {
     // dedup
@@ -59,12 +89,53 @@ auto FileStore::read(FileId id) const -> std::optional<std::string> {
     return s;
 }
 
+auto FileStore::add_dir_for(FileId id) -> DirId {
+    // Need a way to find the parent dir without doing a filesystem scan if the
+    // needed dir is already in the store.
+    for (uint32_t i = 0; auto const &files : dirs_to_files) {
+        if (files.contains(id)) return DirId::from_raw_data(i);
+        i++;
+    }
+
+    return add_dir_for(get_filename(id));
+}
+
+auto FileStore::add_dir_for(std::string path) -> DirId {
+    auto files =
+        scan_dir_of_file(path) |
+        rv::transform([&](fs::path const &path) { return add(path); }) |
+        std::ranges::to<std::unordered_set>();
+    return add_dir(path, files);
+}
+
+auto FileStore::add_dir(std::string path, std::unordered_set<FileId> files)
+    -> DirId {
+    // dedup
+    if (auto maybe_id = find_id_for_dir(path); maybe_id.is_valid()) {
+        return maybe_id;
+    }
+
+    return new_dir_id(path, files);
+}
+
+auto FileStore::get_files_in_dir(DirId id) const -> std::unordered_set<FileId> {
+    return dirs_to_files.at(id.value());
+}
+
 auto FileStore::find_id_for(std::string const &s) const -> FileId {
     if (auto it = filename_to_id.find(s); it != end(filename_to_id)) {
         return it->second;
     }
 
     return FileId::invalid();
+}
+
+auto FileStore::find_id_for_dir(std::string const &s) const -> DirId {
+    if (auto it = dirname_to_id.find(s); it != end(dirname_to_id)) {
+        return it->second;
+    }
+
+    return DirId::invalid();
 }
 
 auto FileStore::new_id(std::string filename, std::string filedata) -> FileId {
@@ -74,6 +145,17 @@ auto FileStore::new_id(std::string filename, std::string filedata) -> FileId {
     filenames.push_back(filename);
     file_contents.push_back(filedata);
     filename_to_id[filename] = id;
+    return id;
+}
+
+auto FileStore::new_dir_id(std::string                dirname,
+                           std::unordered_set<FileId> children) -> DirId {
+    auto sz = directories.size();
+    auto id = DirId::from_raw_data(sz);
+
+    directories.push_back(dirname);
+    dirs_to_files.push_back(children);
+    dirname_to_id[dirname] = id;
     return id;
 }
 
