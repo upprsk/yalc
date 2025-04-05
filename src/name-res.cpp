@@ -46,8 +46,13 @@ auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
 
     auto n = ast.get_node(src_file.as_ref());
     auto mod_found = ast.get_node(conv::source_file(ast, n).mod.as_ref());
-    auto mod_found_name = conv::module_decl(ast, mod_found).name;
 
+    if (!conv::module_decl_is_valid(mod_found)) {
+        // er.report_error(mod_found.get_loc(), "invalid module found");
+        return NodeId::invalid();
+    }
+
+    auto mod_found_name = conv::module_decl(ast, mod_found).name;
     auto mod_name = conv::module_decl(ast, mod_decl).name;
     if (mod_found_name != mod_name) {
         er.report_bug(mod_found.get_loc(),

@@ -226,6 +226,12 @@ struct Assign {
     return {.name = ast.get_identifier(n.get_first().as_id())};
 }
 
+/// A module may appear valid but have no identifier due to a parse error. Use
+/// this to check.
+[[nodiscard]] constexpr auto module_decl_is_valid(Node const& n) -> bool {
+    return n.get_first().is_valid();
+}
+
 [[nodiscard]] constexpr auto func_decl(Ast const& ast, Node const& n)
     -> FuncDecl {
     auto     second = ast.get_array_unbounded(n.get_second().as_array());
