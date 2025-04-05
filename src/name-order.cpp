@@ -102,18 +102,22 @@ struct DependsVisitor : public ast::Visitor<> {
             for (auto id : names.ids) {
                 define_top(ast->get_identifier(id.as_id()), top_decl);
             }
+
+            return;
         }
 
-        else if (node.get_kind() == ast::NodeKind::TopDefDecl) {
+        if (node.get_kind() == ast::NodeKind::TopDefDecl) {
             auto names = ast::conv::top_def_decl_names(*ast, node);
 
             for (auto id : names.ids) {
                 define_top(ast->get_identifier(id.as_id()), top_decl);
             }
+
+            return;
         }
 
-        else if (node.get_kind() == ast::NodeKind::FuncDecl ||
-                 node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
+        if (node.get_kind() == ast::NodeKind::FuncDecl ||
+            node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
             auto names = conv::func_decl_name(*ast, node);
 
             // if we have just one id, then this is not namespaced. We
@@ -128,9 +132,11 @@ struct DependsVisitor : public ast::Visitor<> {
             else {
                 dag[top_decl] = {};
             }
+
+            return;
         }
 
-        else if (node.get_kind() == ast::NodeKind::ImportStmt) {
+        if (node.get_kind() == ast::NodeKind::ImportStmt) {
             // in order to know what is the name that the import
             // statement declares, we need to do the full thing for the
             // imported module.
@@ -138,11 +144,8 @@ struct DependsVisitor : public ast::Visitor<> {
             do_the_thing(*fs, *er, node.get_loc(), import_stmt.path);
         }
 
-        else {
-            PANIC(
-                "top-level kind not implemented in hoisting of name resolution",
-                node.get_kind());
-        }
+        PANIC("top-level kind not implemented in hoisting of name resolution",
+              node.get_kind());
     }
 
     void fixup_namespaced_function(NodeId top_decl, Node func_node,
