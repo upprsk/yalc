@@ -33,6 +33,7 @@ auto real_main(yalc::Args const& args) -> int {
                             .single_file = args.single_file};
 
     auto [ast, root] = yal::load_and_parse(fs, er, args.program, opt);
+    if (!root.is_valid()) return 1;
 
     auto prj_root = yal::resolve_names(ast, root, er, fs, opt);
     if (args.dump_ast_json) {
