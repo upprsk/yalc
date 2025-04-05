@@ -501,4 +501,28 @@ struct Assign {
     return id_pack(ast, ids);
 }
 
+// ==================================================================
+
+enum class PrivateKind { Public, Module, File };
+[[nodiscard]] constexpr auto decorators_private_kind(
+    Ast const& ast, std::span<NodeId const> decorators) -> PrivateKind {
+    for (auto decid : decorators) {
+        auto dec = conv::decorator(ast, ast.get_node(decid.as_ref()));
+        if (dec.name == "private") {
+            auto params = dec.params;
+            ASSERT((params.size() & 1) == 0);
+            for (size_t i = 0; i < params.size(); i += 2) {
+                if (params[i].is_valid() &&
+                    ast.get_identifier(params[i].as_id()) == "file") {
+                    return PrivateKind::File;
+                }
+            }
+
+            return PrivateKind::Module;
+        }
+    }
+
+    return PrivateKind::Public;
+}
+
 }  // namespace yal::ast::conv

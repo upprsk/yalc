@@ -2,6 +2,7 @@
 
 #include <ranges>
 
+#include "ast-node-conv.hpp"
 #include "ast-node-visitor.hpp"
 
 namespace yal::sort {
@@ -49,6 +50,7 @@ void do_the_thing(FileStore& fs, ErrorReporter& er, Location const& from,
 
 struct DependsVisitor : public ast::Visitor<> {
     using Dag = std::unordered_map<NodeId, std::unordered_set<NodeId>>;
+    using TopMap = std::unordered_map<std::string_view, NodeId>;
 
     struct Local {
         std::string_view name;
@@ -95,9 +97,20 @@ struct DependsVisitor : public ast::Visitor<> {
 
     // ------------------------------------------------------------------------
 
+    // FIXME: this function has a stupid ammount of duplication
     void hoist_top_decl(NodeId top_decl) {
         auto node = ast->get_node(top_decl.as_ref());
         if (node.get_kind() == ast::NodeKind::TopVarDecl) {
+            auto top = conv::top_var_decl(*ast, node);
+            if (is_file_private_decl(top.decorators)) {
+                auto names = conv::top_var_decl_names(*ast, node);
+                for (auto id : names.ids) {
+                    define_top_file(ast->get_identifier(id.as_id()), top_decl);
+                }
+
+                return;
+            }
+
             auto names = conv::top_var_decl_names(*ast, node);
             for (auto id : names.ids) {
                 define_top(ast->get_identifier(id.as_id()), top_decl);
@@ -107,8 +120,17 @@ struct DependsVisitor : public ast::Visitor<> {
         }
 
         if (node.get_kind() == ast::NodeKind::TopDefDecl) {
-            auto names = ast::conv::top_def_decl_names(*ast, node);
+            auto top = conv::top_def_decl(*ast, node);
+            if (is_file_private_decl(top.decorators)) {
+                auto names = conv::top_var_decl_names(*ast, node);
+                for (auto id : names.ids) {
+                    define_top_file(ast->get_identifier(id.as_id()), top_decl);
+                }
 
+                return;
+            }
+
+            auto names = ast::conv::top_def_decl_names(*ast, node);
             for (auto id : names.ids) {
                 define_top(ast->get_identifier(id.as_id()), top_decl);
             }
@@ -118,6 +140,27 @@ struct DependsVisitor : public ast::Visitor<> {
 
         if (node.get_kind() == ast::NodeKind::FuncDecl ||
             node.get_kind() == ast::NodeKind::FuncDeclWithCVarArgs) {
+            auto top = conv::func_decl(*ast, node);
+            if (is_file_private_decl(top.decorators)) {
+                auto names = conv::func_decl_name(*ast, node);
+
+                // if we have just one id, then this is not namespaced. We
+                // take care of namespaced functions on another pass.
+                if (names.ids.size() == 1) {
+                    define_top_file(ast->get_identifier(names.ids[0].as_id()),
+                                    top_decl);
+                }
+
+                // the dependencies should come from what we namespaced over,
+                // but if the thing we wrap is not defined, then it does not
+                // end-up in the DAG. So we dummy-define the thing we wrap
+                else {
+                    dag[top_decl] = {};
+                }
+
+                return;
+            }
+
             auto names = conv::func_decl_name(*ast, node);
 
             // if we have just one id, then this is not namespaced. We
@@ -148,6 +191,12 @@ struct DependsVisitor : public ast::Visitor<> {
               node.get_kind());
     }
 
+    auto is_file_private_decl(std::span<NodeId const> decorators) const
+        -> bool {
+        return conv::decorators_private_kind(*ast, decorators) ==
+               conv::PrivateKind::File;
+    }
+
     void fixup_namespaced_function(NodeId top_decl, Node func_node,
                                    Dag const& rev_dag) {
         auto names = conv::func_decl_name(*ast, func_node);
@@ -171,6 +220,18 @@ struct DependsVisitor : public ast::Visitor<> {
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------------
+
+    void visit_before_source_file(Node const& node,
+                                  conv::SourceFile const& /*data*/) override {
+        current_file = node.get_loc().fileid;
+    }
+
+    void visit_after_source_file(Node const& /*node*/,
+                                 conv::SourceFile const& /*data*/) override {
+        current_file = FileId::invalid();
     }
 
     // ------------------------------------------------------------------------
@@ -301,11 +362,36 @@ struct DependsVisitor : public ast::Visitor<> {
         dag[id] = {};
     }
 
+    constexpr void define_top_file(std::string_view name, NodeId id) {
+        file_tops[current_file][name] = id;
+        dag[id] = {};
+    }
+
     constexpr auto lookup_top(std::string_view name) const -> NodeId {
+        // lookup at the current file first
+        auto& ft = current_file_top();
+        if (auto it = ft.find(name); it != end(ft)) return it->second;
+
+        // then at the module level
         auto it = tops.find(name);
         if (it == tops.end()) return NodeId::invalid();
 
         return it->second;
+    }
+
+    constexpr auto current_file_top() -> TopMap& {
+        ASSERT(current_file.is_valid());
+        if (auto it = file_tops.find(current_file); it != end(file_tops))
+            return it->second;
+
+        return tops;
+    }
+
+    constexpr auto current_file_top() const -> TopMap const& {
+        if (auto it = file_tops.find(current_file); it != end(file_tops))
+            return it->second;
+
+        return tops;
     }
 
     constexpr auto build_reverse_dag() const -> Dag {
@@ -337,10 +423,12 @@ struct DependsVisitor : public ast::Visitor<> {
         return it != end(v);
     }
 
-    Dag                                          dag;
-    std::unordered_map<std::string_view, NodeId> tops;
-    std::vector<Local>                           env;
-    size_t                                       level = 0;
+    Dag                                dag;
+    TopMap                             tops;
+    std::unordered_map<FileId, TopMap> file_tops;
+    std::vector<Local>                 env;
+    size_t                             level = 0;
+    FileId                             current_file;
 
     NodeId         current_decl = NodeId::invalid();
     ErrorReporter* er;

@@ -14,9 +14,35 @@ struct DeclFlags {
     enum Flags {
         None = 0,
         Extern = 1 << 0,
-        Private = 2 << 0,
-        PrivateFile = 3 << 0,
+        Private = 1 << 1,
+        PrivateFile = 1 << 2,
     };
+
+    [[nodiscard]] constexpr auto has_private_file() const -> bool {
+        return flags & PrivateFile;
+    }
+
+    struct Builder {
+        [[nodiscard]] constexpr auto set_extern() const -> Builder {
+            return {static_cast<Flags>(flags | Extern)};
+        }
+
+        [[nodiscard]] constexpr auto set_private() const -> Builder {
+            return {static_cast<Flags>(flags | Private)};
+        }
+
+        [[nodiscard]] constexpr auto set_private_file() const -> Builder {
+            return {static_cast<Flags>(flags | PrivateFile)};
+        }
+
+        [[nodiscard]] constexpr auto build() const -> DeclFlags {
+            return {flags};
+        }
+
+        Flags flags = None;
+    };
+
+    static constexpr auto builder() -> Builder { return {}; }
 
     Flags flags = None;
 };
@@ -40,6 +66,10 @@ public:
     /// Flags about the declaration. These further describe properties of the
     /// declaration, like if it is external, private, private(file), etc...
     DeclFlags flags;
+
+    [[nodiscard]] constexpr auto is_private_file() const -> bool {
+        return flags.has_private_file();
+    }
 
 private:
 };
