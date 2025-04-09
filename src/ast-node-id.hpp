@@ -45,7 +45,7 @@ struct NodeIdOfDeclRef {
 /// A handle to an AST node. It is a "stable pointer" that is also half the size
 /// on 64bits.
 ///
-/// A AstNodeHandle may point to many things:
+/// A NodeId may point to many things:
 ///
 /// - Another AST node directly.
 /// - An array of AST nodes (in the `refs` field in the AST).
