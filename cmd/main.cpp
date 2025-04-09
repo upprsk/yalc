@@ -16,7 +16,6 @@
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
-#include "types.hpp"
 #include "utils.hpp"
 #include "yal.hpp"
 
