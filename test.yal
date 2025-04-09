@@ -1,3 +1,18 @@
-module test;
+module main;
 
-func Foo.bar(f: *Foo) {}
+def STDIN_FILENO  = 0;
+def STDOUT_FILENO = 1;
+def STDERR_FILENO = 2;
+
+@extern
+func write(fd: i32, buf: [*]const u8, nbyte: usize);
+
+func main() {
+    // this has a terminating null byte, but it is not included in the `len`
+    var x = "Hello, World!\n"; // string_view
+    write(
+        STDOUT_FILENO,
+        x.ptr, // [*]const u8
+        x.len, // usize
+    );
+}

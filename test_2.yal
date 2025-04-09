@@ -1,6 +1,0 @@
-module test;
-
-func test() {
-    var f: Foo = .{};
-    f.bar();
-}
