@@ -25,6 +25,12 @@ add_library(yal
     span.hpp
     tokenizer.cpp
     tokenizer.hpp
+    type-id.cpp
+    type-id.hpp
+    types.cpp
+    types.hpp
+    typing.cpp
+    typing.hpp
     utils.cpp
     utils.hpp
     yal.cpp

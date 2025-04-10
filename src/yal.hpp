@@ -15,6 +15,7 @@ struct Options {
     bool dump_ast = false;
     bool dump_each_ast_json = false;
     bool single_file = false;
+    bool dump_type_store = false;
 };
 
 auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,

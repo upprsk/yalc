@@ -327,6 +327,11 @@ public:
         return nodes.at(h.value).get_loc().span;
     }
 
+    [[nodiscard]] constexpr auto get_node_type(NodeIdOfRef h) const
+        -> types::TypeId {
+        return nodes.at(h.value).get_type();
+    }
+
     [[nodiscard]] constexpr auto get_node(NodeIdOfRef h) const -> Node {
         return nodes.at(h.value);
     }

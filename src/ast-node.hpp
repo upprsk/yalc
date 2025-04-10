@@ -5,6 +5,7 @@
 
 #include "ast-node-id.hpp"
 #include "file-store.hpp"
+#include "type-id.hpp"
 
 namespace yal::ast {
 
@@ -469,6 +470,10 @@ public:
     [[nodiscard]] constexpr auto get_first() const -> NodeId { return first; }
     [[nodiscard]] constexpr auto get_second() const -> NodeId { return second; }
 
+    [[nodiscard]] constexpr auto get_type() const -> types::TypeId {
+        return type;
+    }
+
     [[nodiscard]] constexpr auto cast_u32() const -> uint32_t {
         return first.value();
     }
@@ -489,13 +494,15 @@ public:
     // ------------------------------------------------------------------------
 
     constexpr void set_second(NodeId v) { second = v; }
+    constexpr void set_type(types::TypeId t) { type = t; }
 
 private:
-    NodeKind kind;
-    NodeId   id;
-    Location loc;
-    NodeId   first;
-    NodeId   second;
+    NodeKind      kind;
+    NodeId        id;
+    Location      loc;
+    NodeId        first;
+    NodeId        second;
+    types::TypeId type;
 };
 
 constexpr auto format_as(NodeKind kind) {

@@ -18,6 +18,7 @@ struct JsonVisitor : public Visitor<> {
         j = json{
             {"kind", fmt::to_string(node.get_kind())},
             {  "id",                   node.get_id()},
+            {"type",                 node.get_type()},
         };
 
         if (show_loc) j["loc"] = node.get_loc();
