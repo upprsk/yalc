@@ -28,6 +28,8 @@ void print_help(std::string_view self) {
             "    --dump-individual-ast-json: dump parsed AST of each file as "
             "each is parsed as json.");
     println(stderr, "    --dump-ast-dot: dump parsed AST as a dot graph.");
+    println(stderr,
+            "    --dump-type-store-json: dump the entire type store as json.");
 }
 
 auto argparse(int argc, char** argv) -> Args {
@@ -62,6 +64,8 @@ auto argparse(int argc, char** argv) -> Args {
             args.dump_individual_ast_json = true;
         } else if (arg == "--dump-ast-dot") {
             args.dump_ast_dot = true;
+        } else if (arg == "--dump-type-store-json") {
+            args.dump_type_store_json = true;
         } else if (args.program.empty()) {
             args.program = arg;
         } else {

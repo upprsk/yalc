@@ -14,6 +14,7 @@ struct Args {
     bool dump_ast_json = false;
     bool dump_individual_ast_json = false;
     bool dump_ast_dot = false;
+    bool dump_type_store_json = false;
 };
 
 auto argparse(int argc, char** argv) -> Args;

@@ -16,6 +16,7 @@
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
+#include "typing.hpp"
 #include "utils.hpp"
 #include "yal.hpp"
 
@@ -29,12 +30,16 @@ auto real_main(yalc::Args const& args) -> int {
     auto opt = yal::Options{.dump_tokens = args.dump_tokens,
                             .dump_ast = args.dump_ast,
                             .dump_each_ast_json = args.dump_individual_ast_json,
-                            .single_file = args.single_file};
+                            .single_file = args.single_file,
+                            .dump_type_store = args.dump_type_store_json};
 
     auto [ast, root] = yal::load_and_parse(fs, er, args.program, opt);
     if (!root.is_valid()) return 1;
 
     auto prj_root = yal::resolve_names(ast, root, er, fs, opt);
+
+    yal::perform_typing(ast, root, er, opt);
+
     if (args.dump_ast_json) {
         json j = ast.fatten(prj_root);
         fmt::println("{}", j.dump());
