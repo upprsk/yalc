@@ -9,6 +9,8 @@ namespace yal::types {
 enum class TypeKind {
     Err,
 
+    Type,
+
     Uint64,
     Int64,
     Uint32,
@@ -25,6 +27,8 @@ enum class TypeKind {
     Float64,
 
     StrView,
+
+    Pack,
 };
 
 struct Type {
@@ -76,14 +80,31 @@ struct Type {
         }
     }
 
+    [[nodiscard]] constexpr auto is_pack() const -> bool {
+        return kind == TypeKind::Pack;
+    }
+
     TypeKind            kind;
     TypeId              id;
     std::vector<TypeId> inner;
 };
 
+struct TypeStore;
+
+struct FatTypeId {
+    TypeId           id;
+    TypeStore const *ts;
+};
+
+struct FatTypeItems {
+    std::span<TypeId const> items;
+    TypeStore const        *ts;
+};
+
 struct TypeStore {
     struct Builtin {
         TypeId error;
+        TypeId type;
 
         TypeId uint64;
         TypeId int64;
@@ -105,6 +126,7 @@ struct TypeStore {
 
     void add_builtins() {
         builtin.error = new_type(TypeKind::Err, {});
+        builtin.type = new_type(TypeKind::Type, {});
 
         builtin.uint64 = new_type(TypeKind::Uint64, {});
         builtin.int64 = new_type(TypeKind::Int64, {});
@@ -129,9 +151,23 @@ struct TypeStore {
     }
 
     [[nodiscard]] auto get_error() const -> TypeId { return builtin.error; }
+    [[nodiscard]] auto get_type() const -> TypeId { return builtin.type; }
+
+    [[nodiscard]] auto get_i64() const -> TypeId { return builtin.int64; }
+    [[nodiscard]] auto get_u64() const -> TypeId { return builtin.uint64; }
     [[nodiscard]] auto get_i32() const -> TypeId { return builtin.int32; }
+    [[nodiscard]] auto get_u32() const -> TypeId { return builtin.uint32; }
+    [[nodiscard]] auto get_i16() const -> TypeId { return builtin.int16; }
+    [[nodiscard]] auto get_u16() const -> TypeId { return builtin.uint16; }
+    [[nodiscard]] auto get_i8() const -> TypeId { return builtin.int8; }
+    [[nodiscard]] auto get_u8() const -> TypeId { return builtin.uint8; }
+
     [[nodiscard]] auto get_f32() const -> TypeId { return builtin.f32; }
     [[nodiscard]] auto get_f64() const -> TypeId { return builtin.f64; }
+
+    [[nodiscard]] auto get_usize() const -> TypeId { return builtin.usize; }
+    [[nodiscard]] auto get_isize() const -> TypeId { return builtin.isize; }
+
     [[nodiscard]] auto get_strview() const -> TypeId { return builtin.strview; }
 
     [[nodiscard]] auto new_type(TypeKind kind, std::vector<TypeId> inner)
@@ -155,7 +191,8 @@ struct TypeStore {
 
     [[nodiscard]] constexpr auto type_size(Type const &ty) const -> size_t {
         switch (ty.kind) {
-            case TypeKind::Err: return 0;
+            case TypeKind::Err:
+            case TypeKind::Type: return 0;
             case TypeKind::Uint64:
             case TypeKind::Int64: return sizeof(uint64_t);
             case TypeKind::Uint32:
@@ -172,9 +209,21 @@ struct TypeStore {
 
             // made of 2 pointers, so double the size of a pointer
             case TypeKind::StrView: return sizeof(uintptr_t) * 2; break;
+
+            // this can't be instantiated, so it should not have size
+            case TypeKind::Pack: return 0;
         }
 
         return 0;
+    }
+
+    [[nodiscard]] auto fatten(std::span<TypeId const> span) const
+        -> FatTypeItems {
+        return {.items = span, .ts = this};
+    }
+
+    [[nodiscard]] auto fatten(TypeId id) const -> FatTypeId {
+        return {.id = id, .ts = this};
     }
 
     std::vector<Type> types;
@@ -186,6 +235,7 @@ constexpr auto format_as(TypeKind kind) {
 
     switch (kind) {
         case TypeKind::Err: name = "Err"; break;
+        case TypeKind::Type: name = "Type"; break;
         case TypeKind::Uint64: name = "Uint64"; break;
         case TypeKind::Int64: name = "Int64"; break;
         case TypeKind::Uint32: name = "Uint32"; break;
@@ -199,12 +249,15 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Float32: name = "f32"; break;
         case TypeKind::Float64: name = "f64"; break;
         case TypeKind::StrView: name = "string_view"; break;
+        case TypeKind::Pack: name = "(pack)"; break;
     }
 
     return name;
 }
 
 void to_json(json &j, Type const &t);
+void to_json(json &j, FatTypeId const &t);
+void to_json(json &j, FatTypeItems const &t);
 void to_json(json &j, TypeStore const &ts);
 
 }  // namespace yal::types

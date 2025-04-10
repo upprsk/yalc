@@ -33,6 +33,8 @@ add_library(yal
     typing.hpp
     utils.cpp
     utils.hpp
+    value.cpp
+    value.hpp
     yal.cpp
     yal.hpp
 )

@@ -7,6 +7,8 @@
 
 #include "ast-node-id.hpp"
 #include "decl-id.hpp"
+#include "type-id.hpp"
+#include "value.hpp"
 
 namespace yal {
 
@@ -67,8 +69,16 @@ public:
     /// declaration, like if it is external, private, private(file), etc...
     DeclFlags flags;
 
+    /// The value of the declaration. In case the actual value is not compile
+    /// time know, then this holds an empty value.
+    Value value;
+
     [[nodiscard]] constexpr auto is_private_file() const -> bool {
         return flags.has_private_file();
+    }
+
+    [[nodiscard]] constexpr auto get_type() const -> types::TypeId {
+        return value.type;
     }
 
 private:

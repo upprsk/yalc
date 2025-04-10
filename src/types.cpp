@@ -2,27 +2,24 @@
 
 #include <string_view>
 
+#include "fmt/base.h"
 #include "fmt/format.h"
+#include "fmt/ranges.h"
 #include "nlohmann/json.hpp"
 
 namespace yal::types {
 
-void to_json(json &j, Type const &t) {
-    j = json{
-        {   "id",                   t.id},
-        { "kind", fmt::to_string(t.kind)},
-        {"inner",                t.inner},
-    };
-}
-
-void to_json(json &j, TypeStore const &ts) {
-    j = json{
-        {"types", ts.types},
-    };
-}
-
 auto TypeStore::equal(Type const &lhs, Type const &rhs) const -> bool {
     if (lhs.kind != rhs.kind) return false;
+
+    if (lhs.is_pack()) {
+        if (lhs.inner.size() != rhs.inner.size()) return false;
+        for (size_t i = 0; i < lhs.inner.size(); i++) {
+            if (!equal(lhs.inner[i], rhs.inner[i])) return false;
+        }
+
+        return true;
+    }
 
     // TODO: handle other types (that may have inner types)
     return true;
@@ -79,9 +76,56 @@ auto TypeStore::coerce(TypeId from, TypeId to) -> TypeId {
 
         // No coercion
         case TypeKind::StrView: return TypeId::invalid();
+        case TypeKind::Pack: return TypeId::invalid();
+        case TypeKind::Type: return TypeId::invalid();
     }
 
     return TypeId::invalid();
+}
+
+void to_json(json &j, Type const &t) {
+    j = json{
+        {   "id",                   t.id},
+        { "kind", fmt::to_string(t.kind)},
+        {"inner",                t.inner},
+    };
+}
+
+void to_json(json &j, FatTypeId const &t) {
+    if (!t.id.is_valid()) {
+        j = {};  // null
+        return;
+    }
+
+    auto ty = t.ts->get(t.id.as_ref());
+
+    j = json{
+        {   "id",                    t.id},
+        { "kind", fmt::to_string(ty.kind)},
+        {"inner",  t.ts->fatten(ty.inner)},
+    };
+}
+
+void to_json(json &j, FatTypeItems const &t) {
+    auto arr = json::array();
+    for (auto const &id : t.items) arr.push_back(t.ts->fatten(id));
+
+    j = arr;
+}
+
+void to_json(json &j, TypeStore const &ts) {
+    auto arr = json::array();
+    for (auto const &type : ts.types) {
+        arr.push_back(json{
+            {   "id",                   type.id},
+            { "kind", fmt::to_string(type.kind)},
+            {"inner",     ts.fatten(type.inner)},
+        });
+    }
+
+    j = json{
+        {"types", arr},
+    };
 }
 
 }  // namespace yal::types
@@ -94,6 +138,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
 
         switch (ty) {
             case yal::types::TypeKind::Err: result = "<error>"; break;
+            case yal::types::TypeKind::Type: result = "type"; break;
             case yal::types::TypeKind::Uint64: result = "u64"; break;
             case yal::types::TypeKind::Int64: result = "i64"; break;
             case yal::types::TypeKind::Uint32: result = "u32"; break;
@@ -115,6 +160,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
 
     switch (ty.kind) {
         case yal::types::TypeKind::Err:
+        case yal::types::TypeKind::Type:
         case yal::types::TypeKind::Uint64:
         case yal::types::TypeKind::Int64:
         case yal::types::TypeKind::Uint32:
@@ -128,6 +174,9 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
         case yal::types::TypeKind::Float32:
         case yal::types::TypeKind::Float64:
         case yal::types::TypeKind::StrView: return format_no_inner(ty.kind);
+
+        case yal::types::TypeKind::Pack:
+            return fmt::format_to(ctx.out(), "{}", fmt::join(ty.inner, ", "));
     }
 
     return fmt::format_to(ctx.out(), "<invalid kind>");

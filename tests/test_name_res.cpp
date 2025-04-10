@@ -11,6 +11,7 @@
 #include "parser.hpp"
 #include "test_helpers.hpp"
 #include "tokenizer.hpp"
+#include "types.hpp"
 
 using json = nlohmann::json;
 
@@ -44,8 +45,11 @@ auto gen_ast_resolved(std::string source) -> json {
         };
     }
 
+    auto ts = yal::types::TypeStore{};
+    ts.add_builtins();
+
     auto prj_root =
-        yal::resolve_names(ast, ast_root, er, fs, {.single_file = true});
+        yal::resolve_names(ast, ast_root, er, fs, ts, {.single_file = true});
     fflush(f.get());
 
     if (er.had_error()) {
@@ -95,7 +99,10 @@ auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
         };
     }
 
-    auto prj_root = yal::resolve_names(ast, ast_root, er, fs, {});
+    auto ts = yal::types::TypeStore{};
+    ts.add_builtins();
+
+    auto prj_root = yal::resolve_names(ast, ast_root, er, fs, ts, {});
     fflush(f.get());
 
     if (er.had_error()) {

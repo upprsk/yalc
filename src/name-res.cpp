@@ -25,6 +25,8 @@
 #include "fmt/ranges.h"
 #include "libassert/assert.hpp"
 #include "name-order.hpp"
+#include "types.hpp"
+#include "value.hpp"
 #include "yal.hpp"
 
 namespace yal {
@@ -98,8 +100,9 @@ auto parse_all_files_into_module(ast::Ast& ast, ast::Node const& start_node,
 // ============================================================================
 
 struct NameSolver : public ast::Visitor<Ast> {
-    explicit NameSolver(FileStore& fs, ErrorReporter& er, Ast& ast)
-        : ast::Visitor<Ast>{ast}, er{&er}, fs{&fs} {
+    explicit NameSolver(FileStore& fs, types::TypeStore& ts, ErrorReporter& er,
+                        Ast& ast)
+        : ast::Visitor<Ast>{ast}, er{&er}, fs{&fs}, ts{&ts} {
         define_buitins();
     }
 
@@ -108,20 +111,35 @@ struct NameSolver : public ast::Visitor<Ast> {
         push_env();
 
         // FIXME: how do we reference back to this?
-        define_at_top("usize", NodeId::invalid());
-        define_at_top("isize", NodeId::invalid());
+        // FIXME: need to set the `value` field to the type, not the `type`
+        // field, as this needs to diferentiate between a type and the type
+        // type.
+        define_at_top("usize", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_usize()});
+        define_at_top("isize", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_isize()});
 
-        define_at_top("i64", NodeId::invalid());
-        define_at_top("u64", NodeId::invalid());
-        define_at_top("i32", NodeId::invalid());
-        define_at_top("u32", NodeId::invalid());
-        define_at_top("i16", NodeId::invalid());
-        define_at_top("u16", NodeId::invalid());
-        define_at_top("i8", NodeId::invalid());
-        define_at_top("u8", NodeId::invalid());
+        define_at_top("i64", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_i64()});
+        define_at_top("u64", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_u64()});
+        define_at_top("i32", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_i32()});
+        define_at_top("u32", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_u32()});
+        define_at_top("i16", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_i16()});
+        define_at_top("u16", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_u16()});
+        define_at_top("i8", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_i8()});
+        define_at_top("u8", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_u8()});
 
-        define_at_top("f32", NodeId::invalid());
-        define_at_top("f64", NodeId::invalid());
+        define_at_top("f32", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_f32()});
+        define_at_top("f64", NodeId::invalid(),
+                      {.type = ts->get_type(), .data = ts->get_f64()});
 
         define_at_top("bool", NodeId::invalid());
 
@@ -343,8 +361,28 @@ struct NameSolver : public ast::Visitor<Ast> {
         return define_at(*get_top_env(), name, node, flags);
     }
 
+    constexpr auto define_at_top(std::string const& name, NodeId node,
+                                 Value type) -> DeclId {
+        return define_at(*get_top_env(), name, node, type);
+    }
+
+    constexpr auto define_at(Env& env, std::string const& name, NodeId node)
+        -> DeclId {
+        return define_at(env, name, node, {}, {});
+    }
+
     constexpr auto define_at(Env& env, std::string const& name, NodeId node,
-                             DeclFlags flags = {}) -> DeclId {
+                             DeclFlags flags) -> DeclId {
+        return define_at(env, name, node, {}, flags);
+    }
+
+    constexpr auto define_at(Env& env, std::string const& name, NodeId node,
+                             Value value) -> DeclId {
+        return define_at(env, name, node, value, {});
+    }
+
+    constexpr auto define_at(Env& env, std::string const& name, NodeId node,
+                             Value value, DeclFlags flags) -> DeclId {
         // fmt::println(stderr, "define_at({:?})", name);
         // for (size_t i = 0; auto const& inner : envs) {
         //     if (env.id == inner.id)
@@ -384,10 +422,13 @@ struct NameSolver : public ast::Visitor<Ast> {
             }
         }
 
-        auto decl = get_ds().gen_decl({.name = gen_name(name),
-                                       .local_name = name,
-                                       .node = node,
-                                       .flags = flags});
+        auto decl = get_ds().gen_decl({
+            .name = gen_name(name),
+            .local_name = name,
+            .node = node,
+            .flags = flags,
+            .value = value,
+        });
 
         env.set(name, decl);
 
@@ -464,8 +505,9 @@ struct NameSolver : public ast::Visitor<Ast> {
     std::unordered_map<NodeId, Env> file_envs;
     std::vector<Env>                envs;
 
-    ErrorReporter* er;
-    FileStore*     fs;
+    ErrorReporter*    er;
+    FileStore*        fs;
+    types::TypeStore* ts;
 };
 
 // ============================================================================
@@ -494,7 +536,8 @@ auto make_map_of_decl_to_source_file(Ast const& ast, NodeId mod)
 // ============================================================================
 
 auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
-                   FileStore& fs, Options const& opt) -> ast::NodeId {
+                   FileStore& fs, types::TypeStore& ts, Options const& opt)
+    -> ast::NodeId {
     auto node = ast.get_node(root.as_ref());
     ASSERT(node.get_kind() == ast::NodeKind::SourceFile);
 
@@ -511,7 +554,7 @@ auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
 
     auto decls_to_source_files = make_map_of_decl_to_source_file(ast, mod);
 
-    auto ns = NameSolver{fs, er, ast};
+    auto ns = NameSolver{fs, ts, er, ast};
 
     ns.visit_before_module(ast.get_node(mod.as_ref()),
                            conv::module(ast, ast.get_node(mod.as_ref())));
