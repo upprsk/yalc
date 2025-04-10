@@ -70,7 +70,6 @@ struct Typer : public ast::Visitor<ast::Ast> {
         }
 
         // TODO: implement the addition of other types. Missing:
-        // - floats
         // - operator overloads
         er->report_error(
             node.get_loc(),
