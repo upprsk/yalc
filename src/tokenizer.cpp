@@ -18,6 +18,11 @@ struct Tokenizer {
         return source.at(current);
     }
 
+    [[nodiscard]] constexpr auto peek_next() const -> uint8_t {
+        if (current >= source.length() - 1) return 0;
+        return source.at(current + 1);
+    }
+
     constexpr auto peek_and_advance() -> uint8_t {
         auto c = peek();
         advance();
@@ -159,7 +164,10 @@ struct Tokenizer {
 
         while (is_digit(peek()) || peek() == '_') advance();
 
-        if (match('.') && is_digit(peek())) {
+        if (peek() == '.' && is_digit(peek_next())) {
+            // eat the .
+            advance();
+
             while (is_digit(peek()) || peek() == '_') advance();
             return mkt(TokenType::Float);
         }
