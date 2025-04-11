@@ -34,18 +34,19 @@ auto real_main(yalc::Args const& args) -> int {
                             .dump_type_store = args.dump_type_store_json};
 
     auto [ast, root] = yal::load_and_parse(fs, er, args.program, opt);
-    if (!root.is_valid()) return 1;
+    if (!root) return 1;
 
     auto ts = yal::types::TypeStore{};
     ts.add_builtins();
 
     auto prj_root = yal::resolve_names(ast, root, er, fs, ts, opt);
 
-    yal::perform_typing(ast, root, er, ts, opt);
+    // yal::perform_typing(ast, root, er, ts, opt);
 
     if (args.dump_ast_json) {
-        json j = ast.fatten(prj_root);
-        fmt::println("{}", j.dump());
+        json j = *prj_root;
+        json ds = *ast.get_decl_store();
+        fmt::println("{}\n{}", j.dump(), ds.dump());
     }
 
     return er.had_error() ? 1 : 0;

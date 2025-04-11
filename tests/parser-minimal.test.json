@@ -1,1 +1,1 @@
-{"children":[],"id":1,"kind":"SourceFile","loc":{"fileid":0,"span":{"begin":0,"end":12}},"mod":{"id":0,"kind":"ModuleDecl","loc":{"fileid":0,"span":{"begin":0,"end":12}},"name":"main"}}
+{"children":[{"children":[],"data":"main","kind":"ModuleDecl","loc":{"fileid":0,"span":{"begin":0,"end":12}}}],"data":null,"kind":"SourceFile","loc":{"fileid":0,"span":{"begin":0,"end":12}}}

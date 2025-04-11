@@ -58,7 +58,7 @@ auto gen_ast_resolved(std::string source) -> json {
         };
     }
 
-    return ast.fatten(prj_root);
+    return *prj_root;
 }
 
 auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
@@ -111,7 +111,7 @@ auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
         };
     }
 
-    return ast.fatten(prj_root);
+    return *prj_root;
 }
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,

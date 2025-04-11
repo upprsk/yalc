@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
-#include "ast-node-id.hpp"
+#include "ast-node.hpp"
 #include "ast.hpp"
 #include "decl-store.hpp"
 
@@ -14,70 +15,128 @@ struct Id {
     DeclId           to;
 };
 
+struct KwLit {
+    std::string_view id;
+};
+
+struct Int {
+    uint64_t value;
+};
+
+struct Double {
+    double value;
+};
+
+struct Float {
+    float value;
+};
+
+struct Str {
+    std::string_view value;
+};
+
+struct Char {
+    uint32_t value;
+};
+
 struct Module {
-    std::string_view        name;
-    std::span<NodeId const> children;
+    std::string_view name;
+    std::span<Node*> children;
 };
 
 struct SourceFile {
-    NodeId                  mod;
-    std::span<NodeId const> children;
-};
-
-struct SourceFileMut {
-    NodeId            mod;
-    std::span<NodeId> children;
+    Node*            mod{};
+    std::span<Node*> children;
 };
 
 struct ModuleDecl {
     std::string_view name;
 };
 
-struct FuncDecl {
-    std::span<NodeId const> decorators;
-    std::span<NodeId const> gargs;
-    std::span<NodeId const> args;
-    NodeId                  name;
-    NodeId                  ret;
-    NodeId                  body;
-    bool                    is_c_varargs;
+struct Decorator {
+    std::string_view name;
+    std::span<Node*> params;
 };
 
-struct TopVarDecl {
-    std::span<NodeId const> decorators;
-    NodeId                  decl;
+struct DecoratorParam {
+    std::string_view key;
+    Node*            value{};
 };
 
-struct TopDefDecl {
-    std::span<NodeId const> decorators;
-    NodeId                  decl;
+struct Decorators {
+    std::span<Node*> items;
+};
+
+struct FuncParams {
+    std::span<Node*> params;
 };
 
 struct IdPack {
-    // NOTE: each id in `ids` points to an identifier, not an AST node
-    std::span<NodeId const> ids;
+    std::span<Node*> ids;
+};
+
+struct FuncRetPack {
+    std::span<Node*> ret;
+};
+
+struct FuncDecl {
+    Decorators  decorators;
+    IdPack      name;
+    FuncParams  gargs;
+    FuncParams  args;
+    FuncRetPack ret;
+    Node*       body{};
+    bool        is_c_varargs;
+
+    struct {
+        Node* decorators;
+        Node* name;
+        Node* gargs;
+        Node* args;
+        Node* ret;
+    } detail;
+};
+
+struct VarDecl {
+    Node* ids;
+    Node* types;
+    Node* inits;
+};
+
+struct DefDecl {
+    Node* ids;
+    Node* types;
+    Node* inits;
+};
+
+struct TopVarDecl {
+    Decorators decorators;
+    VarDecl    decl;
+
+    struct {
+        Node* decorators;
+        Node* decl;
+    } detail;
+};
+
+struct TopDefDecl {
+    Decorators decorators;
+    DefDecl    decl;
+
+    struct {
+        Node* decorators;
+        Node* decl;
+    } detail;
 };
 
 struct FuncParam {
     std::string_view name;
-    NodeId           type;
+    Node*            type{};
 };
 
-struct RetPack {
-    // NOTE: each id in `ret` points to either an identifier or an AST node.
-    // This depends if it is in an even or odd index, as the list contains
-    // key-value pairs of return value name and type. The name may be an invalid
-    // id, for when the return value is not named.
-    std::span<NodeId const> ret;
-};
-
-struct Decorator {
-    // NOTE: each id in `params` points to either an identifier or an AST node.
-    // This depends if it is in an even or odd index, as the list contains
-    // key-value pairs. The name may be an invalid id, for when a raw value is
-    // passed. The value may be an invalid id, for when no value is passed.
-    std::span<NodeId const> params;
-    std::string_view        name;
+struct NamedRet {
+    std::string_view name;
+    Node*            type{};
 };
 
 struct ImportStmt {
@@ -85,436 +144,401 @@ struct ImportStmt {
 };
 
 struct ExprPack {
-    std::span<NodeId const> items;
+    std::span<Node*> items;
 };
 
 struct Binary {
-    NodeId lhs;
-    NodeId rhs;
+    Node* lhs{};
+    Node* rhs{};
 };
 
 struct Unary {
-    NodeId child;
+    Node* child{};
 };
 
 struct StructType {
-    std::span<NodeId const> fields;
+    std::span<Node*> fields;
 };
 
 struct StructField {
     std::string_view name;
-    NodeId           type;
-    NodeId           init;
+    Node*            type{};
+    Node*            init{};
 };
 
 struct Ptr {
-    NodeId inner;
-    bool   is_const;
+    Node* inner{};
+    bool  is_const;
 };
 
 struct MultiPtr {
-    NodeId inner;
-    bool   is_const;
+    Node* inner{};
+    bool  is_const;
 };
 
 struct Slice {
-    NodeId inner;
-    bool   is_const;
+    Node* inner{};
+    bool  is_const;
 };
 
 struct ArrayType {
-    NodeId size;
-    NodeId inner;
-    bool   is_const;
+    Node* size{};
+    Node* inner{};
+    bool  is_const;
 };
 
 struct Array {
-    NodeId                  size;
-    NodeId                  inner;
-    std::span<NodeId const> items;
+    Node*            size{};
+    Node*            inner{};
+    std::span<Node*> items;
 };
 
 struct Lit {
-    // NOTE: each id in `params` points to either the key or the value AST node.
-    // This depends if it is in an even or odd index, as the list contains
-    // key-value pairs. The key may be an invalid id, for when a value is given
-    // without a key.
-    std::span<NodeId const> items;
+    std::span<Node*> items;
+};
+
+struct LitParam {
+    std::string_view key;
+    Node*            init{};
 };
 
 struct Call {
-    NodeId                  callee;
-    std::span<NodeId const> args;
+    Node*            callee{};
+    std::span<Node*> args;
 };
 
 struct Field {
     std::string_view name;
-    NodeId           receiver;
+    Node*            receiver{};
 };
 
 struct Block {
-    std::span<NodeId const> items;
+    std::span<Node*> items;
+};
+
+struct ExprStmt {
+    Node* child{};
+};
+
+struct ReturnStmt {
+    Node* child{};
 };
 
 struct IfStmt {
-    NodeId cond;
-    NodeId wt;
-    // NOTE: `wf` may be an invalid id in case the if does not have an else
-    NodeId wf;
+    Node* cond{};
+    Node* wt{};
+    Node* wf{};
 };
 
 struct WhileStmt {
-    NodeId cond;
-    NodeId body;
+    Node* cond{};
+    Node* body{};
 };
 
 struct DeferStmt {
-    NodeId stmt;
-};
-
-struct VarDecl {
-    NodeId ids;
-    NodeId types;
-    NodeId inits;
-};
-
-struct DefDecl {
-    NodeId ids;
-    NodeId types;
-    NodeId inits;
+    Node* stmt{};
 };
 
 struct Assign {
-    NodeId lhs;
-    NodeId rhs;
+    ExprPack lhs;
+    ExprPack rhs;
+
+    struct {
+        Node* lhs{};
+        Node* rhs{};
+    } detail;
 };
 
 // ------------------------------------------------------------------
 
-[[nodiscard]] constexpr auto id(Ast const& ast, Node const& n) -> Id {
+[[nodiscard]] constexpr auto id(Node const& n) -> Id {
+    ASSERT(n.get_kind() == NodeKind::Id);
+    return {.name = n.get_data_str(), .to = n.get_declid()};
+}
+
+[[nodiscard]] constexpr auto kwlit(Node const& n) -> KwLit {
+    ASSERT(n.get_kind() == NodeKind::KwLit);
+    return {.id = n.get_data_str()};
+}
+
+[[nodiscard]] constexpr auto integers(Node const& n) -> Int {
+    ASSERT(n.get_kind() == NodeKind::Int);
+    return {.value = n.get_data_u64()};
+}
+
+[[nodiscard]] constexpr auto float64(Node const& n) -> Double {
+    ASSERT(n.get_kind() == NodeKind::Double);
+    return {.value = n.get_data_f64()};
+}
+
+[[nodiscard]] constexpr auto float32(Node const& n) -> Float {
+    ASSERT(n.get_kind() == NodeKind::Float);
+    return {.value = n.get_data_f32()};
+}
+
+[[nodiscard]] constexpr auto str(Node const& n) -> Str {
+    ASSERT(n.get_kind() == NodeKind::Str);
+    return {.value = n.get_data_str()};
+}
+
+[[nodiscard]] constexpr auto character(Node const& n) -> Char {
+    ASSERT(n.get_kind() == NodeKind::Char);
+    return {.value = static_cast<uint32_t>(n.get_data_u64())};
+}
+
+[[nodiscard]] constexpr auto module(Node const& n) -> Module {
+    ASSERT(n.get_kind() == NodeKind::Module);
+    return {.name = n.get_data_str(), .children = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto source_file(Node const& n) -> SourceFile {
+    ASSERT(n.get_kind() == NodeKind::SourceFile);
     return {
-        .name = ast.get_identifier(n.get_first().as_id()),
-        .to = n.get_second().as_declref().value,
+        .mod = n.get_children()[0],
+        .children = n.get_children().subspan(1),
     };
 }
 
-[[nodiscard]] constexpr auto module(Ast const& ast, Node const& n) -> Module {
-    return {
-        .name = ast.get_identifier(n.get_first().as_id()),
-        .children = ast.get_array(n.get_second().as_array()),
-    };
+[[nodiscard]] constexpr auto module_decl(Node const& n) -> ModuleDecl {
+    ASSERT(n.get_kind() == NodeKind::ModuleDecl);
+    return {.name = n.get_data_str()};
 }
 
-[[nodiscard]] constexpr auto source_file(Ast const& ast, Node const& n)
-    -> SourceFile {
-    return {
-        .mod = n.get_first(),
-        .children = ast.get_array(n.get_second().as_array()),
-    };
+[[nodiscard]] constexpr auto decorator(Node const& n) -> Decorator {
+    ASSERT(n.get_kind() == NodeKind::Decorator);
+    return {.name = n.get_data_str(), .params = n.get_children()};
 }
 
-[[nodiscard]] constexpr auto source_file_mut(Ast& ast, Node const& n)
-    -> SourceFileMut {
-    return {
-        .mod = n.get_first(),
-        .children = ast.get_array_mut(n.get_second().as_array()),
-    };
+[[nodiscard]] constexpr auto decorator_param(Node const& n) -> DecoratorParam {
+    ASSERT(n.get_kind() == NodeKind::DecoratorParam);
+    return {.key = n.get_data_str(), .value = n.get_children()[0]};
 }
 
-[[nodiscard]] constexpr auto module_decl(Ast const& ast, Node const& n)
-    -> ModuleDecl {
-    return {.name = ast.get_identifier(n.get_first().as_id())};
+[[nodiscard]] constexpr auto decorators(Node const& n) -> Decorators {
+    ASSERT(n.get_kind() == NodeKind::Decorators);
+    return {.items = n.get_children()};
 }
 
-/// A module may appear valid but have no identifier due to a parse error. Use
-/// this to check.
-[[nodiscard]] constexpr auto module_decl_is_valid(Node const& n) -> bool {
-    return n.get_first().is_valid();
+[[nodiscard]] constexpr auto func_params(Node const& n) -> FuncParams {
+    ASSERT(n.get_kind() == NodeKind::FuncParams);
+    return {.params = n.get_children()};
 }
 
-[[nodiscard]] constexpr auto func_decl(Ast const& ast, Node const& n)
-    -> FuncDecl {
-    auto     second = ast.get_array_unbounded(n.get_second().as_array());
-    uint32_t idx{};
+[[nodiscard]] constexpr auto id_pack(Node const& n) -> IdPack {
+    ASSERT(n.get_kind() == NodeKind::IdPack);
+    return {.ids = n.get_children()};
+}
 
-    // NOTE: no bounds check because of span missing the `.at`
-    // method. :(
-    auto dlen = second[idx++].as_count().value;
-    auto decorators = second.subspan(idx, dlen);
-    idx += dlen;
+[[nodiscard]] constexpr auto func_ret_pack(Node const& n) -> FuncRetPack {
+    ASSERT(n.get_kind() == NodeKind::FuncRetPack);
+    return {.ret = n.get_children()};
+}
 
-    auto glen = second[idx++].as_count().value;
-    auto gargs = second.subspan(idx, glen);
-    idx += glen;
-
-    auto alen = second[idx++].as_count().value;
-    auto args = second.subspan(idx, alen);
-    idx += alen;
-
-    auto ret = second[idx++];
-    auto body = second[idx++];
+[[nodiscard]] constexpr auto func_decl(Node const& n) -> FuncDecl {
+    ASSERT(n.get_kind() == NodeKind::FuncDecl);
+    auto c = n.get_children();
 
     return {
-        .decorators = decorators,
-        .gargs = gargs,
-        .args = args,
-        .name = n.get_first(),
-        .ret = ret,
-        .body = body,
+        .decorators = conv::decorators(*c[0]),
+        .name = conv::id_pack(*c[1]),
+        .gargs = conv::func_params(*c[2]),
+        .args = conv::func_params(*c[3]),
+        .ret = c[4] ? conv::func_ret_pack(*c[4]) : FuncRetPack{},
+        .body = c[5],
         .is_c_varargs = n.get_kind() == NodeKind::FuncDeclWithCVarArgs,
+        .detail = {.decorators = c[0],  //
+                   .name = c[1],        //
+                   .gargs = c[2],       //
+                   .args = c[3],        //
+                   .ret = c[4]}
     };
 }
 
-[[nodiscard]] constexpr auto top_var_decl(Ast const& ast, Node const& n)
-    -> TopVarDecl {
+[[nodiscard]] constexpr auto var_decl(Node const& n) -> VarDecl {
+    ASSERT(n.get_kind() == NodeKind::VarDecl);
+    auto c = n.get_children();
+    return {.ids = c[0], .types = c[1], .inits = c[2]};
+}
+
+[[nodiscard]] constexpr auto def_decl(Node const& n) -> DefDecl {
+    ASSERT(n.get_kind() == NodeKind::DefDecl);
+    auto c = n.get_children();
+    return {.ids = c[0], .types = c[1], .inits = c[2]};
+}
+
+[[nodiscard]] constexpr auto top_var_decl(Node const& n) -> TopVarDecl {
+    ASSERT(n.get_kind() == NodeKind::TopVarDecl);
+    auto c = n.get_children();
+
     return {
-        .decorators = ast.get_array(n.get_second().as_array()),
-        .decl = n.get_first(),
+        .decorators = conv::decorators(*c[0]),
+        .decl = conv::var_decl(*c[1]),
+        .detail = {.decorators = c[0], .decl = c[1]},
     };
 }
 
-[[nodiscard]] constexpr auto top_def_decl(Ast const& ast, Node const& n)
-    -> TopDefDecl {
+[[nodiscard]] constexpr auto top_def_decl(Node const& n) -> TopDefDecl {
+    ASSERT(n.get_kind() == NodeKind::TopDefDecl);
+    auto c = n.get_children();
+
     return {
-        .decorators = ast.get_array(n.get_second().as_array()),
-        .decl = n.get_first(),
+        .decorators = conv::decorators(*c[0]),
+        .decl = conv::def_decl(*c[1]),
+        .detail = {.decorators = c[0], .decl = c[1]},
     };
 }
 
-[[nodiscard]] constexpr auto id_pack(Ast const& ast, Node const& n) -> IdPack {
-    return {.ids = ast.get_array(n.get_first().as_count(),
-                                 n.get_second().as_array())};
+[[nodiscard]] constexpr auto func_param(Node const& n) -> FuncParam {
+    ASSERT(n.get_kind() == NodeKind::FuncParam);
+    return {.name = n.get_data_str(), .type = n.get_children()[0]};
 }
 
-[[nodiscard]] constexpr auto func_param(Ast const& ast, Node const& n)
-    -> FuncParam {
-    return {.name = ast.get_identifier(n.get_first().as_id()),
-            .type = n.get_second()};
+[[nodiscard]] constexpr auto named_ret(Node const& n) -> NamedRet {
+    ASSERT(n.get_kind() == NodeKind::NamedRet);
+    return {.name = n.get_data_str(), .type = n.get_children()[0]};
 }
 
-[[nodiscard]] constexpr auto ret_pack(Ast const& ast, Node const& n)
-    -> RetPack {
-    return {.ret = ast.get_array(n.get_first().as_count().of_kv(),
-                                 n.get_second().as_array())};
+[[nodiscard]] constexpr auto import_stmt(Node const& n) -> ImportStmt {
+    ASSERT(n.get_kind() == NodeKind::ImportStmt);
+    return {.path = n.get_data_str()};
 }
 
-[[nodiscard]] constexpr auto decorator(Ast const& ast, Node const& n)
-    -> Decorator {
+[[nodiscard]] constexpr auto expr_pack(Node const& n) -> ExprPack {
+    ASSERT(n.get_kind() == NodeKind::ExprPack);
+    return {.items = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto binary(Node const& n) -> Binary {
+    // TODO: assert that it is a valid binary
+    auto c = n.get_children();
+    return {.lhs = c[0], .rhs = c[1]};
+}
+
+[[nodiscard]] constexpr auto unary(Node const& n) -> Unary {
+    // TODO: assert that it is a valid unary
+    return {.child = n.get_children()[0]};
+}
+
+[[nodiscard]] constexpr auto struct_type(Node const& n) -> StructType {
+    ASSERT(n.get_kind() == NodeKind::StructType);
+    return {.fields = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto struct_field(Node const& n) -> StructField {
+    ASSERT(n.get_kind() == NodeKind::StructField);
+    auto c = n.get_children();
+    return {.name = n.get_data_str(), .type = c[0], .init = c[1]};
+}
+
+[[nodiscard]] constexpr auto ptr(Node const& n) -> Ptr {
+    ASSERT(n.get_kind() == NodeKind::Ptr || n.get_kind() == NodeKind::PtrConst);
     return {
-        .params = ast.get_array_of_kv(n.get_second().as_array()),
-        .name = ast.get_identifier(n.get_first().as_id()),
-    };
-}
-
-[[nodiscard]] constexpr auto import_stmt(Ast const& ast, Node const& n)
-    -> ImportStmt {
-    return {.path = ast.get_bytes_as_string_view(n.get_first().as_bytes())};
-}
-
-[[nodiscard]] constexpr auto expr_pack(Ast const& ast, Node const& n)
-    -> ExprPack {
-    return {.items = ast.get_array(n.get_first().as_count(),
-                                   n.get_second().as_array())};
-}
-
-[[nodiscard]] constexpr auto binary(Ast const& /*unused*/, Node const& n)
-    -> Binary {
-    return {.lhs = n.get_first(), .rhs = n.get_second()};
-}
-
-[[nodiscard]] constexpr auto unary(Ast const& /*unused*/, Node const& n)
-    -> Unary {
-    return {.child = n.get_first()};
-}
-
-[[nodiscard]] constexpr auto struct_type(Ast const& ast, Node const& n)
-    -> StructType {
-    return {.fields = ast.get_array(n.get_first().as_count(),
-                                    n.get_second().as_array())};
-}
-
-[[nodiscard]] constexpr auto struct_field(Ast const& ast, Node const& n)
-    -> StructField {
-    auto parts = ast.get_array({2}, n.get_second().as_array());
-    return {
-        .name = ast.get_identifier(n.get_first().as_id()),
-        .type = parts[0],
-        .init = parts[1],
-    };
-}
-
-[[nodiscard]] constexpr auto ptr(Ast const& /*unused*/, Node const& n) -> Ptr {
-    return {
-        .inner = n.get_first(),
+        .inner = n.get_children()[0],
         .is_const = n.get_kind() == NodeKind::PtrConst,
     };
 }
 
-[[nodiscard]] constexpr auto mptr(Ast const& /*unused*/, Node const& n)
-    -> MultiPtr {
+[[nodiscard]] constexpr auto mptr(Node const& n) -> MultiPtr {
+    ASSERT(n.get_kind() == NodeKind::MultiPtr ||
+           n.get_kind() == NodeKind::MultiPtrConst);
     return {
-        .inner = n.get_first(),
+        .inner = n.get_children()[0],
         .is_const = n.get_kind() == NodeKind::MultiPtrConst,
     };
 }
 
-[[nodiscard]] constexpr auto slice(Ast const& /*unused*/, Node const& n)
-    -> Slice {
+[[nodiscard]] constexpr auto slice(Node const& n) -> Slice {
+    ASSERT(n.get_kind() == NodeKind::Slice ||
+           n.get_kind() == NodeKind::SliceConst);
     return {
-        .inner = n.get_first(),
+        .inner = n.get_children()[0],
         .is_const = n.get_kind() == NodeKind::SliceConst,
     };
 }
 
-[[nodiscard]] constexpr auto array_type(Ast const& /*unused*/, Node const& n)
-    -> ArrayType {
+[[nodiscard]] constexpr auto array_type(Node const& n) -> ArrayType {
+    ASSERT(n.get_kind() == NodeKind::ArrayType ||
+           n.get_kind() == NodeKind::ArrayTypeConst);
+    auto c = n.get_children();
+
     return {
-        .size = n.get_second(),
-        .inner = n.get_first(),
+        .size = c[1],
+        .inner = c[0],
         .is_const = n.get_kind() == NodeKind::ArrayTypeConst,
     };
 }
 
-[[nodiscard]] constexpr auto array(Ast const& ast, Node const& n) -> Array {
-    auto second = ast.get_array_unbounded(n.get_second().as_array());
-    auto size = second[0];
-    auto items = second.subspan(2, second[1].as_count().value);
+[[nodiscard]] constexpr auto array(Node const& n) -> Array {
+    ASSERT(n.get_kind() == NodeKind::Array);
+    auto c = n.get_children();
+    return {.size = c[1], .inner = c[0], .items = c.subspan(2)};
+}
 
+[[nodiscard]] constexpr auto lit(Node const& n) -> Lit {
+    ASSERT(n.get_kind() == NodeKind::Lit);
+    return {.items = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto lit_param(Node const& n) -> LitParam {
+    ASSERT(n.get_kind() == NodeKind::LitParam);
+    return {.key = n.get_data_str(), .init = n.get_children()[0]};
+}
+
+[[nodiscard]] constexpr auto call(Node const& n) -> Call {
+    ASSERT(n.get_kind() == NodeKind::Call);
+    auto c = n.get_children();
+    return {.callee = c[0], .args = c.subspan(1)};
+}
+
+[[nodiscard]] constexpr auto field(Node const& n) -> Field {
+    ASSERT(n.get_kind() == NodeKind::Field);
+    return {.name = n.get_data_str(), .receiver = n.get_children()[0]};
+}
+
+[[nodiscard]] constexpr auto block(Node const& n) -> Block {
+    ASSERT(n.get_kind() == NodeKind::Block);
+    return {.items = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto if_stmt(Node const& n) -> IfStmt {
+    ASSERT(n.get_kind() == NodeKind::IfStmt);
+    auto c = n.get_children();
+    return {.cond = c[0], .wt = c[1], .wf = c[2]};
+}
+
+[[nodiscard]] constexpr auto while_stmt(Node const& n) -> WhileStmt {
+    ASSERT(n.get_kind() == NodeKind::WhileStmt);
+    auto c = n.get_children();
+    return {.cond = c[0], .body = c[1]};
+}
+
+[[nodiscard]] constexpr auto defer_stmt(Node const& n) -> DeferStmt {
+    ASSERT(n.get_kind() == NodeKind::DeferStmt);
+    return {.stmt = n.get_children()[0]};
+}
+
+[[nodiscard]] constexpr auto assign(Node const& n) -> Assign {
+    // FIXME: check if it is a valid assign
+    auto c = n.get_children();
     return {
-        .size = size,
-        .inner = n.get_first(),
-        .items = items,
+        .lhs = conv::expr_pack(*c[0]),
+        .rhs = conv::expr_pack(*c[1]),
+        .detail = {.lhs = c[0], .rhs = c[1]},
     };
-}
-
-[[nodiscard]] constexpr auto lit(Ast const& ast, Node const& n) -> Lit {
-    return {.items = ast.get_array(n.get_first().as_count().of_kv(),
-                                   n.get_second().as_array())};
-}
-
-[[nodiscard]] constexpr auto call(Ast const& ast, Node const& n) -> Call {
-    return {
-        .callee = n.get_first(),
-        .args = ast.get_array(n.get_second().as_array()),
-    };
-}
-
-[[nodiscard]] constexpr auto field(Ast const& ast, Node const& n) -> Field {
-    return {
-        .name = ast.get_identifier(n.get_second().as_id()),
-        .receiver = n.get_first(),
-    };
-}
-
-[[nodiscard]] constexpr auto block(Ast const& ast, Node const& n) -> Block {
-    return {.items = ast.get_array(n.get_first().as_count(),
-                                   n.get_second().as_array())};
-}
-
-[[nodiscard]] constexpr auto if_stmt(Ast const& ast, Node const& n) -> IfStmt {
-    if (n.get_kind() == NodeKind::IfStmt)
-        return {.cond = n.get_first(),
-                .wt = n.get_second(),
-                .wf = NodeId::invalid()};
-
-    // NodeKind::IfStmtWithElse
-    auto second = ast.get_array({2}, n.get_second().as_array());
-    return {.cond = n.get_first(), .wt = second[0], .wf = second[1]};
-}
-
-[[nodiscard]] constexpr auto while_stmt(Ast const& /*unused*/, Node const& n)
-    -> WhileStmt {
-    return {.cond = n.get_first(), .body = n.get_second()};
-}
-
-[[nodiscard]] constexpr auto defer_stmt(Ast const& /*unused*/, Node const& n)
-    -> DeferStmt {
-    return {.stmt = n.get_first()};
-}
-
-[[nodiscard]] constexpr auto var_decl(Ast const& ast, Node const& n)
-    -> VarDecl {
-    auto second = ast.get_array({2}, n.get_second().as_array());
-    return {.ids = n.get_first(), .types = second[0], .inits = second[1]};
-}
-
-[[nodiscard]] constexpr auto def_decl(Ast const& ast, Node const& n)
-    -> DefDecl {
-    auto second = ast.get_array({2}, n.get_second().as_array());
-    return {.ids = n.get_first(), .types = second[0], .inits = second[1]};
-}
-
-[[nodiscard]] constexpr auto assign(Ast const& /*unused*/, Node const& n)
-    -> Assign {
-    return {.lhs = n.get_first(), .rhs = n.get_second()};
-}
-
-// ------------------------------------------------------------------
-
-/// Get the inner `IdPack` of a func-decl
-[[nodiscard]] constexpr auto func_decl_id_pack(Node const& n) -> NodeId {
-    return n.get_first();
-}
-
-/// Get the names of the inner `IdPack` of a func-decl
-[[nodiscard]] constexpr auto func_decl_name(Ast const& ast, Node const& n)
-    -> IdPack {
-    auto ids = ast.get_node(func_decl_id_pack(n).as_ref());
-    ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
-
-    return id_pack(ast, ids);
-}
-
-/// Get the inner `IdPack` for the given top-var-decl
-[[nodiscard]] constexpr auto top_var_decl_id_pack(Ast const& ast, Node const& n)
-    -> NodeId {
-    auto child = ast.get_node(n.get_first().as_ref());
-    ASSERT(child.get_kind() == ast::NodeKind::VarDecl);
-
-    return child.get_first();
-}
-
-/// Get the names of the inner `IdPack` for the given top-var-decl
-[[nodiscard]] constexpr auto top_var_decl_names(Ast const& ast, Node const& n)
-    -> IdPack {
-    auto ids = ast.get_node(top_var_decl_id_pack(ast, n).as_ref());
-    ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
-
-    return id_pack(ast, ids);
-}
-
-/// Get the inner `IdPack` for the given top-def-decl
-[[nodiscard]] constexpr auto top_def_decl_id_pack(Ast const& ast, Node const& n)
-    -> NodeId {
-    auto child = ast.get_node(n.get_first().as_ref());
-    ASSERT(child.get_kind() == ast::NodeKind::DefDecl);
-
-    return child.get_first();
-}
-
-/// Get the names of the inner `IdPack` for the given top-def-decl
-[[nodiscard]] constexpr auto top_def_decl_names(Ast const& ast, Node const& n)
-    -> IdPack {
-    auto ids = ast.get_node(top_def_decl_id_pack(ast, n).as_ref());
-    ASSERT(ids.get_kind() == ast::NodeKind::IdPack);
-
-    return id_pack(ast, ids);
 }
 
 // ==================================================================
 
 enum class PrivateKind { Public, Module, File };
-[[nodiscard]] constexpr auto decorators_private_kind(
-    Ast const& ast, std::span<NodeId const> decorators) -> PrivateKind {
-    for (auto decid : decorators) {
-        auto dec = conv::decorator(ast, ast.get_node(decid.as_ref()));
-        if (dec.name == "private") {
-            auto params = dec.params;
-            ASSERT((params.size() & 1) == 0);
-            for (size_t i = 0; i < params.size(); i += 2) {
-                if (params[i].is_valid() &&
-                    ast.get_identifier(params[i].as_id()) == "file") {
-                    return PrivateKind::File;
+[[nodiscard]] constexpr auto decorators_private_kind(Decorators decorators)
+    -> PrivateKind {
+    for (auto decl_ptr : decorators.items) {
+        auto decl = conv::decorator(*decl_ptr);
+        if (decl.name == "private") {
+            for (auto param : decl.params) {
+                if (param->get_kind() == NodeKind::Id) {
+                    auto p = conv::id(*param);
+                    if (p.name == "file") return PrivateKind::File;
                 }
             }
 

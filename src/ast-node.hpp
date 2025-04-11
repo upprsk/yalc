@@ -2,8 +2,12 @@
 
 #include <bit>
 #include <cstdint>
+#include <span>
+#include <string_view>
+#include <utility>
+#include <variant>
 
-#include "ast-node-id.hpp"
+#include "decl-id.hpp"
 #include "file-store.hpp"
 #include "type-id.hpp"
 
@@ -12,9 +16,6 @@ namespace yal::ast {
 // All of the kinds of AST nodes.
 enum class NodeKind : uint16_t {
     /// An error in the AST, most likely due to parsing errors.
-    //
-    /// - `first` points to a string (in bytes in the store) with an error
-    /// message.
     Err = 0,
 
     /// --------
@@ -22,41 +23,38 @@ enum class NodeKind : uint16_t {
     /// --------
 
     /// An identifier.
-    //
-    /// - `first` points to the identifier in the store.
-    /// - `second` points to the declaration for the id. This will be invalid
-    /// before name resolution, and may remain invalid if the name is not
-    /// defined.
+    ///
+    /// - `data` contains a string with the identifier.
     Id,
 
     /// A keyword literal (`.id`)
+    ///
+    /// - `data` contains a string with the identifier.
     KwLit,
 
     /// An integer.
-    //
-    /// - `first` and `second` form a 64bit unsigned integer.
+    ///
+    /// - `data` contains a 64bit unsigened integer.
     Int,
 
     /// A double/f64.
     //
-    /// - `first` and `second` form a 64bit floating point number.
+    /// - `data` contains a 64bit double.
     Double,
 
     /// A float/f32.
     //
-    /// - `first` contains a 32bit floating point number.
-    /// NOTE: this might not be needed
+    /// - `data` contains a 32bit double.
     Float,
 
     /// A string.
     //
-    /// - `first` points to the byte contents of the string in the store.
+    /// - `data` contains a string (already escaped).
     Str,
 
     /// A character.
     //
-    /// - `first` contains the byte value (or multi-byte for UFT-8) of the
-    /// character.
+    /// - `data` contains the character in a 64bit unsigened integer.
     Char,
 
     /// ---------
@@ -65,29 +63,24 @@ enum class NodeKind : uint16_t {
 
     /// A module, which may contain multiple source files. This is the root of
     /// the tree.
-    //
-    /// - `first` points to an identifier with the module name.
-    /// - `second` points to an array of `SourceFile`s.
-    //
-    /// The `second` array is made of `[{length}, ...]`.
-    //
+    ///
+    /// - `data` contains a string with the module name.
+    /// - `children` contains all of `SourceFile`s that are a part of the
+    /// module.
+    ///
     /// The location of this node is that of the first source file found when
     /// discovering the module. Not very exact but should be sufficient.
     Module,
 
     /// A single source file. Always a child of `Module`.
-    //
-    /// - `first` points to a ModuleDecl (the `module <name>;` at the start of
-    /// every file).
-    /// - `second` points to an array of children nodes.
-    //
-    /// The `second` array is made of `[{length}, ...]`.
+    ///
+    /// - `children` contains in the first position the `ModuleDecl` ast node
+    /// followed by all of the declarations in the file.
     SourceFile,
 
     /// The `module <name>;` at the start of a source file.
-    //
-    /// - `first` points to the identifier of `<name>`.
-    /// - `second` is not used.
+    ///
+    /// - `data` has a string with the module name.
     ModuleDecl,
 
     /// A function declaration.
@@ -105,76 +98,62 @@ enum class NodeKind : uint16_t {
     ///                        |
     ///                        \_ name (with namespace)
     ///
-    /// 1. A function may be annotated with a "decorator". This can change
-    /// various attributes of the function, like: `extern`, link name,
-    /// alignment, etc.
+    /// A function may be annotated with a "decorator". This can change various
+    /// attributes of the function, like: `extern`, link name, alignment, etc.
     ///
-    /// - `first` points to a `IdPack` node with the function name (and
-    /// namespacing).
-    /// - `second` points to all other things in an array.
-    ///
-    /// Structure of `second`:
-    ///
-    /// - **len(A)**: Number of decorators added to the function.
-    /// - **A...**: Pointers to each decorator.
-    /// - **len(B)**: Number of generic arguments.
-    /// - **B...**: Pointers to each generic argument.
-    /// - **len(C)**: Number of arguments.
-    /// - **C...**: Pointers to each argument.
-    /// - **D?**: Pointer to the return type, if any. The function may have
-    /// multiple return values, this is handled by using a FuncRetPack node.
-    /// - **E?**: Pointer to the body, if any.
-    ///
-    /// +--------+--....--+--------+--....--+--------+--....--+--------+--------+
-    /// | len(A) |  A...  | len(B) |  B...  | len(C) |  C...  |   D?   |   E? |
-    /// +--------+--....--+--------+--....--+--------+--....--+--------+--------+
+    /// - `children` points to all parts of the function declaration.
+    ///     1. `Decorators` node with all decorators.
+    ///     2. `IdPack` node with the function name (maybe namespaced).
+    ///     3. `FuncParams` node with all generic arguments.
+    ///     4. `FuncParams` node with all arguments.
+    ///     5. The return type, or null in case we have no explicit return
+    ///     type.
+    ///     6. The function body, or null in case the function has no body.
     FuncDecl,
     FuncDeclWithCVarArgs,
 
+    /// The list of arguments or generic arguments to a function.
+    ///
+    /// - `children` points to either a list of `FuncParam` or `FuncGenParam`,
+    /// depending if this is used as arguments or generic arguments.
+    FuncParams,
+
     /// A top-level (global) variable declaration.
     ///
-    /// - `first` points to a VarDecl node.
-    /// - `second` points to an array of decorators added to the declaration.
-    ///
-    /// The `second` array is made of `[{length}, ...]`.
+    /// - `children` has 2 elements: The inner `VarDecl` and a `Decorators`.
     TopVarDecl,
 
     /// A top-level (global) constant declaration.
     ///
-    /// - `first` points to a DefDecl node.
-    /// - `second` points to an array of decorators added to the declaration.
-    ///
-    /// The `second` array is made of `[{length}, ...]`.
+    /// - `children` has 2 elements: The inner `DefDecl` and a `Decorators`.
     TopDefDecl,
 
     /// A pack of ids. This is used in function definitions for namespacing and
     /// on variable definitions to allow multiple returns.
     ///
-    /// - `first`: Number of identifiers.
-    /// - `second`: Pointer to array of identifiers (in the identifier list).
-    /// The ids are in wrapping order, with the last one having the actual name
-    /// of the function and the previous ones containing each of the wrapping
-    /// names.
+    /// - `children` points to various `Id` nodes with the identifiers.
     IdPack,
 
     /// A function parameter.
     ///
-    /// - `first` has a pointer to the parameter name in identifiers.
-    /// - `second` has a pointer to the type expression. A parameter may not
-    /// have an explicit type, so this field may be an invalid id.
+    /// - `data` has a string with the name of the parameter.
+    /// - `children` has the type of the expression, or null in case it was
+    /// not given.
     FuncParam,
 
     /// Used for functions that return multiple values.
     ///
-    /// Function return values may be named, this is why we store key-value
-    /// pairs in this node. In case the node is not named, then the key is an
-    /// invalid id. This node is used even when the function returns a single
-    /// value.
+    /// Function return values may be named, this is why we store either any
+    /// expression or a `NamedRet`.
     ///
-    /// - `first`: has a count of how many key-value pairs there are.
-    /// - `second`: pointer to array of key-value pairs of the name of the
-    /// return value and type.
+    /// - `children` list of either arbitrary expressions or `NamedRet`.
     FuncRetPack,
+
+    /// Store a named return.
+    ///
+    /// - `data` has a string with the name of the return.
+    /// - `children` has the type.
+    NamedRet,
 
     /// Decorates a top-level declaration to add additional functionality (like
     /// extern).
@@ -193,34 +172,41 @@ enum class NodeKind : uint16_t {
     ///      |         \_ key
     ///      \_ name
     ///
-    /// - `first`: points to an identifier for the name of the decorator. Node
-    /// that the starting `@` is removed.
-    /// - `second`: may point to the arguments. In case the decorator is used
-    /// without arguments, then this is an invalid id. When there is both key
-    /// and value, then we have a pair of `[{key, value}]` in the array. When
-    /// there is just a key (an identifier without the `=`), we have `[{key},
-    /// <inval>]`. When there is just a value, we have `[<inval>, {value}]`.
+    /// - `data` is a string with the decorator name.
+    /// - `children` has the parameters. Each item may be either an expression
+    /// for a positional argument or a `DecoratorParam` for keyword arguments.
     Decorator,
+
+    /// A decorator parameter.
+    ///
+    /// - `data` has a string with the name of the parameter.
+    /// - `children` has the value.
+    DecoratorParam,
+
+    /// A list of decorators, as we can add many decorators to a single
+    /// declaration.
+    ///
+    /// - `children` has all of the `Decorator` notes.
+    Decorators,
 
     /// Import statement.
     ///
-    /// - `first` points to the library import path string.
+    /// - `data` is a string with the import path.
     ImportStmt,
 
     /// -----------
     /// Expressions
     /// -----------
 
-    /// Used for multiple returns and contains a list of expressions.
+    /// Used for multiple returns and assignments and contains a list of
+    /// expressions.
     ///
-    /// - `first` has the count of how many children the node has.
-    /// - `second` pointer to array of children.
+    /// - `children` has all of the expressions.
     ExprPack,
 
     /// Generic binary operation expressions.
     ///
-    /// - `first` has the left side of the operation.
-    /// - `second` has the right side of the operation.
+    /// - `children` has 2 elements: the left an right side of the operation.
     Add,           // +
     Sub,           // -
     Mul,           // *
@@ -243,21 +229,20 @@ enum class NodeKind : uint16_t {
 
     /// Generic unary operation expressions.
     ///
-    /// - `first` points to the child.
+    /// - `children` has the child.
     AddrOf,  // &
     Lnot,    // !
     Bnot,    // ~
     Neg,     // -
 
-    /// A struct type literal
+    /// A struct type literal.
     ///
     ///     struct {
     ///         field_1: type_1,
     ///         field_2: type_2 = init,
     ///     }
     ///
-    /// - `first` contains the number of fields.
-    /// - `second` points to an array of struct fields.
+    /// - `children` has many `StructField`s.
     StructType,
 
     /// A struct type field.
@@ -267,9 +252,11 @@ enum class NodeKind : uint16_t {
     ///         field_2: type_2 = init,
     ///     }
     ///
-    /// - `first` points to an identifier for the name of the field.
-    /// - `second` points to an array with `[{type}, {init}]`. `init` is
-    /// optional and may be an invalid id.
+    /// - `data` has a string with the name of the field.
+    /// - `children` has 2 elements:
+    ///     1. The type of the field.
+    ///     2. The default initializer for the field. May be null in case the
+    ///     field does not have a default initializer.
     StructField,
 
     /// A pointer type literal.
@@ -277,7 +264,7 @@ enum class NodeKind : uint16_t {
     ///     *const i32
     ///     *f32
     ///
-    /// - `first` points to the inner type.
+    /// - `children` points to the inner type.
     PtrConst,
     Ptr,
 
@@ -286,7 +273,7 @@ enum class NodeKind : uint16_t {
     ///     [*]const u8
     ///     [*]i32
     ///
-    /// - `first` points to the inner type.
+    /// - `children` points to the inner type.
     MultiPtrConst,
     MultiPtr,
 
@@ -295,7 +282,7 @@ enum class NodeKind : uint16_t {
     ///     []const u8
     ///     []i16
     ///
-    /// - `first` points to the inner type.
+    /// - `children` points to the inner type.
     SliceConst,
     Slice,
 
@@ -304,8 +291,9 @@ enum class NodeKind : uint16_t {
     ///     [23]const i32
     ///     [6 + 6]u8
     ///
-    /// - `first` points to the inner type.
-    /// - `second` points to the size.
+    /// - `children` has 2 elements:
+    ///     1. The inner type
+    ///     2. The expression for the size of the array.
     ArrayTypeConst,
     ArrayType,
 
@@ -314,10 +302,12 @@ enum class NodeKind : uint16_t {
     ///     [5]i32{0, 1, 2, 3, 4, 5}
     ///     [_]u8{'h', 'i', '!', 0}
     ///
-    /// - `first` points to the inner type.
-    /// - `second` points to an array with size expression and list of
-    /// initializer items in the format: `[{inner}, {length}, ...]`. In case the
-    /// size in inferred (`_`), then `size` is an invalid id.
+    /// - `children` has at least 2 elements:
+    ///     1. The inner type.
+    ///     2. The expression for the size of the array. In case the array has
+    ///     an inferred size (`_`), then this is null.
+    ///     3. All of the remaining elements form the elements of the
+    ///     initializer.
     Array,
 
     /// A struct or array literal, with inferred/auto type.
@@ -325,28 +315,25 @@ enum class NodeKind : uint16_t {
     ///     .{.a = v1, .b = v2}
     ///     .{1, 2, 3}
     ///
-    /// - `first` contains the number of initializer item pairs.
-    /// - `second` contains a list of key-value pairs. In case there is no key,
-    /// then it has an invalid id in it's place.
-    ///
-    /// For example: `.{.a = v1, .b = v2, .c, 1}`
-    ///     +----+----+----+----+----+----+----+----+
-    ///     | .a | v1 | .b | v2 | -- | .c | -- |  1 |
-    ///     +----+----+----+----+----+----+----+----+
+    /// - `children` has an array where each element is either an arbitrary
+    /// expression for a positional item or a `LitParam` when the item is keyed.
     Lit,
+
+    /// A single keyed item in a `Lit`.
+    ///
+    /// - `data` has a string with the key.
+    /// - `children` has the initializer expression.
+    LitParam,
 
     /// A function call.
     ///
-    /// - `first` contains the callee.
-    /// - `second` points to an array of arguments.
-    ///
-    /// The `second` array is made of `[{length}, ...]`.
+    /// - `children` contains the callee and then all of the arguments.
     Call,
 
     /// A field access.
     ///
-    /// - `first` points to the receiver.
-    /// - `second` points to the field name (identifier).
+    /// - `data` has a string with the field name.
+    /// - `children` has the receiver.
     Field,
 
     /// ----------
@@ -355,39 +342,30 @@ enum class NodeKind : uint16_t {
 
     /// A block of statements.
     ///
-    /// - `first` has the number of statements.
-    /// - `second` points to array of `first` statements.
+    /// - `children` has all of the statements.
     Block,
 
     /// A statement over an expression, like `print("hi!");`.
     ///
-    /// - `first` has the child node.
+    /// - `children` has the child node.
     ExprStmt,
 
     /// A return statement.
     ///
-    /// - `first` has the child node. For multiple return values, child will be
-    /// an ExprPack. When it is a bare return without an expression, child is an
-    /// invalid id.
+    /// - `children` has the child node. For multiple return values, child will
+    /// be an `ExprPack`. When it is a bare return without an expression,
+    /// `children` is empty.
     ReturnStmt,
 
-    /// An if statement without an else.
+    /// An if statement.
     ///
-    /// - `first` has the condition expression.
-    /// - `second` has the _then_ block.
+    /// - `children` has 3 elements: the condition, followed by the _then_
+    /// branch, followed by the _else_ branch.
     IfStmt,
-
-    /// An if statement with an else.
-    ///
-    /// - `first` has the condition expression.
-    /// - `second` points to an array with the _then_ and _else_ branches (in
-    /// the format `[{then}, {else}]`.
-    IfStmtWithElse,
 
     /// A while statement.
     ///
-    /// - `first` has the condition expression.
-    /// - `second` has the body.
+    /// - `children` has 2 elements: the condition and the loop block.
     WhileStmt,
 
     /// Break statement.
@@ -397,6 +375,8 @@ enum class NodeKind : uint16_t {
     Continue,
 
     /// Defer statement.
+    ///
+    /// - `children` has the deferred statement.
     DeferStmt,
 
     /// A variable declaration.
@@ -408,29 +388,42 @@ enum class NodeKind : uint16_t {
     ///         |     \_ types
     ///         \_ ids
     ///
-    /// - `first` points to an `IdPack` with all of the declared names.
-    /// - `second` points to an an array with all explicit types and
-    /// initializers as `[{types}, {inits}]`. Each of `types` and `inits` should
-    /// be an `ExprPack`.
+    /// - `children` has 3 elements:
+    ///     1. `IdPack` with all identifiers beeing declared.
+    ///     2. An `ExprPack` with all of the types. This may be null when we
+    ///     have no explicit types.
+    ///     3. An `ExprPack` with all of the initializers. This may be null when
+    ///     we have no initializers.
     ///
     /// Both `types` and `inits` are optional during parsing, so either can be
-    /// an invalid id.
+    /// null.
     VarDecl,
 
     /// A constant declaration.
     ///
-    /// - `first` points to an `IdPack` with all of the declared names.
-    /// - `second` points to an an array with all explicit types and
-    /// initializers as `[{types}, {inits}]`. Each of `types` and `inits` should
-    /// be an `ExprPack`.
+    ///     def a, b: T, U = 1, 2;
+    ///         ^~~^  ^~~^   ^~~^
+    ///         |     |      |
+    ///         |     |      \_ initializers
+    ///         |     \_ types
+    ///         \_ ids
     ///
-    /// `types` is optional, so it can be an invalid id.
+    /// - `children` has 3 elements:
+    ///     1. `IdPack` with all identifiers beeing declared.
+    ///     2. An `ExprPack` with all of the types. This may be null when we
+    ///     have no explicit types.
+    ///     3. An `ExprPack` with all of the initializers. This may be null when
+    ///     we have no initializers.
+    ///
+    /// Both `types` and `inits` are optional during parsing, so either can be
+    /// null, even if `inits` is required.
     DefDecl,
 
     /// Assigment statements.
     ///
-    /// - `first` points to the left hand side of the assigment.
-    /// - `second` points to the right hand side of the assgment.
+    /// - `children` has 2 elements:
+    ///     1. Has an `ExprPack` with all of the l-values for the assignment.
+    ///     2. Has an `ExprPack` with all of the r-values for the assignment.
     Assign,
     AssignAdd,
     AssignSub,
@@ -445,64 +438,75 @@ enum class NodeKind : uint16_t {
 };
 
 class Node {
-    constexpr Node(NodeKind kind, NodeId id, Location loc, NodeId first,
-                   NodeId second)
-        : kind{kind}, id{id}, loc{loc}, first{first}, second{second} {}
-
 public:
     // ------------
     // Constructors
     // ------------
-    constexpr Node(Node const &) = default;
+    constexpr Node(Node const &o) = default;
     constexpr Node(Node &&) = default;
     constexpr auto operator=(Node const &) -> Node & = default;
     constexpr auto operator=(Node &&) -> Node & = default;
 
-    // construct an AST node from it's raw parts
-    static constexpr auto from_parts(NodeKind kind, NodeId id, Location loc,
-                                     NodeId first, NodeId second) -> Node {
-        return {kind, id, loc, first, second};
-    }
+    constexpr Node(
+        NodeKind kind, Location loc, std::span<Node *> children,
+        std::variant<std::monostate, float, double, uint64_t, std::string_view>
+            data)
+        : kind{kind}, loc{loc}, children{children}, data{std::move(data)} {}
 
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
-    [[nodiscard]] constexpr auto get_id() const -> NodeId { return id; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
-    [[nodiscard]] constexpr auto get_first() const -> NodeId { return first; }
-    [[nodiscard]] constexpr auto get_second() const -> NodeId { return second; }
-
-    [[nodiscard]] constexpr auto get_type() const -> types::TypeId {
-        return type;
+    [[nodiscard]] constexpr auto get_children() const -> std::span<Node *> {
+        return children;
     }
 
-    [[nodiscard]] constexpr auto cast_u32() const -> uint32_t {
-        return first.value();
+    [[nodiscard]] constexpr auto get_data_f64() const -> double {
+        return std::get<double>(data);
     }
 
-    [[nodiscard]] constexpr auto cast_u64() const -> uint64_t {
-        return static_cast<uint64_t>(first.value()) << 32 |
-               static_cast<uint64_t>(second.value());
+    [[nodiscard]] constexpr auto get_data_f32() const -> float {
+        return std::get<float>(data);
     }
 
-    [[nodiscard]] constexpr auto cast_double() const -> double {
-        return std::bit_cast<double>(cast_u64());
+    [[nodiscard]] constexpr auto get_data_str() const -> std::string_view {
+        return std::get<std::string_view>(data);
     }
 
-    [[nodiscard]] constexpr auto cast_float() const -> float {
-        return std::bit_cast<float>(first.value());
+    [[nodiscard]] constexpr auto get_data_u64() const -> uint64_t {
+        return std::get<uint64_t>(data);
+    }
+
+    [[nodiscard]] constexpr auto get_declid() const -> DeclId { return declid; }
+    constexpr void               set_declid(DeclId id) { declid = id; }
+
+    [[nodiscard]] constexpr auto get_data() const
+        -> std::variant<std::monostate, float, double, uint64_t,
+                        std::string_view> {
+        return data;
+    }
+
+    [[nodiscard]] constexpr auto has_data() const -> bool {
+        return std::holds_alternative<std::monostate>(data);
     }
 
     // ------------------------------------------------------------------------
 
-    constexpr void set_second(NodeId v) { second = v; }
-    constexpr void set_type(types::TypeId t) { type = t; }
+    constexpr void clear_data() { data = {}; }
+    constexpr void set_data(float v) { data = v; }
+    constexpr void set_data(double v) { data = v; }
+    constexpr void set_data(uint64_t v) { data = v; }
+    constexpr void set_data(std::string_view v) { data = v; }
+
+    constexpr void update_with_decl_ref(std::string_view v) { data = v; }
 
 private:
-    NodeKind      kind;
-    NodeId        id;
-    Location      loc;
-    NodeId        first;
-    NodeId        second;
-    types::TypeId type;
+    NodeKind          kind;
+    Location          loc;
+    std::span<Node *> children;
+
+    // FIXME: this is only used for some nodes. Maybe move it out?
+    DeclId declid;
+    std::variant<std::monostate, float, double, uint64_t, std::string_view>
+        data;
 };
 
 constexpr auto format_as(NodeKind kind) {
@@ -524,12 +528,16 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::FuncDeclWithCVarArgs:
             name = "FuncDeclWithCVarArgs";
             break;
+        case NodeKind::FuncParams: name = "FuncParams"; break;
         case NodeKind::TopVarDecl: name = "TopVarDecl"; break;
         case NodeKind::TopDefDecl: name = "TopDefDecl"; break;
         case NodeKind::IdPack: name = "IdPack"; break;
         case NodeKind::FuncParam: name = "FuncParam"; break;
         case NodeKind::FuncRetPack: name = "FuncRetPack"; break;
+        case NodeKind::NamedRet: name = "NamedRet"; break;
         case NodeKind::Decorator: name = "Decorator"; break;
+        case NodeKind::DecoratorParam: name = "DecoratorParam"; break;
+        case NodeKind::Decorators: name = "Decorators"; break;
         case NodeKind::ImportStmt: name = "ImportStmt"; break;
         case NodeKind::ExprPack: name = "ExprPack"; break;
         case NodeKind::Add: name = "Add"; break;
@@ -567,13 +575,13 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ArrayType: name = "ArrayType"; break;
         case NodeKind::Array: name = "Array"; break;
         case NodeKind::Lit: name = "Lit"; break;
+        case NodeKind::LitParam: name = "LitParam"; break;
         case NodeKind::Call: name = "Call"; break;
         case NodeKind::Field: name = "Field"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
         case NodeKind::IfStmt: name = "IfStmt"; break;
-        case NodeKind::IfStmtWithElse: name = "IfStmtWithElse"; break;
         case NodeKind::WhileStmt: name = "WhileStmt"; break;
         case NodeKind::Break: name = "Break"; break;
         case NodeKind::Continue: name = "Continue"; break;
@@ -596,4 +604,14 @@ constexpr auto format_as(NodeKind kind) {
     return name;
 }
 
+void to_json(json &j, Node const &n);
+
 }  // namespace yal::ast
+
+template <>
+struct fmt::formatter<yal::ast::Node> : formatter<string_view> {
+    // parse is inherited from formatter<string_view>.
+
+    auto format(yal::ast::Node const &n, format_context &ctx) const
+        -> format_context::iterator;
+};

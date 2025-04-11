@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "ast-node-id.hpp"
 #include "ast-node.hpp"
 #include "ast.hpp"
 #include "error_reporter.hpp"
@@ -215,23 +214,23 @@ struct Parser {
 
     // ------------------------------------------------------------------------
 
-    auto parse_file() -> ast::NodeId {
+    auto parse_file() -> ast::Node* {
         skip_start_comments();
 
         auto m = parse_module_decl();
 
-        std::vector<ast::NodeId> children;
+        std::vector<ast::Node*> children;
         while (!is_at_end()) {
             children.push_back(parse_top_level_decl());
         }
 
         (void)consume(TokenType::Eof);
 
-        auto loc = ast->get_node_loc(m.as_ref()).extend(prev_span());
-        return ast->new_source_file(loc, m, children);
+        return ast->new_source_file(m->get_loc().extend(prev_span()), m,
+                                    children);
     }
 
-    auto parse_module_decl() -> ast::NodeId {
+    auto parse_module_decl() -> ast::Node* {
         auto start = loc();
         try(consume("module"));
 
@@ -243,16 +242,24 @@ struct Parser {
                                     name.span.str(source));
     }
 
-    auto parse_top_level_decl() -> ast::NodeId {
+    auto parse_decorators() -> ast::Node* {
+        auto dec_start = loc();
+
+        std::vector<ast::Node*> decorators;
+        while (check(TokenType::Decorator)) {
+            decorators.push_back(parse_top_decl_attr());
+        }
+
+        return ast->new_decorators(dec_start.extend(prev_span()), decorators);
+    }
+
+    auto parse_top_level_decl() -> ast::Node* {
         if (check("import")) return parse_import();
         if (check("part")) return parse_part();
 
         // all other kinds of top-level may contain a top_decl_attr, se we parse
         // it here
-        std::vector<ast::NodeId> decorators;
-        while (check(TokenType::Decorator)) {
-            decorators.push_back(parse_top_decl_attr());
-        }
+        auto decorators = parse_decorators();
 
         if (check("func")) return parse_func_decl(decorators);
         if (check("var")) return parse_top_var_decl(decorators);
@@ -266,7 +273,7 @@ struct Parser {
         return ast->new_err(prev_loc());
     }
 
-    auto parse_import() -> ast::NodeId {
+    auto parse_import() -> ast::Node* {
         auto start = loc();
         try(consume("import"));
 
@@ -280,13 +287,13 @@ struct Parser {
         return ast->new_import_stmt(start.extend(prev_span()), result);
     }
 
-    auto parse_part() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_part() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
 
-    auto parse_top_decl_attr() -> ast::NodeId {
+    auto parse_top_decl_attr() -> ast::Node* {
         auto start = loc();
         try(consume(TokenType::Decorator));
 
-        std::vector<std::pair<std::string_view, ast::NodeId>> items;
+        std::vector<ast::Node*> items;
         if (match(TokenType::Lparen)) {
             while (!check(TokenType::Rparen)) {
                 auto s = span();
@@ -294,16 +301,17 @@ struct Parser {
                     if (match(TokenType::Equal)) {
                         // value and key
                         auto expr = parse_expr();
-                        items.emplace_back(s.str(source), expr);
+                        items.push_back(ast->new_decorator_param(
+                            to_loc(s.extend(prev_span())), s.str(source),
+                            expr));
                     } else {
                         // just key
-                        items.emplace_back(s.str(source),
-                                           ast::NodeId::invalid());
+                        items.push_back(ast->new_id(to_loc(s), s.str(source)));
                     }
                 } else {
                     // just value, no key
                     auto expr = parse_expr();
-                    items.emplace_back("", expr);
+                    items.push_back(expr);
                 }
 
                 if (check(TokenType::Rparen)) break;
@@ -317,23 +325,25 @@ struct Parser {
                                   start.span.str(source).substr(1), items);
     }
 
-    auto parse_func_decl(std::span<ast::NodeId const> decorators)
-        -> ast::NodeId {
+    auto parse_func_decl(ast::Node* decorators) -> ast::Node* {
         auto start = loc();
         try(consume("func"));
 
         auto name = parse_func_id_pack();
 
-        std::vector<ast::NodeId> gargs;
-        if (check(TokenType::Lbracket)) gargs = parse_func_gargs();
+        ast::Node* gargs = nullptr;
+        if (check(TokenType::Lbracket))
+            gargs = parse_func_gargs();
+        else
+            gargs = ast->new_func_params(prev_loc(), {});
 
         auto [args, is_c_varargs] = parse_func_args();
 
-        auto ret = ast::NodeId::invalid();
+        ast::Node* ret = nullptr;
         if (!check_oneof(TokenType::Lbrace, TokenType::Semi))
             ret = parse_func_ret_pack();
 
-        auto body = ast::NodeId::invalid();
+        ast::Node* body = nullptr;
         if (check(TokenType::Lbrace))
             body = parse_block();
         else
@@ -343,8 +353,7 @@ struct Parser {
                                   gargs, args, ret, body, is_c_varargs);
     }
 
-    auto parse_top_var_decl(std::span<ast::NodeId const> decorators)
-        -> ast::NodeId {
+    auto parse_top_var_decl(ast::Node* decorators) -> ast::Node* {
         auto start = loc();
         auto inner = parse_var_decl();
 
@@ -352,8 +361,7 @@ struct Parser {
                                      inner);
     }
 
-    auto parse_top_def_decl(std::span<ast::NodeId const> decorators)
-        -> ast::NodeId {
+    auto parse_top_def_decl(ast::Node* decorators) -> ast::Node* {
         auto start = loc();
         auto inner = parse_def_decl();
 
@@ -363,41 +371,45 @@ struct Parser {
 
     // ------------------------------------------------------------------------
 
-    auto parse_id_pack() -> ast::NodeId {
+    auto parse_id_pack() -> ast::Node* {
         auto start = loc();
 
-        std::vector<ast::NodeId> names;
+        std::vector<ast::Node*> names;
         do {
             auto name_span = span();
             try(consume(TokenType::Id));
 
-            names.push_back(ast->new_identifier(name_span.str(source)));
+            names.push_back(
+                ast->new_id(to_loc(name_span), name_span.str(source)));
         } while (match(TokenType::Comma));
 
         return ast->new_id_pack(start.extend(prev_span()), names);
     }
 
-    auto parse_func_id_pack() -> ast::NodeId {
+    auto parse_func_id_pack() -> ast::Node* {
         auto start = loc();
 
-        std::vector<ast::NodeId> names;
+        std::vector<ast::Node*> names;
         do {
             auto name_span = span();
             try(consume(TokenType::Id));
 
-            names.push_back(ast->new_identifier(name_span.str(source)));
+            names.push_back(
+                ast->new_id(to_loc(name_span), name_span.str(source)));
         } while (match(TokenType::Dot));
 
         return ast->new_id_pack(start.extend(prev_span()), names);
     }
 
-    auto parse_func_gargs() -> std::vector<ast::NodeId> {
-        PANIC("NOT IMPLEMENTED");
-    }
+    auto parse_func_gargs() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
 
-    auto parse_func_args() -> std::pair<std::vector<ast::NodeId>, bool> {
-        std::vector<ast::NodeId> args;
-        if (!consume(TokenType::Lparen)) return std::make_pair(args, false);
+    auto parse_func_args() -> std::pair<ast::Node*, bool> {
+        auto start = loc();
+
+        std::vector<ast::Node*> args;
+        if (!consume(TokenType::Lparen))
+            return std::make_pair(ast->new_func_params(prev_loc(), args),
+                                  false);
 
         while (!check(TokenType::Rparen)) {
             if (check(TokenType::DotDotDot)) break;
@@ -418,31 +430,35 @@ struct Parser {
         }
 
         if (!consume(TokenType::Rparen))
-            return std::make_pair(args, is_c_varargs);
-        return std::make_pair(args, is_c_varargs);
+            return std::make_pair(
+                ast->new_func_params(start.extend(prev_span()), args),
+                is_c_varargs);
+        return std::make_pair(
+            ast->new_func_params(start.extend(prev_span()), args),
+            is_c_varargs);
     }
 
-    auto parse_func_arg() -> ast::NodeId {
+    auto parse_func_arg() -> ast::Node* {
         auto start = loc();
         auto name = span();
         try(consume(TokenType::Id));
 
         auto end = prev_span();
 
-        auto ty = ast::NodeId::invalid();
+        ast::Node* ty = nullptr;
         if (match(TokenType::Colon)) {
             ty = parse_expr();
-            end = ast->get_node_span(ty.as_ref());
+            end = ty->get_loc().span;
         }
 
         return ast->new_func_param(start.extend(end), name.str(source), ty);
     }
 
-    auto parse_func_ret_pack() -> ast::NodeId {
+    auto parse_func_ret_pack() -> ast::Node* {
         auto start = loc();
 
         if (match(TokenType::Lparen)) {
-            std::vector<std::pair<std::string_view, ast::NodeId>> ret;
+            std::vector<ast::Node*> ret;
 
             do {
                 // named
@@ -454,38 +470,35 @@ struct Parser {
                     advance();
 
                     auto type = parse_expr();
-                    ret.emplace_back(name.str(source), type);
+                    ret.push_back(
+                        ast->new_named_ret(to_loc(name.extend(prev_span())),
+                                           name.str(source), type));
                 }
 
                 // not named
                 else {
-                    auto type = parse_expr();
-                    ret.emplace_back("", type);
+                    ret.push_back(parse_expr());
                 }
 
                 if (check(TokenType::Rparen)) break;
             } while (match(TokenType::Comma));
 
             try(consume(TokenType::Rparen));
-
-            // in case it is just a single return without a name, unwrap it
-            if (ret.size() == 1 && ret[0].first.empty()) {
-                return ret[0].second;
-            }
-
             return ast->new_func_ret_pack(start.extend(prev_span()), ret);
         }
 
-        return parse_expr();
+        auto expr = parse_expr();
+        return ast->new_func_ret_pack(start.extend(prev_span()),
+                                      std::array{expr});
     }
 
     // ========================================================================
 
-    auto parse_block() -> ast::NodeId {
+    auto parse_block() -> ast::Node* {
         auto start = loc();
         try(consume(TokenType::Lbrace));
 
-        std::vector<ast::NodeId> children;
+        std::vector<ast::Node*> children;
         while (!is_at_end() && !check(TokenType::Rbrace)) {
             children.push_back(parse_stmt());
         }
@@ -495,17 +508,17 @@ struct Parser {
         return ast->new_block(start.extend(prev_span()), children);
     }
 
-    auto parse_var_decl() -> ast::NodeId {
+    auto parse_var_decl() -> ast::Node* {
         auto start = loc();
         try(consume("var"));
 
-        auto names = parse_id_pack();
-        auto tys = ast::NodeId::invalid();
+        auto       names = parse_id_pack();
+        ast::Node* tys = nullptr;
         if (match(TokenType::Colon)) {
             tys = parse_expr_pack();
         }
 
-        auto inits = ast::NodeId::invalid();
+        ast::Node* inits = nullptr;
         if (match(TokenType::Equal)) {
             inits = parse_expr_pack();
         }
@@ -515,17 +528,17 @@ struct Parser {
         return ast->new_var_decl(start.extend(prev_span()), names, tys, inits);
     }
 
-    auto parse_def_decl() -> ast::NodeId {
+    auto parse_def_decl() -> ast::Node* {
         auto start = loc();
         try(consume("def"));
 
-        auto names = parse_id_pack();
-        auto tys = ast::NodeId::invalid();
+        auto       names = parse_id_pack();
+        ast::Node* tys = nullptr;
         if (match(TokenType::Colon)) {
             tys = parse_expr_pack();
         }
 
-        auto inits = ast::NodeId::invalid();
+        ast::Node* inits = nullptr;
         if (match(TokenType::Equal)) {
             inits = parse_expr_pack();
         } else {
@@ -541,12 +554,12 @@ struct Parser {
 
     // ========================================================================
 
-    auto parse_expr() -> ast::NodeId { return parse_prec_expr(PREC_NONE); }
+    auto parse_expr() -> ast::Node* { return parse_prec_expr(PREC_NONE); }
 
-    auto parse_expr_pack() -> ast::NodeId {
+    auto parse_expr_pack() -> ast::Node* {
         auto start = loc();
 
-        std::vector<ast::NodeId> children;
+        std::vector<ast::Node*> children;
 
         do {
             children.push_back(parse_expr());
@@ -557,7 +570,7 @@ struct Parser {
 
     // ------------------------------------------------------------------------
 
-    auto parse_prec_expr(int precedence) -> ast::NodeId {
+    auto parse_prec_expr(int precedence) -> ast::Node* {
         auto left = parse_prefix_expr();
         while (get_precedence(peek()) > precedence)
             left = parse_infix_expr(left);
@@ -565,7 +578,7 @@ struct Parser {
         return left;
     }
 
-    auto parse_prefix_expr() -> ast::NodeId {
+    auto parse_prefix_expr() -> ast::Node* {
         auto t = peek_and_advance();
         switch (t.type) {
             case TokenType::Lparen: {
@@ -606,7 +619,7 @@ struct Parser {
         return ast->new_err(loc());
     }
 
-    auto parse_infix_expr(ast::NodeId left) -> ast::NodeId {
+    auto parse_infix_expr(ast::Node* left) -> ast::Node* {
         auto t = peek_and_advance();
         if (t.type == TokenType::Lparen) return parse_call(left);
         if (t.type == TokenType::Dot) return parse_field(left);
@@ -651,19 +664,17 @@ struct Parser {
             default: UNREACHABLE("invalid token in infix expr", t);
         }
 
-        return ast->new_binary_expr(
-            ast->get_node_loc(left.as_ref())
-                .extend(ast->get_node_span(right.as_ref())),
-            kind, left, right);
+        return ast->new_binary_expr(left->get_loc().extend(right->get_loc()),
+                                    kind, left, right);
     }
 
     // ------------------------------------------------------------------------
 
-    auto parse_id(Token t) -> ast::NodeId {
+    [[nodiscard]] auto parse_id(Token t) const -> ast::Node* {
         return ast->new_id(to_loc(t.span), t.span.str(source));
     }
 
-    auto parse_number(Token t) -> ast::NodeId {
+    [[nodiscard]] auto parse_number(Token t) const -> ast::Node* {
         switch (t.type) {
             case TokenType::Int: {
                 // TODO: do not use replace and a dynamic string here
@@ -720,10 +731,10 @@ struct Parser {
         }
     }
 
-    auto parse_lit() -> ast::NodeId {
+    auto parse_lit() -> ast::Node* {
         auto start = prev_loc();
 
-        std::vector<std::pair<ast::NodeId, ast::NodeId>> items;
+        std::vector<ast::Node*> items;
         while (!check(TokenType::Rbrace)) {
             auto item = parse_lit_item();
             items.push_back(item);
@@ -736,23 +747,24 @@ struct Parser {
         return ast->new_lit(start.extend(prev_span()), items);
     }
 
-    auto parse_lit_item() -> std::pair<ast::NodeId, ast::NodeId> {
+    auto parse_lit_item() -> ast::Node* {
+        auto start = loc();
+
         // key-value pair
         if (match(TokenType::Dot)) {
-            auto kw = parse_kw_lit();
+            auto kw = parse_kw_lit_raw_str();
             if (match(TokenType::Equal)) {
                 auto v = parse_expr();
-                return std::make_pair(kw, v);
+                return ast->new_lit_param(start.extend(prev_span()), kw, v);
             }
 
-            return std::make_pair(ast::NodeId::invalid(), kw);
+            return ast->new_kw_lit(start.extend(prev_span()), kw);
         }
 
-        auto v = parse_expr();
-        return std::make_pair(ast::NodeId::invalid(), v);
+        return parse_expr();
     }
 
-    auto parse_arr() -> ast::NodeId {
+    auto parse_arr() -> ast::Node* {
         auto start = prev_loc();
 
         if (match(TokenType::Star)) {
@@ -783,8 +795,8 @@ struct Parser {
 
             auto type = parse_prec_expr(PREC_UNARY);
             auto items = parse_array_items();
-            return ast->new_array(start.extend(prev_span()),
-                                  ast::NodeId::invalid(), type, items);
+            return ast->new_array(start.extend(prev_span()), nullptr, type,
+                                  items);
         }
 
         auto size = parse_expr();
@@ -813,8 +825,8 @@ struct Parser {
         return ast->new_array(start.extend(prev_span()), size, type, items);
     }
 
-    auto parse_array_items() -> std::vector<ast::NodeId> {
-        std::vector<ast::NodeId> items;
+    auto parse_array_items() -> std::vector<ast::Node*> {
+        std::vector<ast::Node*> items;
 
         if (!consume(TokenType::Lbrace)) return items;
 
@@ -830,7 +842,7 @@ struct Parser {
         return items;
     }
 
-    auto parse_str(Token t) -> ast::NodeId {
+    [[nodiscard]] [[nodiscard]] auto parse_str(Token t) const -> ast::Node* {
         auto s = t.span.str(source);
         s = s.substr(1, s.size() - 2);
 
@@ -838,9 +850,9 @@ struct Parser {
         return ast->new_str(to_loc(t.span), result);
     }
 
-    auto parse_char() -> ast::NodeId { PANIC("NOT IMPLEMENTED"); }
+    auto parse_char() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
 
-    auto parse_struct() -> ast::NodeId {
+    auto parse_struct() -> ast::Node* {
         auto start = prev_loc();
         try(consume(TokenType::Lbrace));
 
@@ -851,7 +863,14 @@ struct Parser {
         return ast->new_struct_type(start.extend(prev_span()), fields);
     }
 
-    auto parse_kw_lit() -> ast::NodeId {
+    auto parse_kw_lit_raw_str() -> std::string_view {
+        auto name = span();
+        if (!consume(TokenType::Id)) return "";
+
+        return name.str(source);
+    }
+
+    auto parse_kw_lit() -> ast::Node* {
         auto start = prev_loc();
         auto name = span();
         try(consume(TokenType::Id));
@@ -859,8 +878,8 @@ struct Parser {
         return ast->new_kw_lit(start.extend(prev_span()), name.str(source));
     }
 
-    auto parse_struct_fields() -> std::vector<ast::NodeId> {
-        std::vector<ast::NodeId> fields;
+    auto parse_struct_fields() -> std::vector<ast::Node*> {
+        std::vector<ast::Node*> fields;
         while (!check(TokenType::Rbrace)) {
             fields.push_back(parse_struct_field());
 
@@ -871,14 +890,13 @@ struct Parser {
         return fields;
     }
 
-    auto parse_struct_field() -> ast::NodeId {
+    auto parse_struct_field() -> ast::Node* {
         auto name = span();
         try(consume(TokenType::Id));
         try(consume(TokenType::Colon));
 
-        auto type = parse_expr();
-        auto init = ast::NodeId::invalid();
-
+        auto       type = parse_expr();
+        ast::Node* init = nullptr;
         if (match(TokenType::Equal)) {
             init = parse_expr();
         }
@@ -887,7 +905,7 @@ struct Parser {
                                      name.str(source), type, init);
     }
 
-    auto parse_unary(Token t) -> ast::NodeId {
+    auto parse_unary(Token t) -> ast::Node* {
         if (t.type == TokenType::Star) {
             auto is_const = false;
             if (match("const")) is_const = true;
@@ -915,8 +933,8 @@ struct Parser {
                                    child);
     }
 
-    auto parse_call(ast::NodeId left) -> ast::NodeId {
-        std::vector<ast::NodeId> args;
+    auto parse_call(ast::Node* left) -> ast::Node* {
+        std::vector<ast::Node*> args;
         while (!check(TokenType::Rparen)) {
             args.push_back(parse_expr());
 
@@ -925,17 +943,15 @@ struct Parser {
         }
 
         try(consume(TokenType::Rparen));
-        return ast->new_call(
-            ast->get_node_loc(left.as_ref()).extend(prev_span()), left, args);
+        return ast->new_call(left->get_loc().extend(prev_span()), left, args);
     }
 
-    auto parse_field(ast::NodeId left) -> ast::NodeId {
+    auto parse_field(ast::Node* left) -> ast::Node* {
         auto name = span();
         try(consume(TokenType::Id));
 
-        return ast->new_field(
-            ast->get_node_loc(left.as_ref()).extend(prev_span()), left,
-            name.str(source));
+        return ast->new_field(left->get_loc().extend(prev_span()), left,
+                              name.str(source));
     }
 
     // ------------------------------------------------------------------------
@@ -1008,7 +1024,7 @@ struct Parser {
 
     // ========================================================================
 
-    auto parse_stmt() -> ast::NodeId {
+    auto parse_stmt() -> ast::Node* {
         if (check("return")) return parse_return_stmt();
         if (check("var")) return parse_var_decl();
         if (check("def")) return parse_def_decl();
@@ -1034,6 +1050,10 @@ struct Parser {
 
         // expression statement
         auto expr = parse_expr();
+
+        // TODO: move assignment to its own function
+        // TODO: handle assignment of multiple items (we would have a comma
+        // here)
 
         // handle assigment
         if (match_oneof(
@@ -1083,35 +1103,36 @@ struct Parser {
             auto rhs = parse_expr();
             try(consume(TokenType::Semi));
 
-            return ast->new_assign_stmt(
-                ast->get_node_loc(expr.as_ref()).extend(prev_span()), kind,
-                expr, rhs);
+            expr = ast->new_expr_pack(expr->get_loc(), std::array{expr});
+            rhs = ast->new_expr_pack(rhs->get_loc(), std::array{rhs});
+
+            return ast->new_assign_stmt(expr->get_loc().extend(prev_span()),
+                                        kind, expr, rhs);
         }
 
         try(consume(TokenType::Semi));
 
-        return ast->new_expr_stmt(
-            ast->get_node_loc(expr.as_ref()).extend(prev_span()), expr);
+        return ast->new_expr_stmt(expr->get_loc().extend(prev_span()), expr);
     }
 
-    auto parse_return_stmt() -> ast::NodeId {
+    auto parse_return_stmt() -> ast::Node* {
         auto start = loc();
         try(consume("return"));
 
-        auto expr = ast::NodeId::invalid();
+        ast::Node* expr = nullptr;
         if (!check(TokenType::Semi)) expr = parse_expr_pack();
         try(consume(TokenType::Semi));
 
         return ast->new_return_stmt(start.extend(prev_span()), expr);
     }
 
-    auto parse_if_stmt() -> ast::NodeId {
+    auto parse_if_stmt() -> ast::Node* {
         auto start = loc();
         try(consume("if"));
 
-        auto cond = parse_expr();
-        auto wt = parse_block();
-        auto wf = ast::NodeId::invalid();
+        auto       cond = parse_expr();
+        auto       wt = parse_block();
+        ast::Node* wf = nullptr;
 
         if (match("else")) {
             if (check("if"))
@@ -1123,7 +1144,7 @@ struct Parser {
         return ast->new_if_stmt(start.extend(prev_span()), cond, wt, wf);
     }
 
-    auto parse_while_stmt() -> ast::NodeId {
+    auto parse_while_stmt() -> ast::Node* {
         auto start = loc();
         try(consume("while"));
 
@@ -1133,7 +1154,7 @@ struct Parser {
         return ast->new_while_stmt(start.extend(prev_span()), cond, body);
     }
 
-    auto parse_defer_stmt() -> ast::NodeId {
+    auto parse_defer_stmt() -> ast::Node* {
         auto start = loc();
         try(consume("defer"));
 
@@ -1153,7 +1174,7 @@ struct Parser {
 };
 
 auto parse_into(std::span<Token const> tokens, ast::Ast& ast,
-                ErrorReporterForFile& er) -> ast::NodeId {
+                ErrorReporterForFile& er) -> ast::Node* {
     auto p = Parser{
         .tokens = tokens,
         .source = er.get_source(),
@@ -1166,10 +1187,10 @@ auto parse_into(std::span<Token const> tokens, ast::Ast& ast,
 }
 
 auto parse(std::span<Token const> tokens, ErrorReporterForFile& er)
-    -> std::pair<ast::Ast, ast::NodeId> {
+    -> std::pair<ast::Ast, ast::Node*> {
     ast::Ast ast;
     auto     root = parse_into(tokens, ast, er);
-    return {ast, root};
+    return std::make_pair(std::move(ast), root);
 }
 
 }  // namespace yal

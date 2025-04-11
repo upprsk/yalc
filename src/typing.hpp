@@ -8,7 +8,7 @@
 
 namespace yal {
 
-void perform_typing(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
+void perform_typing(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
                     types::TypeStore& ts, Options const& opt);
 
 }  // namespace yal

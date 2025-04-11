@@ -17,7 +17,7 @@ void to_json(json& j, Decl const& n) {
         {        "id",         n.id},
         {      "name",       n.name},
         {"local_name", n.local_name},
-        {      "node",       n.node},
+        // {      "node",       n.node},
         {     "flags",      n.flags},
     };
 }

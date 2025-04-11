@@ -38,7 +38,7 @@ auto gen_ast(std::string source) -> json {
         };
     }
 
-    return ast.fatten(ast_root);
+    return *ast_root;
 }
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,

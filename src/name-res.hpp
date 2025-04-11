@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ast-node-id.hpp"
 #include "ast.hpp"
 #include "error_reporter.hpp"
 #include "types.hpp"
@@ -8,8 +7,8 @@
 
 namespace yal {
 
-auto resolve_names(ast::Ast& ast, ast::NodeId root, ErrorReporter& er,
+auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
                    FileStore& fs, types::TypeStore& ts, Options const& opt)
-    -> ast::NodeId;
+    -> ast::Node*;
 
 }  // namespace yal

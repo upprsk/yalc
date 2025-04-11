@@ -1,6 +1,5 @@
 #include "yal.hpp"
 
-#include "ast-node-id.hpp"
 #include "fmt/ranges.h"
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
@@ -10,13 +9,13 @@ namespace yal {
 
 auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
                              std::filesystem::path filepath, ast::Ast& dst_ast,
-                             Options const& opt) -> ast::NodeId {
+                             Options const& opt) -> ast::Node* {
     auto fileid = fs.add(filepath);
     if (!fileid.is_valid()) {
         fmt::println(stderr, "error: failed to open/read {}",
                      filepath.string());
 
-        return ast::NodeId::invalid();
+        return nullptr;
     }
 
     auto erf = er.for_file(fileid);
@@ -30,15 +29,20 @@ auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
     auto file_root = parse_into(tokens, dst_ast, erf);
     er.update_error_count(erf);
 
+    if (!file_root) {
+        PANIC("NOTE: got no output from `parse_into`");
+    }
+
     if (opt.dump_ast) {
         fmt::println(
             stderr, "NOTE: this has not been implemented, use --dump-ast-json");
-        fmt::println("{}", dst_ast.fatten(file_root));
+        fmt::println("{}", *file_root);
     }
 
     if (opt.dump_each_ast_json) {
-        json j = dst_ast.fatten(file_root);
-        fmt::println("{}", j.dump());
+        json j = *file_root;
+        json ds = *dst_ast.get_decl_store();
+        fmt::println("{}\n{}", j.dump(), ds.dump());
     }
 
     return file_root;
@@ -46,10 +50,10 @@ auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
 
 auto load_and_parse(FileStore& fs, ErrorReporter& er,
                     std::filesystem::path filepath, Options const& opt)
-    -> std::pair<ast::Ast, ast::NodeId> {
+    -> std::pair<ast::Ast, ast::Node*> {
     ast::Ast ast;
     auto     root = load_and_parse_into_ast(fs, er, filepath, ast, opt);
-    return std::make_pair(ast, root);
+    return std::make_pair(std::move(ast), root);
 }
 
 }  // namespace yal

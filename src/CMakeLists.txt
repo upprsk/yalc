@@ -1,10 +1,18 @@
 add_library(yal
+    # type-id.cpp
+    # type-id.hpp
+    # types.cpp
+    # types.hpp
+    # typing.cpp
+    # typing.hpp
+    arena.cpp
+    arena.hpp
     ast-node-conv.cpp
     ast-node-conv.hpp
-    ast-node-id.cpp
-    ast-node-id.hpp
     ast-node-visitor.cpp
     ast-node-visitor.hpp
+    ast-node.cpp
+    ast-node.hpp
     ast.cpp
     ast.hpp
     decl-id.cpp
@@ -25,12 +33,6 @@ add_library(yal
     span.hpp
     tokenizer.cpp
     tokenizer.hpp
-    type-id.cpp
-    type-id.hpp
-    types.cpp
-    types.hpp
-    typing.cpp
-    typing.hpp
     utils.cpp
     utils.hpp
     value.cpp

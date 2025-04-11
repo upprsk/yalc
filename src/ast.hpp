@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "ast-node-id.hpp"
+#include "arena.hpp"
 #include "ast-node.hpp"
 #include "decl-store.hpp"
 #include "file-store.hpp"
@@ -29,55 +29,38 @@ public:
     // Node Constructors
     // -----------------
 
-    auto new_err(Location loc, std::string s) -> NodeId {
-        return new_node(NodeKind::Err, loc, new_bytes(s), NodeId::invalid());
-    }
-
-    auto new_err(Location loc) -> NodeId {
-        return new_node(NodeKind::Err, loc, NodeId::invalid(),
-                        NodeId::invalid());
-    }
+    auto new_err(Location loc) -> Node* { return new_node(NodeKind::Err, loc); }
 
     // --------
     // Literals
     // --------
 
-    auto new_id(Location loc, std::string_view s) -> NodeId {
-        return new_node(NodeKind::Id, loc, new_identifier(s),
-                        NodeId::invalid());
+    auto new_id(Location loc, std::string_view s) -> Node* {
+        return new_node(NodeKind::Id, loc, new_string(s));
     }
 
-    auto new_kw_lit(Location loc, std::string_view s) -> NodeId {
-        return new_node(NodeKind::KwLit, loc, new_identifier(s),
-                        NodeId::invalid());
+    auto new_kw_lit(Location loc, std::string_view s) -> Node* {
+        return new_node(NodeKind::KwLit, loc, new_string(s));
     }
 
-    auto new_int(Location loc, uint64_t v) -> NodeId {
-        auto hi = NodeId::from_raw_data(v >> 32);
-        auto lo = NodeId::from_raw_data(v);
-        return new_node(NodeKind::Int, loc, hi, lo);
+    auto new_int(Location loc, uint64_t v) -> Node* {
+        return new_node(NodeKind::Int, loc, v);
     }
 
-    auto new_double(Location loc, double d) -> NodeId {
-        auto v = std::bit_cast<uint64_t>(d);
-        auto hi = NodeId::from_raw_data(v >> 32);
-        auto lo = NodeId::from_raw_data(v);
-        return new_node(NodeKind::Double, loc, hi, lo);
+    auto new_double(Location loc, double d) -> Node* {
+        return new_node(NodeKind::Double, loc, d);
     }
 
-    auto new_float(Location loc, float d) -> NodeId {
-        auto v = std::bit_cast<uint32_t>(d);
-        return new_node(NodeKind::Float, loc, NodeId::from_raw_data(v),
-                        NodeId::invalid());
+    auto new_float(Location loc, float d) -> Node* {
+        return new_node(NodeKind::Float, loc, d);
     }
 
-    auto new_str(Location loc, std::string s) -> NodeId {
-        return new_node(NodeKind::Str, loc, new_bytes(s), NodeId::invalid());
+    auto new_str(Location loc, std::string_view s) -> Node* {
+        return new_node(NodeKind::Str, loc, new_string(s));
     }
 
-    auto new_char(Location loc, uint32_t c) -> NodeId {
-        return new_node(NodeKind::Char, loc, NodeId::from_raw_data(c),
-                        NodeId::invalid());
+    auto new_char(Location loc, uint32_t c) -> Node* {
+        return new_node(NodeKind::Char, loc, c);
     }
 
     // ---------
@@ -85,474 +68,297 @@ public:
     // ---------
 
     auto new_module(Location loc, std::string_view name,
-                    std::span<NodeId const> children) -> NodeId {
-        auto second = new_ref_array_sized(children);
-        return new_node(NodeKind::Module, loc, new_identifier(name), second);
+                    std::span<Node* const> children) -> Node* {
+        return new_node(NodeKind::Module, loc, new_node_array_with(children),
+                        new_string(name));
     }
 
-    auto new_source_file(Location loc, NodeId mdecl,
-                         std::span<NodeId const> children) -> NodeId {
-        auto second = new_ref_array_sized(children);
-        return new_node(NodeKind::SourceFile, loc, mdecl, second);
+    auto new_source_file(Location loc, Node* mdecl,
+                         std::span<Node* const> children) -> Node* {
+        return new_node(NodeKind::SourceFile, loc,
+                        new_node_array_with(mdecl, children));
     }
 
-    auto new_module_decl(Location loc, std::string_view s) -> NodeId {
-        return new_node(NodeKind::ModuleDecl, loc, new_identifier(s),
-                        NodeId::invalid());
+    auto new_module_decl(Location loc, std::string_view s) -> Node* {
+        return new_node(NodeKind::ModuleDecl, loc, new_string(s));
     }
 
-    auto new_func_decl(Location loc, std::span<NodeId const> decorators,
-                       NodeId name, std::span<NodeId const> gargs,
-                       std::span<NodeId const> args, NodeId ret, NodeId body,
-                       bool is_c_varags) -> NodeId {
+    auto new_func_decl(Location loc, Node* decorators, Node* name, Node* gargs,
+                       Node* args, Node* ret, Node* body, bool is_c_varags)
+        -> Node* {
         return new_node(
             is_c_varags ? NodeKind::FuncDeclWithCVarArgs : NodeKind::FuncDecl,
-            loc, name,
-            new_ref_array_with(NodeId::from_raw_data(decorators.size()),
-                               decorators, NodeId::from_raw_data(gargs.size()),
-                               gargs, NodeId::from_raw_data(args.size()), args,
-                               ret, body));
+            loc, new_node_array_with(decorators, name, gargs, args, ret, body));
     }
 
-    auto new_top_var_decl(Location loc, std::span<NodeId const> decorators,
-                          NodeId decl) -> NodeId {
-        return new_node(NodeKind::TopVarDecl, loc, decl,
-                        new_ref_array_sized(decorators));
+    auto new_top_var_decl(Location loc, Node* decorators, Node* decl) -> Node* {
+        return new_node(NodeKind::TopVarDecl, loc,
+                        new_node_array_with(decorators, decl));
     }
 
-    auto new_top_def_decl(Location loc, std::span<NodeId const> decorators,
-                          NodeId decl) -> NodeId {
-        return new_node(NodeKind::TopDefDecl, loc, decl,
-                        new_ref_array_sized(decorators));
+    auto new_top_def_decl(Location loc, Node* decorators, Node* decl) -> Node* {
+        return new_node(NodeKind::TopDefDecl, loc,
+                        new_node_array_with(decorators, decl));
     }
 
-    auto new_id_pack(Location loc, std::span<NodeId const> ids) -> NodeId {
-        return new_node(NodeKind::IdPack, loc,
-                        NodeId::from_raw_data(ids.size()),
-                        new_ref_array_with(ids));
+    auto new_id_pack(Location loc, std::span<Node* const> ids) -> Node* {
+        return new_node(NodeKind::IdPack, loc, new_node_array_with(ids));
     }
 
-    auto new_func_param(Location loc, std::string_view name, NodeId type)
-        -> NodeId {
-        return new_node(NodeKind::FuncParam, loc, new_identifier(name), type);
+    auto new_func_param(Location loc, std::string_view name, Node* type)
+        -> Node* {
+        return new_node(NodeKind::FuncParam, loc, new_node_array_with(type),
+                        new_string(name));
     }
 
-    /// Create a new FuncRetPack node. If name is an empty string, then an
-    /// invalid node is used for it.
-    auto new_func_ret_pack(Location                                       loc,
-                           std::span<std::pair<std::string_view, NodeId>> items)
-        -> NodeId {
-        return new_node(NodeKind::FuncRetPack, loc,
-                        NodeId::from_raw_data(items.size()),
-                        new_ref_array_of_idpair(items));
+    auto new_func_params(Location loc, std::span<Node* const> params) -> Node* {
+        return new_node(NodeKind::FuncParams, loc, new_node_array_with(params));
+    }
+
+    auto new_func_ret_pack(Location loc, std::span<Node* const> items)
+        -> Node* {
+        return new_node(NodeKind::FuncRetPack, loc, new_node_array_with(items));
+    }
+
+    auto new_named_ret(Location loc, std::string_view name, Node* type)
+        -> Node* {
+        return new_node(NodeKind::NamedRet, loc, new_node_array_with(type),
+                        name);
     }
 
     /// Create a new Decorator node. If name is an empty string, then an
     /// invalid node is used for it.
     auto new_decorator(Location loc, std::string_view name,
-                       std::span<std::pair<std::string_view, NodeId>> items)
-        -> NodeId {
-        return new_node(NodeKind::Decorator, loc, new_identifier(name),
-                        new_ref_array_of_idpair_with_size(items));
+                       std::span<Node* const> items) -> Node* {
+        return new_node(NodeKind::Decorator, loc, new_node_array_with(items),
+                        new_string(name));
     }
 
-    auto new_import_stmt(Location loc, std::string_view path) -> NodeId {
-        return new_node(NodeKind::ImportStmt, loc, new_bytes(path),
-                        NodeId ::invalid());
+    auto new_decorator_param(Location loc, std::string_view name, Node* value)
+        -> Node* {
+        return new_node(NodeKind::DecoratorParam, loc,
+                        new_node_array_with(value), new_string(name));
+    }
+
+    auto new_decorators(Location loc, std::span<Node* const> items) -> Node* {
+        return new_node(NodeKind::Decorators, loc, new_node_array_with(items));
+    }
+
+    auto new_import_stmt(Location loc, std::string_view path) -> Node* {
+        return new_node(NodeKind::ImportStmt, loc, new_string(path));
     }
 
     // -----------
     // Expressions
     // -----------
 
-    auto new_expr_pack(Location loc, std::span<NodeId const> children)
-        -> NodeId {
-        return new_node(NodeKind::ExprPack, loc,
-                        NodeId::from_raw_data(children.size()),
-                        new_ref_array_with(children));
+    auto new_expr_pack(Location loc, std::span<Node* const> children) -> Node* {
+        return new_node(NodeKind::ExprPack, loc, new_node_array_with(children));
     }
 
-    auto new_binary_expr(Location loc, NodeKind kind, NodeId left, NodeId right)
-        -> NodeId {
-        return new_node(kind, loc, left, right);
+    auto new_binary_expr(Location loc, NodeKind kind, Node* left, Node* right)
+        -> Node* {
+        return new_node(kind, loc, new_node_array_with(left, right));
     }
 
-    auto new_unary_expr(Location loc, NodeKind kind, NodeId child) -> NodeId {
-        return new_node(kind, loc, child, NodeId::invalid());
+    auto new_unary_expr(Location loc, NodeKind kind, Node* child) -> Node* {
+        return new_node(kind, loc, new_node_array_with(child));
     }
 
-    auto new_struct_type(Location loc, std::span<NodeId const> fields)
-        -> NodeId {
-        return new_node(NodeKind::StructType, loc,
-                        NodeId::from_raw_data(fields.size()),
-                        new_ref_array_with(fields));
+    auto new_struct_type(Location loc, std::span<Node* const> fields) -> Node* {
+        return new_node(NodeKind::StructType, loc, new_node_array_with(fields));
     }
 
-    auto new_struct_field(Location loc, std::string_view name, NodeId type,
-                          NodeId init) -> NodeId {
-        return new_node(NodeKind::StructField, loc, new_identifier(name),
-                        new_ref_array_with(type, init));
+    auto new_struct_field(Location loc, std::string_view name, Node* type,
+                          Node* init) -> Node* {
+        return new_node(NodeKind::StructField, loc,
+                        new_node_array_with(type, init), new_string(name));
     }
 
-    auto new_ptr(Location loc, bool is_const, NodeId inner) -> NodeId {
+    auto new_ptr(Location loc, bool is_const, Node* inner) -> Node* {
         return new_node(is_const ? NodeKind::PtrConst : NodeKind::Ptr, loc,
-                        inner, NodeId::invalid());
+                        new_node_array_with(inner));
     }
 
-    auto new_mptr(Location loc, bool is_const, NodeId inner) -> NodeId {
+    auto new_mptr(Location loc, bool is_const, Node* inner) -> Node* {
         return new_node(is_const ? NodeKind::MultiPtrConst : NodeKind::MultiPtr,
-                        loc, inner, NodeId::invalid());
+                        loc, new_node_array_with(inner));
     }
 
-    auto new_slice(Location loc, bool is_const, NodeId inner) -> NodeId {
+    auto new_slice(Location loc, bool is_const, Node* inner) -> Node* {
         return new_node(is_const ? NodeKind::SliceConst : NodeKind::Slice, loc,
-                        inner, NodeId::invalid());
+                        new_node_array_with(inner));
     }
 
-    auto new_array_type(Location loc, bool is_const, NodeId size, NodeId inner)
-        -> NodeId {
+    auto new_array_type(Location loc, bool is_const, Node* size, Node* inner)
+        -> Node* {
         return new_node(
             is_const ? NodeKind::ArrayTypeConst : NodeKind::ArrayType, loc,
-            inner, size);
+            new_node_array_with(inner, size));
     }
 
-    auto new_array(Location loc, NodeId size, NodeId inner,
-                   std::span<NodeId const> items) -> NodeId {
-        return new_node(NodeKind::Array, loc, inner,
-                        new_ref_array_with(
-                            size, NodeId::from_raw_data(items.size()), items));
+    auto new_array(Location loc, Node* size, Node* inner,
+                   std::span<Node* const> items) -> Node* {
+        return new_node(NodeKind::Array, loc,
+                        new_node_array_with(inner, size, items));
     }
 
-    auto new_lit(Location loc, std::span<std::pair<NodeId, NodeId> const> items)
-        -> NodeId {
-        return new_node(NodeKind::Lit, loc, NodeId::from_raw_data(items.size()),
-                        new_ref_array_with(items));
+    auto new_lit(Location loc, std::span<Node* const> items) -> Node* {
+        return new_node(NodeKind::Lit, loc, new_node_array_with(items));
     }
 
-    auto new_call(Location loc, NodeId callee, std::span<NodeId const> args)
-        -> NodeId {
-        return new_node(NodeKind::Call, loc, callee, new_ref_array_sized(args));
+    auto new_lit_param(Location loc, std::string_view key, Node* init)
+        -> Node* {
+        return new_node(NodeKind::Lit, loc, new_node_array_with(init),
+                        new_string(key));
     }
 
-    auto new_field(Location loc, NodeId receiver, std::string_view name)
-        -> NodeId {
-        return new_node(NodeKind::Field, loc, receiver, new_identifier(name));
+    auto new_call(Location loc, Node* callee, std::span<Node* const> args)
+        -> Node* {
+        return new_node(NodeKind::Call, loc, new_node_array_with(callee, args));
+    }
+
+    auto new_field(Location loc, Node* receiver, std::string_view name)
+        -> Node* {
+        return new_node(NodeKind::Field, loc, new_node_array_with(receiver),
+                        new_string(name));
     }
 
     // ----------
     // Statements
     // ----------
 
-    auto new_block(Location loc, std::span<NodeId const> children) -> NodeId {
-        return new_node(NodeKind::Block, loc,
-                        NodeId::from_raw_data(children.size()),
-                        new_ref_array_with(children));
+    auto new_block(Location loc, std::span<Node* const> children) -> Node* {
+        return new_node(NodeKind::Block, loc, new_node_array_with(children));
     }
 
-    auto new_expr_stmt(Location loc, NodeId child) -> NodeId {
-        return new_node(NodeKind::ExprStmt, loc, child, NodeId::invalid());
+    auto new_expr_stmt(Location loc, Node* child) -> Node* {
+        return new_node(NodeKind::ExprStmt, loc, new_node_array_with(child));
     }
 
-    auto new_return_stmt(Location loc, NodeId child) -> NodeId {
-        return new_node(NodeKind::ReturnStmt, loc, child, NodeId::invalid());
+    auto new_return_stmt(Location loc, Node* child) -> Node* {
+        return new_node(NodeKind::ReturnStmt, loc, new_node_array_with(child));
     }
 
-    auto new_if_stmt(Location loc, NodeId cond, NodeId wt, NodeId wf)
-        -> NodeId {
-        if (wf.is_valid())
-            return new_node(NodeKind::IfStmtWithElse, loc, cond,
-                            new_ref_array_with(wt, wf));
-
-        return new_node(NodeKind::IfStmt, loc, cond, wt);
+    auto new_if_stmt(Location loc, Node* cond, Node* wt, Node* wf) -> Node* {
+        return new_node(NodeKind::IfStmt, loc,
+                        new_node_array_with(cond, wt, wf));
     }
 
-    auto new_while_stmt(Location loc, NodeId cond, NodeId body) -> NodeId {
-        // NOLINTNEXTLINE(readability-suspicious-call-argument)
-        return new_node(NodeKind::WhileStmt, loc, cond, body);
+    auto new_while_stmt(Location loc, Node* cond, Node* body) -> Node* {
+        return new_node(NodeKind::WhileStmt, loc,
+                        new_node_array_with(cond, body));
     }
 
-    auto new_break(Location loc) -> NodeId {
-        return new_node(NodeKind::Break, loc, NodeId::invalid(),
-                        NodeId::invalid());
+    auto new_break(Location loc) -> Node* {
+        return new_node(NodeKind::Break, loc);
     }
 
-    auto new_continue(Location loc) -> NodeId {
-        return new_node(NodeKind::Continue, loc, NodeId::invalid(),
-                        NodeId::invalid());
+    auto new_continue(Location loc) -> Node* {
+        return new_node(NodeKind::Continue, loc);
     }
 
-    auto new_defer_stmt(Location loc, NodeId stmt) -> NodeId {
-        return new_node(NodeKind::DeferStmt, loc, stmt, NodeId::invalid());
+    auto new_defer_stmt(Location loc, Node* stmt) -> Node* {
+        return new_node(NodeKind::DeferStmt, loc, new_node_array_with(stmt));
     }
 
-    auto new_var_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
-        -> NodeId {
-        return new_node(NodeKind::VarDecl, loc, ids,
-                        new_ref_array_with(types, inits));
+    auto new_var_decl(Location loc, Node* ids, Node* types, Node* inits)
+        -> Node* {
+        return new_node(NodeKind::VarDecl, loc,
+                        new_node_array_with(ids, types, inits));
     }
 
-    auto new_def_decl(Location loc, NodeId ids, NodeId types, NodeId inits)
-        -> NodeId {
-        return new_node(NodeKind::DefDecl, loc, ids,
-                        new_ref_array_with(types, inits));
+    auto new_def_decl(Location loc, Node* ids, Node* types, Node* inits)
+        -> Node* {
+        return new_node(NodeKind::DefDecl, loc,
+                        new_node_array_with(ids, types, inits));
     }
 
-    auto new_assign_stmt(Location loc, NodeKind kind, NodeId left, NodeId right)
-        -> NodeId {
-        return new_node(kind, loc, left, right);
+    auto new_assign_stmt(Location loc, NodeKind kind, Node* left, Node* right)
+        -> Node* {
+        return new_node(kind, loc, new_node_array_with(left, right));
     }
 
 public:
-    [[nodiscard]] constexpr auto fatten(NodeId id) const -> FatNodeId;
-    [[nodiscard]] constexpr auto fatten(std::span<NodeId const> ids) const
-        -> FatNodeArray;
-
     [[nodiscard]] constexpr auto get_decl_store() const -> DeclStore const* {
         return &ds;
     }
 
     [[nodiscard]] constexpr auto get_decl_store() -> DeclStore* { return &ds; }
 
-public:
-    [[nodiscard]] constexpr auto get_node_kind(NodeIdOfRef h) const
-        -> NodeKind {
-        return nodes.at(h.value).get_kind();
-    }
-
-    [[nodiscard]] constexpr auto get_node_loc(NodeIdOfRef h) const -> Location {
-        return nodes.at(h.value).get_loc();
-    }
-
-    [[nodiscard]] constexpr auto get_node_span(NodeIdOfRef h) const -> Span {
-        return nodes.at(h.value).get_loc().span;
-    }
-
-    [[nodiscard]] constexpr auto get_node_type(NodeIdOfRef h) const
-        -> types::TypeId {
-        return nodes.at(h.value).get_type();
-    }
-
-    [[nodiscard]] constexpr auto get_node(NodeIdOfRef h) const -> Node {
-        return nodes.at(h.value);
-    }
-
-    [[nodiscard]] constexpr auto get_node_ref(NodeIdOfRef h) const
-        -> Node const& {
-        return nodes.at(h.value);
-    }
-
-    [[nodiscard]] constexpr auto get_node_ref(NodeIdOfRef h) -> Node& {
-        return nodes.at(h.value);
-    }
-
-    // get an array of nodes from the given length and id.
-    [[nodiscard]] constexpr auto get_array(NodeIdOfCount length,
-                                           NodeIdOfArray h) const
-        -> std::span<NodeId const> {
-        std::span view = refs_array;
-        return view.subspan(h.value, length.value);
-    }
-
-    // get an array of nodes from the given id. The length is stored at the
-    // first pointed-to location.
-    [[nodiscard]] constexpr auto get_array(NodeIdOfArray h) const
-        -> std::span<NodeId const> {
-        auto      length = refs_array.at(h.value).as_count();
-        std::span view = refs_array;
-
-        return view.subspan(h.value + 1, length.value);
-    }
-
-    // get an array of key-value nodes from the given id. The length is stored
-    // at the first pointed-to location.
-    [[nodiscard]] constexpr auto get_array_of_kv(NodeIdOfArray h) const
-        -> std::span<NodeId const> {
-        auto      length = refs_array.at(h.value).as_count();
-        std::span view = refs_array;
-
-        return view.subspan(h.value + 1, length.of_kv().value);
-    }
-
-    // get an array starting at the given id, but without a set size.
-    [[nodiscard]] constexpr auto get_array_unbounded(NodeIdOfArray h) const
-        -> std::span<NodeId const> {
-        std::span view = refs_array;
-        return view.subspan(h.value);
-    }
-
-    // get an identifier from `identifiers`
-    [[nodiscard]] constexpr auto get_identifier(NodeIdOfId h) const
-        -> std::string const& {
-        return identifiers.at(h.value);
-    }
-
-    // get a byte buffer from `bytes`.
-    [[nodiscard]] constexpr auto get_bytes(NodeIdOfBytes h) const
-        -> std::vector<char> const& {
-        return bytes.at(h.value);
-    }
-
-    // get a byte buffer from `bytes` as a string_view.
-    [[nodiscard]] constexpr auto get_bytes_as_string_view(NodeIdOfBytes h) const
-        -> std::string_view {
-        auto const& b = bytes.at(h.value);
-        return {b.data(), b.size()};
-    }
-
-    // -----------------------------------------------------------------------
-
-    // get an array of nodes from the given id. The length is stored at the
-    // first pointed-to location.
-    [[nodiscard]] constexpr auto get_array_mut(NodeIdOfArray h)
-        -> std::span<NodeId> {
-        auto      length = refs_array.at(h.value).as_count();
-        std::span view = refs_array;
-
-        return view.subspan(h.value + 1, length.value);
-    }
-    // -----------------------------------------------------------------------
-
-    // allocate a new identifier from `identifiers`
-    [[nodiscard]] auto new_identifier(std::string_view s) -> NodeId {
-        auto sz = identifiers.size();
-        identifiers.emplace_back(s);
-        return NodeId::from_raw_data(sz);
-    }
-
 private:
-    [[nodiscard]] auto new_node(NodeKind kind, Location loc, NodeId first,
-                                NodeId second) -> NodeId {
-        auto sz = nodes.size();
-        auto id = NodeId::from_raw_data(sz);
-        nodes.push_back(Node::from_parts(kind, id, loc, first, second));
-        return id;
+    [[nodiscard]] auto new_node(NodeKind kind, Location loc) -> Node* {
+        return nodes_arena.create<Node>(kind, loc, std::span<Node*>{},
+                                        std::monostate{});
     }
 
-    /// Create a new array where the first element contains the size of the
-    /// array.
-    [[nodiscard]] auto new_ref_array_sized(std::span<NodeId const> items)
-        -> NodeId {
-        return new_ref_array_with(NodeId::from_raw_data(items.size()), items);
+    [[nodiscard]] auto new_node(NodeKind kind, Location loc,
+                                std::variant<std::monostate, float, double,
+                                             uint64_t, std::string_view> data)
+        -> Node* {
+        return nodes_arena.create<Node>(kind, loc, std::span<Node*>{}, data);
     }
 
-    [[nodiscard]] auto new_ref_array_with(auto&&... items) -> NodeId {
-        auto sz = refs_array.size();
-        push_to_array(items...);
-        return NodeId::from_raw_data(sz);
+    [[nodiscard]] auto new_node(NodeKind kind, Location loc,
+                                std::span<Node*> children) -> Node* {
+        return nodes_arena.create<Node>(kind, loc, children, std::monostate{});
     }
 
-    /// Create an array made of pairs of identifiers and regular NodeIds. If the
-    /// string for the id is empty, then an invalid NodeId is added in it's
-    /// place.
-    [[nodiscard]] auto new_ref_array_of_idpair(
-        std::span<std::pair<std::string_view, NodeId> const> items) -> NodeId {
-        auto sz = refs_array.size();
-        for (auto const& [identifier, node] : items) {
-            if (identifier.empty()) {
-                refs_array.push_back(NodeId::invalid());
-                refs_array.push_back(node);
-            } else {
-                auto id = new_identifier(identifier);
-                refs_array.push_back(id);
-                refs_array.push_back(node);
-            }
-        }
-
-        return NodeId::from_raw_data(sz);
+    [[nodiscard]] auto new_node(NodeKind kind, Location loc,
+                                std::span<Node*> children,
+                                std::variant<std::monostate, float, double,
+                                             uint64_t, std::string_view> data)
+        -> Node* {
+        return nodes_arena.create<Node>(kind, loc, children, data);
     }
 
-    /// Create an array made of pairs of identifiers and regular NodeIds, but
-    /// add the size as the first element. If the string for the id is empty,
-    /// then an invalid NodeId is added in it's place.
-    [[nodiscard]] auto new_ref_array_of_idpair_with_size(
-        std::span<std::pair<std::string_view, NodeId> const> items) -> NodeId {
-        auto sz = refs_array.size();
+    [[nodiscard]] auto new_node_array_with(auto&&... items)
+        -> std::span<Node*> {
+        auto sz = args_size(std::forward<decltype(items)>(items)...);
+        if (sz == 0) return {};  // empty, with no allocation when empty
 
-        refs_array.push_back(NodeId::from_raw_data(items.size()));
-        for (auto const& [identifier, node] : items) {
-            if (identifier.empty()) {
-                refs_array.push_back(NodeId::invalid());
-                refs_array.push_back(node);
-            } else {
-                auto id = new_identifier(identifier);
-                refs_array.push_back(id);
-                refs_array.push_back(node);
-            }
-        }
+        auto arr = arrays_arena.alloc_size<Node*>(sz);
 
-        return NodeId::from_raw_data(sz);
+        insert_into_array(arr.begin(), std::forward<decltype(items)>(items)...);
+
+        return arr;
     }
+
+    void insert_into_array(auto&& it, Node* item, auto&&... rest) {
+        *it = item;
+        insert_into_array(it + 1, std::forward<decltype(rest)>(rest)...);
+    }
+
+    void insert_into_array(auto&& it, std::span<Node* const> items,
+                           auto&&... rest) {
+        insert_into_array(std::ranges::copy(items, it),
+                          std::forward<decltype(rest)>(rest)...);
+    }
+
+    void insert_into_array(auto&& /*unused*/) {}
+
+    [[nodiscard]] auto args_size(std::span<Node* const> node, auto&&... rest)
+        -> size_t {
+        return node.size() + args_size(std::forward<decltype(rest)>(rest)...);
+    }
+
+    [[nodiscard]] auto args_size(Node* /*unused*/, auto&&... rest) -> size_t {
+        return 1 + args_size(std::forward<decltype(rest)>(rest)...);
+    }
+
+    [[nodiscard]] auto args_size() -> size_t { return 0; }
 
     // allocate a new string buffer from `bytes`
-    [[nodiscard]] auto new_bytes(std::string_view s) -> NodeId {
-        auto sz = bytes.size();
-        bytes.emplace_back(s.data(), s.data() + s.size());
-        return NodeId::from_raw_data(sz);
+    [[nodiscard]] auto new_string(std::string_view s) -> std::string_view {
+        return string_arena.alloc_string_view(s);
     }
-
-    void push_to_array(NodeId item, auto&&... rest) {
-        refs_array.push_back(item);
-        push_to_array(rest...);
-    }
-
-    void push_to_array(std::span<NodeId const> items, auto&&... rest) {
-        refs_array.insert(refs_array.end(), items.begin(), items.end());
-        push_to_array(rest...);
-    }
-
-    void push_to_array(std::span<std::pair<NodeId, NodeId> const> items,
-                       auto&&... rest) {
-        for (auto const& [first, second] : items) {
-            refs_array.push_back(first);
-            refs_array.push_back(second);
-        }
-
-        push_to_array(rest...);
-    }
-
-    void push_to_array() {}
 
 private:
-    std::vector<Node>   nodes;
-    std::vector<NodeId> refs_array;
-
-    // NOTE: Should use a more efficient storage for strings
-    std::vector<std::string>       identifiers;
-    std::vector<std::vector<char>> bytes;
+    mem::Arena nodes_arena;
+    mem::Arena arrays_arena;
+    mem::Arena string_arena;
 
     DeclStore ds;
 };
 
-struct FatNodeId {
-    Ast const* ast;
-    NodeId     id;
-
-    auto dump_to_ctx(fmt::format_context& ctx) const
-        -> fmt::format_context::iterator;
-};
-
-struct FatNodeArray {
-    Ast const*              ast;
-    std::span<NodeId const> ids;
-};
-
-constexpr auto Ast::fatten(NodeId id) const -> FatNodeId {
-    return {.ast = this, .id = id};
-}
-
-constexpr auto Ast::fatten(std::span<NodeId const> ids) const -> FatNodeArray {
-    return {.ast = this, .ids = ids};
-}
-
-void to_json(json& j, FatNodeId const& n);
-void to_json(json& j, FatNodeArray const& n);
-
 }  // namespace yal::ast
-
-template <>
-struct fmt::formatter<yal::ast::FatNodeId> : formatter<string_view> {
-    // parse is inherited from formatter<string_view>.
-
-    auto format(yal::ast::FatNodeId n, format_context& ctx) const
-        -> format_context::iterator;
-};

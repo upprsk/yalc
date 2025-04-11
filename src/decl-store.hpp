@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "ast-node-id.hpp"
+#include "ast-node.hpp"
 #include "decl-id.hpp"
 #include "type-id.hpp"
 #include "value.hpp"
@@ -63,7 +63,7 @@ public:
 
     /// The node that declared this. It may be an invalid id if the value is a
     /// buitin or something that does not come from the AST.
-    ast::NodeId node;
+    ast::Node const* node;
 
     /// Flags about the declaration. These further describe properties of the
     /// declaration, like if it is external, private, private(file), etc...

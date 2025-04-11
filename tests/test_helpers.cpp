@@ -127,8 +127,7 @@ auto run_checks_for_test_output(Context& ctx, TestParams const& p,
         } else {
             fmt::println("{} got as output:\n{}", fullname,
                          json_to_pretty_string(output));
-            fmt::println("but expected:\n{}", fullname,
-                         json_to_pretty_string(exp));
+            fmt::println("but expected:\n{}", json_to_pretty_string(exp));
         }
 
         fmt::print(fmt::bg(fmt::color::red), "FAIL");
