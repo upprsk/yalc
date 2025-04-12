@@ -13,3 +13,9 @@ Remove all `"loc"` fields from AST:
 ```jq
 walk(if type == "object" then del(.loc) else . end)
 ```
+
+## Join various lines into array
+
+```jq
+jq -s .
+```
