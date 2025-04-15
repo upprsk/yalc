@@ -1,32 +1,31 @@
 #include "test_tokenizer.hpp"
 
+#include <cstdio>
+
 #include "file-store.hpp"
 #include "fmt/color.h"
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
 #include "test_helpers.hpp"
 #include "tokenizer.hpp"
+#include "utils.hpp"
 
 using json = nlohmann::json;
 
 auto gen_tokens(std::string source) -> json {
-    char*  buf = nullptr;
-    size_t bufsize = 0;
-
-    std::unique_ptr<FILE, void (*)(FILE*)> f = {open_memstream(&buf, &bufsize),
-                                                [](auto f) { fclose(f); }};
+    yal::MemStream ms;
 
     auto fs = yal::FileStore{};
-    auto er = yal::ErrorReporter{fs, f.get()};
+    auto er = yal::ErrorReporter{fs, ms.f};
 
     auto root = fs.add(":memory:", source);
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
-    fflush(f.get());
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 

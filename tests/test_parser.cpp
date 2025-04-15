@@ -5,36 +5,35 @@
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
+#include "utils.hpp"
 
 using json = nlohmann::json;
 
 auto gen_ast(std::string source) -> json {
-    char*  buf = nullptr;
-    size_t bufsize = 0;
-
-    std::unique_ptr<FILE, void (*)(FILE*)> f = {open_memstream(&buf, &bufsize),
-                                                [](auto f) { fclose(f); }};
+    yal::MemStream ms;
 
     auto fs = yal::FileStore{};
-    auto er = yal::ErrorReporter{fs, f.get()};
+    auto er = yal::ErrorReporter{fs, ms.f};
 
     auto root = fs.add(":memory:", source);
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
-    fflush(f.get());
+    er.update_error_count(fer);
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
     auto [ast, ast_root] = yal::parse(tokens, fer);
-    fflush(f.get());
+    er.update_error_count(fer);
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
@@ -712,7 +711,7 @@ func add(x: i32, y: i32) i32 { return x + y; }
     run_test(ctx, p, "with args and trailing comma", R"(
 module test;
 func test() {
-    var x = add(1, 2);
+    var x = add(1, 2,);
 }
 
 func add(x: i32, y: i32) i32 { return x + y; }

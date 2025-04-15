@@ -44,4 +44,7 @@ target_include_directories(yal PUBLIC .)
 target_compile_options(yal PRIVATE -Wall -Wextra)
 target_link_libraries(yal PUBLIC fmt::fmt libassert::assert nlohmann_json::nlohmann_json)
 
+target_compile_options(yal PUBLIC -fsanitize=address)
+target_link_options(yal PUBLIC -fsanitize=address)
+
 # add_mocked_library(yal)

@@ -91,18 +91,18 @@ auto real_main(Args args) -> int {
         .filters = {}, .use_diff = args.diff, .ask_for_updates = args.ask};
     for (auto const& s : args.filters) p.filters.insert(s);
 
-    // {
-    //     auto [tok, tfailed] = test_tokenizer(p);
-    //     ok += tok;
-    //     failed += tfailed;
-    // }
-    //
-    // {
-    //     auto [tok, tfailed] = test_parser(p);
-    //     ok += tok;
-    //     failed += tfailed;
-    // }
-    //
+    {
+        auto [tok, tfailed] = test_tokenizer(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
+    {
+        auto [tok, tfailed] = test_parser(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
     // {
     //     auto [tok, tfailed] = test_name_res(p);
     //     ok += tok;

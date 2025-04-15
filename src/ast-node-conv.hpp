@@ -335,7 +335,8 @@ struct Assign {
 }
 
 [[nodiscard]] constexpr auto func_decl(Node const& n) -> FuncDecl {
-    ASSERT(n.get_kind() == NodeKind::FuncDecl);
+    ASSERT(n.get_kind() == NodeKind::FuncDecl ||
+           n.get_kind() == NodeKind::FuncDeclWithCVarArgs);
     auto c = n.get_children();
 
     return {

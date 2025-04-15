@@ -203,8 +203,11 @@ struct NameSolver : public ast::Visitor<Ast> {
 
     // ------------------------------------------------------------------------
 
-    void visit_before_func_decl(Node&                 node,
-                                conv::FuncDecl const& data) override {
+    void visit_func_decl(Node& node, conv::FuncDecl const& data) override {
+        visit_before_func_decl(node, data);
+
+        visit_decorators(*data.detail.decorators, data.decorators);
+
         if (data.name.ids.size() == 1) {
             auto name = data.name.ids[0]->get_data_str();
             auto flags = DeclFlags::builder();
@@ -219,15 +222,21 @@ struct NameSolver : public ast::Visitor<Ast> {
             if (!decl_id.is_valid()) {
                 er->report_error(node.get_loc(), "undefined identifier {:?}",
                                  name);
-                return;
+            } else {
+                // TODO: store the namespace in the func decl
             }
-
-            // TODO: store the namespace in the func decl
         }
 
         for (auto const& id : data.name.ids) {
             push_env(id->get_data_str());
         }
+
+        visit_func_params(*data.detail.gargs, data.gargs);
+        visit_func_params(*data.detail.args, data.args);
+        visit_func_ret_pack(*data.detail.ret, data.ret);
+        visit(data.body);
+
+        visit_after_func_decl(node, data);
     }
 
     void visit_after_func_decl(Node& /*node*/,
@@ -240,7 +249,10 @@ struct NameSolver : public ast::Visitor<Ast> {
         next_decl_is_file_private = is_file_private_decl(data.decorators);
     }
 
-    void visit_after_var_decl(Node& node, conv::VarDecl const& data) override {
+    void visit_var_decl(Node& node, conv::VarDecl const& data) override {
+        visit(data.types);
+        visit(data.inits);
+
         auto flags = DeclFlags::builder();
         if (next_decl_is_file_private) {
             next_decl_is_file_private = false;
@@ -258,7 +270,10 @@ struct NameSolver : public ast::Visitor<Ast> {
         next_decl_is_file_private = is_file_private_decl(data.decorators);
     }
 
-    void visit_after_def_decl(Node& node, conv::DefDecl const& data) override {
+    void visit_def_decl(Node& node, conv::DefDecl const& data) override {
+        visit(data.types);
+        visit(data.inits);
+
         auto flags = DeclFlags::builder();
         if (next_decl_is_file_private) {
             next_decl_is_file_private = false;

@@ -46,7 +46,7 @@ auto real_main(yalc::Args const& args) -> int {
     if (args.dump_ast_json) {
         json j = *prj_root;
         json ds = *ast.get_decl_store();
-        fmt::println("{}\n{}", j.dump(), ds.dump());
+        fmt::println("[{},\n{}]", j.dump(), ds.dump());
     }
 
     return er.had_error() ? 1 : 0;

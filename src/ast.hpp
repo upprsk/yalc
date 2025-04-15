@@ -123,7 +123,7 @@ public:
     auto new_named_ret(Location loc, std::string_view name, Node* type)
         -> Node* {
         return new_node(NodeKind::NamedRet, loc, new_node_array_with(type),
-                        name);
+                        new_string(name));
     }
 
     /// Create a new Decorator node. If name is an empty string, then an
@@ -209,7 +209,7 @@ public:
 
     auto new_lit_param(Location loc, std::string_view key, Node* init)
         -> Node* {
-        return new_node(NodeKind::Lit, loc, new_node_array_with(init),
+        return new_node(NodeKind::LitParam, loc, new_node_array_with(init),
                         new_string(key));
     }
 

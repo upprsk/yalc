@@ -259,7 +259,10 @@ struct DependsVisitor : public ast::Visitor<> {
         visit_before_func_decl(node, data);
 
         visit_decorators(*data.detail.decorators, data.decorators);
-        // visit_id_pack(*data.detail.name, data.name);
+
+        if (data.name.ids.size() != 1) {
+            visit(data.name.ids[0]);
+        }
 
         // open a scope for the arguments and returns
         level++;

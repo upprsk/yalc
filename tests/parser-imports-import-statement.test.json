@@ -1,1 +1,1 @@
-{"children":[{"id":1,"kind":"ImportStmt","loc":{"fileid":0,"span":{"begin":13,"end":31}},"path":"some_lib"}],"id":2,"kind":"SourceFile","loc":{"fileid":0,"span":{"begin":0,"end":31}},"mod":{"id":0,"kind":"ModuleDecl","loc":{"fileid":0,"span":{"begin":0,"end":12}},"name":"test"}}
+{"children":[{"children":[],"data":"test","kind":"ModuleDecl","loc":{"fileid":0,"span":{"begin":0,"end":12}}},{"children":[],"data":"some_lib","kind":"ImportStmt","loc":{"fileid":0,"span":{"begin":13,"end":31}}}],"data":null,"kind":"SourceFile","loc":{"fileid":0,"span":{"begin":0,"end":31}}}
