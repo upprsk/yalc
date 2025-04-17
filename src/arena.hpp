@@ -22,7 +22,7 @@ class Arena {
             if (!fits(sz)) return nullptr;
 
             auto ptr = head;
-            head += sz;
+            head += (sz + (sizeof(uintptr_t) - 1)) & -sizeof(uintptr_t);
 
             return ptr;
         }
