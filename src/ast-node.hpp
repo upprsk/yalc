@@ -453,11 +453,25 @@ public:
             data)
         : kind{kind}, loc{loc}, children{children}, data{std::move(data)} {}
 
+    // ------------------------------------------------------------------------
+
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
     [[nodiscard]] constexpr auto get_children() const -> std::span<Node *> {
         return children;
     }
+    [[nodiscard]] constexpr auto get_child(size_t at) const -> Node * {
+        ASSERT(at < children.size());
+        return children[at];
+    }
+
+    // ------------------------------------------------------------------------
+
+    constexpr auto is_oneof(auto &&...kinds) const -> bool {
+        return ((get_kind() == kinds) || ...);
+    }
+
+    // ------------------------------------------------------------------------
 
     [[nodiscard]] constexpr auto get_data_f64() const -> double {
         return std::get<double>(data);
