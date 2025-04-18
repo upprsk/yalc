@@ -206,18 +206,18 @@ struct NameSolver : public ast::Visitor<Ast> {
     void visit_func_decl(Node& node, conv::FuncDecl const& data) override {
         visit_before_func_decl(node, data);
 
-        visit_decorators(*data.detail.decorators, data.decorators);
+        visit_decorators(*data.decorators, data.get_decorators());
 
-        if (data.name.ids.size() == 1) {
-            auto name = data.name.ids[0]->get_data_str();
+        if (data.get_name().ids.size() == 1) {
+            auto name = data.get_name().ids[0]->get_data_str();
             auto flags = DeclFlags::builder();
-            if (is_file_private_decl(data.decorators))
+            if (is_file_private_decl(data.get_decorators()))
                 flags = flags.set_private_file();
 
             define_at_top(name, &node, flags.build());
         } else {
             // this is namespaced, check that what we namespace under exists
-            auto name = data.name.ids[0]->get_data_str();
+            auto name = data.get_name().ids[0]->get_data_str();
             auto decl_id = lookup_name(name);
             if (!decl_id.is_valid()) {
                 er->report_error(node.get_loc(), "undefined identifier {:?}",
@@ -227,13 +227,13 @@ struct NameSolver : public ast::Visitor<Ast> {
             }
         }
 
-        for (auto const& id : data.name.ids) {
+        for (auto const& id : data.get_name().ids) {
             push_env(id->get_data_str());
         }
 
-        visit_func_params(*data.detail.gargs, data.gargs);
-        visit_func_params(*data.detail.args, data.args);
-        visit_func_ret_pack(*data.detail.ret, data.ret);
+        visit_func_params(*data.gargs, data.get_gargs());
+        visit_func_params(*data.args, data.get_args());
+        visit_func_ret_pack(*data.ret, data.get_ret());
         visit(data.body);
 
         visit_after_func_decl(node, data);
@@ -241,12 +241,12 @@ struct NameSolver : public ast::Visitor<Ast> {
 
     void visit_after_func_decl(Node& /*node*/,
                                conv::FuncDecl const& data) override {
-        pop_env(data.name.ids.size());
+        pop_env(data.get_name().ids.size());
     }
 
     void visit_before_top_var_decl(Node& /*node*/,
                                    conv::TopVarDecl const& data) override {
-        next_decl_is_file_private = is_file_private_decl(data.decorators);
+        next_decl_is_file_private = is_file_private_decl(data.get_decorators());
     }
 
     void visit_var_decl(Node& node, conv::VarDecl const& data) override {
@@ -267,7 +267,7 @@ struct NameSolver : public ast::Visitor<Ast> {
 
     void visit_before_top_def_decl(Node& /*node*/,
                                    conv::TopDefDecl const& data) override {
-        next_decl_is_file_private = is_file_private_decl(data.decorators);
+        next_decl_is_file_private = is_file_private_decl(data.get_decorators());
     }
 
     void visit_def_decl(Node& node, conv::DefDecl const& data) override {
@@ -544,7 +544,7 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
     auto mod_decl = conv::source_file(*root).mod;
     auto mod = parse_all_files_into_module(ast, *root, *mod_decl, fs, er, opt);
 
-    auto order = sort::topo_sort_top_decls(ast, mod, er, fs);
+    auto order = sort::topo_sort_top_decls(ast, mod, er);
     // for (auto const& n : order) {
     //     auto node = ast.get_node(n.as_ref());
     //     er.report_debug(node.get_loc(), "should run {}", n);
