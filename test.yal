@@ -1,44 +1,51 @@
 module main;
 
-def Counter = struct { cnt: i32 = 0, total: i32 };
-func Counter.next(
-    c: *Counter,
-) (i32, bool) {
-    if c.cnt == c.total {
-        return c.cnt, false;
-    }
+def int = struct { v: i32 };
 
-    var v = c.cnt;
-    c.cnt += 1;
-    return v, true;
+func int.yay() {}
+
+func int.__add__(self: int, o: int) int { return self.v + o.v; }
+func int.__sub__(self: int, o: int) int { return self.v - o.v; }
+
+func int.fib(n: int) int {
+    if n.v == 0 or n.v == 1 { return .{ 1 }; }
+    return (n - 1).fib() + (n - 2).fib();
 }
 
 func main() {
-    var c: Counter = .{ .total = 10 };
-    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
-
-    while true {
-        var it, ok = c.next();
-        if !ok { break; }
-
-        c_printf("it=%d\n", it);
-    }
+    var i: int = .{ 10 };
+    i.yay();
 }
-
-@extern(link_name="printf")
-func c_printf(fmt: [*]const u8, ...);
 
 // module main;
 // 
-// func main() {
-//     var x, y = 10 + 10 - 1
-//              , 100 - 50
-//              , 10 * 10
-//              , 10 / 2
-//              , 1.0 - 5.0;
+// def Counter = struct { cnt: i32 = 0, total: i32 };
+// func Counter.next(
+//     c: *Counter,
+// ) (i32, bool) {
+//     if c.cnt == c.total {
+//         return c.cnt, false;
+//     }
 // 
-//     var a, b: i32 = 10, 11;
+//     var v = c.cnt;
+//     c.cnt += 1;
+//     return v, true;
 // }
+// 
+// func main() {
+//     var c: Counter = .{ .total = 10 };
+//     c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
+// 
+//     while true {
+//         var it, ok = c.next();
+//         if !ok { break; }
+// 
+//         c_printf("it=%d\n", it);
+//     }
+// }
+// 
+// @extern(link_name="printf")
+// func c_printf(fmt: [*]const u8, ...);
 
 // def STDIN_FILENO  = 0;
 // def STDOUT_FILENO = 1;
