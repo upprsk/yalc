@@ -12,6 +12,8 @@ namespace yal {
 void ErrorReporterForFile::report(Span s, std::string_view prefix,
                                   fmt::text_style color, fmt::string_view fmt,
                                   fmt::format_args args, uint32_t context) {
+    ASSERT(s.begin <= s.end);
+
     auto [row, col] = find_rowcol(s);
 
     fmt::print(out, "{}:{}:{}: ", source_path, row, col, prefix);
