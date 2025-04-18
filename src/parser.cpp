@@ -243,14 +243,15 @@ struct Parser {
     }
 
     auto parse_decorators() -> ast::Node* {
-        auto dec_start = loc();
+        auto dec_loc = loc();
 
         std::vector<ast::Node*> decorators;
         while (check(TokenType::Decorator)) {
             decorators.push_back(parse_top_decl_attr());
         }
 
-        return ast->new_decorators(dec_start.extend(prev_span()), decorators);
+        if (decorators.size() > 0) dec_loc = dec_loc.extend(prev_span());
+        return ast->new_decorators(dec_loc, decorators);
     }
 
     auto parse_top_level_decl() -> ast::Node* {
