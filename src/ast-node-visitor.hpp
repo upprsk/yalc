@@ -281,11 +281,11 @@ struct Visitor {
     virtual void visit_func_decl(Node& node, conv::FuncDecl const& data) {
         visit_before_func_decl(node, data);
 
-        visit_decorators(*data.detail.decorators, data.decorators);
-        visit_id_pack(*data.detail.name, data.name);
-        visit_func_params(*data.detail.gargs, data.gargs);
-        visit_func_params(*data.detail.args, data.args);
-        visit_func_ret_pack(*data.detail.ret, data.ret);
+        visit_decorators(*data.decorators, data.get_decorators());
+        visit_id_pack(*data.name, data.get_name());
+        visit_func_params(*data.gargs, data.get_gargs());
+        visit_func_params(*data.args, data.get_args());
+        visit_func_ret_pack(*data.ret, data.get_ret());
         visit(data.body);
 
         visit_after_func_decl(node, data);
@@ -307,8 +307,8 @@ struct Visitor {
     virtual void visit_top_var_decl(Node& node, conv::TopVarDecl const& data) {
         visit_before_top_var_decl(node, data);
 
-        visit_decorators(*data.detail.decorators, data.decorators);
-        visit_var_decl(*data.detail.decl, data.decl);
+        visit_decorators(*data.decorators, data.get_decorators());
+        visit_var_decl(*data.decl, data.get_decl());
 
         visit_after_top_var_decl(node, data);
     }
@@ -322,8 +322,8 @@ struct Visitor {
 
     virtual void visit_top_def_decl(Node& node, conv::TopDefDecl const& data) {
         visit_before_top_def_decl(node, data);
-        visit_decorators(*data.detail.decorators, data.decorators);
-        visit_def_decl(*data.detail.decl, data.decl);
+        visit_decorators(*data.decorators, data.get_decorators());
+        visit_def_decl(*data.decl, data.get_decl());
         visit_after_top_def_decl(node, data);
     }
 
@@ -538,8 +538,8 @@ struct Visitor {
 
 #define VISIT_ASSIGN(name)                                            \
     virtual void visit_##name(Node& node, conv::Assign const& data) { \
-        visit_expr_pack(*data.detail.lhs, data.lhs);                  \
-        visit_expr_pack(*data.detail.rhs, data.rhs);                  \
+        visit_expr_pack(*data.lhs, data.get_lhs());                   \
+        visit_expr_pack(*data.rhs, data.get_rhs());                   \
     }
 
     VISIT_ASSIGN(assign);

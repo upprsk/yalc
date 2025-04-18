@@ -80,53 +80,51 @@ struct FuncRetPack {
 };
 
 struct FuncDecl {
-    Decorators  decorators;
-    IdPack      name;
-    FuncParams  gargs;
-    FuncParams  args;
-    FuncRetPack ret;
-    Node*       body{};
-    bool        is_c_varargs;
+    Node* decorators;
+    Node* name;
+    Node* gargs;
+    Node* args;
+    Node* ret;
+    Node* body{};
+    bool  is_c_varargs;
 
-    struct {
-        Node* decorators;
-        Node* name;
-        Node* gargs;
-        Node* args;
-        Node* ret;
-    } detail;
+    [[nodiscard]] constexpr auto get_decorators() const -> Decorators;
+    [[nodiscard]] constexpr auto get_name() const -> IdPack;
+    [[nodiscard]] constexpr auto get_gargs() const -> FuncParams;
+    [[nodiscard]] constexpr auto get_args() const -> FuncParams;
+    [[nodiscard]] constexpr auto get_ret() const -> FuncRetPack;
 };
 
 struct VarDecl {
     Node* ids;
     Node* types;
     Node* inits;
+
+    [[nodiscard]] constexpr auto get_ids() const -> IdPack;
 };
 
 struct DefDecl {
     Node* ids;
     Node* types;
     Node* inits;
+
+    [[nodiscard]] constexpr auto get_ids() const -> IdPack;
 };
 
 struct TopVarDecl {
-    Decorators decorators;
-    VarDecl    decl;
+    Node* decorators;
+    Node* decl;
 
-    struct {
-        Node* decorators;
-        Node* decl;
-    } detail;
+    [[nodiscard]] constexpr auto get_decorators() const -> Decorators;
+    [[nodiscard]] constexpr auto get_decl() const -> VarDecl;
 };
 
 struct TopDefDecl {
-    Decorators decorators;
-    DefDecl    decl;
+    Node* decorators;
+    Node* decl;
 
-    struct {
-        Node* decorators;
-        Node* decl;
-    } detail;
+    [[nodiscard]] constexpr auto get_decorators() const -> Decorators;
+    [[nodiscard]] constexpr auto get_decl() const -> DefDecl;
 };
 
 struct FuncParam {
@@ -240,13 +238,11 @@ struct DeferStmt {
 };
 
 struct Assign {
-    ExprPack lhs;
-    ExprPack rhs;
+    Node* lhs;
+    Node* rhs;
 
-    struct {
-        Node* lhs{};
-        Node* rhs{};
-    } detail;
+    [[nodiscard]] constexpr auto get_lhs() const -> ExprPack;
+    [[nodiscard]] constexpr auto get_rhs() const -> ExprPack;
 };
 
 // ------------------------------------------------------------------
@@ -294,7 +290,7 @@ struct Assign {
 [[nodiscard]] constexpr auto source_file(Node const& n) -> SourceFile {
     ASSERT(n.get_kind() == NodeKind::SourceFile);
     return {
-        .mod = n.get_children()[0],
+        .mod = n.get_child(0),
         .children = n.get_children().subspan(1),
     };
 }
@@ -311,7 +307,7 @@ struct Assign {
 
 [[nodiscard]] constexpr auto decorator_param(Node const& n) -> DecoratorParam {
     ASSERT(n.get_kind() == NodeKind::DecoratorParam);
-    return {.key = n.get_data_str(), .value = n.get_children()[0]};
+    return {.key = n.get_data_str(), .value = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto decorators(Node const& n) -> Decorators {
@@ -335,68 +331,56 @@ struct Assign {
 }
 
 [[nodiscard]] constexpr auto func_decl(Node const& n) -> FuncDecl {
-    ASSERT(n.get_kind() == NodeKind::FuncDecl ||
-           n.get_kind() == NodeKind::FuncDeclWithCVarArgs);
-    auto c = n.get_children();
-
+    ASSERT(n.is_oneof(NodeKind::FuncDecl, NodeKind::FuncDeclWithCVarArgs));
     return {
-        .decorators = conv::decorators(*c[0]),
-        .name = conv::id_pack(*c[1]),
-        .gargs = conv::func_params(*c[2]),
-        .args = conv::func_params(*c[3]),
-        .ret = c[4] ? conv::func_ret_pack(*c[4]) : FuncRetPack{},
-        .body = c[5],
+        .decorators = n.get_child(0),
+        .name = n.get_child(1),
+        .gargs = n.get_child(2),
+        .args = n.get_child(3),
+        .ret = n.get_child(4),
+        .body = n.get_child(5),
         .is_c_varargs = n.get_kind() == NodeKind::FuncDeclWithCVarArgs,
-        .detail = {.decorators = c[0],  //
-                   .name = c[1],        //
-                   .gargs = c[2],       //
-                   .args = c[3],        //
-                   .ret = c[4]}
     };
 }
 
 [[nodiscard]] constexpr auto var_decl(Node const& n) -> VarDecl {
     ASSERT(n.get_kind() == NodeKind::VarDecl);
-    auto c = n.get_children();
-    return {.ids = c[0], .types = c[1], .inits = c[2]};
+    return {.ids = n.get_child(0),
+            .types = n.get_child(1),
+            .inits = n.get_child(2)};
 }
 
 [[nodiscard]] constexpr auto def_decl(Node const& n) -> DefDecl {
     ASSERT(n.get_kind() == NodeKind::DefDecl);
-    auto c = n.get_children();
-    return {.ids = c[0], .types = c[1], .inits = c[2]};
+    return {.ids = n.get_child(0),
+            .types = n.get_child(1),
+            .inits = n.get_child(2)};
 }
 
 [[nodiscard]] constexpr auto top_var_decl(Node const& n) -> TopVarDecl {
     ASSERT(n.get_kind() == NodeKind::TopVarDecl);
-    auto c = n.get_children();
-
     return {
-        .decorators = conv::decorators(*c[0]),
-        .decl = conv::var_decl(*c[1]),
-        .detail = {.decorators = c[0], .decl = c[1]},
+        .decorators = n.get_child(0),
+        .decl = n.get_child(1),
     };
 }
 
 [[nodiscard]] constexpr auto top_def_decl(Node const& n) -> TopDefDecl {
     ASSERT(n.get_kind() == NodeKind::TopDefDecl);
-    auto c = n.get_children();
-
     return {
-        .decorators = conv::decorators(*c[0]),
-        .decl = conv::def_decl(*c[1]),
-        .detail = {.decorators = c[0], .decl = c[1]},
+        .decorators = n.get_child(0),
+        .decl = n.get_child(1),
     };
 }
 
 [[nodiscard]] constexpr auto func_param(Node const& n) -> FuncParam {
     ASSERT(n.get_kind() == NodeKind::FuncParam);
-    return {.name = n.get_data_str(), .type = n.get_children()[0]};
+    return {.name = n.get_data_str(), .type = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto named_ret(Node const& n) -> NamedRet {
     ASSERT(n.get_kind() == NodeKind::NamedRet);
-    return {.name = n.get_data_str(), .type = n.get_children()[0]};
+    return {.name = n.get_data_str(), .type = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto import_stmt(Node const& n) -> ImportStmt {
@@ -411,13 +395,12 @@ struct Assign {
 
 [[nodiscard]] constexpr auto binary(Node const& n) -> Binary {
     // TODO: assert that it is a valid binary
-    auto c = n.get_children();
-    return {.lhs = c[0], .rhs = c[1]};
+    return {.lhs = n.get_child(0), .rhs = n.get_child(1)};
 }
 
 [[nodiscard]] constexpr auto unary(Node const& n) -> Unary {
     // TODO: assert that it is a valid unary
-    return {.child = n.get_children()[0]};
+    return {.child = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto struct_type(Node const& n) -> StructType {
@@ -427,52 +410,53 @@ struct Assign {
 
 [[nodiscard]] constexpr auto struct_field(Node const& n) -> StructField {
     ASSERT(n.get_kind() == NodeKind::StructField);
-    auto c = n.get_children();
-    return {.name = n.get_data_str(), .type = c[0], .init = c[1]};
+    return {
+        .name = n.get_data_str(),
+        .type = n.get_child(0),
+        .init = n.get_child(1),
+    };
 }
 
 [[nodiscard]] constexpr auto ptr(Node const& n) -> Ptr {
-    ASSERT(n.get_kind() == NodeKind::Ptr || n.get_kind() == NodeKind::PtrConst);
+    ASSERT(n.is_oneof(NodeKind::Ptr, NodeKind::PtrConst));
     return {
-        .inner = n.get_children()[0],
+        .inner = n.get_child(0),
         .is_const = n.get_kind() == NodeKind::PtrConst,
     };
 }
 
 [[nodiscard]] constexpr auto mptr(Node const& n) -> MultiPtr {
-    ASSERT(n.get_kind() == NodeKind::MultiPtr ||
-           n.get_kind() == NodeKind::MultiPtrConst);
+    ASSERT(n.is_oneof(NodeKind::MultiPtr, NodeKind::MultiPtrConst));
     return {
-        .inner = n.get_children()[0],
+        .inner = n.get_child(0),
         .is_const = n.get_kind() == NodeKind::MultiPtrConst,
     };
 }
 
 [[nodiscard]] constexpr auto slice(Node const& n) -> Slice {
-    ASSERT(n.get_kind() == NodeKind::Slice ||
-           n.get_kind() == NodeKind::SliceConst);
+    ASSERT(n.is_oneof(NodeKind::Slice, NodeKind::SliceConst));
     return {
-        .inner = n.get_children()[0],
+        .inner = n.get_child(0),
         .is_const = n.get_kind() == NodeKind::SliceConst,
     };
 }
 
 [[nodiscard]] constexpr auto array_type(Node const& n) -> ArrayType {
-    ASSERT(n.get_kind() == NodeKind::ArrayType ||
-           n.get_kind() == NodeKind::ArrayTypeConst);
-    auto c = n.get_children();
-
+    ASSERT(n.is_oneof(NodeKind::ArrayType, NodeKind::ArrayTypeConst));
     return {
-        .size = c[1],
-        .inner = c[0],
+        .size = n.get_child(1),
+        .inner = n.get_child(0),
         .is_const = n.get_kind() == NodeKind::ArrayTypeConst,
     };
 }
 
 [[nodiscard]] constexpr auto array(Node const& n) -> Array {
     ASSERT(n.get_kind() == NodeKind::Array);
-    auto c = n.get_children();
-    return {.size = c[1], .inner = c[0], .items = c.subspan(2)};
+    return {
+        .size = n.get_child(1),
+        .inner = n.get_child(0),
+        .items = n.get_children().subspan(2),
+    };
 }
 
 [[nodiscard]] constexpr auto lit(Node const& n) -> Lit {
@@ -482,18 +466,17 @@ struct Assign {
 
 [[nodiscard]] constexpr auto lit_param(Node const& n) -> LitParam {
     ASSERT(n.get_kind() == NodeKind::LitParam);
-    return {.key = n.get_data_str(), .init = n.get_children()[0]};
+    return {.key = n.get_data_str(), .init = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto call(Node const& n) -> Call {
     ASSERT(n.get_kind() == NodeKind::Call);
-    auto c = n.get_children();
-    return {.callee = c[0], .args = c.subspan(1)};
+    return {.callee = n.get_child(0), .args = n.get_children().subspan(1)};
 }
 
 [[nodiscard]] constexpr auto field(Node const& n) -> Field {
     ASSERT(n.get_kind() == NodeKind::Field);
-    return {.name = n.get_data_str(), .receiver = n.get_children()[0]};
+    return {.name = n.get_data_str(), .receiver = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto block(Node const& n) -> Block {
@@ -503,28 +486,24 @@ struct Assign {
 
 [[nodiscard]] constexpr auto if_stmt(Node const& n) -> IfStmt {
     ASSERT(n.get_kind() == NodeKind::IfStmt);
-    auto c = n.get_children();
-    return {.cond = c[0], .wt = c[1], .wf = c[2]};
+    return {.cond = n.get_child(0), .wt = n.get_child(1), .wf = n.get_child(2)};
 }
 
 [[nodiscard]] constexpr auto while_stmt(Node const& n) -> WhileStmt {
     ASSERT(n.get_kind() == NodeKind::WhileStmt);
-    auto c = n.get_children();
-    return {.cond = c[0], .body = c[1]};
+    return {.cond = n.get_child(0), .body = n.get_child(1)};
 }
 
 [[nodiscard]] constexpr auto defer_stmt(Node const& n) -> DeferStmt {
     ASSERT(n.get_kind() == NodeKind::DeferStmt);
-    return {.stmt = n.get_children()[0]};
+    return {.stmt = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto assign(Node const& n) -> Assign {
     // FIXME: check if it is a valid assign
-    auto c = n.get_children();
     return {
-        .lhs = conv::expr_pack(*c[0]),
-        .rhs = conv::expr_pack(*c[1]),
-        .detail = {.lhs = c[0], .rhs = c[1]},
+        .lhs = n.get_child(0),
+        .rhs = n.get_child(1),
     };
 }
 
@@ -537,7 +516,7 @@ enum class PrivateKind { Public, Module, File };
         auto decl = conv::decorator(*decl_ptr);
         if (decl.name == "private") {
             for (auto param : decl.params) {
-                if (param->get_kind() == NodeKind::Id) {
+                if (param->is_oneof(NodeKind::Id)) {
                     auto p = conv::id(*param);
                     if (p.name == "file") return PrivateKind::File;
                 }
@@ -548,6 +527,59 @@ enum class PrivateKind { Public, Module, File };
     }
 
     return PrivateKind::Public;
+}
+
+// ==================================================================
+
+constexpr auto FuncDecl::get_decorators() const -> Decorators {
+    return conv::decorators(*decorators);
+}
+
+constexpr auto FuncDecl::get_name() const -> IdPack {
+    return conv::id_pack(*name);
+}
+
+constexpr auto FuncDecl::get_gargs() const -> FuncParams {
+    return conv::func_params(*gargs);
+}
+
+constexpr auto FuncDecl::get_args() const -> FuncParams {
+    return conv::func_params(*args);
+}
+
+constexpr auto FuncDecl::get_ret() const -> FuncRetPack {
+    return ret ? conv::func_ret_pack(*ret) : FuncRetPack{};
+}
+
+constexpr auto VarDecl::get_ids() const -> IdPack {
+    return conv::id_pack(*ids);
+}
+
+constexpr auto DefDecl::get_ids() const -> IdPack {
+    return conv::id_pack(*ids);
+}
+
+constexpr auto TopVarDecl::get_decorators() const -> Decorators {
+    return conv::decorators(*decorators);
+}
+
+constexpr auto TopVarDecl::get_decl() const -> VarDecl {
+    return conv::var_decl(*decl);
+}
+
+constexpr auto TopDefDecl::get_decorators() const -> Decorators {
+    return conv::decorators(*decorators);
+}
+
+constexpr auto TopDefDecl::get_decl() const -> DefDecl {
+    return conv::def_decl(*decl);
+}
+
+constexpr auto Assign::get_lhs() const -> ExprPack {
+    return conv::expr_pack(*lhs);
+}
+constexpr auto Assign::get_rhs() const -> ExprPack {
+    return conv::expr_pack(*rhs);
 }
 
 }  // namespace yal::ast::conv
