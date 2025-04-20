@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <ranges>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "arena.hpp"
 #include "ast-node.hpp"
-#include "decl-id.hpp"
-#include "type-id.hpp"
 #include "value.hpp"
 
 namespace yal {
@@ -19,6 +20,14 @@ struct DeclFlags {
         Private = 1 << 1,
         PrivateFile = 1 << 2,
     };
+
+    [[nodiscard]] constexpr auto has_extern() const -> bool {
+        return flags & Extern;
+    }
+
+    [[nodiscard]] constexpr auto has_private() const -> bool {
+        return flags & Private;
+    }
 
     [[nodiscard]] constexpr auto has_private_file() const -> bool {
         return flags & PrivateFile;
@@ -49,17 +58,19 @@ struct DeclFlags {
     Flags flags = None;
 };
 
-class Decl {
+struct Decl {
 public:
-    DeclId id{};  // NOLINT(readability-redundant-member-init)
+    uint32_t uid;
 
     /// This is the name that the declaration has globally. This prepends the
     /// names of all scopes above it an joins them with '.'.
-    std::string name;
+    std::string_view full_name;
 
     /// This is the name that the declaration has locally. This is what is used
     /// by lexical scoping.
-    std::string local_name;
+    std::string_view local_name;
+
+    std::string_view link_name;
 
     /// The node that declared this. It may be an invalid id if the value is a
     /// buitin or something that does not come from the AST.
@@ -77,7 +88,7 @@ public:
         return flags.has_private_file();
     }
 
-    [[nodiscard]] constexpr auto get_type() const -> types::TypeId {
+    [[nodiscard]] constexpr auto get_type() const -> types::Type* {
         return value.type;
     }
 
@@ -85,27 +96,68 @@ private:
 };
 
 class DeclStore {
+    struct DeclItem {
+        DeclItem* next;
+        Decl      decl;
+    };
+
 public:
-    auto gen_decl(Decl decl) -> DeclId {
-        auto sz = decls.size();
-        auto id = DeclId::from_raw_data(sz);
-        decl.id = id;
-        decls.push_back(decl);
+    // https://www.studyplan.dev/pro-cpp/iterator-concepts
+    struct Iterator {
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = Decl;
+        using element_type = value_type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using difference_type = std::ptrdiff_t;
 
-        return id;
-    }
+        constexpr Iterator() = default;
+        constexpr Iterator(DeclItem* it) : item{it} {}
 
-    [[nodiscard]] auto get_decl(DeclId id) const -> Decl const& {
-        return decls.at(id.value());
-    }
+        constexpr auto operator*() const -> reference { return item->decl; }
+        constexpr auto operator->() const -> pointer { return &operator*(); }
 
-    [[nodiscard]] auto get_all_decls() const -> std::span<Decl const> {
-        return decls;
+        constexpr auto operator++() -> Iterator& {
+            item = item->next;
+            return *this;
+        }
+
+        constexpr auto operator++(int) -> Iterator {
+            Iterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        constexpr auto operator==(Iterator const& b) const -> bool {
+            return item == b.item;
+        }
+
+        DeclItem* item{};
+    };
+
+    auto new_decl(std::string_view full_name, std::string_view local_name,
+                  std::string_view link_name, ast::Node* declarator,
+                  DeclFlags flags, Value value) -> Decl*;
+
+    [[nodiscard]] auto begin() const -> Iterator { return {head}; }
+    [[nodiscard]] auto end() const -> Iterator { return {}; }
+
+private:
+    auto new_string(std::string_view base) -> std::string_view {
+        return names.alloc_string_view(base);
     }
 
 private:
-    std::vector<Decl> decls;
+    DeclItem* head;
+
+    uint32_t next_uid{};
+
+    mem::Arena decls;
+    mem::Arena names;
 };
+
+static_assert(std::forward_iterator<DeclStore::Iterator>);
+static_assert(std::ranges::forward_range<DeclStore>);
 
 void to_json(json& j, DeclFlags const& n);
 void to_json(json& j, Decl const& n);
@@ -114,16 +166,17 @@ void to_json(json& j, DeclStore const& n);
 }  // namespace yal
 
 template <>
-struct fmt::formatter<yal::DeclId> : formatter<string_view> {
+struct fmt::formatter<yal::Decl> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
 
-    auto format(yal::DeclId did, format_context& ctx) const
+    auto format(yal::Decl const& d, format_context& ctx) const
         -> format_context::iterator;
 };
 
 template <>
-struct std::hash<yal::DeclId> {
-    auto operator()(yal::DeclId const& k) const -> std::size_t {
-        return std::hash<uint32_t>{}(k.value());
-    }
+struct fmt::formatter<yal::DeclFlags> : formatter<string_view> {
+    // parse is inherited from formatter<string_view>.
+
+    auto format(yal::DeclFlags flags, format_context& ctx) const
+        -> format_context::iterator;
 };

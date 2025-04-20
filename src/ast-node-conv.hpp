@@ -12,7 +12,7 @@ namespace yal::ast::conv {
 
 struct Id {
     std::string_view name;
-    DeclId           to;
+    Decl*            to;
 };
 
 struct KwLit {
@@ -95,12 +95,18 @@ struct FuncDecl {
     [[nodiscard]] constexpr auto get_ret() const -> FuncRetPack;
 };
 
+struct ExprPack {
+    std::span<Node*> items;
+};
+
 struct VarDecl {
     Node* ids;
     Node* types;
     Node* inits;
 
     [[nodiscard]] constexpr auto get_ids() const -> IdPack;
+    [[nodiscard]] constexpr auto get_types() const -> ExprPack;
+    [[nodiscard]] constexpr auto get_inits() const -> ExprPack;
 };
 
 struct DefDecl {
@@ -109,6 +115,8 @@ struct DefDecl {
     Node* inits;
 
     [[nodiscard]] constexpr auto get_ids() const -> IdPack;
+    [[nodiscard]] constexpr auto get_types() const -> ExprPack;
+    [[nodiscard]] constexpr auto get_inits() const -> ExprPack;
 };
 
 struct TopVarDecl {
@@ -139,10 +147,6 @@ struct NamedRet {
 
 struct ImportStmt {
     std::string_view path;
-};
-
-struct ExprPack {
-    std::span<Node*> items;
 };
 
 struct Binary {
@@ -249,7 +253,7 @@ struct Assign {
 
 [[nodiscard]] constexpr auto id(Node const& n) -> Id {
     ASSERT(n.get_kind() == NodeKind::Id);
-    return {.name = n.get_data_str(), .to = n.get_declid()};
+    return {.name = n.get_data_str(), .to = n.get_decl()};
 }
 
 [[nodiscard]] constexpr auto kwlit(Node const& n) -> KwLit {
@@ -516,9 +520,9 @@ enum class PrivateKind { Public, Module, File };
         auto decl = conv::decorator(*decl_ptr);
         if (decl.name == "private") {
             for (auto param : decl.params) {
-                if (param->is_oneof(NodeKind::Id)) {
-                    auto p = conv::id(*param);
-                    if (p.name == "file") return PrivateKind::File;
+                if (param->is_oneof(NodeKind::KwLit)) {
+                    auto p = conv::kwlit(*param);
+                    if (p.id == "file") return PrivateKind::File;
                 }
             }
 
@@ -555,8 +559,24 @@ constexpr auto VarDecl::get_ids() const -> IdPack {
     return conv::id_pack(*ids);
 }
 
+constexpr auto VarDecl::get_types() const -> ExprPack {
+    return conv::expr_pack(*types);
+}
+
+constexpr auto VarDecl::get_inits() const -> ExprPack {
+    return conv::expr_pack(*inits);
+}
+
 constexpr auto DefDecl::get_ids() const -> IdPack {
     return conv::id_pack(*ids);
+}
+
+constexpr auto DefDecl::get_types() const -> ExprPack {
+    return conv::expr_pack(*types);
+}
+
+constexpr auto DefDecl::get_inits() const -> ExprPack {
+    return conv::expr_pack(*inits);
 }
 
 constexpr auto TopVarDecl::get_decorators() const -> Decorators {

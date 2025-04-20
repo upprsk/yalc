@@ -1,5 +1,7 @@
 #include "types.hpp"
 
+#include <algorithm>
+#include <ranges>
 #include <string_view>
 
 #include "fmt/base.h"
@@ -9,118 +11,22 @@
 
 namespace yal::types {
 
-auto TypeStore::equal(Type const &lhs, Type const &rhs) const -> bool {
-    if (lhs.kind != rhs.kind) return false;
-
-    if (lhs.is_pack()) {
-        if (lhs.inner.size() != rhs.inner.size()) return false;
-        for (size_t i = 0; i < lhs.inner.size(); i++) {
-            if (!equal(lhs.inner[i], rhs.inner[i])) return false;
-        }
-
-        return true;
-    }
-
-    // TODO: handle other types (that may have inner types)
-    return true;
-}
-
-auto TypeStore::coerce(TypeId from, TypeId to) -> TypeId {
-    if (from.is_valid() && !to.is_valid()) return from;
-    if (!from.is_valid() && to.is_valid()) return to;
-    if (!from.is_valid() && !to.is_valid()) return TypeId::invalid();
-
-    auto from_type = get(from.as_ref());
-    auto to_type = get(to.as_ref());
-
-    // same type, just return it.
-    if (equal(from_type, to_type)) return to;
-
-    auto from_size = type_size(from_type);
-    auto to_size = type_size(to_type);
-
-    switch (from_type.kind) {
-        // from error, just return target to avoid further unneeded error
-        // messages
-        case TypeKind::Err: return to;
-
-        // unsigned integers
-        // the other must be an integer, have the same sign and the same
-        // bit-width or more.
-        case TypeKind::Usize:
-        case TypeKind::Uint64:
-        case TypeKind::Uint32:
-        case TypeKind::Uint16:
-        case TypeKind::Uint8:
-            if (!to_type.is_integral() || to_type.is_signed())
-                return TypeId::invalid();
-            if (to_size >= from_size) return to;
-            return TypeId::invalid();
-
-        // signed integers
-        // the other must be an integer, have the same sign and the same
-        // bit-width or more.
-        case TypeKind::Isize:
-        case TypeKind::Int64:
-        case TypeKind::Int32:
-        case TypeKind::Int16:
-        case TypeKind::Int8:
-            if (!to_type.is_integral() || to_type.is_unsigned())
-                return TypeId::invalid();
-            if (to_size >= from_size) return to;
-            return TypeId::invalid();
-
-        // floats, no coercion
-        case TypeKind::Float32:
-        case TypeKind::Float64: return TypeId::invalid();
-
-        // No coercion
-        case TypeKind::StrView: return TypeId::invalid();
-        case TypeKind::Pack: return TypeId::invalid();
-        case TypeKind::Type: return TypeId::invalid();
-    }
-
-    return TypeId::invalid();
-}
-
 void to_json(json &j, Type const &t) {
-    j = json{
-        {   "id",                   t.id},
-        { "kind", fmt::to_string(t.kind)},
-        {"inner",                t.inner},
-    };
-}
-
-void to_json(json &j, FatTypeId const &t) {
-    if (!t.id.is_valid()) {
-        j = {};  // null
-        return;
+    auto arr = json::array();
+    for (auto inner : t.inner) {
+        arr.push_back(*inner);
     }
 
-    auto ty = t.ts->get(t.id.as_ref());
-
     j = json{
-        {   "id",                    t.id},
-        { "kind", fmt::to_string(ty.kind)},
-        {"inner",  t.ts->fatten(ty.inner)},
+        { "kind", fmt::to_string(t.kind)},
+        {"inner",                    arr},
     };
-}
-
-void to_json(json &j, FatTypeItems const &t) {
-    auto arr = json::array();
-    for (auto const &id : t.items) arr.push_back(t.ts->fatten(id));
-
-    j = arr;
 }
 
 void to_json(json &j, TypeStore const &ts) {
     auto arr = json::array();
-    for (auto const &type : ts.types) {
-        arr.push_back(json{
-            {   "id",                   type.id},
-            { "kind", fmt::to_string(type.kind)},
-            {"inner",     ts.fatten(type.inner)},
-        });
+    for (auto const &t : ts) {
+        arr.push_back(t);
     }
 
     j = json{
@@ -161,6 +67,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
     switch (ty.kind) {
         case yal::types::TypeKind::Err:
         case yal::types::TypeKind::Type:
+        case yal::types::TypeKind::Void:
         case yal::types::TypeKind::Uint64:
         case yal::types::TypeKind::Int64:
         case yal::types::TypeKind::Uint32:
@@ -176,7 +83,15 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
         case yal::types::TypeKind::StrView: return format_no_inner(ty.kind);
 
         case yal::types::TypeKind::Pack:
-            return fmt::format_to(ctx.out(), "{}", fmt::join(ty.inner, ", "));
+            return fmt::format_to(
+                ctx.out(), "({})",
+                fmt::join(std::ranges::views::transform(
+                              ty.inner,
+                              [](yal::types::Type *t) {
+                                  return static_cast<yal::types::Type const &>(
+                                      *t);
+                              }),
+                          ", "));
     }
 
     return fmt::format_to(ctx.out(), "<invalid kind>");

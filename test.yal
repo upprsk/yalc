@@ -1,12 +1,5 @@
 module main;
 
-def int = struct { v: i32 };
-
-func int.yay() {}
-
-func int.__add__(self: int, o: int) int { return self.v + o.v; }
-func int.__sub__(self: int, o: int) int { return self.v - o.v; }
-
 func int.fib(n: int) int {
     if n.v == 0 or n.v == 1 { return .{ 1 }; }
     return (n - 1).fib() + (n - 2).fib();

@@ -1,8 +1,4 @@
 add_library(yal
-    # type-id.cpp
-    # type-id.hpp
-    # types.cpp
-    # types.hpp
     # typing.cpp
     # typing.hpp
     arena.cpp
@@ -15,8 +11,6 @@ add_library(yal
     ast-node.hpp
     ast.cpp
     ast.hpp
-    decl-id.cpp
-    decl-id.hpp
     decl-store.cpp
     decl-store.hpp
     error_reporter.cpp
@@ -33,6 +27,8 @@ add_library(yal
     span.hpp
     tokenizer.cpp
     tokenizer.hpp
+    types.cpp
+    types.hpp
     utils.cpp
     utils.hpp
     value.cpp

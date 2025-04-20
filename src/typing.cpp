@@ -10,7 +10,6 @@
 #include "file-store.hpp"
 #include "fmt/ranges.h"
 #include "nlohmann/json.hpp"
-#include "type-id.hpp"
 #include "types.hpp"
 
 namespace yal {

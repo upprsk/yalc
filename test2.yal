@@ -1,0 +1,9 @@
+module main;
+
+def int = struct { v: i32 };
+
+@private(.file)
+func int.yay() {}
+
+func int.__add__(self: int, o: int) int { return self.v + o.v; }
+func int.__sub__(self: int, o: int) int { return self.v - o.v; }

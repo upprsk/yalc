@@ -2,6 +2,7 @@
 
 #include <string_view>
 
+#include "decl-store.hpp"
 #include "file-store.hpp"
 #include "fmt/format.h"
 #include "fmt/ranges.h"
@@ -19,8 +20,8 @@ void to_json(json& j, Node const& n) {
         { "loc",                  n.get_loc()},
     };
 
-    if (n.get_declid().is_valid()) {
-        j["declid"] = n.get_declid();
+    if (n.get_decl()) {
+        j["decl"] = n.get_decl()->uid;
     }
 
     if (std::holds_alternative<std::monostate>(n.get_data()))

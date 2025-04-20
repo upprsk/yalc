@@ -343,8 +343,6 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
     };
 
     if (node->is_oneof(ast::NodeKind::Module)) {
-        fmt::println(stderr, "Module");
-
         auto data = conv::module(*node);
 
         for (auto source_file : data.children) {
@@ -464,8 +462,9 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
 
         auto top = ctx.lookup_top(data.name);
         if (!top) {
-            state.er->report_warn(
-                node->get_loc(), "name {:?} not found in top-level", data.name);
+            // state.er->report_warn(
+            //     node->get_loc(), "name {:?} not found in top-level",
+            //     data.name);
             return;
         }
 
@@ -480,9 +479,6 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
 
 auto topo_sort_top_decls(ast::Ast& ast, ast::Node* mod, ErrorReporter& er)
     -> std::vector<ast::Node*> {
-    // auto dv = DependsVisitor{ast, &er, &fs};
-    // dv.visit(mod);
-
     auto state = State{.dag = {}, .file_tops = {}, .tops = {}, .er = &er};
     auto ctx = Context{.state = &state, .decls = {}};
     visit_node(ast, mod, state, ctx);

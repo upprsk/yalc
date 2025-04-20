@@ -7,9 +7,11 @@
 #include <utility>
 #include <variant>
 
-#include "decl-id.hpp"
 #include "file-store.hpp"
-#include "type-id.hpp"
+
+namespace yal {
+struct Decl;
+}
 
 namespace yal::ast {
 
@@ -489,8 +491,8 @@ public:
         return std::get<uint64_t>(data);
     }
 
-    [[nodiscard]] constexpr auto get_declid() const -> DeclId { return declid; }
-    constexpr void               set_declid(DeclId id) { declid = id; }
+    [[nodiscard]] constexpr auto get_decl() const -> Decl * { return decl; }
+    constexpr void               set_decl(Decl *d) { decl = d; }
 
     [[nodiscard]] constexpr auto get_data() const
         -> std::variant<std::monostate, float, double, uint64_t,
@@ -513,12 +515,12 @@ public:
     constexpr void update_with_decl_ref(std::string_view v) { data = v; }
 
 private:
-    NodeKind          kind;
-    Location          loc;
+    NodeKind          kind{};
+    Location          loc{};
     std::span<Node *> children;
 
-    // FIXME: this is only used for some nodes. Maybe move it out?
-    DeclId declid;
+    Decl *decl{};
+
     std::variant<std::monostate, float, double, uint64_t, std::string_view>
         data;
 };

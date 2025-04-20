@@ -2,14 +2,18 @@
 
 #include <vector>
 
-#include "type-id.hpp"
+#include "arena.hpp"
+#include "fmt/base.h"
+#include "nlohmann/json_fwd.hpp"
 
 namespace yal::types {
+using json = nlohmann::json;
 
 enum class TypeKind {
     Err,
 
     Type,
+    Void,
 
     Uint64,
     Int64,
@@ -84,49 +88,81 @@ struct Type {
         return kind == TypeKind::Pack;
     }
 
-    TypeKind            kind;
-    TypeId              id;
-    std::vector<TypeId> inner;
-};
+    constexpr auto operator==(Type const& other) const -> bool {
+        return kind == other.kind && std::ranges::equal(inner, other.inner);
+    }
 
-struct TypeStore;
-
-struct FatTypeId {
-    TypeId           id;
-    TypeStore const *ts;
-};
-
-struct FatTypeItems {
-    std::span<TypeId const> items;
-    TypeStore const        *ts;
+    TypeKind         kind;
+    std::span<Type*> inner;
 };
 
 struct TypeStore {
+    struct TypeItem {
+        TypeItem* next;
+        Type      type;
+    };
+
     struct Builtin {
-        TypeId error;
-        TypeId type;
+        Type* error;
+        Type* type;
+        Type* _void;
 
-        TypeId uint64;
-        TypeId int64;
-        TypeId uint32;
-        TypeId int32;
-        TypeId uint16;
-        TypeId int16;
-        TypeId uint8;
-        TypeId int8;
+        Type* uint64;
+        Type* int64;
+        Type* uint32;
+        Type* int32;
+        Type* uint16;
+        Type* int16;
+        Type* uint8;
+        Type* int8;
 
-        TypeId usize;
-        TypeId isize;
+        Type* usize;
+        Type* isize;
 
-        TypeId f32;
-        TypeId f64;
+        Type* f32;
+        Type* f64;
 
-        TypeId strview;
+        Type* strview;
+    };
+
+public:
+    // https://www.studyplan.dev/pro-cpp/iterator-concepts
+    struct Iterator {
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = Type;
+        using element_type = value_type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using difference_type = std::ptrdiff_t;
+
+        constexpr Iterator() = default;
+        constexpr Iterator(TypeItem* it) : item{it} {}
+
+        constexpr auto operator*() const -> reference { return item->type; }
+        constexpr auto operator->() const -> pointer { return &operator*(); }
+
+        constexpr auto operator++() -> Iterator& {
+            item = item->next;
+            return *this;
+        }
+
+        constexpr auto operator++(int) -> Iterator {
+            Iterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        constexpr auto operator==(Iterator const& b) const -> bool {
+            return item == b.item;
+        }
+
+        TypeItem* item{};
     };
 
     void add_builtins() {
         builtin.error = new_type(TypeKind::Err, {});
         builtin.type = new_type(TypeKind::Type, {});
+        builtin._void = new_type(TypeKind::Void, {});
 
         builtin.uint64 = new_type(TypeKind::Uint64, {});
         builtin.int64 = new_type(TypeKind::Int64, {});
@@ -146,53 +182,47 @@ struct TypeStore {
         builtin.strview = new_type(TypeKind::StrView, {});
     }
 
-    [[nodiscard]] auto get(TypeIdOfRef h) const -> Type {
-        return types.at(h.value);
+    [[nodiscard]] auto get_error() const -> Type* { return builtin.error; }
+    [[nodiscard]] auto get_type() const -> Type* { return builtin.type; }
+    [[nodiscard]] auto get_void() const -> Type* { return builtin._void; }
+
+    [[nodiscard]] auto get_i64() const -> Type* { return builtin.int64; }
+    [[nodiscard]] auto get_u64() const -> Type* { return builtin.uint64; }
+    [[nodiscard]] auto get_i32() const -> Type* { return builtin.int32; }
+    [[nodiscard]] auto get_u32() const -> Type* { return builtin.uint32; }
+    [[nodiscard]] auto get_i16() const -> Type* { return builtin.int16; }
+    [[nodiscard]] auto get_u16() const -> Type* { return builtin.uint16; }
+    [[nodiscard]] auto get_i8() const -> Type* { return builtin.int8; }
+    [[nodiscard]] auto get_u8() const -> Type* { return builtin.uint8; }
+
+    [[nodiscard]] auto get_f32() const -> Type* { return builtin.f32; }
+    [[nodiscard]] auto get_f64() const -> Type* { return builtin.f64; }
+
+    [[nodiscard]] auto get_usize() const -> Type* { return builtin.usize; }
+    [[nodiscard]] auto get_isize() const -> Type* { return builtin.isize; }
+
+    [[nodiscard]] auto get_strview() const -> Type* { return builtin.strview; }
+
+    [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner)
+        -> Type* {
+        auto ty = types.create<TypeItem>(
+            head, Type{.kind = kind, .inner = new_array(inner)});
+        head = ty;
+
+        return &ty->type;
     }
 
-    [[nodiscard]] auto get_error() const -> TypeId { return builtin.error; }
-    [[nodiscard]] auto get_type() const -> TypeId { return builtin.type; }
-
-    [[nodiscard]] auto get_i64() const -> TypeId { return builtin.int64; }
-    [[nodiscard]] auto get_u64() const -> TypeId { return builtin.uint64; }
-    [[nodiscard]] auto get_i32() const -> TypeId { return builtin.int32; }
-    [[nodiscard]] auto get_u32() const -> TypeId { return builtin.uint32; }
-    [[nodiscard]] auto get_i16() const -> TypeId { return builtin.int16; }
-    [[nodiscard]] auto get_u16() const -> TypeId { return builtin.uint16; }
-    [[nodiscard]] auto get_i8() const -> TypeId { return builtin.int8; }
-    [[nodiscard]] auto get_u8() const -> TypeId { return builtin.uint8; }
-
-    [[nodiscard]] auto get_f32() const -> TypeId { return builtin.f32; }
-    [[nodiscard]] auto get_f64() const -> TypeId { return builtin.f64; }
-
-    [[nodiscard]] auto get_usize() const -> TypeId { return builtin.usize; }
-    [[nodiscard]] auto get_isize() const -> TypeId { return builtin.isize; }
-
-    [[nodiscard]] auto get_strview() const -> TypeId { return builtin.strview; }
-
-    [[nodiscard]] auto new_type(TypeKind kind, std::vector<TypeId> inner)
-        -> TypeId {
-        auto sz = types.size();
-        auto id = TypeId::from_raw_data(sz);
-        types.push_back({kind, id, inner});
-
-        return id;
+    [[nodiscard]] auto new_array(std::span<Type* const> arr)
+        -> std::span<Type*> {
+        if (arr.empty()) return {};
+        return types.alloc<Type*>(arr);
     }
 
-    [[nodiscard]] auto coerce(TypeId from, TypeId to) -> TypeId;
-
-    [[nodiscard]] auto equal(Type const &lhs, Type const &rhs) const -> bool;
-    [[nodiscard]] auto equal(TypeId lhs, TypeId rhs) const -> bool {
-        if (lhs.is_valid() && rhs.is_valid())
-            return equal(get(lhs.as_ref()), get(rhs.as_ref()));
-
-        return lhs.is_valid() == rhs.is_valid();
-    }
-
-    [[nodiscard]] constexpr auto type_size(Type const &ty) const -> size_t {
+    [[nodiscard]] constexpr auto type_size(Type const& ty) const -> size_t {
         switch (ty.kind) {
             case TypeKind::Err:
-            case TypeKind::Type: return 0;
+            case TypeKind::Type:
+            case TypeKind::Void: return 0;
             case TypeKind::Uint64:
             case TypeKind::Int64: return sizeof(uint64_t);
             case TypeKind::Uint32:
@@ -217,18 +247,19 @@ struct TypeStore {
         return 0;
     }
 
-    [[nodiscard]] auto fatten(std::span<TypeId const> span) const
-        -> FatTypeItems {
-        return {.items = span, .ts = this};
-    }
+    [[nodiscard]] auto begin() const -> Iterator { return {head}; }
+    [[nodiscard]] auto end() const -> Iterator { return {}; }
 
-    [[nodiscard]] auto fatten(TypeId id) const -> FatTypeId {
-        return {.id = id, .ts = this};
-    }
+private:
+    TypeItem* head;
 
-    std::vector<Type> types;
-    Builtin           builtin;
+    mem::Arena types;
+    mem::Arena arrays;
+    Builtin    builtin;
 };
+
+static_assert(std::forward_iterator<TypeStore::Iterator>);
+static_assert(std::ranges::forward_range<TypeStore>);
 
 constexpr auto format_as(TypeKind kind) {
     std::string_view name;
@@ -236,6 +267,7 @@ constexpr auto format_as(TypeKind kind) {
     switch (kind) {
         case TypeKind::Err: name = "Err"; break;
         case TypeKind::Type: name = "Type"; break;
+        case TypeKind::Void: name = "Void"; break;
         case TypeKind::Uint64: name = "Uint64"; break;
         case TypeKind::Int64: name = "Int64"; break;
         case TypeKind::Uint32: name = "Uint32"; break;
@@ -255,10 +287,8 @@ constexpr auto format_as(TypeKind kind) {
     return name;
 }
 
-void to_json(json &j, Type const &t);
-void to_json(json &j, FatTypeId const &t);
-void to_json(json &j, FatTypeItems const &t);
-void to_json(json &j, TypeStore const &ts);
+void to_json(json& j, Type const& t);
+void to_json(json& j, TypeStore const& ts);
 
 }  // namespace yal::types
 
@@ -266,6 +296,6 @@ template <>
 struct fmt::formatter<yal::types::Type> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
 
-    auto format(yal::types::Type ty, format_context &ctx) const
+    auto format(yal::types::Type ty, format_context& ctx) const
         -> format_context::iterator;
 };
