@@ -43,10 +43,10 @@ class Arena {
 public:
     Arena() = default;
 
-    // constexpr Arena(Arena const& o) = default;
+    constexpr Arena(Arena const& o) = delete;
     constexpr Arena(Arena&& o) : head{o.head} { o.head = nullptr; }
 
-    // constexpr auto operator=(Arena const&) -> Arena& = default;
+    constexpr auto operator=(Arena const&) -> Arena& = delete;
     constexpr auto operator=(Arena&& o) -> Arena& {
         head = o.head;
         o.head = nullptr;
