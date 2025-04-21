@@ -242,6 +242,12 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
             }
         } break;
 
+        case NodeKind::Optional: {
+            auto data = conv::unary(*node);
+            visitor(ast, data.child, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
+
         case NodeKind::Lit: {
             auto data = conv::lit(*node);
             for (auto c : data.items) {

@@ -927,6 +927,7 @@ struct Parser {
             case TokenType::Plus:
                 // this is literally a nop, just return the child
                 return child;
+            case TokenType::Question: kind = ast::NodeKind::Optional; break;
             default: UNREACHABLE("invalid token in infix expr", t);
         }
 

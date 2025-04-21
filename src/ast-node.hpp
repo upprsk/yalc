@@ -312,6 +312,15 @@ enum class NodeKind : uint16_t {
     ///     initializer.
     Array,
 
+    /// An optional type.
+    ///
+    ///     ?*i32
+    ///     ?[]string_view
+    ///     ?struct { v: i32 }
+    ///
+    /// - `children` has the inner type.
+    Optional,
+
     /// A struct or array literal, with inferred/auto type.
     ///
     ///     .{.a = v1, .b = v2}
@@ -594,6 +603,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::ArrayTypeConst: name = "ArrayTypeConst"; break;
         case NodeKind::ArrayType: name = "ArrayType"; break;
         case NodeKind::Array: name = "Array"; break;
+        case NodeKind::Optional: name = "Optional"; break;
         case NodeKind::Lit: name = "Lit"; break;
         case NodeKind::LitParam: name = "LitParam"; break;
         case NodeKind::Call: name = "Call"; break;
