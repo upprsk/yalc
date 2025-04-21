@@ -47,6 +47,7 @@ void to_json(json& j, Decl const& n) {
         { "link_name",  n.link_name},
         // {      "node",       n.node},
         {     "flags",      n.flags},
+        {     "value",      n.value},
     };
 }
 

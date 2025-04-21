@@ -165,31 +165,7 @@ public:
         TypeItem* item{};
     };
 
-    void add_builtins() {
-        builtin.error = new_type(TypeKind::Err, {});
-        builtin.type = new_type(TypeKind::Type, {});
-        builtin._void = new_type(TypeKind::Void, {});
-
-        builtin.uint64 = new_type(TypeKind::Uint64, {});
-        builtin.int64 = new_type(TypeKind::Int64, {});
-        builtin.uint32 = new_type(TypeKind::Uint32, {});
-        builtin.int32 = new_type(TypeKind::Int32, {});
-        builtin.uint16 = new_type(TypeKind::Uint16, {});
-        builtin.int16 = new_type(TypeKind::Int16, {});
-        builtin.uint8 = new_type(TypeKind::Uint8, {});
-        builtin.int8 = new_type(TypeKind::Int8, {});
-
-        builtin.usize = new_type(TypeKind::Usize, {});
-        builtin.isize = new_type(TypeKind::Isize, {});
-
-        builtin._bool = new_type(TypeKind::Bool, {});
-
-        builtin.f32 = new_type(TypeKind::Float32, {});
-        builtin.f64 = new_type(TypeKind::Float64, {});
-
-        builtin.strview = new_type(TypeKind::StrView, {});
-        builtin.nil = new_type(TypeKind::Nil, {});
-    }
+    TypeStore() { add_builtins(); }
 
     [[nodiscard]] auto get_error() const -> Type* { return builtin.error; }
     [[nodiscard]] auto get_type() const -> Type* { return builtin.type; }
@@ -267,7 +243,34 @@ public:
     [[nodiscard]] auto end() const -> Iterator { return {}; }
 
 private:
-    TypeItem* head;
+    void add_builtins() {
+        builtin.error = new_type(TypeKind::Err, {});
+        builtin.type = new_type(TypeKind::Type, {});
+        builtin._void = new_type(TypeKind::Void, {});
+
+        builtin.uint64 = new_type(TypeKind::Uint64, {});
+        builtin.int64 = new_type(TypeKind::Int64, {});
+        builtin.uint32 = new_type(TypeKind::Uint32, {});
+        builtin.int32 = new_type(TypeKind::Int32, {});
+        builtin.uint16 = new_type(TypeKind::Uint16, {});
+        builtin.int16 = new_type(TypeKind::Int16, {});
+        builtin.uint8 = new_type(TypeKind::Uint8, {});
+        builtin.int8 = new_type(TypeKind::Int8, {});
+
+        builtin.usize = new_type(TypeKind::Usize, {});
+        builtin.isize = new_type(TypeKind::Isize, {});
+
+        builtin._bool = new_type(TypeKind::Bool, {});
+
+        builtin.f32 = new_type(TypeKind::Float32, {});
+        builtin.f64 = new_type(TypeKind::Float64, {});
+
+        builtin.strview = new_type(TypeKind::StrView, {});
+        builtin.nil = new_type(TypeKind::Nil, {});
+    }
+
+private:
+    TypeItem* head{};
 
     mem::Arena types;
     mem::Arena arrays;

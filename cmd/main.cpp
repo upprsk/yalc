@@ -37,7 +37,6 @@ auto real_main(yalc::Args const& args) -> int {
     if (!root) return 1;
 
     auto ts = yal::types::TypeStore{};
-    ts.add_builtins();
 
     auto prj_root = yal::resolve_names(ast, root, er, fs, ts, opt);
 

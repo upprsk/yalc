@@ -3,13 +3,16 @@
 #include <cstdint>
 #include <variant>
 
+#include "nlohmann/json_fwd.hpp"
 #include "types.hpp"
 
 namespace yal {
+using json = nlohmann::json;
 
 struct Value {
-    types::Type*                                               type;
-    std::variant<std::monostate, types::Type*, bool, uint64_t> data;
+    types::Type*                                               type{};
+    std::variant<std::monostate, types::Type*, bool, uint64_t> data =
+        std::monostate{};
 
     [[nodiscard]] constexpr auto has_data() const -> bool {
         return std::holds_alternative<std::monostate>(data);
@@ -28,4 +31,14 @@ struct Value {
     }
 };
 
+void to_json(json& j, Value const& v);
+
 }  // namespace yal
+
+template <>
+struct fmt::formatter<yal::Value> : formatter<string_view> {
+    // parse is inherited from formatter<string_view>.
+
+    auto format(yal::Value const& v, format_context& ctx) const
+        -> format_context::iterator;
+};
