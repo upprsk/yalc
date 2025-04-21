@@ -47,7 +47,7 @@ auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
     }
 
     auto mod_found = conv::source_file(*src_file).mod;
-    if (!mod_found) {
+    if (!mod_found || mod_found->is_err()) {
         er.report_error(mod_found->get_loc(), "invalid module found");
         return nullptr;
     }
@@ -554,15 +554,38 @@ struct Env {
         };
     }
 
-    constexpr void update(Env const& env) {
+    constexpr void update(ErrorReporter& er, Env const& env) {
         for (auto const& [k, v] : env.items) {
-            items[k] = v;
+            if (auto it = items.find(k); it != end(items)) {
+                ASSERT(v->node != nullptr);
+                er.report_error(v->node->get_loc(),
+                                "redefinition of identifier: {:?}", k);
+                if (it->second->node) {
+                    er.report_note(it->second->node->get_loc(),
+                                   "previously value defined here");
+                }
+            } else {
+                items[k] = v;
+            }
         }
     }
 
-    constexpr void update_preserve_private(Env const& env) {
+    constexpr void update_preserve_private(ErrorReporter& er, Env const& env) {
         for (auto const& [k, v] : env.items) {
-            if (!v->is_private_file()) items[k] = v;
+            if (!v->is_private_file()) {
+                if (auto it = items.find(k);
+                    it != end(items) && it->second->node != v->node) {
+                    ASSERT(v->node != nullptr);
+                    er.report_error(v->node->get_loc(),
+                                    "redefinition of identifier: {:?}", k);
+                    if (it->second->node) {
+                        er.report_note(it->second->node->get_loc(),
+                                       "previously value defined here");
+                    }
+                } else {
+                    items[k] = v;
+                }
+            }
         }
     }
 
@@ -650,7 +673,7 @@ auto flags_from_decorators(conv::Decorators const& dec) -> DeclFlags {
     if (priv == ast::conv::PrivateKind::Module)
         flags = flags.set_private();
     else if (priv == ast::conv::PrivateKind::File)
-        flags = flags.set_private();
+        flags = flags.set_private_file();
 
     return flags.build();
 };
@@ -708,9 +731,10 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
 
             // want to use the one before the top, to not include itself in the
             // namespacing and double the name
-            envs.at(envs.size() - 2)
-                .define_ghost(ds, conv::id(*name.ids[name.ids.size() - 1]).name,
-                              node, {}, flags);
+            auto n = conv::id(*name.ids[name.ids.size() - 1]);
+            auto d = envs.at(envs.size() - 2)
+                         .define_ghost(ds, n.name, node, {}, flags);
+            node->set_decl(d);
         } else {
             ctx.er->report_error(name.ids[0]->get_loc(),
                                  "undefined identifier: {:?}", id.name);
@@ -734,13 +758,14 @@ void visit_def_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
 
     auto flags = DeclFlags::builder();
 
-    if (env.current_decl) {
+    if (env.current_decl &&
+        conv::top_def_decl(*env.current_decl).decl == node) {
         auto data = conv::top_def_decl(*env.current_decl);
         auto priv = conv::decorators_private_kind(data.get_decorators());
         if (priv == ast::conv::PrivateKind::Module)
             flags = flags.set_private();
         else if (priv == ast::conv::PrivateKind::File)
-            flags = flags.set_private();
+            flags = flags.set_private_file();
     }
 
     // first difine the ids at the current level
@@ -789,23 +814,18 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
 
     auto flags = DeclFlags::builder();
 
-    if (env.current_decl) {
+    if (env.current_decl &&
+        conv::top_var_decl(*env.current_decl).decl == node) {
         auto data = conv::top_var_decl(*env.current_decl);
         auto priv = conv::decorators_private_kind(data.get_decorators());
+
         if (priv == ast::conv::PrivateKind::Module)
             flags = flags.set_private();
         else if (priv == ast::conv::PrivateKind::File)
-            flags = flags.set_private();
+            flags = flags.set_private_file();
     }
 
-    // first difine the ids at the current level
-    for (auto const& id : data.get_ids().ids) {
-        auto name = conv::id(*id);
-        auto d = env.define(ds, name.name, node, {}, flags.build());
-        id->set_decl(d);
-    }
-
-    // then process the initializers and types one level deeper (so that
+    // first process the initializers and types one level deeper (so that
     // we can namespace all ids under the declared name)
 
     // in case we have explicit types, then we run them before the init
@@ -830,6 +850,13 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
 
             visit(ctx, senv, init);
         }
+    }
+
+    // then difine the ids at the current level
+    for (auto const& id : data.get_ids().ids) {
+        auto name = conv::id(*id);
+        auto d = env.define(ds, name.name, node, {}, flags.build());
+        id->set_decl(d);
     }
 }
 
@@ -870,7 +897,18 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
     if (node->is_oneof(ast::NodeKind::FuncParam)) {
         auto data = conv::func_param(*node);
 
-        env.define(ds, data.name, node, {}, {});
+        auto d = env.define(ds, data.name, node, {}, {});
+        node->set_decl(d);
+
+        visit(ctx, env, data.type);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::NamedRet)) {
+        auto data = conv::named_ret(*node);
+
+        auto d = env.define(ds, data.name, node, {}, {});
+        node->set_decl(d);
 
         visit(ctx, env, data.type);
         return;
@@ -879,7 +917,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
     if (node->is_oneof(ast::NodeKind::TopDefDecl)) {
         auto senv = env.with_decl(node);
         visit_children(ctx, senv, node);
-        env.update(senv);
+        env.update(*ctx.er, senv);
 
         return;
     }
@@ -887,7 +925,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
     if (node->is_oneof(ast::NodeKind::TopVarDecl)) {
         auto senv = env.with_decl(node);
         visit_children(ctx, senv, node);
-        env.update(senv);
+        env.update(*ctx.er, senv);
 
         return;
     }
@@ -909,6 +947,24 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
         return;
     }
 
+    // if (node->is_oneof(ast::NodeKind::StructType)) {
+    //     auto senv = env.with_name();
+    //     visit_children(ctx, senv, node);
+    //
+    //     return;
+    // }
+
+    if (node->is_oneof(ast::NodeKind::StructField)) {
+        auto data = conv::struct_field(*node);
+
+        auto d = env.define_ghost(ds, data.name, node, {}, {});
+        node->set_decl(d);
+
+        visit_children(ctx, env, node);
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
         auto decl = env.lookup(data.name);
@@ -918,6 +974,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
             return;
         }
 
+        node->set_decl(decl);
         // ctx.er->report_debug(node->get_loc(), "got decl: {}",
         // decl->full_name); if (decl->node) {
         //     ctx.er->report_debug(decl->node->get_loc(), "defined here:");
@@ -985,10 +1042,17 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
         root_env.define(ds, "isize", nullptr, mkty(ts.get_isize()), {});
         root_env.define(ds, "usize", nullptr, mkty(ts.get_usize()), {});
 
+        root_env.define(ds, "bool", nullptr, mkty(ts.get_bool()), {});
+
         root_env.define(ds, "f64", nullptr, mkty(ts.get_f64()), {});
         root_env.define(ds, "f32", nullptr, mkty(ts.get_f32()), {});
 
         root_env.define(ds, "string_view", nullptr, mkty(ts.get_strview()), {});
+
+        root_env.define(ds, "true", nullptr,
+                        {.type = ts.get_bool(), .data = true}, {});
+        root_env.define(ds, "false", nullptr,
+                        {.type = ts.get_bool(), .data = false}, {});
     }
 
     auto m = conv::module(*mod);
@@ -1009,7 +1073,7 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
         ctx.current_file = source_file->get_loc().fileid;
         visit_node(ast, ordered, ctx, file_env);
 
-        top_env.update_preserve_private(file_env);
+        top_env.update_preserve_private(er, file_env);
     }
 
     // auto ns = NameSolver{fs, ts, er, ast};

@@ -469,6 +469,10 @@ public:
 
     // ------------------------------------------------------------------------
 
+    [[nodiscard]] constexpr auto is_err() const -> bool {
+        return is_oneof(NodeKind::Err);
+    }
+
     constexpr auto is_oneof(auto &&...kinds) const -> bool {
         return ((get_kind() == kinds) || ...);
     }
