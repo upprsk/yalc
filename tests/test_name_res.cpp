@@ -44,8 +44,6 @@ auto gen_ast_resolved(std::string source) -> json {
     }
 
     auto ts = yal::types::TypeStore{};
-    ts.add_builtins();
-
     auto prj_root =
         yal::resolve_names(ast, ast_root, er, fs, ts, {.single_file = true});
     ms.flush();
@@ -98,8 +96,6 @@ auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
     }
 
     auto ts = yal::types::TypeStore{};
-    ts.add_builtins();
-
     auto prj_root = yal::resolve_names(ast, ast_root, er, fs, ts, {});
     ms.flush();
 
