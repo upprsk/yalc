@@ -33,6 +33,7 @@ enum class TypeKind {
     Float64,
 
     StrView,
+    Nil,
 
     Pack,
 };
@@ -127,6 +128,7 @@ struct TypeStore {
         Type* f64;
 
         Type* strview;
+        Type* nil;
     };
 
 public:
@@ -186,6 +188,7 @@ public:
         builtin.f64 = new_type(TypeKind::Float64, {});
 
         builtin.strview = new_type(TypeKind::StrView, {});
+        builtin.nil = new_type(TypeKind::Nil, {});
     }
 
     [[nodiscard]] auto get_error() const -> Type* { return builtin.error; }
@@ -210,6 +213,7 @@ public:
     [[nodiscard]] auto get_bool() const -> Type* { return builtin._bool; }
 
     [[nodiscard]] auto get_strview() const -> Type* { return builtin.strview; }
+    [[nodiscard]] auto get_nil() const -> Type* { return builtin.nil; }
 
     [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner)
         -> Type* {
@@ -249,6 +253,8 @@ public:
 
             // made of 2 pointers, so double the size of a pointer
             case TypeKind::StrView: return sizeof(uintptr_t) * 2; break;
+
+            case TypeKind::Nil: return 0; break;
 
             // this can't be instantiated, so it should not have size
             case TypeKind::Pack: return 0;
@@ -292,6 +298,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Float32: name = "f32"; break;
         case TypeKind::Float64: name = "f64"; break;
         case TypeKind::StrView: name = "string_view"; break;
+        case TypeKind::Nil: name = "Nil"; break;
         case TypeKind::Pack: name = "(pack)"; break;
     }
 

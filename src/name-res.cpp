@@ -1053,6 +1053,9 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
                         {.type = ts.get_bool(), .data = true}, {});
         root_env.define(ds, "false", nullptr,
                         {.type = ts.get_bool(), .data = false}, {});
+
+        root_env.define(ds, "nil", nullptr, {.type = ts.get_nil(), .data = {}},
+                        {});
     }
 
     auto m = conv::module(*mod);
