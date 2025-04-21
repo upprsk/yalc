@@ -280,6 +280,12 @@ void hoist_top_decl(State& state, Context& ctx, Node* node) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::ImportStmt)) {
+        state.er->report_bug(node->get_loc(),
+                             "import statements have not been implemented yet");
+        return;
+    }
+
     UNREACHABLE("invalid node kind", node->get_kind());
 }
 
