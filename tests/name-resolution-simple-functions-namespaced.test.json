@@ -1,1 +1,1 @@
-{"stderr":":memory::1:10: error: undefined identifier \"g\"\n> 0001 | module f; func g.f() {}\n                   ^^^^^^^^^^^^^\n"}
+{"stderr":":memory::1:15: error: undefined identifier: \"g\"\n> 0001 | module f; func g.f() {}\n                        ^\n"}

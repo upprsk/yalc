@@ -103,11 +103,11 @@ auto real_main(Args args) -> int {
         failed += tfailed;
     }
 
-    // {
-    //     auto [tok, tfailed] = test_name_res(p);
-    //     ok += tok;
-    //     failed += tfailed;
-    // }
+    {
+        auto [tok, tfailed] = test_name_res(p);
+        ok += tok;
+        failed += tfailed;
+    }
 
     fmt::println("{} tests, {} success, {} failed", ok + failed, ok, failed);
     return failed > 0;

@@ -12,36 +12,34 @@
 #include "test_helpers.hpp"
 #include "tokenizer.hpp"
 #include "types.hpp"
+#include "utils.hpp"
 
 using json = nlohmann::json;
 
 auto gen_ast_resolved(std::string source) -> json {
-    char*  buf = nullptr;
-    size_t bufsize = 0;
-
-    std::unique_ptr<FILE, void (*)(FILE*)> f = {open_memstream(&buf, &bufsize),
-                                                [](auto f) { fclose(f); }};
+    yal::MemStream ms;
 
     auto fs = yal::FileStore{};
-    auto er = yal::ErrorReporter{fs, f.get()};
+    auto er = yal::ErrorReporter{fs, ms.f};
 
     auto root = fs.add(":memory:", source);
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
-    fflush(f.get());
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
     auto [ast, ast_root] = yal::parse(tokens, fer);
-    fflush(f.get());
+    er.update_error_count(fer);
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
@@ -50,26 +48,25 @@ auto gen_ast_resolved(std::string source) -> json {
 
     auto prj_root =
         yal::resolve_names(ast, ast_root, er, fs, ts, {.single_file = true});
-    fflush(f.get());
+    ms.flush();
 
     if (er.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
-    return *prj_root;
+    json j = *prj_root;
+    j["ds"] = *ast.get_decl_store();
+
+    return j;
 }
 
 auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
-    char*  buf = nullptr;
-    size_t bufsize = 0;
-
-    std::unique_ptr<FILE, void (*)(FILE*)> f = {open_memstream(&buf, &bufsize),
-                                                [](auto f) { fclose(f); }};
+    yal::MemStream ms;
 
     auto fs = yal::FileStore{};
-    auto er = yal::ErrorReporter{fs, f.get()};
+    auto er = yal::ErrorReporter{fs, ms.f};
 
     std::unordered_set<yal::FileId> filenames;
     for (uint32_t idx = 0; auto const& source : sources) {
@@ -82,20 +79,21 @@ auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
     auto root = fs.add(":memory-0:");
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
-    fflush(f.get());
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
     auto [ast, ast_root] = yal::parse(tokens, fer);
-    fflush(f.get());
+    er.update_error_count(fer);
+    ms.flush();
 
     if (fer.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
@@ -103,15 +101,18 @@ auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
     ts.add_builtins();
 
     auto prj_root = yal::resolve_names(ast, ast_root, er, fs, ts, {});
-    fflush(f.get());
+    ms.flush();
 
     if (er.had_error()) {
         return json{
-            {"stderr", std::string_view{buf, bufsize}}
+            {"stderr", ms.str()}
         };
     }
 
-    return *prj_root;
+    json j = *prj_root;
+    j["ds"] = *ast.get_decl_store();
+
+    return j;
 }
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,
@@ -239,6 +240,53 @@ func main() {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
+    run_test(ctx, p, "redefine same name", R"(
+module main;
+
+func main() {
+    var x = 0;
+    var x = x + 1;
+}
+)");
+
+    run_test(ctx, p, "self-referential struct 0", R"(
+module main;
+
+def S = struct {
+    children: []S,
+};
+)");
+
+    run_test(ctx, p, "self-referential struct", R"(
+module main;
+
+def S = struct {
+    next: ?*S = nil,
+    value: i32,
+};
+
+func main() {
+    var a: S = .{ .value = 0 };
+    var b: S = .{ .next = &a, .value = 1 };
+}
+)",
+             true);
+
+    run_test(ctx, p, "self-referential generic struct", R"(
+module main;
+
+def S[T] = struct {
+    next: ?*S = nil,
+    value: T,
+};
+
+func main() {
+    var a: S[i32] = .{ .value = 0 };
+    var b: S[i32] = .{ .next = &a, .value = 1 };
+}
+)",
+             true);
+
     ctx.tags.emplace_back("multi-file");
 
     run_test(ctx, p, "multi-file 1",
@@ -354,7 +402,7 @@ func c_printf(fmt: [*]const u8, ...);
     run_test(ctx, p, "private names",
              std::vector<std::string>{
                  R"(module test; // first
-             @private(file)
+             @private(.file)
              var x = 0;
              var y = x + 2;
              )",
@@ -367,7 +415,7 @@ func c_printf(fmt: [*]const u8, ...);
     run_test(ctx, p, "private names 2",
              std::vector<std::string>{
                  R"(module test; // first
-             @private(file)
+             @private(.file)
              var x = 0;
              var x2 = x + 2;
              )",
@@ -380,7 +428,7 @@ func c_printf(fmt: [*]const u8, ...);
     run_test(ctx, p, "private names 3",
              std::vector<std::string>{
                  R"(module test; // first
-             @private(file)
+             @private(.file)
              var x = 0;
              var x2 = x + 2;
              )",
@@ -396,7 +444,7 @@ func c_printf(fmt: [*]const u8, ...);
     run_test(ctx, p, "private names 4",
              std::vector<std::string>{
                  R"(module test; // first
-             @private(file)
+             @private(.file)
              func getx() i32 { return 0; }
 
              var x2 = getx() + 2;
