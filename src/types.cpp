@@ -78,6 +78,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
         case yal::types::TypeKind::Int8:
         case yal::types::TypeKind::Usize:
         case yal::types::TypeKind::Isize:
+        case yal::types::TypeKind::Bool:
         case yal::types::TypeKind::Float32:
         case yal::types::TypeKind::Float64:
         case yal::types::TypeKind::StrView: return format_no_inner(ty.kind);

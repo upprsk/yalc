@@ -8,8 +8,8 @@
 namespace yal {
 
 struct Value {
-    types::Type*                                         type;
-    std::variant<std::monostate, types::Type*, uint64_t> data;
+    types::Type*                                               type;
+    std::variant<std::monostate, types::Type*, bool, uint64_t> data;
 
     [[nodiscard]] constexpr auto has_data() const -> bool {
         return std::holds_alternative<std::monostate>(data);
@@ -17,6 +17,10 @@ struct Value {
 
     [[nodiscard]] constexpr auto get_data_type() const -> types::Type* {
         return std::get<types::Type*>(data);
+    }
+
+    [[nodiscard]] constexpr auto get_data_bool() const -> bool {
+        return std::get<bool>(data);
     }
 
     [[nodiscard]] constexpr auto get_data_uint() const -> uint64_t {

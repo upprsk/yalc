@@ -27,6 +27,8 @@ enum class TypeKind {
     Usize,
     Isize,
 
+    Bool,
+
     Float32,
     Float64,
 
@@ -119,6 +121,8 @@ struct TypeStore {
         Type* usize;
         Type* isize;
 
+        Type* _bool;
+
         Type* f32;
         Type* f64;
 
@@ -176,6 +180,8 @@ public:
         builtin.usize = new_type(TypeKind::Usize, {});
         builtin.isize = new_type(TypeKind::Isize, {});
 
+        builtin._bool = new_type(TypeKind::Bool, {});
+
         builtin.f32 = new_type(TypeKind::Float32, {});
         builtin.f64 = new_type(TypeKind::Float64, {});
 
@@ -200,6 +206,8 @@ public:
 
     [[nodiscard]] auto get_usize() const -> Type* { return builtin.usize; }
     [[nodiscard]] auto get_isize() const -> Type* { return builtin.isize; }
+
+    [[nodiscard]] auto get_bool() const -> Type* { return builtin._bool; }
 
     [[nodiscard]] auto get_strview() const -> Type* { return builtin.strview; }
 
@@ -233,6 +241,8 @@ public:
             case TypeKind::Int8: return sizeof(uint8_t);
             case TypeKind::Usize:
             case TypeKind::Isize: return sizeof(size_t);
+
+            case TypeKind::Bool: return sizeof(bool);
 
             case TypeKind::Float32: return sizeof(float);
             case TypeKind::Float64: return sizeof(double);
@@ -278,6 +288,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Int8: name = "Int8"; break;
         case TypeKind::Usize: name = "Usize"; break;
         case TypeKind::Isize: name = "Isize"; break;
+        case TypeKind::Bool: name = "Bool"; break;
         case TypeKind::Float32: name = "f32"; break;
         case TypeKind::Float64: name = "f64"; break;
         case TypeKind::StrView: name = "string_view"; break;
