@@ -148,7 +148,7 @@ private:
     }
 
 private:
-    DeclItem* head;
+    DeclItem* head{};
 
     uint32_t next_uid{};
 
