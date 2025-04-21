@@ -1,5 +1,11 @@
 module main;
 
 def S = struct {
-    children: []S,
+    next: ?*S = nil,
+    value: i32,
 };
+
+func main() {
+    var a: S = .{ .value = 0 };
+    var b: S = .{ .next = &a, .value = 1 };
+}

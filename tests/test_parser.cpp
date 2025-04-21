@@ -499,7 +499,27 @@ def S = struct {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("optionals");
 
+    run_test(ctx, p, "linked list", R"(
+module test;
+
+def Node = struct {
+    next: ?*Node,
+    value: i32,
+};
+)");
+
+    run_test(ctx, p, "optional i32", R"(
+module test;
+
+def S = struct {
+    value:        i32,
+    other_value: ?i32,
+};
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("lit");
 
     run_test(ctx, p, "rather complete", R"(

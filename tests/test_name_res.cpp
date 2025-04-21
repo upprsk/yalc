@@ -284,8 +284,7 @@ func main() {
     var a: S[i32] = .{ .value = 0 };
     var b: S[i32] = .{ .next = &a, .value = 1 };
 }
-)",
-             true);
+)", true);
 
     ctx.tags.emplace_back("multi-file");
 
