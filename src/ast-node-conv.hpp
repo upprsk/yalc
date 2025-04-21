@@ -517,9 +517,9 @@ enum class PrivateKind { Public, Module, File };
 [[nodiscard]] constexpr auto decorators_private_kind(Decorators decorators)
     -> PrivateKind {
     for (auto decl_ptr : decorators.items) {
-        auto decl = conv::decorator(*decl_ptr);
-        if (decl.name == "private") {
-            for (auto param : decl.params) {
+        auto deco = conv::decorator(*decl_ptr);
+        if (deco.name == "private") {
+            for (auto param : deco.params) {
                 if (param->is_oneof(NodeKind::KwLit)) {
                     auto p = conv::kwlit(*param);
                     if (p.id == "file") return PrivateKind::File;
