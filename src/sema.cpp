@@ -20,6 +20,13 @@ namespace conv = ast::conv;
 namespace rv = std::ranges::views;
 
 struct Context {
+    [[nodiscard]] constexpr auto child(types::Type* current_function) const
+        -> Context {
+        return {.current_function = current_function, .ts = ts, .er = er};
+    }
+
+    types::Type* current_function{};
+
     types::TypeStore* ts{};
     ErrorReporter*    er{};
 };
@@ -28,6 +35,142 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value;
 void visit_node(Ast& ast, Node* node, Context& ctx);
 
 // ============================================================================
+
+auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto data = conv::func_params(*node);
+
+    std::vector<std::pair<Node*, types::Type*>> types;
+
+    for (auto child : data.params) {
+        auto param = conv::func_param(*child);
+
+        if (!param.type) {
+            types.emplace_back(child, nullptr);
+            continue;
+        }
+
+        types::Type* ty = nullptr;
+
+        auto v = eval_node(ast, param.type, ctx);
+        ASSERT(v.type != nullptr);
+        if (!v.type->is_type()) {
+            er.report_error(
+                child->get_loc(),
+                "can not use value of type {} as type for parameter", *v.type);
+            ty = ts.get_error();
+        } else {
+            ty = v.get_data_type();
+        }
+
+        types.emplace_back(child, ty);
+    }
+
+    types::Type* prev_ty = nullptr;
+    for (auto& [node, ty] : types | rv::reverse) {
+        if (ty == nullptr) {
+            if (prev_ty == nullptr) {
+                er.report_error(node->get_loc(), "no type found for parameter");
+
+                ty = ts.get_error();
+            } else {
+                ty = prev_ty;
+            }
+        }
+
+        auto d = node->get_decl();
+        ASSERT(d != nullptr);
+        ASSERT(d->get_type() == nullptr);
+
+        d->value = {.type = ty};
+
+        prev_ty = ty;
+    }
+
+    return {.type = ts.get_type(),
+            .data = ts.new_pack(types |
+                                rv::transform([](auto p) { return p.second; }) |
+                                std::ranges::to<std::vector>())};
+}
+
+auto eval_node_func_ret_pack(Ast& ast, Node* node, Context& ctx) -> Value {
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto data = conv::func_ret_pack(*node);
+
+    std::vector<std::pair<Node*, types::Type*>> types;
+
+    for (auto child : data.ret) {
+        if (child->is_oneof(ast::NodeKind::NamedRet)) {
+            auto param = conv::named_ret(*child);
+
+            if (!param.type) {
+                types.emplace_back(child, nullptr);
+                continue;
+            }
+
+            types::Type* ty = nullptr;
+
+            auto v = eval_node(ast, param.type, ctx);
+            ASSERT(v.type != nullptr);
+            if (!v.type->is_type()) {
+                er.report_error(
+                    child->get_loc(),
+                    "can not use value of type {} as type for parameter",
+                    *v.type);
+                ty = ts.get_error();
+            } else {
+                ty = v.get_data_type();
+            }
+
+            types.emplace_back(child, ty);
+            continue;
+        }
+
+        types::Type* ty = nullptr;
+
+        auto v = eval_node(ast, child, ctx);
+        ASSERT(v.type != nullptr);
+        if (!v.type->is_type()) {
+            er.report_error(
+                child->get_loc(),
+                "can not use value of type {} as type for parameter", *v.type);
+            ty = ts.get_error();
+        } else {
+            ty = v.get_data_type();
+        }
+
+        types.emplace_back(child, ty);
+    }
+
+    types::Type* prev_ty = nullptr;
+    for (auto& [node, ty] : types | rv::reverse) {
+        if (ty == nullptr) {
+            if (prev_ty == nullptr) {
+                er.report_error(node->get_loc(), "no type found for parameter");
+
+                ty = ts.get_error();
+            } else {
+                ty = prev_ty;
+            }
+        }
+
+        auto d = node->get_decl();
+        ASSERT(d != nullptr);
+
+        d->value = {.type = ty};
+
+        prev_ty = ty;
+    }
+
+    return {.type = ts.get_type(),
+            .data = ts.new_pack(types |
+                                rv::transform([](auto p) { return p.second; }) |
+                                std::ranges::to<std::vector>())};
+}
 
 auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
     auto& ts = *ctx.ts;
@@ -54,61 +197,11 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
     }
 
     if (node->is_oneof(ast::NodeKind::FuncParams)) {
-        auto data = conv::func_params(*node);
+        return eval_node_func_params(ast, node, ctx);
+    }
 
-        std::vector<std::pair<Node*, types::Type*>> types;
-
-        for (auto child : data.params) {
-            auto param = conv::func_param(*child);
-
-            if (!param.type) {
-                types.emplace_back(child, nullptr);
-                continue;
-            }
-
-            types::Type* ty = nullptr;
-
-            auto v = eval_node(ast, param.type, ctx);
-            ASSERT(v.type != nullptr);
-            if (!v.type->is_type()) {
-                er.report_error(
-                    child->get_loc(),
-                    "can not use value of type {} as type for parameter",
-                    *v.type);
-                ty = ts.get_error();
-            } else {
-                ty = v.get_data_type();
-            }
-
-            types.emplace_back(child, ty);
-        }
-
-        types::Type* prev_ty = nullptr;
-        for (auto& [node, ty] : types | rv::reverse) {
-            if (ty == nullptr) {
-                if (prev_ty == nullptr) {
-                    er.report_error(node->get_loc(),
-                                    "no type found for parameter");
-
-                    ty = ts.get_error();
-                } else {
-                    ty = prev_ty;
-                }
-            }
-
-            auto d = node->get_decl();
-            ASSERT(d != nullptr);
-            ASSERT(d->get_type() == nullptr);
-
-            d->value = {.type = ty};
-
-            prev_ty = ty;
-        }
-
-        return {.type = ts.get_type(),
-                .data = ts.new_pack(
-                    types | rv::transform([](auto p) { return p.second; }) |
-                    std::ranges::to<std::vector>())};
+    if (node->is_oneof(ast::NodeKind::FuncRetPack)) {
+        return eval_node_func_ret_pack(ast, node, ctx);
     }
 
     if (node->is_oneof(NodeKind::Str)) {
@@ -153,7 +246,6 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
     visit(ctx, data.gargs);
     visit(ctx, data.args);
     visit(ctx, data.ret);
-    visit(ctx, data.body);
 
     // TODO: Evaluate decorators
     if (data.get_gargs().params.size() != 0) {
@@ -186,6 +278,9 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
 
     // TODO: save the function as value. Somehow
     d->value = {.type = ty};
+
+    auto sctx = ctx.child(ty);
+    visit(sctx, data.body);
 }
 
 void visit_node(Ast& ast, Node* node, Context& ctx) {
@@ -211,7 +306,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node->is_oneof(NodeKind::Module, NodeKind::SourceFile,
                        NodeKind::ModuleDecl, NodeKind::Decorators,
                        NodeKind::Decorator, NodeKind::FuncParams,
-                       NodeKind::Block)) {
+                       NodeKind::FuncRetPack, NodeKind::Block)) {
         node->set_type(ts.get_void());
         visit_children(ctx, node);
         return;
@@ -253,6 +348,20 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::ExprPack)) {
+        auto data = conv::expr_pack(*node);
+
+        std::vector<types::Type*> types;
+        for (auto child : data.items) {
+            visit(ctx, child);
+            ASSERT(child->get_type() != nullptr);
+            types.push_back(child->get_type());
+        }
+
+        node->set_type(ts.new_pack(types));
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::AddrOf)) {
         auto data = conv::unary(*node);
         visit(ctx, data.child);
@@ -267,6 +376,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Str)) {
         node->set_type(ts.get_strview());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Int)) {
+        node->set_type(ts.get_i32());
         return;
     }
 
@@ -388,6 +502,36 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         }
 
         node->set_type(ts.get_void());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
+        auto data = conv::unary(*node);
+        visit(ctx, data.child);
+
+        node->set_type(ts.get_void());
+
+        if (ctx.current_function == nullptr) {
+            er.report_error(node->get_loc(),
+                            "can not use return statement outside of function");
+            return;
+        }
+
+        auto rty = data.child->get_type();
+        ASSERT(rty != nullptr);
+
+        auto expected_rty = ctx.current_function->as_func().ret;
+        ASSERT(expected_rty != nullptr);
+
+        auto r = ts.coerce(expected_rty, rty);
+        if (!r) {
+            er.report_error(
+                node->get_loc(),
+                "can not coerce value of type {} to return of type {}", *rty,
+                *expected_rty);
+            return;
+        }
+
         return;
     }
 

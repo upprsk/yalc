@@ -1,8 +1,5 @@
 module main;
 
-@extern(link_name="puts")
-func c_puts(s: [*]const u8);
-
-func main() {
-    c_puts("Hello world!".ptr);
+func main() i32 {
+    return 0;
 }

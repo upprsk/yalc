@@ -11,6 +11,7 @@
 #include "nlohmann/json.hpp"
 
 namespace yal::types {
+namespace rv = std::ranges::views;
 
 auto Type::as_func() const -> Func {
     ASSERT(is_func());
@@ -29,6 +30,12 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     ASSERT(dst != nullptr);
     ASSERT(src != nullptr);
 
+    if (dst->is_integral()) {
+        if (dst->kind != src->kind) return nullptr;
+
+        return dst;
+    }
+
     if (dst->kind == TypeKind::StrView) {
         if (src->kind == TypeKind::StrView) return dst;
         return nullptr;
@@ -44,6 +51,21 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
             src->kind == TypeKind::MultiPtrConst)
             return dst;
         return nullptr;
+    }
+
+    if (dst->kind == TypeKind::Pack) {
+        if (src->kind != TypeKind::Pack) return nullptr;
+
+        std::vector<Type *> res;
+        for (auto [s, d] : rv::zip(src->inner, dst->inner)) {
+            auto r = coerce(d, s);
+
+            // TODO: do we want to abort completally here or keep the nullptr
+            if (r == nullptr) return nullptr;
+            res.push_back(r);
+        }
+
+        return new_pack(res);
     }
 
     return nullptr;
