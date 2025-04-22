@@ -398,12 +398,21 @@ struct Assign {
 }
 
 [[nodiscard]] constexpr auto binary(Node const& n) -> Binary {
-    // TODO: assert that it is a valid binary
+    ASSERT(n.is_oneof(
+        ast::NodeKind::Add, ast::NodeKind::Sub, ast::NodeKind::Mul,
+        ast::NodeKind::Div, ast::NodeKind::Mod, ast::NodeKind::LeftShift,
+        ast::NodeKind::RightShift, ast::NodeKind::Equal,
+        ast::NodeKind::NotEqual, ast::NodeKind::Less, ast::NodeKind::LessEqual,
+        ast::NodeKind::Greater, ast::NodeKind::GreaterEqual,
+        ast::NodeKind::Band, ast::NodeKind::Bor, ast::NodeKind::Bxor,
+        ast::NodeKind::Land, ast::NodeKind::Lor, ast::NodeKind::Cast));
     return {.lhs = n.get_child(0), .rhs = n.get_child(1)};
 }
 
 [[nodiscard]] constexpr auto unary(Node const& n) -> Unary {
-    // TODO: assert that it is a valid unary
+    ASSERT(n.is_oneof(NodeKind::AddrOf, NodeKind::Lnot, NodeKind::Bnot,
+                      NodeKind::Neg, NodeKind::Optional, NodeKind::ExprStmt,
+                      NodeKind::ReturnStmt));
     return {.child = n.get_child(0)};
 }
 
