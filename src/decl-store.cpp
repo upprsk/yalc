@@ -65,9 +65,9 @@ void to_json(json& j, DeclStore const& n) {
 auto fmt::formatter<yal::Decl>::format(yal::Decl const& d,
                                        format_context&  ctx) const
     -> format_context::iterator {
-    // FIXME: add value
-    return fmt::format_to(ctx.out(), "Decl({:?}, {:?}, {:?}, {})", d.full_name,
-                          d.local_name, d.link_name, d.flags);
+    return fmt::format_to(ctx.out(), "Decl({:?}, {:?}, {:?}, {}, {})",
+                          d.full_name, d.local_name, d.link_name, d.flags,
+                          d.value);
 }
 
 auto fmt::formatter<yal::DeclFlags>::format(yal::DeclFlags  flags,
