@@ -513,7 +513,13 @@ struct Assign {
 }
 
 [[nodiscard]] constexpr auto assign(Node const& n) -> Assign {
-    // FIXME: check if it is a valid assign
+    ASSERT(n.is_oneof(ast::NodeKind::Assign, ast::NodeKind::AssignAdd,
+                      ast::NodeKind::AssignSub, ast::NodeKind::AssignMul,
+                      ast::NodeKind::AssignDiv, ast::NodeKind::AssignMod,
+                      ast::NodeKind::AssignShiftLeft,
+                      ast::NodeKind::AssignShiftRight,
+                      ast::NodeKind::AssignBand, ast::NodeKind::AssignBxor,
+                      ast::NodeKind::AssignBor));
     return {
         .lhs = n.get_child(0),
         .rhs = n.get_child(1),
