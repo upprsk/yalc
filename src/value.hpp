@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 #include <variant>
 
 #include "nlohmann/json_fwd.hpp"
@@ -10,9 +11,9 @@ namespace yal {
 using json = nlohmann::json;
 
 struct Value {
-    types::Type*                                               type{};
-    std::variant<std::monostate, types::Type*, bool, uint64_t> data =
-        std::monostate{};
+    types::Type* type{};
+    std::variant<std::monostate, types::Type*, bool, uint64_t, std::string_view>
+        data = std::monostate{};
 
     [[nodiscard]] constexpr auto has_data() const -> bool {
         return std::holds_alternative<std::monostate>(data);
@@ -28,6 +29,10 @@ struct Value {
 
     [[nodiscard]] constexpr auto get_data_uint() const -> uint64_t {
         return std::get<uint64_t>(data);
+    }
+
+    [[nodiscard]] constexpr auto get_data_strv() const -> std::string_view {
+        return std::get<std::string_view>(data);
     }
 };
 

@@ -8,6 +8,7 @@
 #include <variant>
 
 #include "file-store.hpp"
+#include "types.hpp"
 
 namespace yal {
 struct Decl;
@@ -507,6 +508,11 @@ public:
     [[nodiscard]] constexpr auto get_decl() const -> Decl * { return decl; }
     constexpr void               set_decl(Decl *d) { decl = d; }
 
+    [[nodiscard]] constexpr auto get_type() const -> types::Type * {
+        return type;
+    }
+    constexpr void set_type(types::Type *d) { type = d; }
+
     [[nodiscard]] constexpr auto get_data() const
         -> std::variant<std::monostate, float, double, uint64_t,
                         std::string_view> {
@@ -532,7 +538,8 @@ private:
     Location          loc{};
     std::span<Node *> children;
 
-    Decl *decl{};
+    Decl        *decl{};
+    types::Type *type{};
 
     std::variant<std::monostate, float, double, uint64_t, std::string_view>
         data;

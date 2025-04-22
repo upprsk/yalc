@@ -1,0 +1,405 @@
+#include "sema.hpp"
+
+#include <ranges>
+
+#include "ast-node-conv.hpp"
+#include "ast-node-visitor.hpp"
+#include "ast-node.hpp"
+#include "error_reporter.hpp"
+#include "file-store.hpp"
+#include "libassert/assert.hpp"
+#include "types.hpp"
+#include "value.hpp"
+
+namespace yal::sema {
+using ast::Ast;
+using ast::Node;
+using ast::NodeKind;
+namespace conv = ast::conv;
+
+namespace rv = std::ranges::views;
+
+struct Context {
+    types::TypeStore* ts{};
+    ErrorReporter*    er{};
+};
+
+auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value;
+void visit_node(Ast& ast, Node* node, Context& ctx);
+
+// ============================================================================
+
+auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    if (node->is_oneof(ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst)) {
+        auto data = conv::mptr(*node);
+        auto inner = eval_node(ast, data.inner, ctx);
+        ASSERT(inner.type != nullptr);
+
+        types::Type* inner_ty = nullptr;
+        if (!inner.type->is_type()) {
+            er.report_error(
+                node->get_loc(),
+                "can not use value of type {} as type in multi-pointer",
+                *inner.type);
+            inner_ty = ts.get_error();
+        } else {
+            inner_ty = inner.get_data_type();
+        }
+
+        auto ty = ts.new_mptr(inner_ty, data.is_const);
+        return {.type = ts.get_type(), .data = ty};
+    }
+
+    if (node->is_oneof(ast::NodeKind::FuncParams)) {
+        auto data = conv::func_params(*node);
+
+        std::vector<std::pair<Node*, types::Type*>> types;
+
+        for (auto child : data.params) {
+            auto param = conv::func_param(*child);
+
+            if (!param.type) {
+                types.emplace_back(child, nullptr);
+                continue;
+            }
+
+            types::Type* ty = nullptr;
+
+            auto v = eval_node(ast, param.type, ctx);
+            ASSERT(v.type != nullptr);
+            if (!v.type->is_type()) {
+                er.report_error(
+                    child->get_loc(),
+                    "can not use value of type {} as type for parameter",
+                    *v.type);
+                ty = ts.get_error();
+            } else {
+                ty = v.get_data_type();
+            }
+
+            types.emplace_back(child, ty);
+        }
+
+        types::Type* prev_ty = nullptr;
+        for (auto& [node, ty] : types | rv::reverse) {
+            if (ty == nullptr) {
+                if (prev_ty == nullptr) {
+                    er.report_error(node->get_loc(),
+                                    "no type found for parameter");
+
+                    ty = ts.get_error();
+                } else {
+                    ty = prev_ty;
+                }
+            }
+
+            auto d = node->get_decl();
+            ASSERT(d != nullptr);
+            ASSERT(d->get_type() == nullptr);
+
+            d->value = {.type = ty};
+
+            prev_ty = ty;
+        }
+
+        return {.type = ts.get_type(),
+                .data = ts.new_pack(
+                    types | rv::transform([](auto p) { return p.second; }) |
+                    std::ranges::to<std::vector>())};
+    }
+
+    if (node->is_oneof(NodeKind::Str)) {
+        return {.type = ts.get_strview(), .data = node->get_data_str()};
+    }
+
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        auto data = conv::id(*node);
+        if (!data.to) {
+            er.report_debug(node->get_loc(), "no decl found in {:?}",
+                            data.name);
+            return {.type = ts.get_error()};
+        }
+
+        auto ty = data.to->get_type();
+        if (!ty) {
+            ASSERT(data.to->node != nullptr);
+
+            er.report_debug(node->get_loc(), "no type found in {:?}",
+                            data.name);
+            er.report_note(data.to->node->get_loc(), "defined here ({})",
+                           data.to->full_name);
+            return {.type = ts.get_error()};
+        }
+
+        return data.to->value;
+    }
+
+    PANIC("cant eval node of type", node->get_kind());
+}
+
+// ============================================================================
+
+void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+    auto  data = conv::func_decl(*node);
+
+    visit(ctx, data.decorators);
+    visit(ctx, data.gargs);
+    visit(ctx, data.args);
+    visit(ctx, data.ret);
+    visit(ctx, data.body);
+
+    // TODO: Evaluate decorators
+    if (data.get_gargs().params.size() != 0) {
+        er.report_bug(data.gargs->get_loc(),
+                      "Generic args have not been implemented");
+    }
+
+    auto params = eval_node(ast, data.args, ctx);
+    ASSERT(params.type != nullptr);
+    ASSERT(params.type->is_type());
+
+    Value ret;
+    if (data.ret)
+        ret = eval_node(ast, data.ret, ctx);
+    else
+        ret = {.type = ts.get_type(),
+               .data = ts.new_pack(std::array{ts.get_void()})};
+
+    ASSERT(ret.type != nullptr);
+    ASSERT(ret.type->is_type());
+
+    auto ty =
+        ts.new_func(params.get_data_type(), ret.get_data_type(),
+                    node->get_kind() == ast::NodeKind::FuncDeclWithCVarArgs);
+    node->set_type(ty);
+
+    auto d = node->get_decl();
+    ASSERT(d != nullptr);
+    ASSERT(d->get_type() == nullptr);
+
+    // TODO: save the function as value. Somehow
+    d->value = {.type = ty};
+}
+
+void visit_node(Ast& ast, Node* node, Context& ctx) {
+    if (node == nullptr) return;
+
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+    auto visit_span = [&](Context& ctx, std::span<Node* const> nodes) {
+        for (auto node : nodes) visit_node(ast, node, ctx);
+    };
+
+    auto visit_children = [&](Context& ctx, Node* node) {
+        ast::visit_children(
+            ast, node,
+            [](Ast& ast, Node* node, auto&&, Context& ctx) {
+                visit_node(ast, node, ctx);
+            },
+            ctx);
+    };
+
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    if (node->is_oneof(NodeKind::Module, NodeKind::SourceFile,
+                       NodeKind::ModuleDecl, NodeKind::Decorators,
+                       NodeKind::Decorator, NodeKind::FuncParams,
+                       NodeKind::Block)) {
+        node->set_type(ts.get_void());
+        visit_children(ctx, node);
+        return;
+    }
+
+    if (node->is_oneof(NodeKind::FuncDecl, NodeKind::FuncDeclWithCVarArgs)) {
+        visit_func_decl(ast, node, ctx);
+        return;
+    }
+
+    if (node->is_oneof(NodeKind::DecoratorParam)) {
+        auto data = conv::decorator_param(*node);
+        visit(ctx, data.value);
+
+        auto ty = data.value ? data.value->get_type() : ts.get_void();
+        node->set_type(ty);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::FuncParam)) {
+        auto data = conv::func_param(*node);
+        visit(ctx, data.type);
+
+        auto ty = data.type->get_type();
+        ASSERT(ty != nullptr);
+        if (!ty->is_type()) {
+            er.report_error(
+                node->get_loc(),
+                "can not use value of type {} as type for parameter", *ty);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        auto e = eval_node(ast, data.type, ctx);
+        ASSERT(e.type != nullptr);
+        ASSERT(e.type->is_type());
+
+        node->set_type(e.get_data_type());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::AddrOf)) {
+        auto data = conv::unary(*node);
+        visit(ctx, data.child);
+
+        auto cty = data.child->get_type();
+        ASSERT(cty != nullptr);
+
+        // FIXME: when to make const?
+        node->set_type(ts.new_ptr(cty, true));
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Str)) {
+        node->set_type(ts.get_strview());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        auto data = conv::id(*node);
+        if (!data.to) {
+            er.report_debug(node->get_loc(), "no decl found in {:?}",
+                            data.name);
+            return;
+        }
+
+        auto ty = data.to->get_type();
+        if (!ty) {
+            ASSERT(data.to->node != nullptr);
+
+            er.report_debug(node->get_loc(), "no type found in {:?}",
+                            data.name);
+            er.report_note(data.to->node->get_loc(), "defined here ({})",
+                           data.to->full_name);
+        }
+
+        node->set_type(data.to->get_type());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Ptr, ast::NodeKind::PtrConst,
+                       ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst)) {
+        visit_children(ctx, node);
+        node->set_type(ts.get_type());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Call)) {
+        auto data = conv::call(*node);
+        visit(ctx, data.callee);
+
+        auto cty = data.callee->get_type();
+        ASSERT(cty != nullptr);
+
+        if (!cty->is_func()) {
+            er.report_error(node->get_loc(),
+                            "can not call non-function value of type {}", *cty);
+            visit_span(ctx, data.args);
+            return;
+        }
+
+        auto fn = cty->as_func();
+        if (fn.is_var_args) {
+            er.report_bug(node->get_loc(), "varargs have not been implemented");
+        }
+
+        if (fn.get_params().size() != data.args.size()) {
+            er.report_error(
+                node->get_loc(),
+                "wrong number of arguments in call. Expected {} but got {}",
+                fn.get_params().size(), data.args.size());
+        }
+
+        for (auto const& [param, arg] : rv::zip(fn.get_params(), data.args)) {
+            visit(ctx, arg);
+            ASSERT(arg->get_type() != nullptr);
+
+            auto r = ts.coerce(param, arg->get_type());
+            if (!r) {
+                er.report_error(arg->get_loc(),
+                                "can not coerce argument of type {} to {}",
+                                *arg->get_type(), *param);
+                arg->set_type(ts.get_error());
+                continue;
+            }
+
+            // FIXME: introduce a coerce/cast node in-place
+            arg->set_type(r);
+        }
+
+        node->set_type(fn.ret);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Field)) {
+        auto data = conv::field(*node);
+        visit(ctx, data.receiver);
+
+        auto rty = data.receiver->get_type();
+        ASSERT(rty != nullptr);
+
+        if (rty->is_strview()) {
+            if (data.name == "ptr") {
+                node->set_type(ts.new_mptr(ts.get_u8(), true));
+                return;
+            }
+
+            if (data.name == "len") {
+                node->set_type(ts.get_usize());
+                return;
+            }
+
+            er.report_error(node->get_loc(),
+                            "type {} does not have a field named {:?}", *rty,
+                            data.name);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        er.report_error(node->get_loc(), "type {} does not have fields", *rty);
+        node->set_type(ts.get_error());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::ExprStmt)) {
+        auto data = conv::unary(*node);
+        visit(ctx, data.child);
+
+        ASSERT(data.child->get_type() != nullptr);
+        if (!data.child->get_type()->is_void()) {
+            er.report_warn(node->get_loc(),
+                           "discard of non-void result of type {}",
+                           *data.child->get_type());
+        }
+
+        node->set_type(ts.get_void());
+        return;
+    }
+
+    er.report_warn(node->get_loc(), "node not sema analized ({})",
+                   node->get_kind());
+    visit_children(ctx, node);
+}
+
+void sema_ast(Ast& ast, Node* root, ErrorReporter& er, types::TypeStore& ts,
+              Options const& opt) {
+    auto ctx = Context{.ts = &ts, .er = &er};
+    visit_node(ast, root, ctx);
+}
+
+}  // namespace yal::sema

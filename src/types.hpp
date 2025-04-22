@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "arena.hpp"
+#include "error_reporter.hpp"
 #include "fmt/base.h"
 #include "nlohmann/json_fwd.hpp"
 
@@ -12,9 +13,14 @@ using json = nlohmann::json;
 enum class TypeKind {
     Err,
 
+    /// The type of types. As types can be used as types, we need a type for
+    /// them.
     Type,
+
+    /// Absence of a value.
     Void,
 
+    /// Sized integers.
     Uint64,
     Int64,
     Uint32,
@@ -24,16 +30,41 @@ enum class TypeKind {
     Uint8,
     Int8,
 
+    /// Integers with platform dependent size. u64 on 64bit systems an u32 on
+    /// 32bit systems.
     Usize,
     Isize,
 
+    /// Boolean type. Represented as a byte.
     Bool,
 
+    /// Floating point types
     Float32,
     Float64,
 
+    /// Pointers
+    Ptr,
+    PtrConst,
+
+    /// Multi pointers
+    MultiPtr,
+    MultiPtrConst,
+
+    /// The type of immutable strings. Mutable strings should use slices of
+    /// bytes.
     StrView,
+
+    /// Nil type, will coerce to any optional type.
     Nil,
+
+    // Function type.
+    //
+    // The `inner` field contains:
+    //
+    // 1. `Pack` with parameter types.
+    // 2. `Pack` with return types.
+    Func,
+    FuncWithVarArgs,
 
     Pack,
 };
@@ -87,9 +118,43 @@ struct Type {
         }
     }
 
+    [[nodiscard]] constexpr auto is_type() const -> bool {
+        return kind == TypeKind::Type;
+    }
+
+    [[nodiscard]] constexpr auto is_void() const -> bool {
+        return kind == TypeKind::Void ||
+               (kind == TypeKind::Pack && inner.size() == 1 &&
+                inner[0]->is_void());
+    }
+
+    [[nodiscard]] constexpr auto is_func() const -> bool {
+        return kind == TypeKind::Func || kind == TypeKind::FuncWithVarArgs;
+    }
+
     [[nodiscard]] constexpr auto is_pack() const -> bool {
         return kind == TypeKind::Pack;
     }
+
+    [[nodiscard]] constexpr auto is_strview() const -> bool {
+        return kind == TypeKind::StrView;
+    }
+
+    struct Func {
+        Type* params;
+        Type* ret;
+        bool  is_var_args;
+
+        [[nodiscard]] constexpr auto get_params() const -> std::span<Type*> {
+            return params->inner;
+        }
+
+        [[nodiscard]] constexpr auto get_ret() const -> std::span<Type*> {
+            return ret->inner;
+        }
+    };
+
+    [[nodiscard]] auto as_func() const -> Func;
 
     constexpr auto operator==(Type const& other) const -> bool {
         return kind == other.kind && std::ranges::equal(inner, other.inner);
@@ -191,6 +256,27 @@ public:
     [[nodiscard]] auto get_strview() const -> Type* { return builtin.strview; }
     [[nodiscard]] auto get_nil() const -> Type* { return builtin.nil; }
 
+    [[nodiscard]] auto new_ptr(Type* inner, bool is_const) -> Type* {
+        return new_type(is_const ? TypeKind::PtrConst : TypeKind::Ptr,
+                        std::array{inner});
+    }
+
+    [[nodiscard]] auto new_mptr(Type* inner, bool is_const) -> Type* {
+        return new_type(is_const ? TypeKind::MultiPtrConst : TypeKind::MultiPtr,
+                        std::array{inner});
+    }
+
+    [[nodiscard]] auto new_pack(std::span<Type* const> inner) -> Type* {
+        return new_type(TypeKind::Pack, inner);
+    }
+
+    [[nodiscard]] auto new_func(Type* params, Type* ret, bool has_var_args)
+        -> Type* {
+        return new_type(
+            has_var_args ? TypeKind::FuncWithVarArgs : TypeKind::Func,
+            std::array{params, ret});
+    }
+
     [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner)
         -> Type* {
         auto ty = types.create<TypeItem>(
@@ -205,6 +291,12 @@ public:
         if (arr.empty()) return {};
         return types.alloc<Type*>(arr);
     }
+
+    // ========================================================================
+
+    [[nodiscard]] auto coerce(Type* dst, Type* src) -> Type*;
+
+    // ========================================================================
 
     [[nodiscard]] constexpr auto type_size(Type const& ty) const -> size_t {
         switch (ty.kind) {
@@ -230,7 +322,14 @@ public:
             // made of 2 pointers, so double the size of a pointer
             case TypeKind::StrView: return sizeof(uintptr_t) * 2; break;
 
-            case TypeKind::Nil: return 0; break;
+            case TypeKind::Ptr:
+            case TypeKind::PtrConst:
+            case TypeKind::MultiPtr:
+            case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
+
+            case TypeKind::Nil:
+            case TypeKind::Func:
+            case TypeKind::FuncWithVarArgs: return 0; break;
 
             // this can't be instantiated, so it should not have size
             case TypeKind::Pack: return 0;
@@ -301,7 +400,13 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Float32: name = "f32"; break;
         case TypeKind::Float64: name = "f64"; break;
         case TypeKind::StrView: name = "string_view"; break;
+        case TypeKind::Ptr: name = "Ptr"; break;
+        case TypeKind::PtrConst: name = "PtrConst"; break;
+        case TypeKind::MultiPtr: name = "MultiPtr"; break;
+        case TypeKind::MultiPtrConst: name = "MultiPtrConst"; break;
         case TypeKind::Nil: name = "Nil"; break;
+        case TypeKind::Func: name = "Func"; break;
+        case TypeKind::FuncWithVarArgs: name = "FuncWithVarArgs"; break;
         case TypeKind::Pack: name = "(pack)"; break;
     }
 

@@ -7,9 +7,47 @@
 #include "fmt/base.h"
 #include "fmt/format.h"
 #include "fmt/ranges.h"
+#include "libassert/assert.hpp"
 #include "nlohmann/json.hpp"
 
 namespace yal::types {
+
+auto Type::as_func() const -> Func {
+    ASSERT(is_func());
+    ASSERT(inner.size() == 2);
+    ASSERT(inner[0]->kind == TypeKind::Pack);
+    ASSERT(inner[1]->kind == TypeKind::Pack);
+
+    return {
+        .params = inner[0],
+        .ret = inner[1],
+        .is_var_args = kind == TypeKind::FuncWithVarArgs,
+    };
+}
+
+auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
+    ASSERT(dst != nullptr);
+    ASSERT(src != nullptr);
+
+    if (dst->kind == TypeKind::StrView) {
+        if (src->kind == TypeKind::StrView) return dst;
+        return nullptr;
+    }
+
+    if (dst->kind == TypeKind::MultiPtr) {
+        if (src->kind == TypeKind::MultiPtr) return dst;
+        return nullptr;
+    }
+
+    if (dst->kind == TypeKind::MultiPtrConst) {
+        if (src->kind == TypeKind::MultiPtr ||
+            src->kind == TypeKind::MultiPtrConst)
+            return dst;
+        return nullptr;
+    }
+
+    return nullptr;
+}
 
 void to_json(json &j, Type const &t) {
     auto arr = json::array();
@@ -39,61 +77,108 @@ void to_json(json &j, TypeStore const &ts) {
 auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
                                               format_context  &ctx) const
     -> format_context::iterator {
-    auto format_no_inner = [&](yal::types::TypeKind ty) {
-        std::string_view result;
+    using namespace yal::types;
+    namespace rv = std::ranges::views;
+
+    auto format_no_inner = [&](TypeKind ty) {
+        std::string_view result = "<missing>";
 
         switch (ty) {
-            case yal::types::TypeKind::Err: result = "<error>"; break;
-            case yal::types::TypeKind::Type: result = "type"; break;
-            case yal::types::TypeKind::Uint64: result = "u64"; break;
-            case yal::types::TypeKind::Int64: result = "i64"; break;
-            case yal::types::TypeKind::Uint32: result = "u32"; break;
-            case yal::types::TypeKind::Int32: result = "i32"; break;
-            case yal::types::TypeKind::Uint16: result = "u16"; break;
-            case yal::types::TypeKind::Int16: result = "i16"; break;
-            case yal::types::TypeKind::Uint8: result = "u8"; break;
-            case yal::types::TypeKind::Int8: result = "i8"; break;
-            case yal::types::TypeKind::Usize: result = "usize"; break;
-            case yal::types::TypeKind::Isize: result = "isize"; break;
-            case yal::types::TypeKind::Float32: result = "f32"; break;
-            case yal::types::TypeKind::Float64: result = "f64"; break;
-            case yal::types::TypeKind::StrView: result = "string_view"; break;
+            case TypeKind::Err: result = "<error>"; break;
+            case TypeKind::Type: result = "type"; break;
+            case TypeKind::Void: result = "void"; break;
+            case TypeKind::Uint64: result = "u64"; break;
+            case TypeKind::Int64: result = "i64"; break;
+            case TypeKind::Uint32: result = "u32"; break;
+            case TypeKind::Int32: result = "i32"; break;
+            case TypeKind::Uint16: result = "u16"; break;
+            case TypeKind::Int16: result = "i16"; break;
+            case TypeKind::Uint8: result = "u8"; break;
+            case TypeKind::Int8: result = "i8"; break;
+            case TypeKind::Usize: result = "usize"; break;
+            case TypeKind::Isize: result = "isize"; break;
+            case TypeKind::Bool: result = "bool"; break;
+            case TypeKind::Float32: result = "f32"; break;
+            case TypeKind::Float64: result = "f64"; break;
+            case TypeKind::StrView: result = "string_view"; break;
+            case TypeKind::Nil: result = "nil"; break;
             default: break;
         }
 
         return fmt::format_to(ctx.out(), "{}", result);
     };
 
-    switch (ty.kind) {
-        case yal::types::TypeKind::Err:
-        case yal::types::TypeKind::Type:
-        case yal::types::TypeKind::Void:
-        case yal::types::TypeKind::Uint64:
-        case yal::types::TypeKind::Int64:
-        case yal::types::TypeKind::Uint32:
-        case yal::types::TypeKind::Int32:
-        case yal::types::TypeKind::Uint16:
-        case yal::types::TypeKind::Int16:
-        case yal::types::TypeKind::Uint8:
-        case yal::types::TypeKind::Int8:
-        case yal::types::TypeKind::Usize:
-        case yal::types::TypeKind::Isize:
-        case yal::types::TypeKind::Bool:
-        case yal::types::TypeKind::Float32:
-        case yal::types::TypeKind::Float64:
-        case yal::types::TypeKind::StrView:
-        case yal::types::TypeKind::Nil: return format_no_inner(ty.kind);
+    auto comma_separate = [](std::span<Type *const> t) {
+        return fmt::join(
+            rv::transform(
+                t, [](Type *t) { return static_cast<Type const &>(*t); }),
+            ", ");
+    };
 
-        case yal::types::TypeKind::Pack:
-            return fmt::format_to(
-                ctx.out(), "({})",
-                fmt::join(std::ranges::views::transform(
-                              ty.inner,
-                              [](yal::types::Type *t) {
-                                  return static_cast<yal::types::Type const &>(
-                                      *t);
-                              }),
-                          ", "));
+    switch (ty.kind) {
+        case TypeKind::Err:
+        case TypeKind::Type:
+        case TypeKind::Void:
+        case TypeKind::Uint64:
+        case TypeKind::Int64:
+        case TypeKind::Uint32:
+        case TypeKind::Int32:
+        case TypeKind::Uint16:
+        case TypeKind::Int16:
+        case TypeKind::Uint8:
+        case TypeKind::Int8:
+        case TypeKind::Usize:
+        case TypeKind::Isize:
+        case TypeKind::Bool:
+        case TypeKind::Float32:
+        case TypeKind::Float64:
+        case TypeKind::StrView:
+        case TypeKind::Nil: return format_no_inner(ty.kind);
+
+        case TypeKind::Ptr:
+            ASSERT(ty.inner.size() == 1);
+            return fmt::format_to(ctx.out(), "*{}", *ty.inner[0]);
+        case TypeKind::PtrConst:
+            ASSERT(ty.inner.size() == 1);
+            return fmt::format_to(ctx.out(), "*const {}", *ty.inner[0]);
+
+        case TypeKind::MultiPtr:
+            ASSERT(ty.inner.size() == 1);
+            return fmt::format_to(ctx.out(), "[*]{}", *ty.inner[0]);
+        case TypeKind::MultiPtrConst:
+            ASSERT(ty.inner.size() == 1);
+            return fmt::format_to(ctx.out(), "[*]const {}", *ty.inner[0]);
+
+        case TypeKind::Func:
+            ASSERT(ty.inner.size() == 2);
+            ASSERT(ty.inner[0]->kind == TypeKind::Pack);
+            ASSERT(ty.inner[1]->kind == TypeKind::Pack);
+
+            if (ty.inner[1]->inner.size() == 1)
+                return fmt::format_to(ctx.out(), "func({}) {}",
+                                      comma_separate(ty.inner[0]->inner),
+                                      *ty.inner[1]->inner[0]);
+
+            return fmt::format_to(ctx.out(), "func({}) ({})",
+                                  comma_separate(ty.inner[0]->inner),
+                                  comma_separate(ty.inner[1]->inner));
+
+        case TypeKind::FuncWithVarArgs:
+            ASSERT(ty.inner.size() == 2);
+            ASSERT(ty.inner[0]->kind == TypeKind::Pack);
+            ASSERT(ty.inner[1]->kind == TypeKind::Pack);
+
+            if (ty.inner[1]->inner.size() == 1)
+                return fmt::format_to(ctx.out(), "func({}, ...) {}",
+                                      comma_separate(ty.inner[0]->inner),
+                                      *ty.inner[1]->inner[0]);
+
+            return fmt::format_to(ctx.out(), "func({}, ...) ({})",
+                                  comma_separate(ty.inner[0]->inner),
+                                  comma_separate(ty.inner[1]->inner));
+
+        case TypeKind::Pack:
+            return fmt::format_to(ctx.out(), "({})", comma_separate(ty.inner));
     }
 
     return fmt::format_to(ctx.out(), "<invalid kind>");

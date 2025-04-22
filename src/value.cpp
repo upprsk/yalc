@@ -1,5 +1,6 @@
 #include "value.hpp"
 
+#include <string_view>
 #include <variant>
 
 #include "libassert/assert.hpp"
@@ -24,6 +25,8 @@ void to_json(json& j, Value const& v) {
         j["data"] = v.get_data_bool();
     } else if (std::holds_alternative<uint64_t>(v.data)) {
         j["data"] = v.get_data_uint();
+    } else if (std::holds_alternative<std::string_view>(v.data)) {
+        j["data"] = v.get_data_strv();
     }
 }
 
@@ -43,6 +46,8 @@ auto fmt::formatter<yal::Value>::format(yal::Value const& v,
         fmt::format_to(ctx.out(), ", {}", v.get_data_bool());
     } else if (std::holds_alternative<uint64_t>(v.data)) {
         fmt::format_to(ctx.out(), ", {}", v.get_data_uint());
+    } else if (std::holds_alternative<std::string_view>(v.data)) {
+        fmt::format_to(ctx.out(), ", {:?}", v.get_data_strv());
     }
 
     return fmt::format_to(ctx.out(), ")");

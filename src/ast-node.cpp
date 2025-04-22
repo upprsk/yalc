@@ -24,6 +24,10 @@ void to_json(json& j, Node const& n) {
         j["decl"] = n.get_decl()->uid;
     }
 
+    if (n.get_type()) {
+        j["type"] = fmt::to_string(*n.get_type());
+    }
+
     if (std::holds_alternative<std::monostate>(n.get_data()))
         j["data"] = {};
     else if (std::holds_alternative<float>(n.get_data()))

@@ -1,6 +1,4 @@
 add_library(yal
-    # typing.cpp
-    # typing.hpp
     arena.cpp
     arena.hpp
     ast-node-conv.cpp
@@ -23,6 +21,8 @@ add_library(yal
     name-res.hpp
     parser.cpp
     parser.hpp
+    sema.cpp
+    sema.hpp
     span.cpp
     span.hpp
     tokenizer.cpp

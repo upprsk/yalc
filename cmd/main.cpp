@@ -15,8 +15,8 @@
 #include "name-res.hpp"
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
+#include "sema.hpp"
 #include "tokenizer.hpp"
-#include "typing.hpp"
 #include "utils.hpp"
 #include "yal.hpp"
 
@@ -37,10 +37,9 @@ auto real_main(yalc::Args const& args) -> int {
     if (!root) return 1;
 
     auto ts = yal::types::TypeStore{};
-
     auto prj_root = yal::resolve_names(ast, root, er, fs, ts, opt);
 
-    // yal::perform_typing(ast, root, er, ts, opt);
+    yal::sema::sema_ast(ast, prj_root, er, ts, opt);
 
     if (args.dump_ast_json) {
         json j = *prj_root;
