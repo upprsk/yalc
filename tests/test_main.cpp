@@ -11,6 +11,7 @@
 #include "test_helpers.hpp"
 #include "test_name_res.hpp"
 #include "test_parser.hpp"
+#include "test_sema.hpp"
 #include "test_tokenizer.hpp"
 #include "tokenizer.hpp"
 #include "utils.hpp"
@@ -105,6 +106,12 @@ auto real_main(Args args) -> int {
 
     {
         auto [tok, tfailed] = test_name_res(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
+    {
+        auto [tok, tfailed] = test_sema(p);
         ok += tok;
         failed += tfailed;
     }

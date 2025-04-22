@@ -7,6 +7,8 @@ add_executable(tests
     test_name_res.hpp
     test_parser.cpp
     test_parser.hpp
+    test_sema.cpp
+    test_sema.hpp
     test_tokenizer.cpp
     test_tokenizer.hpp
 )
