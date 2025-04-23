@@ -650,6 +650,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
+        if (data.name == "_" && ctx.is_lvalue) {
+            node->set_type(ts.get_void());
+            return;
+        }
+
         if (!data.to) return;
 
         auto ty = data.to->get_type();
