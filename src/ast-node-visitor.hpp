@@ -358,6 +358,12 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
             visitor(ast, data.rhs, std::forward<decltype(visitor)>(visitor),
                     std::forward<decltype(args)>(args)...);
         } break;
+
+        case NodeKind::Coerce: {
+            auto data = conv::coerce(*node);
+            visitor(ast, data.child, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
     }
 }
 

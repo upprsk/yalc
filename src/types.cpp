@@ -31,9 +31,26 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     ASSERT(src != nullptr);
 
     if (dst->is_integral()) {
-        if (dst->kind != src->kind) return nullptr;
+        if (!src->is_integral()) return nullptr;
 
-        return dst;
+        if (dst->is_signed() && src->is_signed()) {
+            if (dst->size() < src->size()) return nullptr;
+            return dst;
+        }
+
+        if (dst->is_signed() && src->is_unsigned()) {
+            if (dst->size() <= src->size()) return nullptr;
+            return dst;
+        }
+
+        if (dst->is_unsigned() && src->is_signed()) return nullptr;
+
+        if (dst->is_unsigned() && src->is_unsigned()) {
+            if (dst->size() < src->size()) return nullptr;
+            return dst;
+        }
+
+        UNREACHABLE("all cases should be handled for integers");
     }
 
     if (dst->kind == TypeKind::StrView) {

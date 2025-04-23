@@ -70,6 +70,11 @@ auto parse_all_files_into_module(ast::Ast& ast, ast::Node& start_node,
                                  ErrorReporter& er, Options const& opt) {
     // when in single file mode, ignore scanning the directory
     if (opt.single_file) {
+        // in case the module is an error, return an empty module
+        if (mod_decl.is_err()) {
+            return ast.new_module(mod_decl.get_loc(), "<error>", {});
+        }
+
         auto mod_name = conv::module_decl(mod_decl).name;
         return ast.new_module(start_node.get_loc(), mod_name,
                               std::array{&start_node});
@@ -125,6 +130,17 @@ struct Env {
             .items = {},
             .name = "",
             .parent = this,
+        };
+    }
+
+    constexpr auto unnamed_lvalue() const -> Env {
+        // fmt::println(stderr, "unnamed_lvalue()");
+
+        return {
+            .items = {},
+            .name = "",
+            .parent = this,
+            .is_lvalue = true,
         };
     }
 
@@ -223,6 +239,8 @@ struct Env {
     std::string name;
     Node*       current_decl{};
     Env const*  parent{};
+
+    bool is_lvalue{};
 };
 
 struct Context {
@@ -345,8 +363,10 @@ void visit_def_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
     // first difine the ids at the current level
     for (auto const& id : data.get_ids().ids) {
         auto name = conv::id(*id);
-        auto d = env.define(ds, name.name, node, {}, flags.build());
-        id->set_decl(d);
+        if (name.name != "_") {
+            auto d = env.define(ds, name.name, node, {}, flags.build());
+            id->set_decl(d);
+        }
     }
 
     // then process the initializers and types one level deeper (so that
@@ -403,34 +423,66 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
     // we can namespace all ids under the declared name)
 
     // in case we have explicit types, then we run them before the init
-    if (data.types) {
-        for (auto const& [_id, ty, init] :
-             std::ranges::views::zip(data.get_ids().ids, data.get_types().items,
-                                     data.get_inits().items)) {
-            auto id = conv::id(*_id);
-            auto senv = env.with_name(std::string{id.name});
+    if (data.types && data.inits) {
+        auto ids = data.get_ids().ids;
+        auto types = data.get_types().items;
+        auto inits = data.get_inits().items;
+        auto count = std::max({ids.size(), types.size(), inits.size()});
+        for (size_t i = 0; i < count; i++) {
+            if (i < ids.size()) {
+                auto id = conv::id(*ids[i]);
+                auto senv = env.with_name(std::string{id.name});
+                if (i < types.size()) visit(ctx, senv, types[i]);
+                if (i < inits.size()) visit(ctx, senv, inits[i]);
+            } else {
+                auto senv = env.with_name("<error>");
+                if (i < types.size()) visit(ctx, senv, types[i]);
+                if (i < inits.size()) visit(ctx, senv, inits[i]);
+            }
+        }
+    }
 
-            visit(ctx, senv, ty);
-            visit(ctx, senv, init);
+    // just explicit types, no initializers
+    else if (data.types) {
+        auto ids = data.get_ids().ids;
+        auto types = data.get_types().items;
+        auto count = std::max({ids.size(), types.size()});
+        for (size_t i = 0; i < count; i++) {
+            if (i < ids.size()) {
+                auto id = conv::id(*ids[i]);
+                auto senv = env.with_name(std::string{id.name});
+                if (i < types.size()) visit(ctx, senv, types[i]);
+            } else {
+                auto senv = env.with_name("<error>");
+                if (i < types.size()) visit(ctx, senv, types[i]);
+            }
         }
     }
 
     // no explicit types, just the initializers
     else if (data.inits) {
-        for (auto const& [_id, init] : std::ranges::views::zip(
-                 data.get_ids().ids, data.get_inits().items)) {
-            auto id = conv::id(*_id);
-            auto senv = env.with_name(std::string{id.name});
-
-            visit(ctx, senv, init);
+        auto ids = data.get_ids().ids;
+        auto inits = data.get_inits().items;
+        auto count = std::max({ids.size(), inits.size()});
+        for (size_t i = 0; i < count; i++) {
+            if (i < ids.size()) {
+                auto id = conv::id(*ids[i]);
+                auto senv = env.with_name(std::string{id.name});
+                if (i < inits.size()) visit(ctx, senv, inits[i]);
+            } else {
+                auto senv = env.with_name("<error>");
+                if (i < inits.size()) visit(ctx, senv, inits[i]);
+            }
         }
     }
 
     // then difine the ids at the current level
     for (auto const& id : data.get_ids().ids) {
         auto name = conv::id(*id);
-        auto d = env.define(ds, name.name, node, {}, flags.build());
-        id->set_decl(d);
+        if (name.name != "_") {
+            auto d = env.define(ds, name.name, node, {}, flags.build());
+            id->set_decl(d);
+        }
     }
 }
 
@@ -539,8 +591,25 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Assign, ast::NodeKind::AssignAdd,
+                       ast::NodeKind::AssignSub, ast::NodeKind::AssignMul,
+                       ast::NodeKind::AssignDiv, ast::NodeKind::AssignMod,
+                       ast::NodeKind::AssignShiftLeft,
+                       ast::NodeKind::AssignShiftRight,
+                       ast::NodeKind::AssignBand, ast::NodeKind::AssignBxor,
+                       ast::NodeKind::AssignBor)) {
+        auto data = conv::assign(*node);
+
+        auto lenv = env.unnamed_lvalue();
+        visit(ctx, lenv, data.lhs);
+        visit(ctx, env, data.rhs);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
+        if (env.is_lvalue && data.name == "_") return;
+
         auto decl = env.lookup(data.name);
         if (decl == nullptr) {
             ctx.er->report_error(node->get_loc(), "undefined identifier: {:?}",

@@ -279,6 +279,11 @@ public:
         return new_node(kind, loc, new_node_array_with(left, right));
     }
 
+    auto new_coerce(Location loc, Node* child, types::Type* target) -> Node* {
+        return new_node(NodeKind::Coerce, loc, new_node_array_with(child),
+                        target);
+    }
+
 public:
     [[nodiscard]] constexpr auto get_decl_store() const -> DeclStore const* {
         return &ds;
@@ -292,10 +297,10 @@ private:
                                         std::monostate{});
     }
 
-    [[nodiscard]] auto new_node(NodeKind kind, Location loc,
-                                std::variant<std::monostate, float, double,
-                                             uint64_t, std::string_view> data)
-        -> Node* {
+    [[nodiscard]] auto new_node(
+        NodeKind kind, Location loc,
+        std::variant<std::monostate, float, double, uint64_t, std::string_view,
+                     types::Type*> data) -> Node* {
         return nodes_arena.create<Node>(kind, loc, std::span<Node*>{}, data);
     }
 
@@ -304,11 +309,10 @@ private:
         return nodes_arena.create<Node>(kind, loc, children, std::monostate{});
     }
 
-    [[nodiscard]] auto new_node(NodeKind kind, Location loc,
-                                std::span<Node*> children,
-                                std::variant<std::monostate, float, double,
-                                             uint64_t, std::string_view> data)
-        -> Node* {
+    [[nodiscard]] auto new_node(
+        NodeKind kind, Location loc, std::span<Node*> children,
+        std::variant<std::monostate, float, double, uint64_t, std::string_view,
+                     types::Type*> data) -> Node* {
         return nodes_arena.create<Node>(kind, loc, children, data);
     }
 

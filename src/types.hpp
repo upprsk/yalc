@@ -156,6 +156,50 @@ struct Type {
 
     [[nodiscard]] auto as_func() const -> Func;
 
+    // ========================================================================
+
+    [[nodiscard]] constexpr auto size() const -> size_t {
+        switch (kind) {
+            case TypeKind::Err:
+            case TypeKind::Type:
+            case TypeKind::Void: return 0;
+            case TypeKind::Uint64:
+            case TypeKind::Int64: return sizeof(uint64_t);
+            case TypeKind::Uint32:
+            case TypeKind::Int32: return sizeof(uint32_t);
+            case TypeKind::Uint16:
+            case TypeKind::Int16: return sizeof(uint16_t);
+            case TypeKind::Uint8:
+            case TypeKind::Int8: return sizeof(uint8_t);
+            case TypeKind::Usize:
+            case TypeKind::Isize: return sizeof(size_t);
+
+            case TypeKind::Bool: return sizeof(bool);
+
+            case TypeKind::Float32: return sizeof(float);
+            case TypeKind::Float64: return sizeof(double);
+
+            // made of 2 pointers, so double the size of a pointer
+            case TypeKind::StrView: return sizeof(uintptr_t) * 2; break;
+
+            case TypeKind::Ptr:
+            case TypeKind::PtrConst:
+            case TypeKind::MultiPtr:
+            case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
+
+            case TypeKind::Nil:
+            case TypeKind::Func:
+            case TypeKind::FuncWithVarArgs: return 0; break;
+
+            // this can't be instantiated, so it should not have size
+            case TypeKind::Pack: return 0;
+        }
+
+        return 0;
+    }
+
+    // ========================================================================
+
     constexpr auto operator==(Type const& other) const -> bool {
         return kind == other.kind && std::ranges::equal(inner, other.inner);
     }
@@ -297,46 +341,6 @@ public:
     [[nodiscard]] auto coerce(Type* dst, Type* src) -> Type*;
 
     // ========================================================================
-
-    [[nodiscard]] constexpr auto type_size(Type const& ty) const -> size_t {
-        switch (ty.kind) {
-            case TypeKind::Err:
-            case TypeKind::Type:
-            case TypeKind::Void: return 0;
-            case TypeKind::Uint64:
-            case TypeKind::Int64: return sizeof(uint64_t);
-            case TypeKind::Uint32:
-            case TypeKind::Int32: return sizeof(uint32_t);
-            case TypeKind::Uint16:
-            case TypeKind::Int16: return sizeof(uint16_t);
-            case TypeKind::Uint8:
-            case TypeKind::Int8: return sizeof(uint8_t);
-            case TypeKind::Usize:
-            case TypeKind::Isize: return sizeof(size_t);
-
-            case TypeKind::Bool: return sizeof(bool);
-
-            case TypeKind::Float32: return sizeof(float);
-            case TypeKind::Float64: return sizeof(double);
-
-            // made of 2 pointers, so double the size of a pointer
-            case TypeKind::StrView: return sizeof(uintptr_t) * 2; break;
-
-            case TypeKind::Ptr:
-            case TypeKind::PtrConst:
-            case TypeKind::MultiPtr:
-            case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
-
-            case TypeKind::Nil:
-            case TypeKind::Func:
-            case TypeKind::FuncWithVarArgs: return 0; break;
-
-            // this can't be instantiated, so it should not have size
-            case TypeKind::Pack: return 0;
-        }
-
-        return 0;
-    }
 
     [[nodiscard]] auto begin() const -> Iterator { return {head}; }
     [[nodiscard]] auto end() const -> Iterator { return {}; }

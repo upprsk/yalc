@@ -447,6 +447,17 @@ enum class NodeKind : uint16_t {
     AssignBand,
     AssignBxor,
     AssignBor,
+
+    /// ---------
+    /// Internals
+    /// ---------
+
+    /// Coerce some type into another. This is inserted whenever an implicit
+    /// conversion ocurs.
+    ///
+    /// - `children` has 1 element, the expression to convert.
+    /// - `data` has the type to convert to.
+    Coerce,
 };
 
 class Node {
@@ -459,10 +470,10 @@ public:
     constexpr auto operator=(Node const &) -> Node & = default;
     constexpr auto operator=(Node &&) -> Node & = default;
 
-    constexpr Node(
-        NodeKind kind, Location loc, std::span<Node *> children,
-        std::variant<std::monostate, float, double, uint64_t, std::string_view>
-            data)
+    constexpr Node(NodeKind kind, Location loc, std::span<Node *> children,
+                   std::variant<std::monostate, float, double, uint64_t,
+                                std::string_view, types::Type *>
+                       data)
         : kind{kind}, loc{loc}, children{children}, data{std::move(data)} {}
 
     // ------------------------------------------------------------------------
@@ -505,6 +516,10 @@ public:
         return std::get<uint64_t>(data);
     }
 
+    [[nodiscard]] constexpr auto get_data_type() const -> types::Type * {
+        return std::get<types::Type *>(data);
+    }
+
     [[nodiscard]] constexpr auto get_decl() const -> Decl * { return decl; }
     constexpr void               set_decl(Decl *d) { decl = d; }
 
@@ -515,7 +530,7 @@ public:
 
     [[nodiscard]] constexpr auto get_data() const
         -> std::variant<std::monostate, float, double, uint64_t,
-                        std::string_view> {
+                        std::string_view, types::Type *> {
         return data;
     }
 
@@ -533,6 +548,11 @@ public:
 
     constexpr void update_with_decl_ref(std::string_view v) { data = v; }
 
+    constexpr void set_child(size_t i, Node *n) {
+        ASSERT(i < children.size());
+        children[i] = n;
+    }
+
 private:
     NodeKind          kind{};
     Location          loc{};
@@ -541,7 +561,8 @@ private:
     Decl        *decl{};
     types::Type *type{};
 
-    std::variant<std::monostate, float, double, uint64_t, std::string_view>
+    std::variant<std::monostate, float, double, uint64_t, std::string_view,
+                 types::Type *>
         data;
 };
 
@@ -636,6 +657,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::AssignBand: name = "AssignBand"; break;
         case NodeKind::AssignBxor: name = "AssignBxor"; break;
         case NodeKind::AssignBor: name = "AssignBor"; break;
+        case NodeKind::Coerce: name = "Coerce"; break;
     }
 
     return name;

@@ -249,6 +249,11 @@ struct Assign {
     [[nodiscard]] constexpr auto get_rhs() const -> ExprPack;
 };
 
+struct Coerce {
+    Node*        child{};
+    types::Type* target{};
+};
+
 // ------------------------------------------------------------------
 
 [[nodiscard]] constexpr auto id(Node const& n) -> Id {
@@ -523,6 +528,14 @@ struct Assign {
     return {
         .lhs = n.get_child(0),
         .rhs = n.get_child(1),
+    };
+}
+
+[[nodiscard]] constexpr auto coerce(Node const& n) -> Coerce {
+    ASSERT(n.is_oneof(ast::NodeKind::Coerce));
+    return {
+        .child = n.get_child(0),
+        .target = n.get_data_type(),
     };
 }
 

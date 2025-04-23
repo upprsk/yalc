@@ -97,6 +97,7 @@ struct Context {
     FileId                               current_file = FileId::invalid();
     Node*                                current_decl = nullptr;
 
+    bool     is_lvalue{};
     size_t   depth = 0;
     Context* parent = nullptr;
 
@@ -105,6 +106,16 @@ struct Context {
                 .decls = {},
                 .current_file = current_file,
                 .current_decl = current_decl,
+                .depth = depth + 1,
+                .parent = this};
+    }
+
+    [[nodiscard]] constexpr auto sub_lvalue() -> Context {
+        return {.state = state,
+                .decls = {},
+                .current_file = current_file,
+                .current_decl = current_decl,
+                .is_lvalue = true,
                 .depth = depth + 1,
                 .parent = this};
     }
@@ -412,6 +423,12 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         auto data = conv::named_ret(*node);
         visit(ctx, data.type);
 
+        if (data.name == "_") {
+            state.er->report_warn(node->get_loc(),
+                                  "discarding named return, remove the `_:`");
+            return;
+        }
+
         ctx.add_local(data.name);
         return;
     }
@@ -419,7 +436,11 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::FuncParam)) {
         auto data = conv::func_param(*node);
         visit(ctx, data.type);
-        ctx.add_local(data.name);
+
+        if (data.name != "_") {
+            ctx.add_local(data.name);
+        }
+
         return;
     }
 
@@ -442,7 +463,10 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
 
         if (ctx.depth > 2) {
             for (auto name : data.get_ids().ids) {
-                ctx.add_local(conv::id(*name).name);
+                auto id = conv::id(*name);
+                if (id.name != "_") {
+                    ctx.add_local(id.name);
+                }
             }
         }
 
@@ -453,7 +477,10 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         auto data = conv::def_decl(*node);
         if (ctx.depth > 2) {
             for (auto name : data.get_ids().ids) {
-                ctx.add_local(conv::id(*name).name);
+                auto id = conv::id(*name);
+                if (id.name != "_") {
+                    ctx.add_local(id.name);
+                }
             }
         }
 
@@ -462,8 +489,24 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Assign, ast::NodeKind::AssignAdd,
+                       ast::NodeKind::AssignSub, ast::NodeKind::AssignMul,
+                       ast::NodeKind::AssignDiv, ast::NodeKind::AssignMod,
+                       ast::NodeKind::AssignShiftLeft,
+                       ast::NodeKind::AssignShiftRight,
+                       ast::NodeKind::AssignBand, ast::NodeKind::AssignBxor,
+                       ast::NodeKind::AssignBor)) {
+        auto data = conv::assign(*node);
+
+        auto lctx = ctx.sub_lvalue();
+        visit(lctx, data.lhs);
+        visit(ctx, data.rhs);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
+        if (ctx.is_lvalue && data.name == "_") return;
         if (ctx.lookup_local(data.name)) return;
 
         auto top = ctx.lookup_top(data.name);
