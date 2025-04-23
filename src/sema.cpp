@@ -573,6 +573,71 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Equal, ast::NodeKind::Less,
+                       ast::NodeKind::Greater, ast::NodeKind::LessEqual,
+                       ast::NodeKind::GreaterEqual)) {
+        auto data = conv::binary(*node);
+        visit(ctx, data.lhs);
+        visit(ctx, data.rhs);
+
+        auto lhs = data.lhs->get_type();
+        ASSERT(lhs != nullptr);
+        auto rhs = data.rhs->get_type();
+        ASSERT(rhs != nullptr);
+
+        node->set_type(ts.get_bool());
+
+        // first try to coerce the rhs to lhs to have a single type on both
+        // sides
+        auto r = ts.coerce(lhs, rhs);
+        if (!r) {
+            er.report_error(
+                node->get_loc(),
+                "can not coerce argument of type {} to {} in comparison", *lhs,
+                *rhs);
+        } else {
+            // coerce rhs to the same type as lhs
+            node->set_child(1,
+                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
+        }
+
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Add)) {
+        auto data = conv::binary(*node);
+        visit(ctx, data.lhs);
+        visit(ctx, data.rhs);
+
+        auto lhs = data.lhs->get_type();
+        ASSERT(lhs != nullptr);
+        auto rhs = data.rhs->get_type();
+        ASSERT(rhs != nullptr);
+
+        auto r = ts.coerce(lhs, rhs);
+        if (!r) {
+            er.report_error(
+                node->get_loc(),
+                "can not coerce argument of type {} to {} in operation", *lhs,
+                *rhs);
+
+            r = ts.get_error();
+        } else {
+            // coerce rhs to the same type as lhs
+            node->set_child(1,
+                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
+        }
+
+        if (!r->is_integral() && !r->is_err()) {
+            er.report_error(node->get_loc(), "type {} does not support {}", *r,
+                            node->get_kind());
+            r = ts.get_error();
+        }
+
+        node->set_type(r);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Str)) {
         node->set_type(ts.get_strview());
         return;
@@ -693,6 +758,15 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Assign)) {
+        auto data = conv::assign(*node);
+
+        auto sctx = ctx.child_lvalue();
+        visit(sctx, data.lhs);
+        visit(ctx, data.rhs);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ExprStmt)) {
         auto data = conv::unary(*node);
         visit(ctx, data.child);
@@ -703,6 +777,25 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                            "discard of non-void result of type {}",
                            *data.child->get_type());
         }
+
+        node->set_type(ts.get_void());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::WhileStmt)) {
+        auto data = conv::while_stmt(*node);
+        visit(ctx, data.cond);
+
+        auto cty = data.cond->get_type();
+        ASSERT(cty != nullptr);
+
+        if (!cty->is_bool()) {
+            er.report_error(data.cond->get_loc(),
+                            "wrong type for condition: {}, expected boolean",
+                            *cty);
+        }
+
+        visit(ctx, data.body);
 
         node->set_type(ts.get_void());
         return;
