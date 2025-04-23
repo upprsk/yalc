@@ -34,6 +34,8 @@ using ast::Ast;
 using ast::Node;
 namespace conv = ast::conv;
 
+namespace rv = std::ranges::views;
+
 auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
                                     Node const& mod_decl, ast::Ast& ast,
                                     FileStore& fs, ErrorReporter& er,
@@ -213,8 +215,6 @@ struct Env {
     }
 
     constexpr auto gen_full_name(std::string_view name) const -> std::string {
-        namespace rv = std::ranges::views;
-
         std::vector<std::string_view> names{name};
         for (auto it = this; it != nullptr; it = it->parent) {
             if (!it->name.empty()) names.push_back(it->name);
@@ -224,8 +224,6 @@ struct Env {
     }
 
     constexpr auto gen_link_name(std::string_view name) const -> std::string {
-        namespace rv = std::ranges::views;
-
         std::vector<std::string_view> names{name};
         for (auto it = this; it != nullptr; it = it->parent) {
             if (!it->name.empty()) names.push_back(it->name);
@@ -281,8 +279,7 @@ auto envs_for_func_decl(conv::IdPack const& name, Env const& parent)
     envs[0] = parent.with_name(std::string{conv::id(*name.ids[0]).name});
 
     // and then one for each id
-    for (auto const& [idx, id] : name.ids | std::ranges::views::enumerate |
-                                     std::ranges::views::drop(1)) {
+    for (auto const& [idx, id] : name.ids | rv::enumerate | rv::drop(1)) {
         envs[idx] = envs[idx - 1].with_name(std::string{conv::id(*id).name});
     }
 
@@ -375,8 +372,8 @@ void visit_def_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
     // in case we have explicit types, then we run them before the init
     if (data.types) {
         for (auto const& [_id, ty, init] :
-             std::ranges::views::zip(data.get_ids().ids, data.get_types().items,
-                                     data.get_inits().items)) {
+             rv::zip(data.get_ids().ids, data.get_types().items,
+                     data.get_inits().items)) {
             auto id = conv::id(*_id);
             auto senv = env.with_name(std::string{id.name});
 
@@ -388,8 +385,8 @@ void visit_def_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
     // no explicit types, just the initializers
     // NOTE: parse errors may leave us with no initializers
     else if (data.inits) {
-        for (auto const& [_id, init] : std::ranges::views::zip(
-                 data.get_ids().ids, data.get_inits().items)) {
+        for (auto const& [_id, init] :
+             rv::zip(data.get_ids().ids, data.get_inits().items)) {
             auto id = conv::id(*_id);
             auto senv = env.with_name(std::string{id.name});
 
