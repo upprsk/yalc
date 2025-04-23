@@ -31,16 +31,17 @@ void to_json(json& j, Node const& n) {
     if (std::holds_alternative<std::monostate>(n.get_data())) {
         j["data"] = {};
     } else if (std::holds_alternative<float>(n.get_data())) {
-        j["data"] = std::get<float>(n.get_data());
+        j["data"] = n.get_data_f32();
     } else if (std::holds_alternative<double>(n.get_data())) {
-        j["data"] = std::get<double>(n.get_data());
+        j["data"] = n.get_data_f64();
     } else if (std::holds_alternative<uint64_t>(n.get_data())) {
-        j["data"] = std::get<uint64_t>(n.get_data());
+        j["data"] = n.get_data_u64();
     } else if (std::holds_alternative<std::string_view>(n.get_data())) {
-        j["data"] = std::get<std::string_view>(n.get_data());
-    } else if (std::holds_alternative<types::Type*>(n.get_data())) {
-        ASSERT(std::get<types::Type*>(n.get_data()) != nullptr);
-        j["data"] = fmt::to_string(*std::get<types::Type*>(n.get_data()));
+        j["data"] = n.get_data_str();
+    } else if (std::holds_alternative<yal::types::Type*>(n.get_data())) {
+        ASSERT(n.get_data_type() != nullptr);
+        j["data"] = fmt::to_string(*n.get_data_type());
+        // j["data"] = *n.get_data_type();
     } else {
         PANIC("invalid data in AST node");
     }
