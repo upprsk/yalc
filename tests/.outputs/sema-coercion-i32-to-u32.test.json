@@ -1,0 +1,1 @@
+{"stderr":":memory::5:7: error: can not coerce argument of type i32 to u32\n  0004 | func main() {\n> 0005 |     f(13);\n               ^^\n  0006 | }\n"}

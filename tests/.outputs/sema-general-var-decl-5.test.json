@@ -1,0 +1,1 @@
+{"stderr":":memory::4:13: error: wrong number of initializers for declaration, expected 1 but got 2\n  0003 |     var a = 0xFF;\n> 0004 |     var x = 0xDe, a;\n                     ^^^^^^^\n  0005 | }\n:memory::4:9: note: 1 identifiers declared here\n  0003 |     var a = 0xFF;\n> 0004 |     var x = 0xDe, a;\n                 ^\n  0005 | }\n"}

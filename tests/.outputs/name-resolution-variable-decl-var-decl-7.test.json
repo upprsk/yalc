@@ -1,0 +1,1 @@
+{"stderr":":memory::3:19: error: undefined identifier: \"a\"\n  0002 | func main() {\n> 0003 |     var x = 0xDe, a;\n                           ^\n  0004 | }\n"}

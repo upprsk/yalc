@@ -25,23 +25,9 @@ auto gen_ast_resolved(std::string source) -> json {
     auto root = fs.add(":memory:", source);
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
-    ms.flush();
-
-    if (fer.had_error()) {
-        return json{
-            {"stderr", ms.str()}
-        };
-    }
 
     auto [ast, ast_root] = yal::parse(tokens, fer);
     er.update_error_count(fer);
-    ms.flush();
-
-    if (fer.had_error()) {
-        return json{
-            {"stderr", ms.str()}
-        };
-    }
 
     auto ts = yal::types::TypeStore{};
     auto prj_root =
@@ -190,6 +176,52 @@ func main() i32 {
     run_test(ctx, p, "namespaced 2", R"(module f; func g.f(a) b {})");
     run_test(ctx, p, "namespaced 3",
              R"(module f; func f.g(a, b: int) (c: int) {})");
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("variable decl");
+
+    run_test(ctx, p, "var decl 1", R"(module main;
+
+func main() {
+    var x = 12;
+})");
+
+    run_test(ctx, p, "var decl 2", R"(module main;
+func main() {
+    var x: u8, u8 = 0xDe,0xad;
+}
+)");
+
+    run_test(ctx, p, "var decl 3", R"(module main;
+func main() {
+    var x: u32;
+}
+)");
+
+    run_test(ctx, p, "var decl 4", R"(module main;
+func main() {
+    var x, y: u32, u32;
+}
+)");
+
+    run_test(ctx, p, "var decl 5", R"(module main;
+func main() {
+    var a = 0xFF;
+    var x = 0xDe, a;
+}
+)");
+
+    run_test(ctx, p, "var decl 6", R"(module main;
+func main() {
+    var a: i32, u8;
+}
+)");
+
+    run_test(ctx, p, "var decl 7", R"(module main;
+func main() {
+    var x = 0xDe, a;
+}
+)");
+
     ctx.tags.pop_back();
 
     run_test(ctx, p, "hello world libc with shbang", R"(
@@ -452,6 +484,53 @@ func main() {
              var z = getx;
              )",
              });
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("discarding names");
+
+    run_test(ctx, p, "discard variable decl 1", R"(module main;
+func main() {
+    var _ = 1;
+}
+)");
+
+    run_test(ctx, p, "discard variable decl 2", R"(module main;
+func main() {
+    var _, x = 1, 2;
+    var y = x;
+}
+)");
+
+    run_test(ctx, p, "discard variable decl 3", R"(module main;
+func main() {
+    var _ = 1;
+    var x = _ + 1;
+}
+)");
+
+    run_test(ctx, p, "discard assign", R"(module main;
+func main() {
+    var x = 1;
+    _ = x;
+}
+)");
+
+    run_test(ctx, p, "discard assign 2", R"(module main;
+
+@extern
+func putchar(c: i32) i32;
+
+func main() i32 {
+    _ = putchar(0x48);
+    _ = putchar(0x65);
+    _ = putchar(0x6C);
+    _ = putchar(0x6C);
+    _ = putchar(0x6F);
+    _ = putchar(0xa);
+
+    return 0;
+}
+)");
 
     ctx.tags.pop_back();
 

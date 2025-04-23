@@ -19,27 +19,15 @@ auto gen_ast_typed(std::string source) -> json {
     auto root = fs.add(":memory:", source);
     auto fer = er.for_file(root);
     auto tokens = yal::tokenize(fer.get_source(), fer);
-    ms.flush();
-
-    if (fer.had_error()) {
-        return json{
-            {"stderr", ms.str()}
-        };
-    }
 
     auto [ast, ast_root] = yal::parse(tokens, fer);
     er.update_error_count(fer);
-    ms.flush();
-
-    if (fer.had_error()) {
-        return json{
-            {"stderr", ms.str()}
-        };
-    }
 
     auto ts = yal::types::TypeStore{};
     auto prj_root =
         yal::resolve_names(ast, ast_root, er, fs, ts, {.single_file = true});
+
+    yal::sema::sema_ast(ast, prj_root, er, ts, {.single_file = true});
     ms.flush();
 
     if (er.had_error()) {
@@ -47,8 +35,6 @@ auto gen_ast_typed(std::string source) -> json {
             {"stderr", ms.str()}
         };
     }
-
-    yal::sema::sema_ast(ast, prj_root, er, ts, {.single_file = true});
 
     json j = *prj_root;
     j["ds"] = *ast.get_decl_store();
@@ -80,6 +66,143 @@ auto test_sema(TestParams const& p) -> std::pair<int, int> {
 func main() i32 {
     return 0;
 })");
+
+    ctx.tags.emplace_back("general");
+
+    run_test(ctx, p, "var decl 1", R"(module main;
+
+func main() {
+    var x = 12;
+})");
+
+    run_test(ctx, p, "var decl 2", R"(module main;
+func main() {
+    var x: u8, u8 = 0xDe,0xad;
+}
+)");
+
+    run_test(ctx, p, "var decl 3", R"(module main;
+func main() {
+    var x: u32;
+}
+)");
+
+    run_test(ctx, p, "var decl 4", R"(module main;
+func main() {
+    var x, y: u32, u32;
+}
+)");
+
+    run_test(ctx, p, "var decl 5", R"(module main;
+func main() {
+    var a = 0xFF;
+    var x = 0xDe, a;
+}
+)");
+
+    run_test(ctx, p, "var decl 6", R"(module main;
+func main() {
+    var a: i32, u8;
+}
+)");
+
+    run_test(ctx, p, "var decl, missing init 1", R"(module main;
+
+func main() {
+    var x, y = 12;
+})");
+
+    run_test(ctx, p, "var decl, missing init 2", R"(module main;
+
+func main() {
+    var x, _ = 12;
+})");
+
+    run_test(ctx, p, "var decl, extra init 1", R"(module main;
+
+func main() {
+    var x = 12, 13;
+})");
+
+    run_test(ctx, p, "var decl, missing type", R"(module main;
+func main() {
+    var x, y: u32;
+}
+)");
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("coercion");
+
+    run_test(ctx, p, "i32 to i8", R"(module main;
+
+func f(x: i8) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to u8", R"(module main;
+
+func f(x: u8) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to i16", R"(module main;
+
+func f(x: i16) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to u16", R"(module main;
+
+func f(x: u16) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to i32", R"(module main;
+
+func f(x: i32) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to u32", R"(module main;
+
+func f(x: u32) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to i64", R"(module main;
+
+func f(x: i64) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "i32 to u64", R"(module main;
+
+func f(x: u64) {}
+func main() {
+    f(13);
+})");
+
+    run_test(ctx, p, "in var-decl, i32 to u64", R"(module main;
+func main() {
+    var x      = 12;
+    var y: i64 = x;
+}
+)");
+
+    run_test(ctx, p, "in var-decl 1", R"(module main;
+func main() {
+    var x, y: i32, u32 = 0xDe,0xad;
+}
+)");
+
+    ctx.tags.pop_back();
 
     fmt::println("sema tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
