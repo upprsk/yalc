@@ -130,6 +130,15 @@ func main() {
 }
 )");
 
+    run_test(ctx, p, "simple while", R"(module main;
+func main() {
+    var i: i32;
+    while i < 10 {
+        i = i + 1;
+    }
+}
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("coercion");
 
@@ -187,7 +196,8 @@ func main() {
 func f(x: u64) {}
 func main() {
     f(13);
-})");
+}
+)");
 
     run_test(ctx, p, "in var-decl, i32 to u64", R"(module main;
 func main() {
