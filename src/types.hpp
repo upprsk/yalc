@@ -118,6 +118,10 @@ struct Type {
         }
     }
 
+    [[nodiscard]] constexpr auto is_err() const -> bool {
+        return kind == TypeKind::Err;
+    }
+
     [[nodiscard]] constexpr auto is_type() const -> bool {
         return kind == TypeKind::Type;
     }
@@ -130,6 +134,10 @@ struct Type {
 
     [[nodiscard]] constexpr auto is_func() const -> bool {
         return kind == TypeKind::Func || kind == TypeKind::FuncWithVarArgs;
+    }
+
+    [[nodiscard]] constexpr auto is_bool() const -> bool {
+        return kind == TypeKind::Bool;
     }
 
     [[nodiscard]] constexpr auto is_pack() const -> bool {
