@@ -213,6 +213,26 @@ func main() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("examples");
+
+    run_test(ctx, p, "hello", R"(module main;
+
+@extern
+func putchar(c: i32) i32;
+
+func main() i32 {
+    _ = putchar(0x48);
+    _ = putchar(0x65);
+    _ = putchar(0x6C);
+    _ = putchar(0x6C);
+    _ = putchar(0x6F);
+    _ = putchar(0xa);
+
+    return 0;
+}
+)");
+
+    ctx.tags.pop_back();
 
     fmt::println("sema tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);

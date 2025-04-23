@@ -1,8 +1,16 @@
 module main;
 
-func main() {
-    var i: i32;
-    while i < 10 {
-        i = i + 1;
-    }
+@extern
+func putchar(c: i32) i32;
+
+@export
+func main() i32 {
+    _ = putchar(0x48);
+    _ = putchar(0x65);
+    _ = putchar(0x6C);
+    _ = putchar(0x6C);
+    _ = putchar(0x6F);
+    _ = putchar(0xa);
+
+    return 0;
 }
