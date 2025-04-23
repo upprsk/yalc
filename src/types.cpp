@@ -91,7 +91,10 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
 void to_json(json &j, Type const &t) {
     auto arr = json::array();
     for (auto inner : t.inner) {
-        arr.push_back(*inner);
+        if (inner)
+            arr.push_back(*inner);
+        else
+            arr.push_back({});
     }
 
     j = json{
