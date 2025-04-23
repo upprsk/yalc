@@ -284,6 +284,12 @@ public:
                         target);
     }
 
+    // ------------------------------------------------------------------------
+
+    auto shallow_dupe(Node const& node) -> Node* {
+        return nodes_arena.create<Node>(node);
+    }
+
 public:
     [[nodiscard]] constexpr auto get_decl_store() const -> DeclStore const* {
         return &ds;
