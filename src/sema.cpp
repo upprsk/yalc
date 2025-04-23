@@ -252,6 +252,8 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
     auto& ts = *ctx.ts;
     auto& er = *ctx.er;
     auto  data = conv::func_decl(*node);
+    auto  decl = node->get_decl();
+    ASSERT(decl != nullptr);
 
     visit(ctx, data.decorators);
     visit(ctx, data.gargs);
@@ -259,6 +261,116 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
     visit(ctx, data.ret);
 
     // TODO: Evaluate decorators
+    for (auto decorator : data.get_decorators().items) {
+        auto dec = conv::decorator(*decorator);
+
+        // handle extern decorator
+        if (dec.name == "extern") {
+            // no parameters, just mark as extern and set extern name to
+            // local_name
+            if (dec.params.size() == 0) {
+                decl->flags.set_extern();
+                decl->link_name = decl->local_name;
+            }
+
+            // with paramters, validate
+            else if (dec.params.size() == 1) {
+                auto param = conv::decorator_param(*dec.params[0]);
+                if (param.key == "link_name") {
+                    auto v = eval_node(ast, param.value, ctx);
+                    ASSERT(v.type != nullptr);
+
+                    if (v.type->is_strview()) {
+                        decl->link_name = v.get_data_strv();
+                    } else {
+                        er.report_error(
+                            param.value->get_loc(),
+                            "expected string view for parameter, got {}",
+                            *v.type);
+                    }
+                }
+
+                // unknown parameter, error
+                else {
+                    er.report_error(dec.params[0]->get_loc(),
+                                    "unknown parameter for `extern`: {:?}",
+                                    param.key);
+                }
+            }
+
+            // too many parameters, error
+            else {
+                er.report_error(decorator->get_loc(),
+                                "expected none or a single named parameter for "
+                                "`extern`, got {} parameters",
+                                dec.params.size());
+            }
+
+            // extern should not have no body
+            if (data.body != nullptr) {
+                er.report_error(node->get_loc(),
+                                "extern function should not have a body");
+            }
+        }
+
+        // export the current function, very similar to `extern`
+        else if (dec.name == "export") {
+            // no parameters, just mark extern name to local_name
+            if (dec.params.size() == 0) {
+                decl->link_name = decl->local_name;
+            }
+
+            // with paramters, validate
+            else if (dec.params.size() == 1) {
+                auto param = conv::decorator_param(*dec.params[0]);
+                if (param.key == "link_name") {
+                    auto v = eval_node(ast, param.value, ctx);
+                    ASSERT(v.type != nullptr);
+
+                    if (v.type->is_strview()) {
+                        decl->link_name = v.get_data_strv();
+                    } else {
+                        er.report_error(
+                            param.value->get_loc(),
+                            "expected string view for parameter, got {}",
+                            *v.type);
+                    }
+                }
+
+                // unknown parameter, error
+                else {
+                    er.report_error(dec.params[0]->get_loc(),
+                                    "unknown parameter for `export`: {:?}",
+                                    param.key);
+                }
+            }
+
+            // too many parameters, error
+            else {
+                er.report_error(decorator->get_loc(),
+                                "expected none or a single named parameter for "
+                                "`export`, got {} parameters",
+                                dec.params.size());
+            }
+        }
+
+        // this has no meaning here?
+        else if (dec.name == "private") {
+            PANIC("still dont know what to do here");
+        }
+
+        // we don' support custom decorators yet
+        else {
+            er.report_error(decorator->get_loc(),
+                            "custom decorators not implemented (got {:?})",
+                            dec.name);
+        }
+    }
+
+    if (!decl->flags.has_extern() && data.body == nullptr) {
+        er.report_error(node->get_loc(), "missing body for function");
+    }
+
     if (data.get_gargs().params.size() != 0) {
         er.report_bug(data.gargs->get_loc(),
                       "Generic args have not been implemented");

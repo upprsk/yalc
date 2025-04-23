@@ -33,6 +33,8 @@ struct DeclFlags {
         return flags & PrivateFile;
     }
 
+    constexpr void set_extern() { flags = static_cast<Flags>(flags | Extern); }
+
     struct Builder {
         [[nodiscard]] constexpr auto set_extern() const -> Builder {
             return {static_cast<Flags>(flags | Extern)};
