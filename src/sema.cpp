@@ -328,7 +328,8 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                            ids.size());
         }
 
-        for (auto const& [id, ty, init] : rv::zip(ids, types, inits)) {
+        for (auto const& [idx, id, ty, init] :
+             rv::zip(rv::iota(0), ids, types, inits)) {
             auto name = conv::id(*id);
 
             visit(ctx, ty);
@@ -364,6 +365,8 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
             }
 
             id->set_type(r);
+
+            inits[idx] = ast.new_coerce(init->get_loc(), init, r);
 
             if (name.to) {
                 ASSERT(name.to->get_type() == nullptr);
