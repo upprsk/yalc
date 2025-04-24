@@ -131,7 +131,7 @@ auto run_checks_for_test_output(Context& ctx, TestParams const& p,
         }
 
         fmt::print(fmt::bg(fmt::color::red), "FAIL");
-        fmt::println(" got unexpected value", fullname);
+        fmt::println(" {} got unexpected value", fullname);
 
         if (p.ask_for_updates) {
             auto gen = ask_for_updates(fullname);
