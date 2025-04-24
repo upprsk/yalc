@@ -646,7 +646,8 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
         node->set_decl(decl);
         // ctx.er->report_debug(node->get_loc(), "got decl: {}",
         // decl->full_name); if (decl->node) {
-        //     ctx.er->report_debug(decl->node->get_loc(), "defined here:");
+        //     ctx.er->report_debug(decl->node->get_loc(), "defined
+        //     here:");
         // }
 
         return;
@@ -685,7 +686,8 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
 
     auto order = sort::topo_sort_top_decls(ast, mod, er);
     // for (auto const& n : order) {
-    //     er.report_debug(n->get_loc(), "should run {}", n->get_kind());
+    //     er.report_debug(n->get_loc(), "should run {}",
+    //     n->get_kind());
     // }
 
     auto root_env = Env{};
