@@ -212,6 +212,55 @@ func main() {
 }
 )");
 
+    run_test(ctx, p, "multiple function returns 1", R"(module main;
+func check(num: i32) (i32, bool) {}
+func main() i32 {
+    var r, ok = check(12);
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "multiple function returns 2", R"(module main;
+func check(num: i32) (i32, bool) {}
+func main() i32 {
+    var r, ok: u32, u8 = check(12);
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "multiple function returns 3", R"(module main;
+func check(num: i32) (i64, bool) {
+    return 0, false;
+}
+
+func main() i32 {
+    var r, ok = check(12);
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "multiple function returns 4", R"(module main;
+func check(num: i32) (i64, bool) {
+    return num, false;
+}
+
+func main() i32 {
+    var r, ok = check(12);
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "multiple function returns 5", R"(module main;
+func check(num: i32) (i64, bool) {
+    return num, false;
+}
+
+func main() i32 {
+    var r, ok, x = check(12), 69;
+    return 0;
+}
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("examples");
 

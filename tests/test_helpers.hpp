@@ -37,6 +37,7 @@ struct Context {
 struct TestParams {
     std::unordered_set<std::string> filters;
 
+    bool verbose;
     bool use_diff;
     bool ask_for_updates;
 };
