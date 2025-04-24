@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ranges>
 #include <vector>
 
 #include "arena.hpp"
@@ -209,7 +210,13 @@ struct Type {
     // ========================================================================
 
     constexpr auto operator==(Type const& other) const -> bool {
-        return kind == other.kind && std::ranges::equal(inner, other.inner);
+        namespace r = std::ranges;
+        namespace rv = std::ranges::views;
+
+        auto toref = [](Type* o) -> Type const& { return *o; };
+        return kind == other.kind &&
+               r::equal(rv::transform(inner, toref),
+                        rv::transform(other.inner, toref));
     }
 
     TypeKind         kind;
