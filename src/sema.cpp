@@ -424,8 +424,6 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
         size_t expr_count{};
         for (auto init : inits) {
-            visit(ctx, init);
-
             auto ty = init->get_type();
             ASSERT(ty != nullptr);
 
@@ -605,8 +603,6 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
         size_t expr_count{};
         for (auto init : inits) {
-            visit(ctx, init);
-
             auto ty = init->get_type();
             ASSERT(ty != nullptr);
 
