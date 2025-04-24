@@ -21,6 +21,10 @@ enum class TypeKind {
     /// Absence of a value.
     Void,
 
+    /// Integer literals, these are untyped until a type can be inferred for the
+    /// literal
+    UntypedInt,
+
     /// Sized integers.
     Uint64,
     Int64,
@@ -73,6 +77,7 @@ enum class TypeKind {
 struct Type {
     [[nodiscard]] constexpr auto is_integral() const -> bool {
         switch (kind) {
+            case TypeKind::UntypedInt:
             case TypeKind::Uint64:
             case TypeKind::Int64:
             case TypeKind::Uint32:
@@ -123,6 +128,24 @@ struct Type {
         return kind == TypeKind::Err;
     }
 
+    [[nodiscard]] constexpr auto is_untyped_int() const -> bool {
+        return kind == TypeKind::UntypedInt;
+    }
+
+    [[nodiscard]] constexpr auto contains_untyped_int() const -> bool {
+        namespace r = std::ranges;
+        namespace rv = std::ranges::views;
+        return kind == TypeKind::UntypedInt ||
+               (kind == TypeKind::Pack
+                    ? r::any_of(rv::transform(
+                                    inner,
+                                    [](Type* inner) {
+                                        return inner->contains_untyped_int();
+                                    }),
+                                [](bool v) { return v; })
+                    : false);
+    }
+
     [[nodiscard]] constexpr auto is_type() const -> bool {
         return kind == TypeKind::Type;
     }
@@ -171,7 +194,8 @@ struct Type {
         switch (kind) {
             case TypeKind::Err:
             case TypeKind::Type:
-            case TypeKind::Void: return 0;
+            case TypeKind::Void:
+            case TypeKind::UntypedInt: return 0;
             case TypeKind::Uint64:
             case TypeKind::Int64: return sizeof(uint64_t);
             case TypeKind::Uint32:
@@ -234,6 +258,8 @@ struct TypeStore {
         Type* type;
         Type* _void;
 
+        Type* untyped_int;
+
         Type* uint64;
         Type* int64;
         Type* uint32;
@@ -294,6 +320,10 @@ public:
     [[nodiscard]] auto get_error() const -> Type* { return builtin.error; }
     [[nodiscard]] auto get_type() const -> Type* { return builtin.type; }
     [[nodiscard]] auto get_void() const -> Type* { return builtin._void; }
+
+    [[nodiscard]] auto get_untyped_int() const -> Type* {
+        return builtin.untyped_int;
+    }
 
     [[nodiscard]] auto get_i64() const -> Type* { return builtin.int64; }
     [[nodiscard]] auto get_u64() const -> Type* { return builtin.uint64; }
@@ -364,6 +394,8 @@ private:
         builtin.type = new_type(TypeKind::Type, {});
         builtin._void = new_type(TypeKind::Void, {});
 
+        builtin.untyped_int = new_type(TypeKind::UntypedInt, {});
+
         builtin.uint64 = new_type(TypeKind::Uint64, {});
         builtin.int64 = new_type(TypeKind::Int64, {});
         builtin.uint32 = new_type(TypeKind::Uint32, {});
@@ -403,6 +435,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Err: name = "Err"; break;
         case TypeKind::Type: name = "Type"; break;
         case TypeKind::Void: name = "Void"; break;
+        case TypeKind::UntypedInt: name = "UntypedInt"; break;
         case TypeKind::Uint64: name = "Uint64"; break;
         case TypeKind::Int64: name = "Int64"; break;
         case TypeKind::Uint32: name = "Uint32"; break;

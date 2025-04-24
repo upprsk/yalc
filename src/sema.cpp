@@ -7,6 +7,7 @@
 #include "ast-node.hpp"
 #include "error_reporter.hpp"
 #include "file-store.hpp"
+#include "fmt/color.h"
 #include "libassert/assert.hpp"
 #include "types.hpp"
 #include "value.hpp"
@@ -406,6 +407,40 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
     visit(sctx, data.body);
 }
 
+void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
+                                 types::Type* target) {
+    ASSERT(chain != nullptr);
+    ASSERT(chain->get_type() != nullptr);
+    // ASSERT(chain->get_type()->is_untyped_int(), *chain->get_type());
+
+    if (chain->is_oneof(ast::NodeKind::Int)) {
+        chain->set_type(target);
+        return;
+    }
+
+    if (chain->is_oneof(ast::NodeKind::Add)) {
+        chain->set_type(target);
+        for (auto c : chain->get_children())
+            fixup_untyped_integer_chain(ts, c, target);
+        return;
+    }
+
+    if (chain->is_oneof(ast::NodeKind::ExprPack)) {
+        auto data = conv::expr_pack(*chain);
+        ASSERT(data.items.size() == target->inner.size());
+        ASSERT(!target->contains_untyped_int());
+
+        chain->set_type(target);
+        for (auto [c, inner] : rv::zip(data.items, target->inner))
+            fixup_untyped_integer_chain(ts, c, inner);
+        return;
+    }
+
+    // fmt::println(stderr, "{}: got end of int updating chain on {}",
+    //              fmt::styled("ERROR", fmt::fg(fmt::color::red)),
+    //              chain->get_kind());
+}
+
 void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
 
@@ -499,6 +534,9 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                         r = ts.get_error();
                     }
 
+                    // a function should not be able to return this
+                    ASSERT(!i->is_untyped_int());
+
                     ids[name_idx]->set_type(r);
                     coercions.push_back(r);
                     if (*r != *i) {
@@ -553,11 +591,18 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                                     *init_type, *type);
                     er.report_note(types[ty_idx]->get_loc(),
                                    "required {} from here", *type);
-                    r = init_type;  // NOTE: maybe set to error
+                    r = ts.get_error();
+                }
+
+                if (init_type->is_untyped_int()) {
+                    ASSERT(!r->is_untyped_int());
+
+                    // fixup untyped integers
+                    fixup_untyped_integer_chain(ts, init, r);
                 }
 
                 ids[name_idx]->set_type(r);
-                if (*r != *type)
+                if (*r != *init->get_type())
                     inits[init_idx] = ast.new_coerce(init->get_loc(), init, r);
 
                 auto name = conv::id(*ids[name_idx]);
@@ -683,9 +728,12 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                     continue;
                 }
 
+                if (init_type->is_untyped_int()) {
+                    fixup_untyped_integer_chain(ts, init, ts.get_i32());
+                    init_type = init->get_type();
+                }
+
                 ids[name_idx]->set_type(init_type);
-                inits[init_idx] =
-                    ast.new_coerce(init->get_loc(), init, init_type);
 
                 auto name = conv::id(*ids[name_idx]);
                 if (name.to) {
@@ -862,6 +910,14 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                     1, ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
         }
 
+        if (lhs->is_untyped_int() && !rhs->is_untyped_int()) {
+            fixup_untyped_integer_chain(ts, data.lhs, rhs);
+        }
+
+        if (rhs->is_untyped_int() && !lhs->is_untyped_int()) {
+            fixup_untyped_integer_chain(ts, data.rhs, lhs);
+        }
+
         return;
     }
 
@@ -879,15 +935,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         if (!r) {
             er.report_error(
                 node->get_loc(),
-                "can not coerce argument of type {} to {} in operation", *lhs,
-                *rhs);
+                "can not coerce argument of type {} to {} in operation", *rhs,
+                *lhs);
+            er.report_note(data.lhs->get_loc(), "this has type {}", *lhs);
 
             r = ts.get_error();
-        } else {
-            // coerce rhs to the same type as lhs
-            if (*r != *rhs)
-                node->set_child(
-                    1, ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
         }
 
         if (!r->is_integral() && !r->is_err()) {
@@ -895,6 +947,19 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                             node->get_kind());
             r = ts.get_error();
         }
+
+        if (lhs->is_untyped_int() && !rhs->is_untyped_int()) {
+            fixup_untyped_integer_chain(ts, data.lhs, rhs);
+        }
+
+        if (rhs->is_untyped_int() && !lhs->is_untyped_int()) {
+            fixup_untyped_integer_chain(ts, data.rhs, lhs);
+        }
+
+        // coerce rhs to the same type as lhs
+        if (*r != *data.rhs->get_type())
+            node->set_child(1,
+                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
 
         node->set_type(r);
         return;
@@ -906,7 +971,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Int)) {
-        node->set_type(ts.get_i32());
+        node->set_type(ts.get_untyped_int());
         return;
     }
 
@@ -980,6 +1045,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                                 *arg->get_type(), *param);
                 arg->set_type(ts.get_error());
                 continue;
+            }
+
+            if (arg->get_type()->is_untyped_int()) {
+                ASSERT(!r->is_untyped_int());
+                fixup_untyped_integer_chain(ts, arg, r);
             }
 
             if (*r != *arg->get_type()) {
@@ -1097,7 +1167,15 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
-        if (*r != *rty) {
+        // FIXME: this is not very nice
+        ASSERT(rty->is_pack());
+        ASSERT(r->is_pack());
+        if (rty->contains_untyped_int()) {
+            ASSERT(!r->contains_untyped_int());
+            fixup_untyped_integer_chain(ts, data.child, r);
+        }
+
+        if (*r != *data.child->get_type()) {
             node->set_child(
                 0, ast.new_coerce(data.child->get_loc(), data.child, r));
         }

@@ -48,6 +48,12 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
 
     if (dst->is_integral()) {
         if (!src->is_integral()) return nullptr;
+        if (src->is_untyped_int()) return dst;
+
+        if (dst->is_untyped_int()) {
+            ASSERT(!src->is_untyped_int());
+            return src;
+        }
 
         if (dst->is_signed() && src->is_signed()) {
             if (dst->size() < src->size()) return nullptr;
@@ -66,7 +72,7 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
             return dst;
         }
 
-        UNREACHABLE("all cases should be handled for integers");
+        UNREACHABLE("all cases should be handled for integers", *src, *dst);
     }
 
     if (dst->is_bool()) {
@@ -150,6 +156,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
             case TypeKind::Err: result = "<error>"; break;
             case TypeKind::Type: result = "type"; break;
             case TypeKind::Void: result = "void"; break;
+            case TypeKind::UntypedInt: result = "untyped_int"; break;
             case TypeKind::Uint64: result = "u64"; break;
             case TypeKind::Int64: result = "i64"; break;
             case TypeKind::Uint32: result = "u32"; break;
@@ -182,6 +189,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
         case TypeKind::Err:
         case TypeKind::Type:
         case TypeKind::Void:
+        case TypeKind::UntypedInt:
         case TypeKind::Uint64:
         case TypeKind::Int64:
         case TypeKind::Uint32:
