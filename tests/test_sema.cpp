@@ -142,56 +142,56 @@ func main() {
     ctx.tags.pop_back();
     ctx.tags.emplace_back("coercion");
 
-    run_test(ctx, p, "i32 to i8", R"(module main;
+    run_test(ctx, p, "lit to i8", R"(module main;
 
 func f(x: i8) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to u8", R"(module main;
+    run_test(ctx, p, "lit to u8", R"(module main;
 
 func f(x: u8) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to i16", R"(module main;
+    run_test(ctx, p, "lit to i16", R"(module main;
 
 func f(x: i16) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to u16", R"(module main;
+    run_test(ctx, p, "lit to u16", R"(module main;
 
 func f(x: u16) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to i32", R"(module main;
+    run_test(ctx, p, "lit to i32", R"(module main;
 
 func f(x: i32) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to u32", R"(module main;
+    run_test(ctx, p, "lit to u32", R"(module main;
 
 func f(x: u32) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to i64", R"(module main;
+    run_test(ctx, p, "lit to i64", R"(module main;
 
 func f(x: i64) {}
 func main() {
     f(13);
 })");
 
-    run_test(ctx, p, "i32 to u64", R"(module main;
+    run_test(ctx, p, "lit to u64", R"(module main;
 
 func f(x: u64) {}
 func main() {
@@ -258,6 +258,54 @@ func check(num: i32) (i64, bool) {
 func main() i32 {
     var r, ok, x = check(12), 69;
     return 0;
+}
+)");
+
+    run_test(ctx, p, "various decls with int", R"(module main;
+func main() i32 {
+    var a: u32 = 32 + 1;
+    var b: u64 = 10 + a;
+    var c      = b + a + 1;
+    var d, e   = 10, 10 + 10;
+    var f      = d + e;
+
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "various decls with int 2", R"(module main;
+func test(x: i32) {}
+func main() {
+    var a: u32 = 32 + 1;
+    var b: u64 = 10 + a;
+    var c      = b + a + 1;
+    var d, e   = 10, 10 + 10;
+    var f      = d + e;
+
+    test(a);
+    test(b);
+    test(c);
+    test(d);
+    test(e);
+    test(f);
+}
+)");
+
+    run_test(ctx, p, "various decls with int 3", R"(module main;
+func test(x: u64) {}
+func main() {
+    var a: u32 = 32 + 1;
+    var b: u64 = 10 + a;
+    var c      = b + a + 1;
+    var d, e   = 10, 10 + 10;
+    var f      = d + e;
+
+    test(a);
+    test(b);
+    test(c);
+    test(d);
+    test(e);
+    test(f);
 }
 )");
 

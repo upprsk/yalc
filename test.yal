@@ -1,17 +1,9 @@
 module main;
-
-func get_pair(x: i32, y: i32) (i32, i32) {
-    return x, y;
+func check(num: i32) (i64, bool) {
+    return 0, false;
 }
 
-@export
 func main() i32 {
-    var x, y: i32, i32 = get_pair(10, 20);
-    var x, y, z: i32, i32, i32 = get_pair(10, 20), 0;
-    var x, _    = get_pair(10, 20);
-    var x, y, z = get_pair(10, 20), 0;
-
-    var i: i32;
-
+    var r, ok = check(12);
     return 0;
 }
