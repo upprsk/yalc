@@ -124,7 +124,7 @@ auto run_checks_for_test_output(Context& ctx, TestParams const& p,
     if (exp != output) {
         if (p.use_diff) {
             show_diff(exp, output);
-        } else {
+        } else if (p.verbose) {
             fmt::println("{} got as output:\n{}", fullname,
                          json_to_pretty_string(output));
             fmt::println("but expected:\n{}", json_to_pretty_string(exp));

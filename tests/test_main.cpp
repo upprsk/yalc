@@ -19,6 +19,7 @@
 using json = nlohmann::json;
 
 struct Args {
+    bool                     verbose = false;
     bool                     ask = false;
     bool                     diff = false;
     std::vector<std::string> filters;
@@ -36,6 +37,7 @@ void print_help(std::string_view self) {
     println(stderr, "options:");
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
+    println(stderr, "    -v,--verbose: show output of all failed tests.");
     println(stderr,
             "    --ask: when a test fails, ask to update the expected value.");
     println(stderr,
@@ -60,6 +62,8 @@ auto argparse(int argc, char** argv) -> Args {
             args.ask = true;
         } else if (arg == "--diff") {
             args.diff = true;
+        } else if (arg == "-v" || arg == "--verbose") {
+            args.verbose = true;
         } else if (arg == "--filter" || arg == "-f") {
             if (!it.next(arg)) {
                 fmt::println(stderr, "error: missing argument to filter");
@@ -88,8 +92,10 @@ auto real_main(Args args) -> int {
     int ok{};
     int failed{};
 
-    TestParams p{
-        .filters = {}, .use_diff = args.diff, .ask_for_updates = args.ask};
+    TestParams p{.filters = {},
+                 .verbose = args.verbose,
+                 .use_diff = args.diff,
+                 .ask_for_updates = args.ask};
     for (auto const& s : args.filters) p.filters.insert(s);
 
     {
