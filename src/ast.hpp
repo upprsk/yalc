@@ -280,8 +280,11 @@ public:
     }
 
     auto new_coerce(Location loc, Node* child, types::Type* target) -> Node* {
-        return new_node(NodeKind::Coerce, loc, new_node_array_with(child),
-                        target);
+        auto c =
+            new_node(NodeKind::Coerce, loc, new_node_array_with(child), target);
+        c->set_type(target);
+
+        return c;
     }
 
     // ------------------------------------------------------------------------
