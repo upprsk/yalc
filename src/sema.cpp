@@ -1064,6 +1064,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Coerce)) {
+        visit_children(ctx, node);
+        return;
+    }
+
     er.report_warn(node->get_loc(), "node not sema analized ({})",
                    node->get_kind());
     visit_children(ctx, node);
