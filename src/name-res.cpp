@@ -337,6 +337,17 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
     visit(ctx, top_env, data.body);
 }
 
+auto find_duplicates(std::span<Node* const> ids)
+    -> std::unordered_map<std::string_view, size_t> {
+    auto it = ids | rv::transform([](Node* n) { return conv::id(*n).name; }) |
+              rv::filter([](std::string_view name) { return name != "_"; });
+
+    std::unordered_map<std::string_view, size_t> s;
+    for (auto id : it) s[id] += 1;
+
+    return s;
+}
+
 void visit_def_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
     auto visit = [&](Context& ctx, Env& env, Node* node) {
         visit_node(ast, node, ctx, env);
@@ -355,6 +366,15 @@ void visit_def_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
             flags = flags.set_private();
         else if (priv == ast::conv::PrivateKind::File)
             flags = flags.set_private_file();
+    }
+
+    // check for duplicate ids being declared
+    for (auto const& [k, v] : find_duplicates(data.get_ids().ids)) {
+        if (v > 1) {
+            ctx.er->report_error(
+                data.ids->get_loc(),
+                "duplicate identifier {:?} in variable declaration", k, v);
+        }
     }
 
     // first difine the ids at the current level
@@ -414,6 +434,15 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx, Env& env) {
             flags = flags.set_private();
         else if (priv == ast::conv::PrivateKind::File)
             flags = flags.set_private_file();
+    }
+
+    // check for duplicate ids being declared
+    for (auto const& [k, v] : find_duplicates(data.get_ids().ids)) {
+        if (v > 1) {
+            ctx.er->report_error(
+                data.ids->get_loc(),
+                "duplicate identifier {:?} in variable declaration", k, v);
+        }
     }
 
     // first process the initializers and types one level deeper (so that
