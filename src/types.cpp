@@ -26,6 +26,19 @@ auto Type::as_func() const -> Func {
     };
 }
 
+auto TypeStore::new_pack(std::span<Type *const> inner) -> Type * {
+    std::vector<Type *> expanded;
+    for (auto it : inner) {
+        if (it->is_pack()) {
+            for (auto itt : it->inner) expanded.push_back(itt);
+        } else {
+            expanded.push_back(it);
+        }
+    }
+
+    return new_type(TypeKind::Pack, expanded);
+}
+
 auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     ASSERT(dst != nullptr);
     ASSERT(src != nullptr);

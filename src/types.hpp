@@ -325,9 +325,7 @@ public:
                         std::array{inner});
     }
 
-    [[nodiscard]] auto new_pack(std::span<Type* const> inner) -> Type* {
-        return new_type(TypeKind::Pack, inner);
-    }
+    [[nodiscard]] auto new_pack(std::span<Type* const> inner) -> Type*;
 
     [[nodiscard]] auto new_func(Type* params, Type* ret, bool has_var_args)
         -> Type* {
