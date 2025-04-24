@@ -460,27 +460,32 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
             auto init_type = init->get_type();
             ASSERT(init_type != nullptr);
 
-            auto v = eval_node(ast, types[ty_idx], ctx);
-            ASSERT(v.type != nullptr);
-
-            types::Type* type = nullptr;
-            if (!v.type->is_type()) {
-                er.report_error(
-                    types[ty_idx]->get_loc(),
-                    "can not use value of type {} as type for declaration",
-                    *v.type);
-                type = init_type;  // NOTE: maybe set to error
-            } else {
-                type = v.get_data_type();
-            }
-
             // result of calling some function
             if (init_type->is_pack()) {
+                std::vector<types::Type*> coercions;
+                auto                      requires_coercion = false;
+
                 for (auto i : init_type->inner) {
+                    if (name_idx >= ids.size() || ty_idx >= types.size()) break;
+
                     if (conv::id(*ids[name_idx]).name == "_") {
                         name_idx++;
                         ty_idx++;
                         continue;
+                    }
+
+                    auto v = eval_node(ast, types[ty_idx], ctx);
+                    ASSERT(v.type != nullptr);
+
+                    types::Type* type;
+                    if (!v.type->is_type()) {
+                        er.report_error(types[ty_idx]->get_loc(),
+                                        "can not use value of type {} as type "
+                                        "for declaration",
+                                        *v.type);
+                        type = ts.get_error();
+                    } else {
+                        type = v.get_data_type();
                     }
 
                     auto r = ts.coerce(type, i);
@@ -491,13 +496,14 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                                         *i, *type);
                         er.report_note(types[ty_idx]->get_loc(),
                                        "required {} from here", *type);
-                        r = i;  // NOTE: maybe set to error
+                        r = ts.get_error();
                     }
 
                     ids[name_idx]->set_type(r);
-                    if (*r != *type)
-                        inits[init_idx] =
-                            ast.new_coerce(init->get_loc(), init, r);
+                    coercions.push_back(r);
+                    if (*r != *i) {
+                        requires_coercion = true;
+                    }
 
                     auto name = conv::id(*ids[name_idx]);
                     if (name.to) {
@@ -511,6 +517,10 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                     name_idx++;
                     ty_idx++;
                 }
+
+                if (requires_coercion)
+                    inits[init_idx] = ast.new_coerce(init->get_loc(), init,
+                                                     ts.new_pack(coercions));
             }
 
             // a simple initializer expression
@@ -519,6 +529,20 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                     name_idx++;
                     ty_idx++;
                     continue;
+                }
+
+                auto v = eval_node(ast, types[ty_idx], ctx);
+                ASSERT(v.type != nullptr);
+
+                types::Type* type = nullptr;
+                if (!v.type->is_type()) {
+                    er.report_error(
+                        types[ty_idx]->get_loc(),
+                        "can not use value of type {} as type for declaration",
+                        *v.type);
+                    type = init_type;  // NOTE: maybe set to error
+                } else {
+                    type = v.get_data_type();
                 }
 
                 auto r = ts.coerce(type, init_type);
@@ -579,7 +603,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                     ty->get_loc(),
                     "can not use value of type {} as type for declaration",
                     *v.type);
-                type = ts.get_error();  // NOTE: maybe set to error
+                type = ts.get_error();
             } else {
                 type = v.get_data_type();
             }
@@ -638,7 +662,6 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                     }
 
                     ids[name_idx]->set_type(i);
-                    inits[init_idx] = ast.new_coerce(init->get_loc(), init, i);
 
                     auto name = conv::id(*ids[name_idx]);
                     if (name.to) {
@@ -695,6 +718,20 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                                 name.name);
             }
         }
+    }
+
+    // fixup the type of the init expr pack
+    if (data.inits) {
+        auto inits = conv::expr_pack(*data.inits).items;
+
+        std::vector<types::Type*> types;
+        for (auto n : inits) {
+            ASSERT(n != nullptr);
+            ASSERT(n->get_type() != nullptr);
+            types.push_back(n->get_type());
+        }
+
+        data.inits->set_type(ts.new_pack(types));
     }
 }
 
@@ -820,7 +857,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                 *rhs);
         } else {
             // coerce rhs to the same type as lhs
-            if (*r != *lhs)
+            if (*r != *rhs)
                 node->set_child(
                     1, ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
         }
@@ -848,8 +885,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             r = ts.get_error();
         } else {
             // coerce rhs to the same type as lhs
-            node->set_child(1,
-                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
+            if (*r != *rhs)
+                node->set_child(
+                    1, ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
         }
 
         if (!r->is_integral() && !r->is_err()) {
@@ -944,8 +982,10 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                 continue;
             }
 
-            auto c = ast.new_coerce(arg->get_loc(), arg, r);
-            node->set_child(i, c);
+            if (*r != *arg->get_type()) {
+                auto c = ast.new_coerce(arg->get_loc(), arg, r);
+                node->set_child(i, c);
+            }
         }
 
         node->set_type(fn.ret);
@@ -1055,6 +1095,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                 "can not coerce value of type {} to return of type {}", *rty,
                 *expected_rty);
             return;
+        }
+
+        if (*r != *rty) {
+            node->set_child(
+                0, ast.new_coerce(data.child->get_loc(), data.child, r));
         }
 
         return;
