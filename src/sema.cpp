@@ -422,6 +422,30 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
         auto types = data.get_types().items;
         auto inits = data.get_inits().items;
 
+        size_t expr_count{};
+        for (auto init : inits) {
+            visit(ctx, init);
+
+            auto ty = init->get_type();
+            ASSERT(ty != nullptr);
+
+            if (ty->is_pack()) {
+                // multiple returns of some function
+                expr_count += ty->inner.size();
+            } else {
+                expr_count++;
+            }
+        }
+
+        if (ids.size() != expr_count) {
+            er.report_error(data.inits->get_loc(),
+                            "wrong number of initializers for declaration, "
+                            "expected {} but got {}",
+                            ids.size(), expr_count);
+            er.report_note(data.ids->get_loc(), "{} identifiers declared here ",
+                           ids.size());
+        }
+
         if (ids.size() != types.size()) {
             er.report_error(data.types->get_loc(),
                             "wrong number of types for declaration, "
@@ -431,61 +455,100 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                            ids.size());
         }
 
-        if (ids.size() != inits.size()) {
-            er.report_error(data.inits->get_loc(),
-                            "wrong number of initializers for declaration, "
-                            "expected {} but got {}",
-                            ids.size(), inits.size());
-            er.report_note(data.ids->get_loc(), "{} identifiers declared here",
-                           ids.size());
-        }
+        for (size_t name_idx{}, ty_idx{};
+             auto [init_idx, init] : rv::enumerate(inits)) {
+            if (name_idx >= ids.size() || ty_idx >= types.size()) break;
 
-        for (auto const& [idx, id, ty, init] :
-             rv::zip(rv::iota(0), ids, types, inits)) {
-            auto name = conv::id(*id);
+            auto init_type = init->get_type();
+            ASSERT(init_type != nullptr);
 
-            visit(ctx, ty);
-            visit(ctx, init);
-            if (name.name == "_") continue;
-
-            auto inity = init->get_type();
-            ASSERT(inity != nullptr);
-
-            auto v = eval_node(ast, ty, ctx);
+            auto v = eval_node(ast, types[ty_idx], ctx);
             ASSERT(v.type != nullptr);
 
             types::Type* type = nullptr;
-
             if (!v.type->is_type()) {
                 er.report_error(
-                    ty->get_loc(),
+                    types[ty_idx]->get_loc(),
                     "can not use value of type {} as type for declaration",
                     *v.type);
-                type = inity;  // NOTE: maybe set to error
+                type = init_type;  // NOTE: maybe set to error
             } else {
                 type = v.get_data_type();
             }
 
-            auto r = ts.coerce(type, inity);
-            if (!r) {
-                er.report_error(init->get_loc(),
-                                "can not coerce value of type {} to "
-                                "declaration of type {}",
-                                *inity, *type);
-                er.report_note(ty->get_loc(), "required {} from here", *type);
-                r = inity;  // NOTE: maybe set to error
+            // result of calling some function
+            if (init_type->is_pack()) {
+                for (auto i : init_type->inner) {
+                    if (conv::id(*ids[name_idx]).name == "_") {
+                        name_idx++;
+                        ty_idx++;
+                        continue;
+                    }
+
+                    auto r = ts.coerce(type, i);
+                    if (!r) {
+                        er.report_error(init->get_loc(),
+                                        "can not coerce value of type {} to "
+                                        "declaration of type {}",
+                                        *i, *type);
+                        er.report_note(types[ty_idx]->get_loc(),
+                                       "required {} from here", *type);
+                        r = i;  // NOTE: maybe set to error
+                    }
+
+                    ids[name_idx]->set_type(r);
+                    if (*r != *type)
+                        inits[init_idx] =
+                            ast.new_coerce(init->get_loc(), init, r);
+
+                    auto name = conv::id(*ids[name_idx]);
+                    if (name.to) {
+                        ASSERT(name.to->get_type() == nullptr);
+                        name.to->value = {.type = r};
+                    } else {
+                        er.report_debug(ids[name_idx]->get_loc(),
+                                        "id has no decl: {:?}", name.name);
+                    }
+
+                    name_idx++;
+                    ty_idx++;
+                }
             }
 
-            id->set_type(r);
+            // a simple initializer expression
+            else {
+                if (conv::id(*ids[name_idx]).name == "_") {
+                    name_idx++;
+                    ty_idx++;
+                    continue;
+                }
 
-            inits[idx] = ast.new_coerce(init->get_loc(), init, r);
+                auto r = ts.coerce(type, init_type);
+                if (!r) {
+                    er.report_error(init->get_loc(),
+                                    "can not coerce value of type {} to "
+                                    "declaration of type {}",
+                                    *init_type, *type);
+                    er.report_note(types[ty_idx]->get_loc(),
+                                   "required {} from here", *type);
+                    r = init_type;  // NOTE: maybe set to error
+                }
 
-            if (name.to) {
-                ASSERT(name.to->get_type() == nullptr);
-                name.to->value = {.type = r};
-            } else {
-                er.report_debug(id->get_loc(), "id has no decl: {:?}",
-                                name.name);
+                ids[name_idx]->set_type(r);
+                if (*r != *type)
+                    inits[init_idx] = ast.new_coerce(init->get_loc(), init, r);
+
+                auto name = conv::id(*ids[name_idx]);
+                if (name.to) {
+                    ASSERT(name.to->get_type() == nullptr);
+                    name.to->value = {.type = r};
+                } else {
+                    er.report_debug(ids[name_idx]->get_loc(),
+                                    "id has no decl: {:?}", name.name);
+                }
+
+                name_idx++;
+                ty_idx++;
             }
         }
     }
@@ -506,7 +569,6 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
         for (auto const& [id, ty] : rv::zip(ids.ids, types.items)) {
             auto name = conv::id(*id);
-
             if (name.name == "_") continue;
 
             auto v = eval_node(ast, ty, ctx);
@@ -538,35 +600,84 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
     // no explicit types but got inits
     else if (data.inits) {
-        auto ids = data.get_ids();
-        auto inits = data.get_inits();
+        auto ids = data.get_ids().ids;
+        auto inits = data.get_inits().items;
 
-        if (ids.ids.size() != inits.items.size()) {
+        size_t expr_count{};
+        for (auto init : inits) {
+            visit(ctx, init);
+
+            auto ty = init->get_type();
+            ASSERT(ty != nullptr);
+
+            if (ty->is_pack()) {
+                // multiple returns of some function
+                expr_count += ty->inner.size();
+            } else {
+                expr_count++;
+            }
+        }
+
+        if (ids.size() != expr_count) {
             er.report_error(data.inits->get_loc(),
                             "wrong number of initializers for declaration, "
                             "expected {} but got {}",
-                            ids.ids.size(), inits.items.size());
+                            ids.size(), expr_count);
             er.report_note(data.ids->get_loc(), "{} identifiers declared here",
-                           ids.ids.size());
+                           ids.size());
         }
 
-        for (auto const& [id, init] : rv::zip(ids.ids, inits.items)) {
-            auto name = conv::id(*id);
+        for (size_t name_idx{}; auto [init_idx, init] : rv::enumerate(inits)) {
+            if (name_idx >= ids.size()) break;
 
-            visit(ctx, init);
-            if (name.name == "_") continue;
+            auto init_type = init->get_type();
+            ASSERT(init_type != nullptr);
 
-            auto inity = init->get_type();
-            ASSERT(inity != nullptr);
+            // result of calling some function
+            if (init_type->is_pack()) {
+                for (auto i : init_type->inner) {
+                    if (conv::id(*ids[name_idx]).name == "_") {
+                        name_idx++;
+                        continue;
+                    }
 
-            id->set_type(inity);
+                    ids[name_idx]->set_type(i);
+                    inits[init_idx] = ast.new_coerce(init->get_loc(), init, i);
 
-            if (name.to) {
-                ASSERT(name.to->get_type() == nullptr);
-                name.to->value = {.type = inity};
-            } else {
-                er.report_debug(id->get_loc(), "id has no decl: {:?}",
-                                name.name);
+                    auto name = conv::id(*ids[name_idx]);
+                    if (name.to) {
+                        ASSERT(name.to->get_type() == nullptr);
+                        name.to->value = {.type = i};
+                    } else {
+                        er.report_debug(ids[name_idx]->get_loc(),
+                                        "id has no decl: {:?}", name.name);
+                    }
+
+                    name_idx++;
+                }
+            }
+
+            // a simple initializer expression
+            else {
+                if (conv::id(*ids[name_idx]).name == "_") {
+                    name_idx++;
+                    continue;
+                }
+
+                ids[name_idx]->set_type(init_type);
+                inits[init_idx] =
+                    ast.new_coerce(init->get_loc(), init, init_type);
+
+                auto name = conv::id(*ids[name_idx]);
+                if (name.to) {
+                    ASSERT(name.to->get_type() == nullptr);
+                    name.to->value = {.type = init_type};
+                } else {
+                    er.report_debug(ids[name_idx]->get_loc(),
+                                    "id has no decl: {:?}", name.name);
+                }
+
+                name_idx++;
             }
         }
     }
@@ -709,8 +820,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                 *rhs);
         } else {
             // coerce rhs to the same type as lhs
-            node->set_child(1,
-                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
+            if (*r != *lhs)
+                node->set_child(
+                    1, ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
         }
 
         return;
