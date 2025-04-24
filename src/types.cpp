@@ -43,6 +43,9 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     ASSERT(dst != nullptr);
     ASSERT(src != nullptr);
 
+    // errors are forwarded
+    if (dst->is_err()) return dst;
+
     if (dst->is_integral()) {
         if (!src->is_integral()) return nullptr;
 
@@ -64,6 +67,11 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
         }
 
         UNREACHABLE("all cases should be handled for integers");
+    }
+
+    if (dst->is_bool()) {
+        if (src->is_bool()) return dst;
+        return nullptr;
     }
 
     if (dst->kind == TypeKind::StrView) {
