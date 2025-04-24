@@ -15,12 +15,12 @@ void to_json(json& j, Value const& v) {
     };
 
     if (v.type) {
-        j["type"] = *v.type;
+        j["type"] = fmt::to_string(*v.type);
     }
 
     if (std::holds_alternative<yal::types::Type*>(v.data)) {
         ASSERT(v.get_data_type() != nullptr);
-        j["data"] = *v.get_data_type();
+        j["data"] = fmt::to_string(*v.get_data_type());
     } else if (std::holds_alternative<bool>(v.data)) {
         j["data"] = v.get_data_bool();
     } else if (std::holds_alternative<uint64_t>(v.data)) {
