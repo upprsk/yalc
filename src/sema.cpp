@@ -748,6 +748,10 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::FuncParam)) {
         auto data = conv::func_param(*node);
         visit(ctx, data.type);
+        if (data.type == nullptr) {
+            er.report_error(node->get_loc(), "missing type for parameter");
+            return;
+        }
 
         auto ty = data.type->get_type();
         ASSERT(ty != nullptr);
