@@ -287,6 +287,12 @@ public:
         return c;
     }
 
+    auto new_flat_module(Location loc, std::string_view name,
+                         std::span<Node* const> children) -> Node* {
+        return new_node(NodeKind::FlatModule, loc,
+                        new_node_array_with(children), new_string(name));
+    }
+
     // ------------------------------------------------------------------------
 
     auto shallow_dupe(Node const& node) -> Node* {

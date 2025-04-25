@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "ast-node-conv.hpp"
+#include "ast-node.hpp"
 #include "ast.hpp"
 #include "file-store.hpp"
 #include "libassert/assert.hpp"
@@ -357,6 +358,14 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
                     std::forward<decltype(args)>(args)...);
             visitor(ast, data.rhs, std::forward<decltype(visitor)>(visitor),
                     std::forward<decltype(args)>(args)...);
+        } break;
+
+        case NodeKind::FlatModule: {
+            auto data = conv::flat_module(*node);
+            for (auto c : data.children) {
+                visitor(ast, c, std::forward<decltype(visitor)>(visitor),
+                        std::forward<decltype(args)>(args)...);
+            }
         } break;
 
         case NodeKind::Coerce: {

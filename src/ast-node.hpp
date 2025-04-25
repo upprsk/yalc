@@ -452,6 +452,13 @@ enum class NodeKind : uint16_t {
     /// Internals
     /// ---------
 
+    /// After name resolution, all top-level nodes are placed in a flat module
+    /// structure, ordered correctly for semantic analysis.
+    ///
+    /// - `children` contains all of the top-level declarations.
+    /// - `data` has a string with the module name.
+    FlatModule,
+
     /// Coerce some type into another. This is inserted whenever an implicit
     /// conversion ocurs.
     ///
@@ -657,6 +664,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::AssignBand: name = "AssignBand"; break;
         case NodeKind::AssignBxor: name = "AssignBxor"; break;
         case NodeKind::AssignBor: name = "AssignBor"; break;
+        case NodeKind::FlatModule: name = "FlatModule"; break;
         case NodeKind::Coerce: name = "Coerce"; break;
     }
 

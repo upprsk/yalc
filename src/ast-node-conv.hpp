@@ -261,6 +261,11 @@ struct Assign {
     [[nodiscard]] constexpr auto get_rhs() const -> ExprPack;
 };
 
+struct FlatModule {
+    std::string_view name;
+    std::span<Node*> children;
+};
+
 struct Coerce {
     Node*        child{};
     types::Type* target{};
@@ -305,6 +310,11 @@ struct Coerce {
 
 [[nodiscard]] constexpr auto module(Node const& n) -> Module {
     ASSERT(n.get_kind() == NodeKind::Module);
+    return {.name = n.get_data_str(), .children = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto flat_module(Node const& n) -> FlatModule {
+    ASSERT(n.get_kind() == NodeKind::FlatModule);
     return {.name = n.get_data_str(), .children = n.get_children()};
 }
 

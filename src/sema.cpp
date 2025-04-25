@@ -729,8 +729,14 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     auto& ts = *ctx.ts;
     auto& er = *ctx.er;
 
-    if (node->is_oneof(NodeKind::Module, NodeKind::SourceFile,
-                       NodeKind::ModuleDecl, NodeKind::Decorators,
+    // These should not reach sema
+    if (node->is_oneof(ast::NodeKind::Module, ast::NodeKind::SourceFile,
+                       ast::NodeKind::ModuleDecl)) {
+        UNREACHABLE("found in sema node that should be removed by name-res",
+                    node->get_kind());
+    }
+
+    if (node->is_oneof(NodeKind::FlatModule, NodeKind::Decorators,
                        NodeKind::Decorator, NodeKind::FuncParams,
                        NodeKind::FuncRetPack, NodeKind::Block)) {
         node->set_type(ts.get_void());

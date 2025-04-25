@@ -750,20 +750,7 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
         top_env.update_preserve_private(er, file_env);
     }
 
-    // auto ns = NameSolver{fs, ts, er, ast};
-
-    // ns.visit_before_module(*mod, conv::module(*mod));
-    //
-    // for (auto ordered : order) {
-    //     auto source_file = decls_to_source_files[ordered];
-    //     ns.open_file(source_file);
-    //     ns.visit(ordered);
-    //     ns.close_file(source_file);
-    // }
-    //
-    // ns.visit_after_module(*mod, conv::module(*mod));
-
-    return mod;
+    return ast.new_flat_module(mod->get_loc(), m.name, order);
 }
 
 }  // namespace yal
