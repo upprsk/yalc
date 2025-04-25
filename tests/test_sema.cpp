@@ -376,10 +376,16 @@ func main() {
     var x, y = 0, 1;
     var z, w = swap(2, 3);
 
-    z = 20;
-    // x, y = swap(4, 5);
+    w = 20;
+    z, x = swap(4, 5);
 }
 )");
+
+    run_test(ctx, p, "discard assign", R"(
+ module test;
+func test() {
+    _ = 10 + 10 - 5;
+})");
 
     run_test(ctx, p, "multiple assign", R"(
  module test;
