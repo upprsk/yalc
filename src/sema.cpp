@@ -753,7 +753,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
             }
 
             if (init_type->is_untyped_int()) {
-                fixup_untyped_integer_chain(ts, init, ts.get_i32());
+                fixup_untyped_integer_chain(ts, init, ts.get_default_int());
                 init_type = init->get_type();
             }
 
@@ -1018,7 +1018,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         node->set_type(ts.get_bool());
 
         auto [r, coerce] = coerce_check_and_fixup_simetric_ints_with_fallback(
-            ast, lhs, rhs, ts.get_i32(), data.lhs, data.rhs, ctx);
+            ast, lhs, rhs, ts.get_default_int(), data.lhs, data.rhs, ctx);
         if (coerce) node->set_child(1, coerce);
 
         return;

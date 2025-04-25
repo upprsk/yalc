@@ -325,6 +325,8 @@ public:
         return builtin.untyped_int;
     }
 
+    [[nodiscard]] auto get_default_int() const -> Type* { return get_i32(); }
+
     [[nodiscard]] auto get_i64() const -> Type* { return builtin.int64; }
     [[nodiscard]] auto get_u64() const -> Type* { return builtin.uint64; }
     [[nodiscard]] auto get_i32() const -> Type* { return builtin.int32; }
