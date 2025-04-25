@@ -1,6 +1,7 @@
 #include "sema.hpp"
 
 #include <ranges>
+#include <utility>
 
 #include "ast-node-conv.hpp"
 #include "ast-node-visitor.hpp"
@@ -473,6 +474,118 @@ auto coerce_and_check(types::Type* target, types::Type* source,
     return r;
 }
 
+auto coerce_check_and_fixup_source_ints(Ast& ast, types::Type* target,
+                                        types::Type* source, Node* target_node,
+                                        Node* source_node, Context& ctx)
+    -> std::pair<types::Type*, Node*> {
+    auto r = coerce_and_check(target, source, target_node, source_node, ctx);
+
+    if (source->is_untyped_int()) {
+        ASSERT(!r->is_untyped_int());
+
+        // fixup untyped integers
+        fixup_untyped_integer_chain(*ctx.ts, source_node, r);
+    }
+
+    if (!r->is_err() && *r != *source_node->get_type()) {
+        auto c = ast.new_coerce(source_node->get_loc(), source_node, r);
+        return std::make_pair(r, c);
+    }
+
+    return std::make_pair(r, nullptr);
+}
+
+auto coerce_check_and_fixup_simetric_ints(Ast& ast, types::Type* target,
+                                          types::Type* source,
+                                          Node* target_node, Node* source_node,
+                                          Context& ctx)
+    -> std::pair<types::Type*, Node*> {
+    auto r = coerce_and_check(target, source, target_node, source_node, ctx);
+
+    if (target->is_untyped_int() && !source->is_untyped_int()) {
+        fixup_untyped_integer_chain(*ctx.ts, target_node, r);
+    }
+
+    if (source->is_untyped_int() && !target->is_untyped_int()) {
+        fixup_untyped_integer_chain(*ctx.ts, source_node, r);
+    }
+
+    if (!r->is_err() && !r->is_untyped_int() &&
+        *r != *source_node->get_type()) {
+        auto c = ast.new_coerce(source_node->get_loc(), source_node, r);
+        return std::make_pair(r, c);
+    }
+
+    return std::make_pair(r, nullptr);
+}
+
+auto coerce_check_and_fixup_simetric_ints_with_fallback(
+    Ast& ast, types::Type* target, types::Type* source, types::Type* fallback,
+    Node* target_node, Node* source_node, Context& ctx)
+    -> std::pair<types::Type*, Node*> {
+    auto r = coerce_and_check(target, source, target_node, source_node, ctx);
+
+    if (target->is_untyped_int() && !source->is_untyped_int()) {
+        fixup_untyped_integer_chain(*ctx.ts, target_node, r);
+    }
+
+    if (source->is_untyped_int() && !target->is_untyped_int()) {
+        fixup_untyped_integer_chain(*ctx.ts, source_node, r);
+    }
+
+    if (source->is_untyped_int() && target->is_untyped_int()) {
+        fixup_untyped_integer_chain(*ctx.ts, target_node, fallback);
+        fixup_untyped_integer_chain(*ctx.ts, source_node, fallback);
+    }
+
+    if (!r->is_err() && !r->is_untyped_int() &&
+        *r != *source_node->get_type()) {
+        auto c = ast.new_coerce(source_node->get_loc(), source_node, r);
+        return std::make_pair(r, c);
+    }
+
+    return std::make_pair(r, nullptr);
+}
+
+// ----------------------------------------------------------------------------
+
+void fixup_expr_pack(types::TypeStore& ts, Node* pack) {
+    if (pack == nullptr) return;
+
+    auto inits = conv::expr_pack(*pack).items;
+
+    std::vector<types::Type*> types;
+    for (auto n : inits) {
+        ASSERT(n != nullptr);
+        ASSERT(n->get_type() != nullptr);
+        types.push_back(n->get_type());
+    }
+
+    pack->set_type(ts.new_pack(types));
+}
+
+void fixup_expr_pack_lvalue(types::TypeStore& ts, Node* pack) {
+    if (pack == nullptr) return;
+
+    auto inits = conv::expr_pack(*pack).items;
+
+    std::vector<types::Type*> types;
+    for (auto n : inits) {
+        ASSERT(n != nullptr);
+        if (n->is_oneof(ast::NodeKind::Id) && conv::id(*n).is_discard()) {
+            types.push_back(ts.get_void());
+            continue;
+        }
+
+        ASSERT(n->get_type() != nullptr);
+        types.push_back(n->get_type());
+    }
+
+    pack->set_type(ts.new_pack(types));
+}
+
+// ----------------------------------------------------------------------------
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                                      Node* inits_node, Context& ctx) {
@@ -555,18 +668,9 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
             }
 
             auto type = eval_node_to_type(ast, types[ty_idx], ctx);
-            auto r =
-                coerce_and_check(type, init_type, types[ty_idx], init, ctx);
-
-            if (init_type->is_untyped_int()) {
-                ASSERT(!r->is_untyped_int());
-
-                // fixup untyped integers
-                fixup_untyped_integer_chain(ts, init, r);
-            }
-
-            if (*r != *init->get_type())
-                inits[init_idx] = ast.new_coerce(init->get_loc(), init, r);
+            auto [r, coerce] = coerce_check_and_fixup_source_ints(
+                ast, type, init_type, types[ty_idx], init, ctx);
+            if (coerce) inits[init_idx] = coerce;
 
             set_type_of_id(ids[name_idx], r, ctx);
 
@@ -698,19 +802,59 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     }
 
     // fixup the type of the init expr pack
-    if (data.inits) {
-        auto inits = conv::expr_pack(*data.inits).items;
+    fixup_expr_pack(ts, data.inits);
+}
 
-        std::vector<types::Type*> types;
-        for (auto n : inits) {
-            ASSERT(n != nullptr);
-            ASSERT(n->get_type() != nullptr);
-            types.push_back(n->get_type());
+// ============================================================================
+
+void visit_assign(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto data = conv::assign(*node);
+    auto lhs = data.get_lhs().items;
+    auto rhs = data.get_rhs().items;
+
+    // lhs will be visited later
+    visit(ctx, data.rhs);
+
+    auto expr_count = count_init_exprs(data.get_rhs());
+
+    if (lhs.size() != expr_count) {
+        er.report_error(
+            data.rhs->get_loc(),
+            "wrong number of values for assigment, expected {} but got {}",
+            lhs.size(), expr_count);
+        er.report_note(data.lhs->get_loc(), "{} required from here",
+                       lhs.size());
+    }
+
+    for (auto const& [idx, l, r] : rv::zip(rv::iota(0), lhs, rhs)) {
+        if (l->is_oneof(ast::NodeKind::Id) && conv::id(*l).is_discard()) {
+            // discard the result
+            l->set_type(ts.get_void());
+            continue;
         }
 
-        data.inits->set_type(ts.new_pack(types));
+        visit(ctx, l);
+
+        auto [_, coerce] = coerce_check_and_fixup_source_ints(
+            ast, l->get_type(), r->get_type(), l, r, ctx);
+        if (coerce) rhs[idx] = coerce;
     }
+
+    // fixup the type of the init expr pack
+    fixup_expr_pack_lvalue(ts, data.lhs);
+    fixup_expr_pack(ts, data.rhs);
+
+    // auto sctx = ctx.child_lvalue();
+    // visit(sctx, data.lhs);
+    // visit(ctx, data.rhs);
 }
+
+// ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_node(Ast& ast, Node* node, Context& ctx) {
@@ -828,21 +972,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
         node->set_type(ts.get_bool());
 
-        // first try to coerce the rhs to lhs to have a single type on both
-        // sides
-        auto r = coerce_and_check(lhs, rhs, node, data.rhs, ctx);
-        if (!r->is_err() && *r != *rhs) {
-            node->set_child(1,
-                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
-        }
-
-        if (lhs->is_untyped_int() && !rhs->is_untyped_int()) {
-            fixup_untyped_integer_chain(ts, data.lhs, rhs);
-        }
-
-        if (rhs->is_untyped_int() && !lhs->is_untyped_int()) {
-            fixup_untyped_integer_chain(ts, data.rhs, lhs);
-        }
+        auto [r, coerce] = coerce_check_and_fixup_simetric_ints_with_fallback(
+            ast, lhs, rhs, ts.get_i32(), data.lhs, data.rhs, ctx);
+        if (coerce) node->set_child(1, coerce);
 
         return;
     }
@@ -859,35 +991,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         auto rhs = data.rhs->get_type();
         ASSERT(rhs != nullptr);
 
-        auto r = ts.coerce(lhs, rhs);
-        if (!r) {
-            er.report_error(
-                node->get_loc(),
-                "can not coerce argument of type {} to {} in operation", *rhs,
-                *lhs);
-            er.report_note(data.lhs->get_loc(), "this has type {}", *lhs);
-
-            r = ts.get_error();
-        }
-
-        if (!r->is_integral() && !r->is_err()) {
-            er.report_error(node->get_loc(), "type {} does not support {}", *r,
-                            node->get_kind());
-            r = ts.get_error();
-        }
-
-        if (lhs->is_untyped_int() && !rhs->is_untyped_int()) {
-            fixup_untyped_integer_chain(ts, data.lhs, rhs);
-        }
-
-        if (rhs->is_untyped_int() && !lhs->is_untyped_int()) {
-            fixup_untyped_integer_chain(ts, data.rhs, lhs);
-        }
-
-        // coerce rhs to the same type as lhs
-        if (*r != *data.rhs->get_type())
-            node->set_child(1,
-                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
+        auto [r, coerce] = coerce_check_and_fixup_simetric_ints(
+            ast, lhs, rhs, data.lhs, data.rhs, ctx);
+        if (coerce) node->set_child(1, coerce);
 
         node->set_type(r);
         return;
@@ -970,24 +1076,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
             arg->set_type(arg->get_type());
 
-            auto r = ts.coerce(param, arg->get_type());
-            if (!r) {
-                er.report_error(arg->get_loc(),
-                                "can not coerce argument of type {} to {}",
-                                *arg->get_type(), *param);
-                arg->set_type(ts.get_error());
-                continue;
-            }
-
-            if (arg->get_type()->is_untyped_int()) {
-                ASSERT(!r->is_untyped_int());
-                fixup_untyped_integer_chain(ts, arg, r);
-            }
-
-            if (*r != *arg->get_type()) {
-                auto c = ast.new_coerce(arg->get_loc(), arg, r);
-                node->set_child(i, c);
-            }
+            auto [r, coerce] = coerce_check_and_fixup_source_ints(
+                ast, param, arg->get_type(), data.callee, arg, ctx);
+            if (coerce) node->set_child(i, coerce);
         }
 
         node->set_type(fn.ret);
@@ -1030,11 +1121,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Assign)) {
-        auto data = conv::assign(*node);
-
-        auto sctx = ctx.child_lvalue();
-        visit(sctx, data.lhs);
-        visit(ctx, data.rhs);
+        visit_assign(ast, node, ctx);
         return;
     }
 
