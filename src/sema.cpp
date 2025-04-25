@@ -817,6 +817,8 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
     auto lhs = data.get_lhs().items;
     auto rhs = data.get_rhs().items;
 
+    node->set_type(ts.get_void());
+
     // lhs will be visited later
     visit(ctx, data.rhs);
 
@@ -831,27 +833,70 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
                        lhs.size());
     }
 
-    for (auto const& [idx, l, r] : rv::zip(rv::iota(0), lhs, rhs)) {
-        if (l->is_oneof(ast::NodeKind::Id) && conv::id(*l).is_discard()) {
-            // discard the result
-            l->set_type(ts.get_void());
-            continue;
+    for (size_t lhs_idx{}; auto [rhs_idx, rhs_item] : rv::enumerate(rhs)) {
+        if (lhs_idx >= lhs.size()) break;
+
+        auto rhs_type = rhs_item->get_type();
+        ASSERT(rhs_type != nullptr);
+
+        // result of calling some function
+        if (rhs_type->is_pack()) {
+            std::vector<types::Type*> coercions;
+            auto                      requires_coercion = false;
+
+            for (auto ty : rhs_type->inner) {
+                if (lhs_idx >= lhs.size()) break;
+
+                if (lhs[lhs_idx]->is_oneof(ast::NodeKind::Id) &&
+                    conv::id(*lhs[lhs_idx]).is_discard()) {
+                    coercions.push_back(ts.get_void());
+                    lhs_idx++;
+                    continue;
+                }
+
+                visit(ctx, lhs[lhs_idx]);
+
+                auto r = coerce_and_check(lhs[lhs_idx]->get_type(), ty,
+                                          lhs[lhs_idx], rhs_item, ctx);
+
+                // a function should not be able to return this
+                ASSERT(!ty->is_untyped_int());
+
+                coercions.push_back(r);
+                if (*r != *ty) {
+                    requires_coercion = true;
+                }
+
+                lhs_idx++;
+            }
+
+            if (requires_coercion)
+                rhs[rhs_idx] = ast.new_coerce(rhs_item->get_loc(), rhs_item,
+                                              ts.new_pack(coercions));
         }
 
-        visit(ctx, l);
+        // a simple initializer expression
+        else {
+            if (lhs[lhs_idx]->is_oneof(ast::NodeKind::Id) &&
+                conv::id(*lhs[lhs_idx]).is_discard()) {
+                lhs_idx++;
+                continue;
+            }
 
-        auto [_, coerce] = coerce_check_and_fixup_source_ints(
-            ast, l->get_type(), r->get_type(), l, r, ctx);
-        if (coerce) rhs[idx] = coerce;
+            visit(ctx, lhs[lhs_idx]);
+
+            auto [r, coerce] = coerce_check_and_fixup_source_ints(
+                ast, lhs[lhs_idx]->get_type(), rhs_item->get_type(),
+                lhs[lhs_idx], rhs_item, ctx);
+            if (coerce) rhs[rhs_idx] = coerce;
+
+            lhs_idx++;
+        }
     }
 
     // fixup the type of the init expr pack
     fixup_expr_pack_lvalue(ts, data.lhs);
     fixup_expr_pack(ts, data.rhs);
-
-    // auto sctx = ctx.child_lvalue();
-    // visit(sctx, data.lhs);
-    // visit(ctx, data.rhs);
 }
 
 // ----------------------------------------------------------------------------
