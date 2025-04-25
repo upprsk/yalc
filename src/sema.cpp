@@ -837,7 +837,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    if (node->is_oneof(ast::NodeKind::Add)) {
+    if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
+                       ast::NodeKind::Mul, ast::NodeKind::Div,
+                       ast::NodeKind::Mod)) {
         auto data = conv::binary(*node);
         visit(ctx, data.lhs);
         visit(ctx, data.rhs);
