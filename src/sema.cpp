@@ -391,7 +391,9 @@ void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
         return;
     }
 
-    if (chain->is_oneof(ast::NodeKind::Add)) {
+    if (chain->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
+                        ast::NodeKind::Mul, ast::NodeKind::Div,
+                        ast::NodeKind::Mod)) {
         chain->set_type(target);
         for (auto c : chain->get_children())
             fixup_untyped_integer_chain(ts, c, target);
@@ -812,9 +814,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    if (node->is_oneof(ast::NodeKind::Equal, ast::NodeKind::Less,
-                       ast::NodeKind::Greater, ast::NodeKind::LessEqual,
-                       ast::NodeKind::GreaterEqual)) {
+    if (node->is_oneof(ast::NodeKind::Equal, ast::NodeKind::NotEqual,
+                       ast::NodeKind::Less, ast::NodeKind::Greater,
+                       ast::NodeKind::LessEqual, ast::NodeKind::GreaterEqual)) {
         auto data = conv::binary(*node);
         visit(ctx, data.lhs);
         visit(ctx, data.rhs);
