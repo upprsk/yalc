@@ -215,30 +215,20 @@ auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type* {
 
 // ============================================================================
 
-void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
-
-    auto& ts = *ctx.ts;
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void visit_decorators(Ast& ast, Node* decorators, Decl* decl, Context& ctx) {
     auto& er = *ctx.er;
-    auto  data = conv::func_decl(*node);
-    auto  decl = node->get_decl();
-    ASSERT(decl != nullptr);
 
-    visit(ctx, data.decorators);
-    visit(ctx, data.gargs);
-    visit(ctx, data.args);
-    visit(ctx, data.ret);
-
-    // TODO: Evaluate decorators
-    for (auto decorator : data.get_decorators().items) {
+    for (auto decorator : conv::decorators(*decorators).items) {
         auto dec = conv::decorator(*decorator);
 
         // handle extern decorator
         if (dec.name == "extern") {
+            decl->flags.set_extern();
+
             // no parameters, just mark as extern and set extern name to
             // local_name
             if (dec.params.size() == 0) {
-                decl->flags.set_extern();
                 decl->link_name = decl->local_name;
             }
 
@@ -273,12 +263,6 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
                                 "expected none or a single named parameter for "
                                 "`extern`, got {} parameters",
                                 dec.params.size());
-            }
-
-            // extern should not have no body
-            if (data.body != nullptr) {
-                er.report_error(node->get_loc(),
-                                "extern function should not have a body");
             }
         }
 
@@ -335,7 +319,32 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
                             dec.name);
         }
     }
+}
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+    auto  data = conv::func_decl(*node);
+    auto  decl = node->get_decl();
+    ASSERT(decl != nullptr);
+
+    visit(ctx, data.decorators);
+    visit(ctx, data.gargs);
+    visit(ctx, data.args);
+    visit(ctx, data.ret);
+
+    visit_decorators(ast, data.decorators, decl, ctx);
+
+    // extern should not have body
+    if (decl->flags.has_extern() && data.body != nullptr) {
+        er.report_error(node->get_loc(),
+                        "extern function should not have a body");
+    }
+
+    // no-extern should have body
     if (!decl->flags.has_extern() && data.body == nullptr) {
         er.report_error(node->get_loc(), "missing body for function");
     }
