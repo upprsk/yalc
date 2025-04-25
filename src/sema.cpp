@@ -41,6 +41,7 @@ struct Context {
 };
 
 auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value;
+auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type*;
 void visit_node(Ast& ast, Node* node, Context& ctx);
 
 // ============================================================================
@@ -61,19 +62,7 @@ auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
             continue;
         }
 
-        types::Type* ty = nullptr;
-
-        auto v = eval_node(ast, param.type, ctx);
-        ASSERT(v.type != nullptr);
-        if (!v.type->is_type()) {
-            er.report_error(
-                child->get_loc(),
-                "can not use value of type {} as type for parameter", *v.type);
-            ty = ts.get_error();
-        } else {
-            ty = v.get_data_type();
-        }
-
+        auto ty = eval_node_to_type(ast, param.type, ctx);
         types.emplace_back(child, ty);
     }
 
@@ -121,37 +110,12 @@ auto eval_node_func_ret_pack(Ast& ast, Node* node, Context& ctx) -> Value {
                 continue;
             }
 
-            types::Type* ty = nullptr;
-
-            auto v = eval_node(ast, param.type, ctx);
-            ASSERT(v.type != nullptr);
-            if (!v.type->is_type()) {
-                er.report_error(
-                    child->get_loc(),
-                    "can not use value of type {} as type for named return",
-                    *v.type);
-                ty = ts.get_error();
-            } else {
-                ty = v.get_data_type();
-            }
-
+            auto ty = eval_node_to_type(ast, param.type, ctx);
             types.emplace_back(child, ty);
             continue;
         }
 
-        types::Type* ty = nullptr;
-
-        auto v = eval_node(ast, child, ctx);
-        ASSERT(v.type != nullptr);
-        if (!v.type->is_type()) {
-            er.report_error(child->get_loc(),
-                            "can not use value of type {} as type for return",
-                            *v.type);
-            ty = ts.get_error();
-        } else {
-            ty = v.get_data_type();
-        }
-
+        auto ty = eval_node_to_type(ast, child, ctx);
         types.emplace_back(child, ty);
     }
 
@@ -190,20 +154,7 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
 
     if (node->is_oneof(ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst)) {
         auto data = conv::mptr(*node);
-        auto inner = eval_node(ast, data.inner, ctx);
-        ASSERT(inner.type != nullptr);
-
-        types::Type* inner_ty = nullptr;
-        if (!inner.type->is_type()) {
-            er.report_error(
-                node->get_loc(),
-                "can not use value of type {} as type in multi-pointer",
-                *inner.type);
-            inner_ty = ts.get_error();
-        } else {
-            inner_ty = inner.get_data_type();
-        }
-
+        auto inner_ty = eval_node_to_type(ast, data.inner, ctx);
         auto ty = ts.new_mptr(inner_ty, data.is_const);
         return {.type = ts.get_type(), .data = ty};
     }
@@ -243,6 +194,21 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
     }
 
     PANIC("cant eval node of type", node->get_kind());
+}
+
+auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type* {
+    ASSERT(node != nullptr);
+
+    auto v = eval_node(ast, node, ctx);
+    ASSERT(v.type != nullptr);
+
+    if (!v.type->is_type()) {
+        ctx.er->report_error(node->get_loc(),
+                             "can not use value of type {} as type", *v.type);
+        return ctx.ts->get_error();
+    }
+
+    return v.get_data_type();
 }
 
 // ============================================================================
@@ -377,23 +343,16 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
                       "Generic args have not been implemented");
     }
 
-    auto params = eval_node(ast, data.args, ctx);
-    ASSERT(params.type != nullptr);
-    ASSERT(params.type->is_type());
+    auto params = eval_node_to_type(ast, data.args, ctx);
 
-    Value ret;
+    types::Type* ret = nullptr;
     if (data.ret)
-        ret = eval_node(ast, data.ret, ctx);
+        ret = eval_node_to_type(ast, data.ret, ctx);
     else
-        ret = {.type = ts.get_type(),
-               .data = ts.new_pack(std::array{ts.get_void()})};
+        ret = ts.new_pack(std::array{ts.get_void()});
 
-    ASSERT(ret.type != nullptr);
-    ASSERT(ret.type->is_type());
-
-    auto ty =
-        ts.new_func(params.get_data_type(), ret.get_data_type(),
-                    node->get_kind() == ast::NodeKind::FuncDeclWithCVarArgs);
+    auto ty = ts.new_func(
+        params, ret, node->get_kind() == ast::NodeKind::FuncDeclWithCVarArgs);
     node->set_type(ty);
 
     auto d = node->get_decl();
@@ -509,20 +468,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                         continue;
                     }
 
-                    auto v = eval_node(ast, types[ty_idx], ctx);
-                    ASSERT(v.type != nullptr);
-
-                    types::Type* type;
-                    if (!v.type->is_type()) {
-                        er.report_error(types[ty_idx]->get_loc(),
-                                        "can not use value of type {} as type "
-                                        "for declaration",
-                                        *v.type);
-                        type = ts.get_error();
-                    } else {
-                        type = v.get_data_type();
-                    }
-
+                    auto type = eval_node_to_type(ast, types[ty_idx], ctx);
                     auto r = ts.coerce(type, i);
                     if (!r) {
                         er.report_error(init->get_loc(),
@@ -569,20 +515,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                     continue;
                 }
 
-                auto v = eval_node(ast, types[ty_idx], ctx);
-                ASSERT(v.type != nullptr);
-
-                types::Type* type = nullptr;
-                if (!v.type->is_type()) {
-                    er.report_error(
-                        types[ty_idx]->get_loc(),
-                        "can not use value of type {} as type for declaration",
-                        *v.type);
-                    type = init_type;  // NOTE: maybe set to error
-                } else {
-                    type = v.get_data_type();
-                }
-
+                auto type = eval_node_to_type(ast, types[ty_idx], ctx);
                 auto r = ts.coerce(type, init_type);
                 if (!r) {
                     er.report_error(init->get_loc(),
@@ -638,21 +571,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
             auto name = conv::id(*id);
             if (name.name == "_") continue;
 
-            auto v = eval_node(ast, ty, ctx);
-            ASSERT(v.type != nullptr);
-
-            types::Type* type = nullptr;
-
-            if (!v.type->is_type()) {
-                er.report_error(
-                    ty->get_loc(),
-                    "can not use value of type {} as type for declaration",
-                    *v.type);
-                type = ts.get_error();
-            } else {
-                type = v.get_data_type();
-            }
-
+            auto type = eval_node_to_type(ast, ty, ctx);
             id->set_type(type);
 
             if (name.to) {
@@ -844,11 +763,8 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
-        auto e = eval_node(ast, data.type, ctx);
-        ASSERT(e.type != nullptr);
-        ASSERT(e.type->is_type());
-
-        node->set_type(e.get_data_type());
+        auto type = eval_node_to_type(ast, data.type, ctx);
+        node->set_type(type);
         return;
     }
 
