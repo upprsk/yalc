@@ -908,7 +908,10 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
-        if (!data.to) return;
+        if (!data.to) {
+            node->set_type(ts.get_error());
+            return;
+        }
 
         auto ty = data.to->get_type();
         if (!ty) {
@@ -942,6 +945,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             er.report_error(node->get_loc(),
                             "can not call non-function value of type {}", *cty);
             visit_span(ctx, data.args);
+            node->set_type(ts.get_error());
             return;
         }
 
