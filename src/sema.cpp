@@ -479,7 +479,7 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
             for (auto i : init_type->inner) {
                 if (name_idx >= ids.size() || ty_idx >= types.size()) break;
 
-                if (conv::id(*ids[name_idx]).name == "_") {
+                if (conv::id(*ids[name_idx]).is_discard()) {
                     name_idx++;
                     ty_idx++;
                     continue;
@@ -526,7 +526,7 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
 
         // a simple initializer expression
         else {
-            if (conv::id(*ids[name_idx]).name == "_") {
+            if (conv::id(*ids[name_idx]).is_discard()) {
                 name_idx++;
                 ty_idx++;
                 continue;
@@ -588,7 +588,7 @@ void visit_decl_with_types(Ast& ast, Node* ids_node, Node* types_node,
 
     for (auto const& [id, ty] : rv::zip(ids, types)) {
         auto name = conv::id(*id);
-        if (name.name == "_") continue;
+        if (name.is_discard()) continue;
 
         auto type = eval_node_to_type(ast, ty, ctx);
         id->set_type(type);
@@ -631,7 +631,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
         // result of calling some function
         if (init_type->is_pack()) {
             for (auto i : init_type->inner) {
-                if (conv::id(*ids[name_idx]).name == "_") {
+                if (conv::id(*ids[name_idx]).is_discard()) {
                     name_idx++;
                     continue;
                 }
@@ -653,7 +653,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
 
         // a simple initializer expression
         else {
-            if (conv::id(*ids[name_idx]).name == "_") {
+            if (conv::id(*ids[name_idx]).is_discard()) {
                 name_idx++;
                 continue;
             }
@@ -934,7 +934,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
-        if (data.name == "_" && ctx.is_lvalue) {
+        if (data.is_discard() && ctx.is_lvalue) {
             node->set_type(ts.get_void());
             return;
         }

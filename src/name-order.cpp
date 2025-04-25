@@ -423,7 +423,7 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         auto data = conv::named_ret(*node);
         visit(ctx, data.type);
 
-        if (data.name == "_") {
+        if (data.is_discard()) {
             state.er->report_warn(node->get_loc(),
                                   "discarding named return, remove the `_:`");
             return;
@@ -506,7 +506,7 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
-        if (ctx.is_lvalue && data.name == "_") return;
+        if (ctx.is_lvalue && data.is_discard()) return;
         if (ctx.lookup_local(data.name)) return;
 
         auto top = ctx.lookup_top(data.name);

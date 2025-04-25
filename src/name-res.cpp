@@ -634,7 +634,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx, Env& env) {
 
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
-        if (env.is_lvalue && data.name == "_") return;
+        if (env.is_lvalue && data.is_discard()) return;
 
         auto decl = env.lookup(data.name);
         if (decl == nullptr) {

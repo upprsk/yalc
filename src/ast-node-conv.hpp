@@ -13,6 +13,10 @@ namespace yal::ast::conv {
 struct Id {
     std::string_view name;
     Decl*            to;
+
+    [[nodiscard]] constexpr auto is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 struct KwLit {
@@ -138,11 +142,19 @@ struct TopDefDecl {
 struct FuncParam {
     std::string_view name;
     Node*            type{};
+
+    [[nodiscard]] constexpr auto is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 struct NamedRet {
     std::string_view name;
     Node*            type{};
+
+    [[nodiscard]] constexpr auto is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 struct ImportStmt {
