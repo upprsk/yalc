@@ -381,6 +381,70 @@ func main() {
 }
 )");
 
+    run_test(ctx, p, "multiple assign", R"(
+ module test;
+func test() {
+    var a, b = 11, 12;
+    a, b = 9, 10;
+})");
+
+    run_test(ctx, p, "multiple assign 2", R"(
+module test;
+func test() {
+    var a, b = 11, 12;
+    a, b = f();
+}
+
+func f() (i32, u32) {}
+)");
+
+    run_test(ctx, p, "multiple assign 3", R"(
+module test;
+func test() {
+    var a: i8;
+    a, _ = f();
+}
+
+func f() (i32, u32) {}
+)");
+
+
+    run_test(ctx, p, "multiple assign 4", R"(
+module test;
+func test() {
+    var a: i32;
+    a, _ = f();
+}
+
+func f() (i32, u32) {}
+)");
+
+    run_test(ctx, p, "multiple assign 5", R"(
+module test;
+func test() {
+    var a: i32;
+    a, _ = f();
+}
+
+func f() (i8, u32) {}
+)");
+
+    run_test(ctx, p, "missing types",
+             R"(
+module test;
+func test() {
+    var a;
+}
+)");
+
+    run_test(ctx, p, "missing types 2",
+             R"(
+module test;
+func test() {
+    var a, b;
+}
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("while stmt");
 

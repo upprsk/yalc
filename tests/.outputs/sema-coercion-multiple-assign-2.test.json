@@ -1,0 +1,1 @@
+{"stderr":":memory::5:12: error: can not coerce value of type u32 to type i32\n  0004 |     var a, b = 11, 12;\n> 0005 |     a, b = f();\n                    ^^^\n  0006 | }\n:memory::5:8: note: required i32 from here\n  0004 |     var a, b = 11, 12;\n> 0005 |     a, b = f();\n                ^\n  0006 | }\n"}

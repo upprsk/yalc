@@ -1,0 +1,1 @@
+{"stderr":":memory::5:12: error: can not coerce value of type i32 to type i8\n  0004 |     var a: i8;\n> 0005 |     a, _ = f();\n                    ^^^\n  0006 | }\n:memory::5:5: note: required i8 from here\n  0004 |     var a: i8;\n> 0005 |     a, _ = f();\n             ^\n  0006 | }\n"}

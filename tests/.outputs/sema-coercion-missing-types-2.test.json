@@ -1,0 +1,1 @@
+{"stderr":":memory::4:5: error: no types in declaration\n  0003 | func test() {\n> 0004 |     var a, b;\n             ^^^^^^^^^\n  0005 | }\n"}
