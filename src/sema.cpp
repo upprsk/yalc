@@ -435,6 +435,24 @@ auto count_init_exprs(conv::ExprPack const& pack) -> size_t {
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void set_type_of_id(Node* id_node, types::Type* type, Context& ctx) {
+    ASSERT(type != nullptr);
+    ASSERT(id_node != nullptr);
+
+    ASSERT(id_node->get_type() == nullptr);
+    id_node->set_type(type);
+
+    auto name = conv::id(*id_node);
+    if (name.to) {
+        ASSERT(name.to->get_type() == nullptr);
+        name.to->value = {.type = type};
+    } else {
+        ctx.er->report_bug(id_node->get_loc(), "id has no decl: {:?}",
+                           name.name);
+    }
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                                      Node* inits_node, Context& ctx) {
     auto& ts = *ctx.ts;
@@ -500,20 +518,12 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                 // a function should not be able to return this
                 ASSERT(!i->is_untyped_int());
 
-                ids[name_idx]->set_type(r);
                 coercions.push_back(r);
                 if (*r != *i) {
                     requires_coercion = true;
                 }
 
-                auto name = conv::id(*ids[name_idx]);
-                if (name.to) {
-                    ASSERT(name.to->get_type() == nullptr);
-                    name.to->value = {.type = r};
-                } else {
-                    er.report_debug(ids[name_idx]->get_loc(),
-                                    "id has no decl: {:?}", name.name);
-                }
+                set_type_of_id(ids[name_idx], r, ctx);
 
                 name_idx++;
                 ty_idx++;
@@ -551,18 +561,10 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                 fixup_untyped_integer_chain(ts, init, r);
             }
 
-            ids[name_idx]->set_type(r);
             if (*r != *init->get_type())
                 inits[init_idx] = ast.new_coerce(init->get_loc(), init, r);
 
-            auto name = conv::id(*ids[name_idx]);
-            if (name.to) {
-                ASSERT(name.to->get_type() == nullptr);
-                name.to->value = {.type = r};
-            } else {
-                er.report_debug(ids[name_idx]->get_loc(),
-                                "id has no decl: {:?}", name.name);
-            }
+            set_type_of_id(ids[name_idx], r, ctx);
 
             name_idx++;
             ty_idx++;
@@ -591,14 +593,7 @@ void visit_decl_with_types(Ast& ast, Node* ids_node, Node* types_node,
         if (name.is_discard()) continue;
 
         auto type = eval_node_to_type(ast, ty, ctx);
-        id->set_type(type);
-
-        if (name.to) {
-            ASSERT(name.to->get_type() == nullptr);
-            name.to->value = {.type = type};
-        } else {
-            er.report_debug(id->get_loc(), "id has no decl: {:?}", name.name);
-        }
+        set_type_of_id(id, type, ctx);
     }
 }
 
@@ -636,16 +631,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
                     continue;
                 }
 
-                ids[name_idx]->set_type(i);
-
-                auto name = conv::id(*ids[name_idx]);
-                if (name.to) {
-                    ASSERT(name.to->get_type() == nullptr);
-                    name.to->value = {.type = i};
-                } else {
-                    er.report_debug(ids[name_idx]->get_loc(),
-                                    "id has no decl: {:?}", name.name);
-                }
+                set_type_of_id(ids[name_idx], i, ctx);
 
                 name_idx++;
             }
@@ -663,16 +649,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
                 init_type = init->get_type();
             }
 
-            ids[name_idx]->set_type(init_type);
-
-            auto name = conv::id(*ids[name_idx]);
-            if (name.to) {
-                ASSERT(name.to->get_type() == nullptr);
-                name.to->value = {.type = init_type};
-            } else {
-                er.report_debug(ids[name_idx]->get_loc(),
-                                "id has no decl: {:?}", name.name);
-            }
+            set_type_of_id(ids[name_idx], init_type, ctx);
 
             name_idx++;
         }
@@ -712,16 +689,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
         auto ids = data.get_ids();
         for (auto const& id : ids.ids) {
-            auto name = conv::id(*id);
-            id->set_type(ts.get_error());
-
-            if (name.to) {
-                ASSERT(name.to->get_type() == nullptr);
-                name.to->value = {.type = ts.get_error()};
-            } else {
-                er.report_debug(id->get_loc(), "id has no decl: {:?}",
-                                name.name);
-            }
+            set_type_of_id(id, ts.get_error(), ctx);
         }
     }
 
