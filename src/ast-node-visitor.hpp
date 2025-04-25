@@ -373,6 +373,12 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
             visitor(ast, data.child, std::forward<decltype(visitor)>(visitor),
                     std::forward<decltype(args)>(args)...);
         } break;
+
+        case NodeKind::Discard: {
+            auto data = conv::discard(*node);
+            visitor(ast, data.child, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
     }
 }
 

@@ -1,7 +1,5 @@
-module main;
-func main() {
-    var i: i32;
-    while i < 10 {
-        i = i + 1;
-    }
+module test;
+
+func test() {
+    _ = 10 + 10 - 5;
 }

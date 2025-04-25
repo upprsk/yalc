@@ -287,6 +287,10 @@ public:
         return c;
     }
 
+    auto new_discard(Location loc, Node* child) -> Node* {
+        return new_node(NodeKind::Discard, loc, new_node_array_with(child));
+    }
+
     auto new_flat_module(Location loc, std::string_view name,
                          std::span<Node* const> children) -> Node* {
         return new_node(NodeKind::FlatModule, loc,

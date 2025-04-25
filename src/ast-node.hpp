@@ -465,6 +465,14 @@ enum class NodeKind : uint16_t {
     /// - `children` has 1 element, the expression to convert.
     /// - `data` has the type to convert to.
     Coerce,
+
+    /// Discard the result of some expression.
+    ///
+    ///     _ = 12;
+    ///
+    /// - `children` has 1 element, the child expression that has the discarded
+    /// value.
+    Discard,
 };
 
 class Node {
@@ -666,6 +674,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::AssignBor: name = "AssignBor"; break;
         case NodeKind::FlatModule: name = "FlatModule"; break;
         case NodeKind::Coerce: name = "Coerce"; break;
+        case NodeKind::Discard: name = "Discard"; break;
     }
 
     return name;

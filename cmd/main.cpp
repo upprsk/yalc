@@ -12,6 +12,7 @@
 #include "fmt/base.h"
 #include "fmt/color.h"
 #include "fmt/ranges.h"
+#include "lower.hpp"
 #include "name-res.hpp"
 #include "nlohmann/json.hpp"
 #include "parser.hpp"
@@ -40,7 +41,15 @@ auto real_main(yalc::Args const& args) -> int {
     auto prj_root = yal::resolve_names(ast, root, er, fs, ts, opt);
 
     yal::sema::sema_ast(ast, prj_root, er, ts, opt);
+    // if (args.dump_ast_json) {
+    //     json j = *prj_root;
+    //     j["ds"] = *ast.get_decl_store();
+    //     fmt::println("{}", j.dump());
+    // }
 
+    if (er.had_error()) return 1;
+
+    yal::lower::lower_ast(ast, prj_root, er, ts, opt);
     if (args.dump_ast_json) {
         json j = *prj_root;
         j["ds"] = *ast.get_decl_store();
