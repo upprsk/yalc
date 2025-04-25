@@ -417,18 +417,9 @@ void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
 
 // ============================================================================
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
-                                     Node* inits_node, Context& ctx) {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
-
-    auto ids = conv::id_pack(*ids_node).ids;
-    auto types = conv::expr_pack(*types_node).items;
-    auto inits = conv::expr_pack(*inits_node).items;
-
+auto count_init_exprs(conv::ExprPack const& pack) -> size_t {
     size_t expr_count{};
-    for (auto init : inits) {
+    for (auto init : pack.items) {
         auto ty = init->get_type();
         ASSERT(ty != nullptr);
 
@@ -439,6 +430,21 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
             expr_count++;
         }
     }
+
+    return expr_count;
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
+                                     Node* inits_node, Context& ctx) {
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto ids = conv::id_pack(*ids_node).ids;
+    auto types = conv::expr_pack(*types_node).items;
+    auto inits = conv::expr_pack(*inits_node).items;
+
+    auto expr_count = count_init_exprs(conv::expr_pack(*inits_node));
 
     if (ids.size() != expr_count) {
         er.report_error(inits_node->get_loc(),
@@ -605,18 +611,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
     auto ids = conv::id_pack(*ids_node).ids;
     auto inits = conv::expr_pack(*inits_node).items;
 
-    size_t expr_count{};
-    for (auto init : inits) {
-        auto ty = init->get_type();
-        ASSERT(ty != nullptr);
-
-        if (ty->is_pack()) {
-            // multiple returns of some function
-            expr_count += ty->inner.size();
-        } else {
-            expr_count++;
-        }
-    }
+    auto expr_count = count_init_exprs(conv::expr_pack(*inits_node));
 
     if (ids.size() != expr_count) {
         er.report_error(inits_node->get_loc(),
