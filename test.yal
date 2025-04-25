@@ -1,11 +1,15 @@
-module test;
-func test() {
-    var count = 10;
-    var i     = 0;
+module main;
 
-    while i < count {
-        printf("i=%d\n".ptr, i);
+@extern
+func putchar(c: i32) i32;
 
-        i = i + 1;
-    }
+func main() i32 {
+    _ = putchar(0x48);
+    _ = putchar(0x65);
+    _ = putchar(0x6C);
+    _ = putchar(0x6C);
+    _ = putchar(0x6F);
+    _ = putchar(0xa);
+
+    return 0;
 }

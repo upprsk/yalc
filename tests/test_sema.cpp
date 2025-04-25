@@ -323,6 +323,64 @@ func main() {
 }
 )");
 
+    run_test(ctx, p, "various decls with int 4", R"(
+module test;
+func test() {
+    var a = 10 == 01;
+    var b = 34 < 10 + 1;
+    var c = a != b;
+}
+)");
+
+    run_test(ctx, p, "various decls with int 5", R"(
+module test;
+func test() {
+    f(10 + 2 - 4);
+    g(10 + 2 - 4);
+    h(12 < 1 * 4, 4 == 33 + (100 / 2));
+}
+func f(x: i32) {}
+func g(x: u32) {}
+func h(a: bool, b: bool) {}
+)");
+
+    run_test(ctx, p, "various decls with int 6", R"(
+module test;
+func test() {
+    f(10 + 2 - 4);
+    g(10 + 2 - 4);
+
+    var a: u16 = 4;
+    h(12 < 1 * 4, a == 33 + (100 / 2));
+}
+func f(x: i32) {}
+func g(x: u32) {}
+func h(a: bool, b: bool) {}
+)");
+
+    run_test(ctx, p, "wrong parameters", R"(
+module test;
+func test() {
+    h(f(12), g(4), 12);
+}
+func f(x: i32) {}
+func g(x: u32) {}
+func h(a: bool, b: bool) {}
+)");
+
+    run_test(ctx, p, "assignments", R"(
+module main;
+func swap(x: i32, y: u32) (u32, i32) {}
+
+func main() {
+    var x, y = 0, 1;
+    var z, w = swap(2, 3);
+
+    z = 20;
+    // x, y = swap(4, 5);
+}
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("while stmt");
 
