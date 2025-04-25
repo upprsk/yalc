@@ -1053,7 +1053,6 @@ struct Parser {
         // expression statement
         auto expr = parse_expr();
 
-        // TODO: move assignment to its own function
         // TODO: handle assignment of multiple items (we would have a comma
         // here)
 
@@ -1064,52 +1063,7 @@ struct Parser {
                 TokenType::PercentEqual, TokenType::LessLessEqual,
                 TokenType::GreaterGreaterEqual, TokenType::AmpersandEqual,
                 TokenType::CarrotEqual, TokenType::PipeEqual)) {
-            auto kind = ast::NodeKind::Err;
-            switch (peek_prev().type) {
-                case TokenType::Equal: kind = ast::NodeKind::Assign; break;
-                case TokenType::PlusEqual:
-                    kind = ast::NodeKind::AssignAdd;
-                    break;
-                case TokenType::MinusEqual:
-                    kind = ast::NodeKind::AssignSub;
-                    break;
-                case TokenType::StarEqual:
-                    kind = ast::NodeKind::AssignMul;
-                    break;
-                case TokenType::SlashEqual:
-                    kind = ast::NodeKind::AssignDiv;
-                    break;
-                case TokenType::PercentEqual:
-                    kind = ast::NodeKind::AssignMod;
-                    break;
-                case TokenType::LessLessEqual:
-                    kind = ast::NodeKind::AssignShiftLeft;
-                    break;
-                case TokenType::GreaterGreaterEqual:
-                    kind = ast::NodeKind::AssignShiftRight;
-                    break;
-                case TokenType::AmpersandEqual:
-                    kind = ast::NodeKind::AssignBand;
-                    break;
-                case TokenType::CarrotEqual:
-                    kind = ast::NodeKind::AssignBxor;
-                    break;
-                case TokenType::PipeEqual:
-                    kind = ast::NodeKind::AssignBor;
-                    break;
-                default:
-                    UNREACHABLE("invalid token type when parsing assign",
-                                peek_prev());
-            }
-
-            auto rhs = parse_expr();
-            try(consume(TokenType::Semi));
-
-            expr = ast->new_expr_pack(expr->get_loc(), std::array{expr});
-            rhs = ast->new_expr_pack(rhs->get_loc(), std::array{rhs});
-
-            return ast->new_assign_stmt(expr->get_loc().extend(prev_span()),
-                                        kind, expr, rhs);
+            return parse_assign(expr);
         }
 
         try(consume(TokenType::Semi));
@@ -1162,6 +1116,45 @@ struct Parser {
 
         auto stmt = parse_stmt();
         return ast->new_defer_stmt(start.extend(prev_span()), stmt);
+    }
+
+    auto parse_assign(ast::Node* lhs) -> ast::Node* {
+        auto kind = ast::NodeKind::Err;
+        switch (peek_prev().type) {
+            case TokenType::Equal: kind = ast::NodeKind::Assign; break;
+            case TokenType::PlusEqual: kind = ast::NodeKind::AssignAdd; break;
+            case TokenType::MinusEqual: kind = ast::NodeKind::AssignSub; break;
+            case TokenType::StarEqual: kind = ast::NodeKind::AssignMul; break;
+            case TokenType::SlashEqual: kind = ast::NodeKind::AssignDiv; break;
+            case TokenType::PercentEqual:
+                kind = ast::NodeKind::AssignMod;
+                break;
+            case TokenType::LessLessEqual:
+                kind = ast::NodeKind::AssignShiftLeft;
+                break;
+            case TokenType::GreaterGreaterEqual:
+                kind = ast::NodeKind::AssignShiftRight;
+                break;
+            case TokenType::AmpersandEqual:
+                kind = ast::NodeKind::AssignBand;
+                break;
+            case TokenType::CarrotEqual:
+                kind = ast::NodeKind::AssignBxor;
+                break;
+            case TokenType::PipeEqual: kind = ast::NodeKind::AssignBor; break;
+            default:
+                UNREACHABLE("invalid token type when parsing assign",
+                            peek_prev());
+        }
+
+        auto rhs = parse_expr();
+        try(consume(TokenType::Semi));
+
+        lhs = ast->new_expr_pack(lhs->get_loc(), std::array{lhs});
+        rhs = ast->new_expr_pack(rhs->get_loc(), std::array{rhs});
+
+        return ast->new_assign_stmt(lhs->get_loc().extend(prev_span()), kind,
+                                    lhs, rhs);
     }
 
     // ------------------------------------------------------------------------
