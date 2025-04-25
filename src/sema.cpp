@@ -1037,7 +1037,8 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         visit(ctx, data.child);
 
         ASSERT(data.child->get_type() != nullptr);
-        if (!data.child->get_type()->is_void()) {
+        if (!data.child->get_type()->is_void() &&
+            !data.child->get_type()->is_err()) {
             er.report_warn(node->get_loc(),
                            "discard of non-void result of type {}",
                            *data.child->get_type());
