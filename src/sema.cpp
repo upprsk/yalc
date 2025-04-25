@@ -392,6 +392,7 @@ void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
     if (chain->is_oneof(ast::NodeKind::ExprPack)) {
         auto data = conv::expr_pack(*chain);
         ASSERT(data.items.size() == target->inner.size());
+        ASSERT(target->kind == types::TypeKind::Pack);
         ASSERT(!target->contains_untyped_int());
 
         chain->set_type(target);
