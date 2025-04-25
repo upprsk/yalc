@@ -1,0 +1,1 @@
+{"stderr":":memory::3:1: error: extern function should not have a body\n  0002 | @extern\n> 0003 | func extern_func() {}\n         ^^^^^^^^^^^^^^^^^^^^^\n  0004 | \n"}

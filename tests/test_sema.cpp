@@ -139,6 +139,20 @@ func main() {
 }
 )");
 
+    run_test(ctx, p, "extern with body", R"(module main;
+@extern
+func extern_func() {}
+)");
+
+    run_test(ctx, p, "extern with body 2", R"(module main;
+@extern(link_name="yay")
+func extern_func() {}
+)");
+
+    run_test(ctx, p, "not extern without body", R"(module main;
+func extern_func();
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("coercion");
 
