@@ -46,6 +46,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx);
 
 // ============================================================================
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
     auto& ts = *ctx.ts;
     auto& er = *ctx.er;
@@ -93,6 +94,7 @@ auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
                                 std::ranges::to<std::vector>())};
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto eval_node_func_ret_pack(Ast& ast, Node* node, Context& ctx) -> Value {
     auto& ts = *ctx.ts;
     auto& er = *ctx.er;
@@ -366,6 +368,9 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
     visit(sctx, data.body);
 }
 
+// ============================================================================
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
                                  types::Type* target) {
     ASSERT(chain != nullptr);
@@ -400,6 +405,7 @@ void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
     //              chain->get_kind());
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
 
@@ -702,6 +708,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     }
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node == nullptr) return;
 
