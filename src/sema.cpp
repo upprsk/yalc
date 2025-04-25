@@ -488,7 +488,7 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                         "wrong number of initializers for declaration, "
                         "expected {} but got {}",
                         ids.size(), expr_count);
-        er.report_note(ids_node->get_loc(), "{} identifiers declared here ",
+        er.report_note(ids_node->get_loc(), "{} identifiers declared here",
                        ids.size());
     }
 
