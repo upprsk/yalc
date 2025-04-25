@@ -324,6 +324,83 @@ func main() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("while stmt");
+
+    run_test(ctx, p, "minimal", R"(
+module test;
+func test() {
+    while true {
+        var x = 10;
+    }
+}
+)");
+
+    run_test(ctx, p, "kinda-for fixed-args", R"(
+module test;
+func test() {
+    var count = 10;
+    var i     = 0;
+
+    while i < count {
+        printf("i=%d\n".ptr, i);
+
+        i = i + 1;
+    }
+}
+
+@extern
+func printf(fmt: [*]const u8, arg0: i32);
+)");
+
+    run_test(ctx, p, "kinda-for var-args", R"(
+module test;
+func test() {
+    var count = 10;
+    var i     = 0;
+
+    while i < count {
+        printf("i=%d\n".ptr, i);
+
+        i = i + 1;
+    }
+}
+
+@extern
+func printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "kinda-for fails", R"(
+module test;
+func test() {
+    var count = 10;
+    var i     = 0;
+
+    while i < count {
+        printf("i=%d\n".ptr, i);
+
+        i = i + 1;
+    }
+}
+)");
+
+    run_test(ctx, p, "kinda-for wrong args", R"(
+module test;
+func test() {
+    var count = 10;
+    var i     = 0;
+
+    while i < count {
+        printf("i=%d\n", i);
+
+        i = i + 1;
+    }
+}
+
+@extern
+func printf(fmt: [*]const u8, arg0: i32);
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("examples");
 
     run_test(ctx, p, "hello", R"(module main;

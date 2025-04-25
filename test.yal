@@ -1,9 +1,11 @@
-module main;
-func check(num: i32) (i64, bool) {
-    return 0, false;
-}
+module test;
+func test() {
+    var count = 10;
+    var i     = 0;
 
-func main() i32 {
-    var r, ok = check(12);
-    return 0;
+    while i < count {
+        printf("i=%d\n".ptr, i);
+
+        i = i + 1;
+    }
 }

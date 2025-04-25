@@ -1,0 +1,1 @@
+{"stderr":":memory::8:16: error: can not coerce argument of type string_view to [*]const u8\n  0007 |     while i < count {\n> 0008 |         printf(\"i=%d\\n\", i);\n                        ^^^^^^^^\n  0009 | \n"}
