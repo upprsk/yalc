@@ -1053,8 +1053,9 @@ struct Parser {
         // expression statement
         auto expr = parse_expr();
 
-        // TODO: handle assignment of multiple items (we would have a comma
-        // here)
+        if (check(TokenType::Comma)) {
+            return parse_assign_many(expr);
+        }
 
         // handle assigment
         if (match_oneof(
@@ -1119,8 +1120,55 @@ struct Parser {
     }
 
     auto parse_assign(ast::Node* lhs) -> ast::Node* {
+        auto kind = get_assigment_kind(peek_prev().type);
+
+        auto rhs = parse_expr();
+        try(consume(TokenType::Semi));
+
+        lhs = ast->new_expr_pack(lhs->get_loc(), std::array{lhs});
+        rhs = ast->new_expr_pack(rhs->get_loc(), std::array{rhs});
+
+        return ast->new_assign_stmt(lhs->get_loc().extend(prev_span()), kind,
+                                    lhs, rhs);
+    }
+
+    auto parse_assign_many(ast::Node* first_lhs) -> ast::Node* {
+        std::vector lhs_items{first_lhs};
+        while (match(TokenType::Comma)) {
+            auto lhs_item = parse_expr();
+            lhs_items.push_back(lhs_item);
+        }
+
+        if (!match_oneof(
+                TokenType::Equal, TokenType::PlusEqual, TokenType::MinusEqual,
+                TokenType::StarEqual, TokenType::SlashEqual,
+                TokenType::PercentEqual, TokenType::LessLessEqual,
+                TokenType::GreaterGreaterEqual, TokenType::AmpersandEqual,
+                TokenType::CarrotEqual, TokenType::PipeEqual)) {
+            er->report_error(span(), "expected assignment operator, found {}",
+                             peek().type);
+            (void)consume(TokenType::Semi);
+            return ast->new_err(prev_loc());
+        }
+
+        auto kind = get_assigment_kind(peek_prev().type);
+
+        auto rhs = parse_expr_pack();
+        try(consume(TokenType::Semi));
+
+        auto lhs_loc = first_lhs->get_loc().extend(
+            lhs_items.at(lhs_items.size() - 1)->get_loc().span);
+        auto lhs = ast->new_expr_pack(lhs_loc, lhs_items);
+
+        return ast->new_assign_stmt(lhs->get_loc().extend(prev_span()), kind,
+                                    lhs, rhs);
+    }
+
+    // ------------------------------------------------------------------------
+
+    [[nodiscard]] auto get_assigment_kind(TokenType tt) const -> ast::NodeKind {
         auto kind = ast::NodeKind::Err;
-        switch (peek_prev().type) {
+        switch (tt) {
             case TokenType::Equal: kind = ast::NodeKind::Assign; break;
             case TokenType::PlusEqual: kind = ast::NodeKind::AssignAdd; break;
             case TokenType::MinusEqual: kind = ast::NodeKind::AssignSub; break;
@@ -1142,19 +1190,10 @@ struct Parser {
                 kind = ast::NodeKind::AssignBxor;
                 break;
             case TokenType::PipeEqual: kind = ast::NodeKind::AssignBor; break;
-            default:
-                UNREACHABLE("invalid token type when parsing assign",
-                            peek_prev());
+            default: UNREACHABLE("invalid token type when parsing assign", tt);
         }
 
-        auto rhs = parse_expr();
-        try(consume(TokenType::Semi));
-
-        lhs = ast->new_expr_pack(lhs->get_loc(), std::array{lhs});
-        rhs = ast->new_expr_pack(rhs->get_loc(), std::array{rhs});
-
-        return ast->new_assign_stmt(lhs->get_loc().extend(prev_span()), kind,
-                                    lhs, rhs);
+        return kind;
     }
 
     // ------------------------------------------------------------------------
