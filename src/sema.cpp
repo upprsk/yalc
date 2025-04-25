@@ -879,6 +879,12 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
         else {
             if (lhs[lhs_idx]->is_oneof(ast::NodeKind::Id) &&
                 conv::id(*lhs[lhs_idx]).is_discard()) {
+                // need to fixup
+                if (rhs_type->is_untyped_int()) {
+                    fixup_untyped_integer_chain(ts, rhs_item,
+                                                ts.get_default_int());
+                }
+
                 lhs_idx++;
                 continue;
             }
