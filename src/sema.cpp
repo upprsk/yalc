@@ -452,6 +452,25 @@ void set_type_of_id(Node* id_node, types::Type* type, Context& ctx) {
     }
 }
 
+auto coerce_and_check(types::Type* target, types::Type* source,
+                      Node* target_node, Node* source_node, Context& ctx)
+    -> types::Type* {
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto r = ts.coerce(target, source);
+    if (!r) {
+        er.report_error(source_node->get_loc(),
+                        "can not coerce value of type {} to type {}", *source,
+                        *target);
+        er.report_note(target_node->get_loc(), "required {} from here",
+                       *target);
+        r = ts.get_error();
+    }
+
+    return r;
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                                      Node* inits_node, Context& ctx) {
@@ -504,16 +523,7 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                 }
 
                 auto type = eval_node_to_type(ast, types[ty_idx], ctx);
-                auto r = ts.coerce(type, i);
-                if (!r) {
-                    er.report_error(init->get_loc(),
-                                    "can not coerce value of type {} to "
-                                    "declaration of type {}",
-                                    *i, *type);
-                    er.report_note(types[ty_idx]->get_loc(),
-                                   "required {} from here", *type);
-                    r = ts.get_error();
-                }
+                auto r = coerce_and_check(type, i, types[ty_idx], init, ctx);
 
                 // a function should not be able to return this
                 ASSERT(!i->is_untyped_int());
@@ -543,16 +553,8 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
             }
 
             auto type = eval_node_to_type(ast, types[ty_idx], ctx);
-            auto r = ts.coerce(type, init_type);
-            if (!r) {
-                er.report_error(init->get_loc(),
-                                "can not coerce value of type {} to "
-                                "declaration of type {}",
-                                *init_type, *type);
-                er.report_note(types[ty_idx]->get_loc(),
-                               "required {} from here", *type);
-                r = ts.get_error();
-            }
+            auto r =
+                coerce_and_check(type, init_type, types[ty_idx], init, ctx);
 
             if (init_type->is_untyped_int()) {
                 ASSERT(!r->is_untyped_int());
@@ -826,17 +828,10 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
         // first try to coerce the rhs to lhs to have a single type on both
         // sides
-        auto r = ts.coerce(lhs, rhs);
-        if (!r) {
-            er.report_error(
-                node->get_loc(),
-                "can not coerce argument of type {} to {} in comparison", *lhs,
-                *rhs);
-        } else {
-            // coerce rhs to the same type as lhs
-            if (*r != *rhs)
-                node->set_child(
-                    1, ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
+        auto r = coerce_and_check(lhs, rhs, node, data.rhs, ctx);
+        if (!r->is_err() && *r != *rhs) {
+            node->set_child(1,
+                            ast.new_coerce(data.rhs->get_loc(), data.rhs, r));
         }
 
         if (lhs->is_untyped_int() && !rhs->is_untyped_int()) {
