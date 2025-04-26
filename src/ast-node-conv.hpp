@@ -279,6 +279,16 @@ struct UnscopedGroup {
     std::span<Node*> items;
 };
 
+struct DeclLocalVarDirect {
+    std::string_view name;
+    Node*            init{};
+};
+
+struct DeclLocalVarDirectPack {
+    std::span<Node*> names;
+    Node*            init{};
+};
+
 // ------------------------------------------------------------------
 
 [[nodiscard]] constexpr auto id(Node const& n) -> Id {
@@ -575,6 +585,23 @@ struct UnscopedGroup {
 [[nodiscard]] constexpr auto unscoped_group(Node const& n) -> UnscopedGroup {
     ASSERT(n.get_kind() == NodeKind::UnscopedGroup);
     return {.items = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto decl_local_var_direct(Node const& n)
+    -> DeclLocalVarDirect {
+    ASSERT(n.get_kind() == NodeKind::DeclLocalVarDirect);
+    return {.name = n.get_data_str(), .init = n.get_child(0)};
+}
+
+[[nodiscard]] constexpr auto decl_local_var_direct_pack(Node const& n)
+    -> DeclLocalVarDirectPack {
+    ASSERT(n.get_kind() == NodeKind::DeclLocalVarDirectPack);
+
+    auto size = n.get_children().size();
+    return {
+        .names = n.get_children().subspan(size - 1),
+        .init = n.get_child(size - 1),
+    };
 }
 
 // ==================================================================

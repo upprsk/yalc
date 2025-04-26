@@ -398,6 +398,23 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
             visitor(ast, data.rhs, std::forward<decltype(visitor)>(visitor),
                     std::forward<decltype(args)>(args)...);
         } break;
+
+        case NodeKind::DeclLocalVarDirect: {
+            auto data = conv::decl_local_var_direct(*node);
+            visitor(ast, data.init, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
+
+        case NodeKind::DeclLocalVarDirectPack: {
+            auto data = conv::decl_local_var_direct_pack(*node);
+            for (auto c : data.names) {
+                visitor(ast, c, std::forward<decltype(visitor)>(visitor),
+                        std::forward<decltype(args)>(args)...);
+            }
+
+            visitor(ast, data.init, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
     }
 }
 

@@ -501,6 +501,19 @@ enum class NodeKind : uint16_t {
     /// - `children` contains 2 elements, the ExprPack for the rhs and a single
     /// expression for rhs.
     AssignDirectPack,
+
+    /// Declare a single local variable.
+    ///
+    /// - `children` has the initializer for the variable.
+    /// - `data` has the variable name.
+    DeclLocalVarDirect,
+
+    /// Declare local variables from a function with multible returns.
+    ///
+    /// - `children` has n+1 elements. The first n elements are `Id`s with the
+    /// names beeing declared or `Discarded` when the value is discarded. The
+    /// last element is the initializer expression with the function call.
+    DeclLocalVarDirectPack
 };
 
 class Node {
@@ -712,6 +725,10 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::UnscopedGroup: name = "UnscopedGroup"; break;
         case NodeKind::AssignDirect: name = "AssignDirect"; break;
         case NodeKind::AssignDirectPack: name = "AssignDirectPack"; break;
+        case NodeKind::DeclLocalVarDirect: name = "DeclLocalVarDirect"; break;
+        case NodeKind::DeclLocalVarDirectPack:
+            name = "DeclLocalVarDirectPack";
+            break;
     }
 
     return name;

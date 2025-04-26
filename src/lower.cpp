@@ -26,13 +26,171 @@ struct Context {
 
 // ============================================================================
 
+void visit_node(Ast& ast, Node* node, Context& ctx);
+
+void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+
+    auto data = conv::var_decl(*node);
+
+    std::vector<Node*> items;
+
+    if (data.inits == nullptr) {
+        // got no initializers
+        return;
+    }
+
+    // got initializers
+    auto ids = data.get_ids().ids;
+    auto inits = data.get_inits().items;
+
+    for (size_t id_idx{}; auto [init_idx, init] : rv::enumerate(inits)) {
+        if (id_idx >= ids.size()) break;
+
+        auto init_type = init->get_type();
+
+        // result of calling some function
+        if (init_type->is_pack()) {
+            std::vector<Node*> id_items;
+
+            for (auto _ : init_type->inner) {
+                if (id_idx >= ids.size()) break;
+
+                if (conv::id(*ids[id_idx]).is_discard()) {
+                    id_items.push_back(
+                        ast.new_discarded(ids[id_idx]->get_loc()));
+                    id_idx++;
+                    continue;
+                }
+
+                id_items.push_back(ids[id_idx]);
+                id_idx++;
+            }
+
+            visit(ctx, init);
+
+            auto d = ast.new_decl_local_var_direct_pack(node->get_loc(),
+                                                        id_items, init);
+            d->set_type(ts.get_void());
+            items.push_back(d);
+        }
+
+        // a simple initializer expression
+        else {
+            auto id = ids[id_idx];
+            if (conv::id(*id).is_discard()) {
+                auto d = ast.new_discard(id->get_loc(), init);
+                d->set_type(ts.get_void());
+                items.push_back(d);
+                id_idx++;
+                continue;
+            }
+
+            visit(ctx, init);
+
+            auto d = ast.new_decl_local_var_direct(node->get_loc(),
+                                                   conv::id(*id).name, init);
+            d->set_type(ts.get_void());
+            items.push_back(d);
+        }
+    }
+
+    node->transmute_to_unscoped_group(ast.allocate_node_span(items));
+}
+
+void visit_assign(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+
+    auto data = conv::assign(*node);
+    auto lhs = data.get_lhs().items;
+    auto rhs = data.get_rhs().items;
+
+    std::vector<Node*> items;
+    for (size_t lhs_idx{}; auto [rhs_idx, rhs_item] : rv::enumerate(rhs)) {
+        if (lhs_idx >= lhs.size()) break;
+
+        auto rhs_type = rhs_item->get_type();
+
+        // result of calling some function
+        if (rhs_type->is_pack()) {
+            std::vector<Node*> lhs_items;
+            for (auto _ : rhs_type->inner) {
+                if (lhs_idx >= lhs.size()) break;
+                auto lhs_item = lhs[lhs_idx];
+
+                if (conv::is_discard_id(*lhs_item)) {
+                    lhs_items.push_back(ast.new_discarded(lhs_item->get_loc()));
+                    lhs_idx++;
+                    continue;
+                }
+
+                lhs_items.push_back(lhs_item);
+                lhs_idx++;
+            }
+
+            // in case all of the items are Discarded, just make the whole
+            // thing a Discard
+            auto are_all_discarded = std::ranges::all_of(
+                lhs_items,
+                [](Node* n) { return n->is_oneof(ast::NodeKind::Discarded); });
+            if (are_all_discarded) {
+                auto d = ast.new_discard(node->get_loc(), rhs_item);
+                d->set_type(ts.get_void());
+                items.push_back(d);
+
+                continue;
+            }
+
+            auto loc = lhs_items.at(0)->get_loc().extend(
+                lhs_items.at(lhs_items.size() - 1)->get_loc());
+            // FIXME: add types to the expr pack
+            auto new_lhs_pack = ast.new_expr_pack(loc, lhs_items);
+
+            auto d = ast.new_assign_stmt(node->get_loc(),
+                                         ast::NodeKind::AssignDirectPack,
+                                         new_lhs_pack, rhs_item);
+            d->set_type(ts.get_void());
+            items.push_back(d);
+        }
+
+        // a simple initializer expression
+        else {
+            auto lhs_item = lhs[lhs_idx];
+            if (conv::is_discard_id(*lhs_item)) {
+                // discarding the value, add with discard
+
+                visit(ctx, rhs_item);
+
+                auto d = ast.new_discard(rhs_item->get_loc(), rhs_item);
+                d->set_type(ts.get_void());
+                items.push_back(d);
+
+                lhs_idx++;
+                continue;
+            }
+
+            // convert to a direct assignment
+            auto d = ast.new_assign_stmt(node->get_loc(),
+                                         ast::NodeKind::AssignDirect, lhs_item,
+                                         rhs_item);
+            d->set_type(ts.get_void());
+            items.push_back(d);
+
+            lhs_idx++;
+        }
+    }
+
+    node->transmute_to_unscoped_group(ast.allocate_node_span(items));
+}
+
 void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node == nullptr) return;
 
     auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
-    auto visit_span = [&](Context& ctx, std::span<Node* const> nodes) {
-        for (auto node : nodes) visit_node(ast, node, ctx);
-    };
 
     auto visit_children = [&](Context& ctx, Node* node) {
         ast::visit_children(
@@ -46,89 +204,13 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     auto& er = *ctx.er;
     auto& ts = *ctx.ts;
 
+    if (node->is_oneof(ast::NodeKind::VarDecl)) {
+        visit_var_decl(ast, node, ctx);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Assign)) {
-        auto data = conv::assign(*node);
-        auto lhs = data.get_lhs().items;
-        auto rhs = data.get_rhs().items;
-
-        std::vector<Node*> items;
-        for (size_t lhs_idx{}; auto [rhs_idx, rhs_item] : rv::enumerate(rhs)) {
-            if (lhs_idx >= lhs.size()) break;
-
-            auto rhs_type = rhs_item->get_type();
-
-            // result of calling some function
-            if (rhs_type->is_pack()) {
-                std::vector<Node*> lhs_items;
-                for (auto _ : rhs_type->inner) {
-                    if (lhs_idx >= lhs.size()) break;
-                    auto lhs_item = lhs[lhs_idx];
-
-                    if (conv::is_discard_id(*lhs_item)) {
-                        lhs_items.push_back(
-                            ast.new_discarded(lhs_item->get_loc()));
-                        lhs_idx++;
-                        continue;
-                    }
-
-                    lhs_items.push_back(lhs_item);
-                    lhs_idx++;
-                }
-
-                // in case all of the items are Discarded, just make the whole
-                // thing a Discard
-                auto are_all_discarded =
-                    std::ranges::all_of(lhs_items, [](Node* n) {
-                        return n->is_oneof(ast::NodeKind::Discarded);
-                    });
-                if (are_all_discarded) {
-                    auto d = ast.new_discard(node->get_loc(), rhs_item);
-                    d->set_type(ts.get_void());
-                    items.push_back(d);
-
-                    continue;
-                }
-
-                auto loc = lhs_items.at(0)->get_loc().extend(
-                    lhs_items.at(lhs_items.size() - 1)->get_loc());
-                // FIXME: add types to the expr pack
-                auto new_lhs_pack = ast.new_expr_pack(loc, lhs_items);
-
-                auto d = ast.new_assign_stmt(node->get_loc(),
-                                             ast::NodeKind::AssignDirectPack,
-                                             new_lhs_pack, rhs_item);
-                d->set_type(ts.get_void());
-                items.push_back(d);
-            }
-
-            // a simple initializer expression
-            else {
-                auto lhs_item = lhs[lhs_idx];
-                if (conv::is_discard_id(*lhs_item)) {
-                    // discarding the value, add with discard
-
-                    visit(ctx, rhs_item);
-
-                    auto d = ast.new_discard(rhs_item->get_loc(), rhs_item);
-                    d->set_type(ts.get_void());
-                    items.push_back(d);
-
-                    lhs_idx++;
-                    continue;
-                }
-
-                // convert to a direct assignment
-                auto d = ast.new_assign_stmt(node->get_loc(),
-                                             ast::NodeKind::AssignDirect,
-                                             lhs_item, rhs_item);
-                d->set_type(ts.get_void());
-                items.push_back(d);
-
-                lhs_idx++;
-            }
-        }
-
-        node->transmute_to_unscoped_group(ast.allocate_node_span(items));
+        visit_assign(ast, node, ctx);
         return;
     }
 

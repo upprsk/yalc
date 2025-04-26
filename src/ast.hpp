@@ -307,6 +307,19 @@ public:
                         new_node_array_with(children));
     }
 
+    auto new_decl_local_var_direct(Location loc, std::string_view name,
+                                   Node* init) -> Node* {
+        return new_node(NodeKind::DeclLocalVarDirect, loc,
+                        new_node_array_with(init), new_string(name));
+    }
+
+    auto new_decl_local_var_direct_pack(Location               loc,
+                                        std::span<Node* const> ids, Node* init)
+        -> Node* {
+        return new_node(NodeKind::DeclLocalVarDirectPack, loc,
+                        new_node_array_with(ids, init));
+    }
+
     // ------------------------------------------------------------------------
 
     auto allocate_node_span(std::span<Node* const> nodes) -> std::span<Node*> {
@@ -370,7 +383,7 @@ private:
 
     void insert_into_array(auto&& it, std::span<Node* const> items,
                            auto&&... rest) {
-        insert_into_array(std::ranges::copy(items, it),
+        insert_into_array(std::ranges::copy(items, it).out,
                           std::forward<decltype(rest)>(rest)...);
     }
 
