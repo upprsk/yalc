@@ -589,6 +589,10 @@ enum class PrivateKind { Public, Module, File };
     return PrivateKind::Public;
 }
 
+[[nodiscard]] constexpr auto is_discard_id(Node const& n) -> bool {
+    return n.is_oneof(NodeKind::Id) && id(n).is_discard();
+}
+
 // ==================================================================
 
 constexpr auto FuncDecl::get_decorators() const -> Decorators {

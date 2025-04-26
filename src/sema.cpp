@@ -572,7 +572,7 @@ void fixup_expr_pack_lvalue(types::TypeStore& ts, Node* pack) {
     std::vector<types::Type*> types;
     for (auto n : inits) {
         ASSERT(n != nullptr);
-        if (n->is_oneof(ast::NodeKind::Id) && conv::id(*n).is_discard()) {
+        if (conv::is_discard_id(*n)) {
             types.push_back(ts.get_void());
             continue;
         }
@@ -847,8 +847,7 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
             for (auto ty : rhs_type->inner) {
                 if (lhs_idx >= lhs.size()) break;
 
-                if (lhs[lhs_idx]->is_oneof(ast::NodeKind::Id) &&
-                    conv::id(*lhs[lhs_idx]).is_discard()) {
+                if (conv::is_discard_id(*lhs[lhs_idx])) {
                     coercions.push_back(ts.get_void());
                     lhs_idx++;
                     continue;
@@ -877,8 +876,7 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
 
         // a simple initializer expression
         else {
-            if (lhs[lhs_idx]->is_oneof(ast::NodeKind::Id) &&
-                conv::id(*lhs[lhs_idx]).is_discard()) {
+            if (conv::is_discard_id(*lhs[lhs_idx])) {
                 // need to fixup
                 if (rhs_type->is_untyped_int()) {
                     fixup_untyped_integer_chain(ts, rhs_item,
