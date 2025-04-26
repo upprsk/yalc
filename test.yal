@@ -1,5 +1,7 @@
 module test;
 
+func getx() (i32, i32) {}
 func test() {
-    _ = 10 + 10 - 5;
+    var x, y: i32, i64;
+    _, _, y = getx(), x;
 }

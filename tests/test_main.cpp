@@ -9,6 +9,7 @@
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
 #include "test_helpers.hpp"
+#include "test_lower.hpp"
 #include "test_name_res.hpp"
 #include "test_parser.hpp"
 #include "test_sema.hpp"
@@ -118,6 +119,12 @@ auto real_main(Args args) -> int {
 
     {
         auto [tok, tfailed] = test_sema(p);
+        ok += tok;
+        failed += tfailed;
+    }
+
+    {
+        auto [tok, tfailed] = test_lower(p);
         ok += tok;
         failed += tfailed;
     }
