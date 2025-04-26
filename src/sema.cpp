@@ -787,6 +787,8 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     visit(ctx, data.types);
     visit(ctx, data.inits);
 
+    node->set_type(ts.get_void());
+
     // we have explicit types
     if (data.types && data.inits) {
         visit_decl_with_types_and_inits(ast, data.ids, data.types, data.inits,
