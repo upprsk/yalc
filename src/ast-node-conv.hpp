@@ -429,14 +429,13 @@ struct Discard {
 }
 
 [[nodiscard]] constexpr auto binary(Node const& n) -> Binary {
-    ASSERT(n.is_oneof(
-        ast::NodeKind::Add, ast::NodeKind::Sub, ast::NodeKind::Mul,
-        ast::NodeKind::Div, ast::NodeKind::Mod, ast::NodeKind::LeftShift,
-        ast::NodeKind::RightShift, ast::NodeKind::Equal,
-        ast::NodeKind::NotEqual, ast::NodeKind::Less, ast::NodeKind::LessEqual,
-        ast::NodeKind::Greater, ast::NodeKind::GreaterEqual,
-        ast::NodeKind::Band, ast::NodeKind::Bor, ast::NodeKind::Bxor,
-        ast::NodeKind::Land, ast::NodeKind::Lor, ast::NodeKind::Cast));
+    ASSERT(n.is_oneof(NodeKind::Add, NodeKind::Sub, NodeKind::Mul,
+                      NodeKind::Div, NodeKind::Mod, NodeKind::LeftShift,
+                      NodeKind::RightShift, NodeKind::Equal, NodeKind::NotEqual,
+                      NodeKind::Less, NodeKind::LessEqual, NodeKind::Greater,
+                      NodeKind::GreaterEqual, NodeKind::Band, NodeKind::Bor,
+                      NodeKind::Bxor, NodeKind::Land, NodeKind::Lor,
+                      NodeKind::Cast));
     return {.lhs = n.get_child(0), .rhs = n.get_child(1)};
 }
 
@@ -544,13 +543,11 @@ struct Discard {
 }
 
 [[nodiscard]] constexpr auto assign(Node const& n) -> Assign {
-    ASSERT(n.is_oneof(ast::NodeKind::Assign, ast::NodeKind::AssignAdd,
-                      ast::NodeKind::AssignSub, ast::NodeKind::AssignMul,
-                      ast::NodeKind::AssignDiv, ast::NodeKind::AssignMod,
-                      ast::NodeKind::AssignShiftLeft,
-                      ast::NodeKind::AssignShiftRight,
-                      ast::NodeKind::AssignBand, ast::NodeKind::AssignBxor,
-                      ast::NodeKind::AssignBor));
+    ASSERT(n.is_oneof(
+        NodeKind::Assign, NodeKind::AssignAdd, NodeKind::AssignSub,
+        NodeKind::AssignMul, NodeKind::AssignDiv, NodeKind::AssignMod,
+        NodeKind::AssignShiftLeft, NodeKind::AssignShiftRight,
+        NodeKind::AssignBand, NodeKind::AssignBxor, NodeKind::AssignBor));
     return {
         .lhs = n.get_child(0),
         .rhs = n.get_child(1),
@@ -558,7 +555,7 @@ struct Discard {
 }
 
 [[nodiscard]] constexpr auto coerce(Node const& n) -> Coerce {
-    ASSERT(n.is_oneof(ast::NodeKind::Coerce));
+    ASSERT(n.is_oneof(NodeKind::Coerce));
     return {
         .child = n.get_child(0),
         .target = n.get_data_type(),
@@ -566,7 +563,7 @@ struct Discard {
 }
 
 [[nodiscard]] constexpr auto discard(Node const& n) -> Discard {
-    ASSERT(n.is_oneof(ast::NodeKind::Discard));
+    ASSERT(n.is_oneof(NodeKind::Discard));
     return {.child = n.get_child(0)};
 }
 
