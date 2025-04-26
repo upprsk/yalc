@@ -279,6 +279,12 @@ public:
         return new_node(kind, loc, new_node_array_with(left, right));
     }
 
+    auto new_flat_module(Location loc, std::string_view name,
+                         std::span<Node* const> children) -> Node* {
+        return new_node(NodeKind::FlatModule, loc,
+                        new_node_array_with(children), new_string(name));
+    }
+
     auto new_coerce(Location loc, Node* child, types::Type* target) -> Node* {
         auto c =
             new_node(NodeKind::Coerce, loc, new_node_array_with(child), target);
@@ -289,12 +295,6 @@ public:
 
     auto new_discard(Location loc, Node* child) -> Node* {
         return new_node(NodeKind::Discard, loc, new_node_array_with(child));
-    }
-
-    auto new_flat_module(Location loc, std::string_view name,
-                         std::span<Node* const> children) -> Node* {
-        return new_node(NodeKind::FlatModule, loc,
-                        new_node_array_with(children), new_string(name));
     }
 
     // ------------------------------------------------------------------------
