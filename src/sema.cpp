@@ -662,6 +662,12 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
         // a simple initializer expression
         else {
             if (conv::id(*ids[name_idx]).is_discard()) {
+                if (init_type->is_untyped_int()) {
+                    // fixup untyped integers
+                    fixup_untyped_integer_chain(*ctx.ts, init,
+                                                ts.get_default_int());
+                }
+
                 name_idx++;
                 ty_idx++;
                 continue;
@@ -748,6 +754,12 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
         // a simple initializer expression
         else {
             if (conv::id(*ids[name_idx]).is_discard()) {
+                if (init_type->is_untyped_int()) {
+                    // fixup untyped integers
+                    fixup_untyped_integer_chain(*ctx.ts, init,
+                                                ts.get_default_int());
+                }
+
                 name_idx++;
                 continue;
             }
