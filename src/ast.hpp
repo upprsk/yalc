@@ -297,6 +297,22 @@ public:
         return new_node(NodeKind::Discard, loc, new_node_array_with(child));
     }
 
+    auto new_discarded(Location loc) -> Node* {
+        return new_node(NodeKind::Discarded, loc);
+    }
+
+    auto new_unscoped_group(Location loc, std::span<Node* const> children)
+        -> Node* {
+        return new_node(NodeKind::UnscopedGroup, loc,
+                        new_node_array_with(children));
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto allocate_node_span(std::span<Node* const> nodes) -> std::span<Node*> {
+        return new_node_array_with(nodes);
+    }
+
     // ------------------------------------------------------------------------
 
     auto shallow_dupe(Node const& node) -> Node* {

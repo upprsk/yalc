@@ -275,6 +275,10 @@ struct Discard {
     Node* child{};
 };
 
+struct UnscopedGroup {
+    std::span<Node*> items;
+};
+
 // ------------------------------------------------------------------
 
 [[nodiscard]] constexpr auto id(Node const& n) -> Id {
@@ -547,7 +551,8 @@ struct Discard {
         NodeKind::Assign, NodeKind::AssignAdd, NodeKind::AssignSub,
         NodeKind::AssignMul, NodeKind::AssignDiv, NodeKind::AssignMod,
         NodeKind::AssignShiftLeft, NodeKind::AssignShiftRight,
-        NodeKind::AssignBand, NodeKind::AssignBxor, NodeKind::AssignBor));
+        NodeKind::AssignBand, NodeKind::AssignBxor, NodeKind::AssignBor,
+        NodeKind::AssignDirect, NodeKind::AssignDirectPack));
     return {
         .lhs = n.get_child(0),
         .rhs = n.get_child(1),
@@ -565,6 +570,11 @@ struct Discard {
 [[nodiscard]] constexpr auto discard(Node const& n) -> Discard {
     ASSERT(n.is_oneof(NodeKind::Discard));
     return {.child = n.get_child(0)};
+}
+
+[[nodiscard]] constexpr auto unscoped_group(Node const& n) -> UnscopedGroup {
+    ASSERT(n.get_kind() == NodeKind::UnscopedGroup);
+    return {.items = n.get_children()};
 }
 
 // ==================================================================

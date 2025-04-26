@@ -379,6 +379,25 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
             visitor(ast, data.child, std::forward<decltype(visitor)>(visitor),
                     std::forward<decltype(args)>(args)...);
         } break;
+
+        case NodeKind::Discarded: break;
+
+        case NodeKind::UnscopedGroup: {
+            auto data = conv::unscoped_group(*node);
+            for (auto c : data.items) {
+                visitor(ast, c, std::forward<decltype(visitor)>(visitor),
+                        std::forward<decltype(args)>(args)...);
+            }
+        } break;
+
+        case NodeKind::AssignDirect:
+        case NodeKind::AssignDirectPack: {
+            auto data = conv::assign(*node);
+            visitor(ast, data.lhs, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+            visitor(ast, data.rhs, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
     }
 }
 

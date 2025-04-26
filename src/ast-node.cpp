@@ -10,6 +10,17 @@
 
 namespace yal::ast {
 
+void Node::transmute_to_unscoped_group(
+    std::span<Node*> allocated_unscoped_items) {
+    kind = NodeKind::UnscopedGroup;
+    children = allocated_unscoped_items;
+
+    ASSERT(decl == nullptr);
+    ASSERT(type != nullptr);
+    ASSERT(type->is_void());
+    ASSERT(std::holds_alternative<std::monostate>(data));
+}
+
 void to_json(json& j, Node const& n) {
     j = json{
         {"kind", fmt::to_string(n.get_kind())},

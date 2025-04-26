@@ -473,6 +473,34 @@ enum class NodeKind : uint16_t {
     /// - `children` has 1 element, the child expression that has the discarded
     /// value.
     Discard,
+
+    /// Used as a placeholder for discarded values.
+    ///
+    ///     a, _ = fn();
+    ///        ^_ this becomes a Discarded node
+    Discarded,
+
+    /// A group of statements, like a block, but that does not participate in
+    /// name resolution or scope rules. it is used when transforming one
+    /// node becomes many. This should be flattened on a later step.
+    ///
+    /// - `children` contains the child statements.
+    UnscopedGroup,
+
+    /// A de-sugared assignment, only has one item in the left hand side and one
+    /// element in the right hand side.
+    ///
+    /// - `children` constains 2 elements, the lhs and the rhs.
+    AssignDirect,
+
+    /// A de-sugared assigment from a function call. The left hand side contains
+    /// the expressions to assign to and the right hand side contains just one
+    /// expression (the function call). Discarded values are substituted with
+    /// Discarded nodes.
+    ///
+    /// - `children` contains 2 elements, the ExprPack for the rhs and a single
+    /// expression for rhs.
+    AssignDirectPack,
 };
 
 class Node {
@@ -567,6 +595,11 @@ public:
         ASSERT(i < children.size());
         children[i] = n;
     }
+
+    // ------------------------------------------------------------------------
+
+    void transmute_to_unscoped_group(
+        std::span<Node *> allocated_unscoped_items);
 
 private:
     NodeKind          kind{};
@@ -675,6 +708,10 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::FlatModule: name = "FlatModule"; break;
         case NodeKind::Coerce: name = "Coerce"; break;
         case NodeKind::Discard: name = "Discard"; break;
+        case NodeKind::Discarded: name = "Discarded"; break;
+        case NodeKind::UnscopedGroup: name = "UnscopedGroup"; break;
+        case NodeKind::AssignDirect: name = "AssignDirect"; break;
+        case NodeKind::AssignDirectPack: name = "AssignDirectPack"; break;
     }
 
     return name;

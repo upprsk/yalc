@@ -1,5 +1,6 @@
 #include "lower.hpp"
 
+#include <algorithm>
 #include <ranges>
 
 #include "ast-node-conv.hpp"
@@ -22,24 +23,6 @@ struct Context {
     ErrorReporter*    er{};
     types::TypeStore* ts{};
 };
-
-// FIXME: this is a copy from sema.cpp
-auto count_init_exprs(conv::ExprPack const& pack) -> size_t {
-    size_t expr_count{};
-    for (auto init : pack.items) {
-        auto ty = init->get_type();
-        ASSERT(ty != nullptr);
-
-        if (ty->is_pack()) {
-            // multiple returns of some function
-            expr_count += ty->inner.size();
-        } else {
-            expr_count++;
-        }
-    }
-
-    return expr_count;
-}
 
 // ============================================================================
 
@@ -76,14 +59,55 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
             // result of calling some function
             if (rhs_type->is_pack()) {
-                PANIC("not implemented");
+                std::vector<Node*> lhs_items;
+                for (auto _ : rhs_type->inner) {
+                    if (lhs_idx >= lhs.size()) break;
+                    auto lhs_item = lhs[lhs_idx];
+
+                    if (conv::is_discard_id(*lhs_item)) {
+                        lhs_items.push_back(
+                            ast.new_discarded(lhs_item->get_loc()));
+                        lhs_idx++;
+                        continue;
+                    }
+
+                    lhs_items.push_back(lhs_item);
+                    lhs_idx++;
+                }
+
+                // in case all of the items are Discarded, just make the whole
+                // thing a Discard
+                auto are_all_discarded =
+                    std::ranges::all_of(lhs_items, [](Node* n) {
+                        return n->is_oneof(ast::NodeKind::Discarded);
+                    });
+                if (are_all_discarded) {
+                    auto d = ast.new_discard(node->get_loc(), rhs_item);
+                    d->set_type(ts.get_void());
+                    items.push_back(d);
+
+                    continue;
+                }
+
+                auto loc = lhs_items.at(0)->get_loc().extend(
+                    lhs_items.at(lhs_items.size() - 1)->get_loc());
+                // FIXME: add types to the expr pack
+                auto new_lhs_pack = ast.new_expr_pack(loc, lhs_items);
+
+                auto d = ast.new_assign_stmt(node->get_loc(),
+                                             ast::NodeKind::AssignDirectPack,
+                                             new_lhs_pack, rhs_item);
+                d->set_type(ts.get_void());
+                items.push_back(d);
             }
 
             // a simple initializer expression
             else {
-                if (lhs[lhs_idx]->is_oneof(ast::NodeKind::Id) &&
-                    conv::id(*lhs[lhs_idx]).is_discard()) {
+                auto lhs_item = lhs[lhs_idx];
+                if (conv::is_discard_id(*lhs_item)) {
                     // discarding the value, add with discard
+
+                    visit(ctx, rhs_item);
 
                     auto d = ast.new_discard(rhs_item->get_loc(), rhs_item);
                     d->set_type(ts.get_void());
@@ -93,18 +117,25 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                     continue;
                 }
 
-                PANIC("Not implemented");
+                // convert to a direct assignment
+                auto d = ast.new_assign_stmt(node->get_loc(),
+                                             ast::NodeKind::AssignDirect,
+                                             lhs_item, rhs_item);
+                d->set_type(ts.get_void());
+                items.push_back(d);
 
                 lhs_idx++;
             }
         }
 
-        for (auto it : items) {
-            json j = *it;
-            er.report_debug(it->get_loc(), "de-sugared assign into: {}",
-                            j.dump());
-        }
+        node->transmute_to_unscoped_group(ast.allocate_node_span(items));
+        return;
+    }
 
+    if (node->is_oneof(ast::NodeKind::Block)) {
+        visit_children(ctx, node);
+
+        // cleanup unscoped grousp?
         return;
     }
 

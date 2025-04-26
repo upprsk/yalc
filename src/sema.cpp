@@ -844,6 +844,10 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
             std::vector<types::Type*> coercions;
             auto                      requires_coercion = false;
 
+            // TODO: when a function call is assigned to _ (is discarded) and is
+            // the only item in the assigment (to avoid ambiguity), allow using
+            // a single _ despite the number of return values of the function.
+
             for (auto ty : rhs_type->inner) {
                 if (lhs_idx >= lhs.size()) break;
 
