@@ -1,7 +1,6 @@
 module test;
-
-func getx() (i32, i32) {}
+func getx() (i32, bool) {}
+func gety() i64 {}
 func test() {
-    var x, y: i32, i64;
-    _, _, y = getx(), x;
+    var x, _, y = getx(), gety();
 }

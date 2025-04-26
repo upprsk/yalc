@@ -129,6 +129,38 @@ func test() {
 }
 )");
 
+    run_test(ctx, p, "simple decl 1", R"(
+module test;
+func getx() i32 {}
+func test() {
+    var x = getx();
+}
+)");
+
+    run_test(ctx, p, "simple decl 2", R"(
+module test;
+func getx() (i32, bool) {}
+func test() {
+    var x, _ = getx();
+}
+)");
+
+    run_test(ctx, p, "simple decl 3", R"(
+module test;
+func getx() (i32, bool) {}
+func gety() i64 {}
+func test() {
+    var x, _, y = getx(), gety();
+}
+)");
+
+    run_test(ctx, p, "simple decl 4", R"(
+module test;
+func test() {
+    var _, x = 0 - 1, 0 + 1;
+}
+)");
+
     run_test(ctx, p, "hello", R"(module main;
 
 @extern
