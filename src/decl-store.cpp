@@ -35,6 +35,7 @@ void to_json(json& j, DeclFlags const& n) {
     if (n.has_extern()) arr.push_back("extern");
     if (n.has_private()) arr.push_back("private");
     if (n.has_private_file()) arr.push_back("private-file");
+    if (n.has_export()) arr.push_back("export");
 
     j = arr;
 }
@@ -76,7 +77,8 @@ auto fmt::formatter<yal::DeclFlags>::format(yal::DeclFlags  flags,
     fmt::format_to(ctx.out(), "DeclFlags(");
     if (flags.has_extern()) fmt::format_to(ctx.out(), "extern,");
     if (flags.has_private()) fmt::format_to(ctx.out(), "private,");
-    if (flags.has_private_file()) fmt::format_to(ctx.out(), "private_file");
+    if (flags.has_private_file()) fmt::format_to(ctx.out(), "private_file,");
+    if (flags.has_export()) fmt::format_to(ctx.out(), "export");
 
     return fmt::format_to(ctx.out(), ")");
 }

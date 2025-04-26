@@ -271,6 +271,7 @@ void visit_decorators(Ast& ast, Node* decorators, Decl* decl, Context& ctx) {
         else if (dec.name == "export") {
             // no parameters, just mark extern name to local_name
             if (dec.params.size() == 0) {
+                decl->flags.set_export();
                 decl->link_name = decl->local_name;
             }
 

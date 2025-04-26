@@ -19,6 +19,7 @@ struct DeclFlags {
         Extern = 1 << 0,
         Private = 1 << 1,
         PrivateFile = 1 << 2,
+        Export = 1 << 3,
     };
 
     [[nodiscard]] constexpr auto has_extern() const -> bool {
@@ -33,7 +34,12 @@ struct DeclFlags {
         return flags & PrivateFile;
     }
 
+    [[nodiscard]] constexpr auto has_export() const -> bool {
+        return flags & Export;
+    }
+
     constexpr void set_extern() { flags = static_cast<Flags>(flags | Extern); }
+    constexpr void set_export() { flags = static_cast<Flags>(flags | Export); }
 
     struct Builder {
         [[nodiscard]] constexpr auto set_extern() const -> Builder {
@@ -46,6 +52,10 @@ struct DeclFlags {
 
         [[nodiscard]] constexpr auto set_private_file() const -> Builder {
             return {static_cast<Flags>(flags | PrivateFile)};
+        }
+
+        [[nodiscard]] constexpr auto set_export() const -> Builder {
+            return {static_cast<Flags>(flags | Export)};
         }
 
         [[nodiscard]] constexpr auto build() const -> DeclFlags {
