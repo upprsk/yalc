@@ -6,6 +6,7 @@
 
 #include "argparser.hpp"
 #include "ast.hpp"
+#include "compile/compile_qbe.hpp"
 #include "cpptrace/from_current.hpp"
 #include "error_reporter.hpp"
 #include "file-store.hpp"
@@ -55,6 +56,10 @@ auto real_main(yalc::Args const& args) -> int {
         j["ds"] = *ast.get_decl_store();
         fmt::println("{}", j.dump());
     }
+
+    if (er.had_error()) return 1;
+
+    yal::compile::qbe::compile(ast, prj_root, er, ts, opt);
 
     return er.had_error() ? 1 : 0;
 }

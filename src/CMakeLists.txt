@@ -9,6 +9,8 @@ add_library(yal
     ast-node.hpp
     ast.cpp
     ast.hpp
+    compile/compile_qbe.cpp
+    compile/compile_qbe.hpp
     decl-store.cpp
     decl-store.hpp
     error_reporter.cpp
