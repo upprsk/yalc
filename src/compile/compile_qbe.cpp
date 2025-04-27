@@ -80,7 +80,9 @@ auto to_qbe_integer(types::Type const& type) -> std::string_view {
         case types::TypeKind::PtrConst:
         case types::TypeKind::MultiPtr:
         case types::TypeKind::MultiPtrConst: return ptr_type;
-        default: PANIC("not a valid integer type for qbe: {}", type.kind);
+        default:
+            PANIC("not a valid integer type for qbe", type.kind,
+                  fmt::to_string(type.kind));
     }
 }
 
@@ -103,6 +105,23 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::DeclLocalVarDirectPack)) {
+        auto data = conv::decl_local_var_direct_pack(*node);
+        if (data.names.size() != 1) {
+            ctx.er->report_bug(node->get_loc(),
+                               "declarations using functions that return "
+                               "multiple values have not been implemented");
+            PANIC("not implemented");
+        }
+
+        compile_expr(ast, data.init, ctx);
+        auto tmp = ctx.pop_tmp();
+        println(o, "    %{} ={} copy {}", conv::id(*data.names[0]).name,
+                to_qbe_integer(*data.names[0]->get_type()), tmp);
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
         compile_expr(ast, data.child, ctx);
@@ -111,7 +130,8 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    PANIC("invalid node in compile_stmt", node->get_kind());
+    PANIC("invalid node in compile_stmt", node->get_kind(),
+          fmt::to_string(node->get_kind()));
 }
 
 void compile_block(Ast& ast, Node* node, Context& ctx) {
@@ -134,6 +154,14 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         println(o, "    {} ={} copy {}", tmp, to_qbe_integer(*node->get_type()),
                 data.value);
 
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        auto data = conv::id(*node);
+        auto tmp = ctx.push_tmp();
+        println(o, "    {} ={} copy %{}", tmp, to_qbe_integer(*node->get_type()),
+                data.name);
         return;
     }
 
@@ -194,7 +222,8 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    PANIC("invalid node in compile_expr", node->get_kind());
+    PANIC("invalid node in compile_expr", node->get_kind(),
+          fmt::to_string(node->get_kind()));
 }
 
 void compile_func(Ast& ast, Node* node, Context& ctx) {
