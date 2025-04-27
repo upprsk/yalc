@@ -166,18 +166,26 @@ func test() {
 @extern
 func putchar(c: i32) i32;
 
+@export
 func main() i32 {
-    _ = putchar(0x48);
-    _ = putchar(0x65);
-    _ = putchar(0x6C);
-    _ = putchar(0x6C);
-    _ = putchar(0x6F);
+    _ = putchar(0x48); // 'H'
+    _ = putchar(0x65); // 'e'
+    _ = putchar(0x6C); // 'l'
+    _ = putchar(0x6C); // 'l'
+    _ = putchar(0x6F); // 'o'
+    _ = putchar(0x2C); // ','
+    _ = putchar(0x20); // ' '
+    _ = putchar(0x57); // 'W'
+    _ = putchar(0x6F); // 'o'
+    _ = putchar(0x72); // 'r'
+    _ = putchar(0x6C); // 'l'
+    _ = putchar(0x64); // 'd'
+    _ = putchar(0x21); // '!'
     _ = putchar(0xa);
 
     return 0;
 }
-)",
-             true);
+)");
 
     ctx.tags.pop_back();
 

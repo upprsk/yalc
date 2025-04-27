@@ -55,6 +55,7 @@ auto real_main(yalc::Args const& args) -> int {
         json j = *prj_root;
         j["ds"] = *ast.get_decl_store();
         fmt::println("{}", j.dump());
+        return 0;
     }
 
     if (er.had_error()) return 1;
