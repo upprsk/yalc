@@ -7,8 +7,6 @@
 #include "ast-node-visitor.hpp"
 #include "ast-node.hpp"
 #include "types.hpp"
-// FIXME: remove this
-#include "nlohmann/json.hpp"
 
 namespace yal::lower {
 
