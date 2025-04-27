@@ -20,6 +20,7 @@ namespace rv = std::ranges::views;
 struct Context {
     ErrorReporter*    er{};
     types::TypeStore* ts{};
+    Options const*    opt{};
 };
 
 // ============================================================================
@@ -219,13 +220,15 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    er.report_warn(node->get_loc(), "node not lowered ({})", node->get_kind());
+    if (ctx.opt->verbose_lowering)
+        er.report_warn(node->get_loc(), "node not lowered ({})",
+                       node->get_kind());
     visit_children(ctx, node);
 }
 
 void lower_ast(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
                types::TypeStore& ts, Options const& opt) {
-    auto ctx = Context{.er = &er, .ts = &ts};
+    auto ctx = Context{.er = &er, .ts = &ts, .opt = &opt};
     visit_node(ast, root, ctx);
 }
 
