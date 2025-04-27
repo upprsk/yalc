@@ -599,7 +599,7 @@ struct DeclLocalVarDirectPack {
 
     auto size = n.get_children().size();
     return {
-        .names = n.get_children().subspan(size - 1),
+        .names = n.get_children().subspan(0, size - 1),
         .init = n.get_child(size - 1),
     };
 }
