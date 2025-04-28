@@ -624,6 +624,9 @@ struct Parser {
         auto t = peek_and_advance();
         if (t.type == TokenType::Lparen) return parse_call(left);
         if (t.type == TokenType::Dot) return parse_field(left);
+        if (t.type == TokenType::DotStar)
+            return ast->new_unary_expr(left->get_loc().extend(prev_span()),
+                                       ast::NodeKind::Deref, left);
 
         auto kind = ast::NodeKind::Err;
         auto right = parse_prec_expr(get_precedence(t));
@@ -973,7 +976,8 @@ struct Parser {
     [[nodiscard]] constexpr auto get_precedence(Token t) const -> int {
         switch (t.type) {
             case TokenType::Lparen:
-            case TokenType::Dot: return PREC_CALL;
+            case TokenType::Dot:
+            case TokenType::DotStar: return PREC_CALL;
             case TokenType::Question:
             case TokenType::Lbracket: return PREC_UNARY;
 
