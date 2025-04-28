@@ -59,10 +59,12 @@ void to_json(json& j, Node const& n) {
 
     auto arr = json::array();
     for (auto child : n.get_children()) {
-        if (child)
+        if (child) {
             arr.push_back(*child);
-        else
-            arr.push_back({});
+        } else {
+            json j;
+            arr.push_back(j);
+        }
     }
 
     j["children"] = arr;
