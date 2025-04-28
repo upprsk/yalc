@@ -168,6 +168,10 @@ struct Type {
         return kind == TypeKind::Pack;
     }
 
+    [[nodiscard]] constexpr auto is_ptr() const -> bool {
+        return kind == TypeKind::Ptr || kind == TypeKind::PtrConst;
+    }
+
     [[nodiscard]] constexpr auto is_strview() const -> bool {
         return kind == TypeKind::StrView;
     }

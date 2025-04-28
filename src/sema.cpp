@@ -155,6 +155,13 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
     auto& ts = *ctx.ts;
     auto& er = *ctx.er;
 
+    if (node->is_oneof(ast::NodeKind::Ptr, ast::NodeKind::PtrConst)) {
+        auto data = conv::ptr(*node);
+        auto inner_ty = eval_node_to_type(ast, data.inner, ctx);
+        auto ty = ts.new_ptr(inner_ty, data.is_const);
+        return {.type = ts.get_type(), .data = ty};
+    }
+
     if (node->is_oneof(ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst)) {
         auto data = conv::mptr(*node);
         auto inner_ty = eval_node_to_type(ast, data.inner, ctx);
@@ -1023,6 +1030,28 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
         // FIXME: when to make const?
         node->set_type(ts.new_ptr(cty, true));
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Deref)) {
+        auto data = conv::unary(*node);
+        visit(ctx, data.child);
+
+        auto cty = data.child->get_type();
+        ASSERT(cty != nullptr);
+
+        if (cty->is_pack() && cty->inner.size() == 1) {
+            cty = cty->inner[0];
+        }
+
+        if (!cty->is_ptr()) {
+            er.report_error(node->get_loc(),
+                            "can not dereference non-pointer type {}", *cty);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        node->set_type(cty->inner[0]);
         return;
     }
 
