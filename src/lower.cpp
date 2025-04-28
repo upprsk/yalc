@@ -89,8 +89,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
             visit(ctx, init);
 
-            auto d = ast.new_decl_local_var_direct(node->get_loc(),
-                                                   conv::id(*id).name, init);
+            auto d = ast.new_decl_local_var_direct(node->get_loc(), init);
             d->set_type(ts.get_void());
             d->set_decl(id->get_decl());
             items.push_back(d);

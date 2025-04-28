@@ -503,10 +503,10 @@ enum class NodeKind : uint16_t {
     /// expression for rhs.
     AssignDirectPack,
 
-    /// Declare a single local variable.
+    /// Declare a single local variable. `decl` should point to the variable
+    /// beeing declared.
     ///
     /// - `children` has the initializer for the variable.
-    /// - `data` has the variable name.
     DeclLocalVarDirect,
 
     /// Declare local variables from a function with multible returns.

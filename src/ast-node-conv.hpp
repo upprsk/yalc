@@ -280,8 +280,7 @@ struct UnscopedGroup {
 };
 
 struct DeclLocalVarDirect {
-    std::string_view name;
-    Node*            init{};
+    Node* init{};
 };
 
 struct DeclLocalVarDirectPack {
@@ -590,7 +589,7 @@ struct DeclLocalVarDirectPack {
 [[nodiscard]] constexpr auto decl_local_var_direct(Node const& n)
     -> DeclLocalVarDirect {
     ASSERT(n.get_kind() == NodeKind::DeclLocalVarDirect);
-    return {.name = n.get_data_str(), .init = n.get_child(0)};
+    return {.init = n.get_child(0)};
 }
 
 [[nodiscard]] constexpr auto decl_local_var_direct_pack(Node const& n)

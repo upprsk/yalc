@@ -307,10 +307,9 @@ public:
                         new_node_array_with(children));
     }
 
-    auto new_decl_local_var_direct(Location loc, std::string_view name,
-                                   Node* init) -> Node* {
+    auto new_decl_local_var_direct(Location loc, Node* init) -> Node* {
         return new_node(NodeKind::DeclLocalVarDirect, loc,
-                        new_node_array_with(init), new_string(name));
+                        new_node_array_with(init));
     }
 
     auto new_decl_local_var_direct_pack(Location               loc,
