@@ -1238,6 +1238,26 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::IfStmt)) {
+        auto data = conv::if_stmt(*node);
+        visit(ctx, data.cond);
+
+        auto cty = data.cond->get_type();
+        ASSERT(cty != nullptr);
+
+        if (!cty->is_bool()) {
+            er.report_error(data.cond->get_loc(),
+                            "wrong type for condition: {}, expected boolean",
+                            *cty);
+        }
+
+        visit(ctx, data.wt);
+        visit(ctx, data.wf);
+
+        node->set_type(ts.get_void());
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::WhileStmt)) {
         auto data = conv::while_stmt(*node);
         visit(ctx, data.cond);
