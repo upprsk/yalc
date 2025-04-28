@@ -16,7 +16,7 @@ struct Value {
         data = std::monostate{};
 
     [[nodiscard]] constexpr auto has_data() const -> bool {
-        return std::holds_alternative<std::monostate>(data);
+        return !std::holds_alternative<std::monostate>(data);
     }
 
     [[nodiscard]] constexpr auto get_data_type() const -> types::Type* {
