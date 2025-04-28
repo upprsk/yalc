@@ -115,6 +115,19 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     return nullptr;
 }
 
+auto TypeStore::cast(Type *dst, Type *src) -> Type * {
+    ASSERT(dst != nullptr);
+    ASSERT(src != nullptr);
+
+    // errors are forwarded
+    if (dst->is_err()) return dst;
+    if (*dst == *src) return dst;
+
+    if (dst->is_integral() && src->is_integral()) return dst;
+
+    return nullptr;
+}
+
 void to_json(json &j, Type const &t) {
     auto arr = json::array();
     for (auto inner : t.inner) {

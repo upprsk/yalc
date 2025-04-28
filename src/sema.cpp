@@ -1212,6 +1212,28 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Cast)) {
+        auto data = conv::binary(*node);
+        visit(ctx, data.lhs);
+        visit(ctx, data.rhs);
+
+        auto src = data.lhs->get_type();
+        ASSERT(src != nullptr);
+
+        auto target = eval_node_to_type(ast, data.rhs, ctx);
+        auto r = ts.cast(target, src);
+        if (!r) {
+            er.report_error(node->get_loc(),
+                            "can not cast value of type {} to type {}", *src,
+                            *target);
+            er.report_note(data.lhs->get_loc(), "this has type {}", *src);
+            r = ts.get_error();
+        }
+
+        node->set_type(r);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::VarDecl)) {
         visit_var_decl(ast, node, ctx);
         return;
@@ -1331,11 +1353,6 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                 0, ast.new_coerce(data.child->get_loc(), data.child, r));
         }
 
-        return;
-    }
-
-    if (node->is_oneof(ast::NodeKind::Coerce)) {
-        visit_children(ctx, node);
         return;
     }
 
