@@ -234,6 +234,7 @@ enum class NodeKind : uint16_t {
     ///
     /// - `children` has the child.
     AddrOf,  // &
+    Deref,   // *
     Lnot,    // !
     Bnot,    // ~
     Neg,     // -
@@ -678,6 +679,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Lor: name = "Lor"; break;
         case NodeKind::Cast: name = "Cast"; break;
         case NodeKind::AddrOf: name = "AddrOf"; break;
+        case NodeKind::Deref: name = "Deref"; break;
         case NodeKind::Lnot: name = "Lnot"; break;
         case NodeKind::Bnot: name = "Bnot"; break;
         case NodeKind::Neg: name = "Neg"; break;

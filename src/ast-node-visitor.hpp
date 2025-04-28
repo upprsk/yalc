@@ -177,6 +177,7 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
         } break;
 
         case NodeKind::AddrOf:
+        case NodeKind::Deref:
         case NodeKind::Lnot:
         case NodeKind::Bnot:
         case NodeKind::Neg: {

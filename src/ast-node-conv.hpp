@@ -454,9 +454,9 @@ struct DeclLocalVarDirectPack {
 }
 
 [[nodiscard]] constexpr auto unary(Node const& n) -> Unary {
-    ASSERT(n.is_oneof(NodeKind::AddrOf, NodeKind::Lnot, NodeKind::Bnot,
-                      NodeKind::Neg, NodeKind::Optional, NodeKind::ExprStmt,
-                      NodeKind::ReturnStmt));
+    ASSERT(n.is_oneof(NodeKind::AddrOf, NodeKind::Deref, NodeKind::Lnot,
+                      NodeKind::Bnot, NodeKind::Neg, NodeKind::Optional,
+                      NodeKind::ExprStmt, NodeKind::ReturnStmt));
     return {.child = n.get_child(0)};
 }
 
