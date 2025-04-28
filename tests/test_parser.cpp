@@ -229,7 +229,6 @@ func test() {
 }
 )");
 
-
     ctx.tags.pop_back();
 
     ctx.tags.emplace_back("local def");
@@ -513,6 +512,34 @@ module test;
 def S = struct {
     items: []S,
 };
+)");
+
+    run_test(ctx, p, "pointer deref", R"(
+module test;
+
+func test() {
+    var a = 0;
+    var b = &a;
+    var c = b.*;
+}
+)");
+
+    run_test(ctx, p, "pointer deref 2", R"(
+module test;
+
+func test() {
+    var a = 1;
+    var b = &a;
+    var c = b.* + a;
+}
+)");
+
+    run_test(ctx, p, "pointer deref 3", R"(
+module test;
+func a() *i32 {}
+func test() {
+    var a = a().*;
+}
 )");
 
     ctx.tags.pop_back();
