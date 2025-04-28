@@ -1,8 +1,15 @@
 module main;
 
+// FIXME: this should introduce a new type, completally independent from [*]const u8
+def cstr_t = [*]const u8;
+func cstr_t.print(s: cstr_t) {
+    c_print_cstr(s);
+    return;
+}
+
 @export
 func main() {
-    var v = "Hello, World!".ptr;
-    c_print_cstr(v);
+    var v = "Hello, World!".ptr as cstr_t;
+    v.print();
     return;
 }
