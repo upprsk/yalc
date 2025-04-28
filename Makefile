@@ -12,6 +12,7 @@ test.yal.o: test.yal.asm
 test.yal.asm: test.yal.qbe
 	qbe -o test.yal.asm test.yal.qbe
 
+# https://stackoverflow.com/a/3038439
 .SUFFIXES: .yal
 test.yal.qbe: yalc test.yal
 	./build/cmd/yalc test.yal > test.yal.qbe
@@ -19,6 +20,12 @@ test.yal.qbe: yalc test.yal
 .PHONY: yalc
 yalc:
 	cmake --build build
+
+.PHONY: json
+json: yalc
+	@./build/cmd/yalc test.yal --dump-ast-json |\
+		jq 'walk(if type == "object" then del(.loc, .ds) else . end)' |\
+		wl-copy
 
 .PHONY: clean
 clean:

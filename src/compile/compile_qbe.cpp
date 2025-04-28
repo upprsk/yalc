@@ -41,8 +41,9 @@ struct Context {
     FILE*          out{};
     ErrorReporter* er{};
 
-    uint32_t         next_tmp{};
-    std::vector<Tmp> tmp_stack;
+    uint32_t                      next_tmp{};
+    std::vector<Tmp>              tmp_stack;
+    std::vector<std::string_view> pending_string_literals;
 
     [[nodiscard]] constexpr auto new_tmp() -> Tmp { return {next_tmp++}; }
 
@@ -60,8 +61,12 @@ struct Context {
     }
 };
 
+auto ptr_to_qbe_integer() -> std::string_view {
+    return sizeof(void*) == 4 ? "w" : "l";
+}
+
 auto to_qbe_integer(types::Type const& type) -> std::string_view {
-    std::string_view ptr_type = sizeof(void*) == 4 ? "w" : "l";
+    std::string_view ptr_type = ptr_to_qbe_integer();
 
     switch (type.kind) {
         case types::TypeKind::Uint64:
@@ -185,6 +190,37 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         auto tmp = ctx.push_tmp();
         println(o, "    {} ={} copy %{}", tmp,
                 to_qbe_integer(*node->get_type()), node->get_decl()->link_name);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Str)) {
+        // FIXME: this is actually a struct with pointer and len
+        auto data = conv::str(*node);
+        auto sz = ctx.pending_string_literals.size();
+        ctx.pending_string_literals.push_back(data.value);
+
+        auto tmp = ctx.push_tmp();
+        println(o, "    {} ={} copy $strlit{}", tmp, ptr_to_qbe_integer(), sz);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Field)) {
+        auto data = conv::field(*node);
+        auto rty = data.receiver->get_type();
+
+        if (rty->is_strview()) {
+            if (data.name == "ptr") {
+                compile_expr(ast, data.receiver, ctx);
+                return;
+            }
+
+            if (data.name == "len") {
+                PANIC("len is not implemented");
+                return;
+            }
+        }
+
+        PANIC("invalid Field node", *node);
         return;
     }
 
@@ -337,6 +373,10 @@ void compile_flat_module(Ast& ast, Node* node, Context& ctx) {
         else {
             PANIC("UNEXPECTED top level in module:", child->get_kind());
         }
+    }
+
+    for (auto [i, s] : rv::enumerate(ctx.pending_string_literals)) {
+        println("data $strlit{} = {{ b {:?}, b 0 }}", i, s);
     }
 }
 
