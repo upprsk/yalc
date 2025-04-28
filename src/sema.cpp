@@ -1289,6 +1289,20 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
+        if (data.child == nullptr) {
+            auto expected_rty = ctx.current_function->as_func().ret;
+            ASSERT(expected_rty != nullptr);
+
+            if (expected_rty->inner.size() == 1 &&
+                expected_rty->inner[0]->is_void()) {
+                return;
+            }
+
+            er.report_error(node->get_loc(),
+                            "function expects a return value but got none");
+            return;
+        }
+
         auto rty = data.child->get_type();
         ASSERT(rty != nullptr);
 
