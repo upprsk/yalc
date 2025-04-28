@@ -14,7 +14,7 @@ test.yal.asm: test.yal.qbe
 
 # https://stackoverflow.com/a/3038439
 .SUFFIXES: .yal
-test.yal.qbe: yalc test.yal
+test.yal.qbe: yalc test.yal test_c.yal
 	./build/cmd/yalc test.yal > test.yal.qbe
 
 .PHONY: yalc

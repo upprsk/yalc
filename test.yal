@@ -6,12 +6,3 @@ func main() {
     c_print_cstr(v);
     return;
 }
-
-@extern(link_name="print_int")
-func c_print_int(v: i32);
-
-@extern(link_name="print_str")
-func c_print_str(s: [*]const u8, len: i32);
-
-@extern(link_name="print_cstr")
-func c_print_cstr(s: [*]const u8);

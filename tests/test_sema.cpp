@@ -414,7 +414,6 @@ func test() {
 func f() (i32, u32) {}
 )");
 
-
     run_test(ctx, p, "multiple assign 4", R"(
 module test;
 func test() {
@@ -546,6 +545,26 @@ func main() i32 {
 
     return 0;
 }
+)");
+
+    run_test(ctx, p, "hello string", R"(
+module main;
+
+@export
+func main() {
+    var v = "Hello, World!".ptr;
+    c_print_cstr(v);
+    return;
+}
+
+@extern(link_name="print_int")
+func c_print_int(v: i32);
+
+@extern(link_name="print_str")
+func c_print_str(s: [*]const u8, len: i32);
+
+@extern(link_name="print_cstr")
+func c_print_cstr(s: [*]const u8);
 )");
 
     ctx.tags.pop_back();
