@@ -218,6 +218,12 @@ auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type* {
         return ctx.ts->get_error();
     }
 
+    if (!v.has_data()) {
+        ctx.er->report_bug(node->get_loc(), "no data in compile-time value: {}",
+                           v);
+        return ctx.ts->get_error();
+    }
+
     return v.get_data_type();
 }
 
@@ -381,6 +387,26 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
 
     // TODO: save the function as value. Somehow
     d->value = {.type = ty};
+
+    // if the function is namespaced, add it to the type
+    auto ids = data.get_name().ids;
+    if (ids.size() > 1) {
+        if (ids.size() != 2) {
+            er.report_bug(data.name->get_loc(),
+                          "arbitrary nesting of namespacing on types has not "
+                          "been implemented");
+        }
+
+        else {
+            auto ty_node = ids[0];
+            auto ty_decl = ty_node->get_decl();
+            ASSERT(ty_decl != nullptr);
+            ASSERT(ty_decl->value.type->is_type());
+
+            auto ty = ty_decl->value.get_data_type();
+            ts.add_function_to_type(ty, conv::id(*ids[1]).name, d);
+        }
+    }
 
     auto sctx = ctx.child(ty);
     visit(sctx, data.body);
@@ -784,6 +810,88 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
     }
 }
 
+// ----------------------------------------------------------------------------
+
+void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
+                         std::span<Node*> inits, Context& ctx) {
+    auto& er = *ctx.er;
+    if (ids.size() != inits.size()) {
+        er.report_bug(decl->get_loc(),
+                      "using multiple returns in def has not been implemented");
+        return;
+    }
+
+    for (auto [id, init] : rv::zip(ids, inits)) {
+        auto v = eval_node(ast, init, ctx);
+        auto d = id->get_decl();
+        ASSERT(d != nullptr);
+        ASSERT(d->value.has_data() == false);
+        ASSERT(d->value.type != nullptr);
+        ASSERT(*d->value.type == *v.type);
+
+        d->value = v;
+    }
+}
+
+void visit_top_def_decl(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto top_data = conv::top_def_decl(*node);
+
+    if (!top_data.get_decorators().items.empty()) {
+        er.report_bug(top_data.decorators->get_loc(),
+                      "decorators on `def` not implemented");
+    }
+
+    auto data = top_data.get_decl();
+    visit(ctx, data.types);
+    visit(ctx, data.inits);
+
+    node->set_type(ts.get_void());
+
+    // we have explicit types
+    if (data.types && data.inits) {
+        visit_decl_with_types_and_inits(ast, data.ids, data.types, data.inits,
+                                        ctx);
+        eval_defined_values(ast, top_data.decl, data.get_ids().ids,
+                            data.get_inits().items, ctx);
+    }
+
+    // just types, not inits
+    else if (data.types) {
+        er.report_error(top_data.decl->get_loc(),
+                        "declaration is missing initializers");
+        er.report_note(
+            top_data.decl->get_loc(),
+            "initializers may be ommited on variables, but not constants");
+    }
+
+    // no explicit types but got inits
+    else if (data.inits) {
+        visit_decl_with_inits(ast, data.ids, data.inits, ctx);
+        eval_defined_values(ast, top_data.decl, data.get_ids().ids,
+                            data.get_inits().items, ctx);
+    }
+
+    // nothing given
+    else {
+        er.report_error(node->get_loc(), "no types in declaration");
+
+        auto ids = data.get_ids();
+        for (auto const& id : ids.ids) {
+            set_type_of_id(id, ts.get_error(), ctx);
+        }
+    }
+
+    // fixup the type of the init expr pack
+    fixup_expr_pack(ts, data.inits);
+}
+
+// ----------------------------------------------------------------------------
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
@@ -1147,8 +1255,12 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         ASSERT(cty != nullptr);
 
         if (!cty->is_func()) {
-            er.report_error(node->get_loc(),
-                            "can not call non-function value of type {}", *cty);
+            if (!cty->is_err()) {
+                er.report_error(node->get_loc(),
+                                "can not call non-function value of type {}",
+                                *cty);
+            }
+
             visit_span(ctx, data.args);
             node->set_type(ts.get_error());
             return;
@@ -1207,8 +1319,21 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
-        er.report_error(node->get_loc(), "type {} does not have fields", *rty);
-        node->set_type(ts.get_error());
+        // methods
+        auto d = ts.get_function_from_type(rty, data.name);
+        if (d == nullptr) {
+            er.report_error(node->get_loc(),
+                            "type {} does not have field named {:?}", *rty,
+                            data.name);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        node->set_type(ts.new_bound_from(d->value.type));
+
+        ASSERT(node->get_decl() == nullptr);
+        node->set_decl(d);
+
         return;
     }
 
@@ -1231,6 +1356,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         }
 
         node->set_type(r);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::TopDefDecl)) {
+        visit_top_def_decl(ast, node, ctx);
         return;
     }
 
@@ -1340,7 +1470,6 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
-        // FIXME: this is not very nice
         ASSERT(rty->is_pack());
         ASSERT(r->is_pack());
         if (rty->contains_untyped_int()) {

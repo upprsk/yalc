@@ -1,12 +1,17 @@
 #pragma once
 
 #include <ranges>
+#include <string_view>
 #include <vector>
 
 #include "arena.hpp"
 #include "error_reporter.hpp"
 #include "fmt/base.h"
 #include "nlohmann/json_fwd.hpp"
+
+namespace yal {
+struct Decl;
+}
 
 namespace yal::types {
 using json = nlohmann::json;
@@ -70,6 +75,9 @@ enum class TypeKind {
     // 2. `Pack` with return types.
     Func,
     FuncWithVarArgs,
+
+    // Method type. Very similar to `Func`
+    BoundFunc,
 
     Pack,
 };
@@ -157,7 +165,8 @@ struct Type {
     }
 
     [[nodiscard]] constexpr auto is_func() const -> bool {
-        return kind == TypeKind::Func || kind == TypeKind::FuncWithVarArgs;
+        return kind == TypeKind::Func || kind == TypeKind::FuncWithVarArgs ||
+               kind == TypeKind::BoundFunc;
     }
 
     [[nodiscard]] constexpr auto is_bool() const -> bool {
@@ -172,6 +181,10 @@ struct Type {
         return kind == TypeKind::Ptr || kind == TypeKind::PtrConst;
     }
 
+    [[nodiscard]] constexpr auto is_mptr() const -> bool {
+        return kind == TypeKind::MultiPtr || kind == TypeKind::MultiPtrConst;
+    }
+
     [[nodiscard]] constexpr auto is_strview() const -> bool {
         return kind == TypeKind::StrView;
     }
@@ -180,8 +193,15 @@ struct Type {
         Type* params;
         Type* ret;
         bool  is_var_args;
+        bool  is_bound;
 
         [[nodiscard]] constexpr auto get_params() const -> std::span<Type*> {
+            if (is_bound) return params->inner.subspan(1);
+            return params->inner;
+        }
+
+        [[nodiscard]] constexpr auto get_params_direct() const
+            -> std::span<Type*> {
             return params->inner;
         }
 
@@ -226,7 +246,8 @@ struct Type {
 
             case TypeKind::Nil:
             case TypeKind::Func:
-            case TypeKind::FuncWithVarArgs: return 0; break;
+            case TypeKind::FuncWithVarArgs:
+            case TypeKind::BoundFunc: return 0;
 
             // this can't be instantiated, so it should not have size
             case TypeKind::Pack: return 0;
@@ -385,6 +406,15 @@ public:
         return types.alloc<Type*>(arr);
     }
 
+    // ------------------------------------------------------------------------
+
+    void add_function_to_type(Type const* ty, std::string_view name, Decl* d);
+
+    auto get_function_from_type(Type const* ty, std::string_view name) const
+        -> Decl*;
+
+    auto new_bound_from(Type const* ty) -> Type*;
+
     // ========================================================================
 
     [[nodiscard]] auto coerce(Type* dst, Type* src) -> Type*;
@@ -427,6 +457,9 @@ private:
 private:
     TypeItem* head{};
 
+    std::unordered_map<Type const*, std::unordered_map<std::string_view, Decl*>>
+        namespaced;
+
     mem::Arena types;
     mem::Arena arrays;
     Builtin    builtin;
@@ -465,6 +498,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Func: name = "Func"; break;
         case TypeKind::FuncWithVarArgs: name = "FuncWithVarArgs"; break;
         case TypeKind::Pack: name = "(pack)"; break;
+        case TypeKind::BoundFunc: name = "BoundFunc"; break;
     }
 
     return name;

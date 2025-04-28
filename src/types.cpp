@@ -23,6 +23,7 @@ auto Type::as_func() const -> Func {
         .params = inner[0],
         .ret = inner[1],
         .is_var_args = kind == TypeKind::FuncWithVarArgs,
+        .is_bound = kind == TypeKind::BoundFunc,
     };
 }
 
@@ -37,6 +38,31 @@ auto TypeStore::new_pack(std::span<Type *const> inner) -> Type * {
     }
 
     return new_type(TypeKind::Pack, expanded);
+}
+
+void TypeStore::add_function_to_type(Type const *ty, std::string_view name,
+                                     Decl *d) {
+    // fmt::println(stderr, "add to in {} ({}) method {:?}", fmt::ptr(ty), *ty,
+    //              name);
+    namespaced[ty][name] = d;
+}
+
+auto TypeStore::get_function_from_type(Type const      *ty,
+                                       std::string_view name) const -> Decl * {
+    // fmt::println(stderr, "find in {} ({})", fmt::ptr(ty), *ty);
+    if (auto it = namespaced.find(ty); it != std::end(namespaced)) {
+        if (auto fn = it->second.find(name); fn != std::end(it->second))
+            return fn->second;
+    }
+
+    return nullptr;
+}
+
+auto TypeStore::new_bound_from(Type const *ty) -> Type * {
+    auto data = ty->as_func();
+    ASSERT(ty->kind != TypeKind::FuncWithVarArgs);
+
+    return new_type(TypeKind::BoundFunc, std::array{data.params, data.ret});
 }
 
 auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
@@ -258,6 +284,20 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
                                       *ty.inner[1]->inner[0]);
 
             return fmt::format_to(ctx.out(), "func({}, ...) ({})",
+                                  comma_separate(ty.inner[0]->inner),
+                                  comma_separate(ty.inner[1]->inner));
+
+        case TypeKind::BoundFunc:
+            ASSERT(ty.inner.size() == 2);
+            ASSERT(ty.inner[0]->kind == TypeKind::Pack);
+            ASSERT(ty.inner[1]->kind == TypeKind::Pack);
+
+            if (ty.inner[1]->inner.size() == 1)
+                return fmt::format_to(ctx.out(), "func<bound>({}) {}",
+                                      comma_separate(ty.inner[0]->inner),
+                                      *ty.inner[1]->inner[0]);
+
+            return fmt::format_to(ctx.out(), "func<bound>({}) ({})",
                                   comma_separate(ty.inner[0]->inner),
                                   comma_separate(ty.inner[1]->inner));
 

@@ -21,6 +21,14 @@ void Node::transmute_to_unscoped_group(
     ASSERT(std::holds_alternative<std::monostate>(data));
 }
 
+void Node::transmute_to_call_direct(Decl*            callee,
+                                    std::span<Node*> allocated_args) {
+    kind = NodeKind::CallDirect;
+    children = allocated_args;
+    decl = callee;
+    data = std::monostate{};
+}
+
 void to_json(json& j, Node const& n) {
     j = json{
         {"kind", fmt::to_string(n.get_kind())},

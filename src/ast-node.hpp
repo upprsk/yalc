@@ -514,7 +514,20 @@ enum class NodeKind : uint16_t {
     /// - `children` has n+1 elements. The first n elements are `Id`s with the
     /// names beeing declared or `Discarded` when the value is discarded. The
     /// last element is the initializer expression with the function call.
-    DeclLocalVarDirectPack
+    DeclLocalVarDirectPack,
+
+    /// Call a named function directly. The `Decl` saved is the function to
+    /// call. Method calls are also translated into this node during lower,
+    /// moving the receiver to the first argument and converting to pointer
+    /// automatically when needed.
+    ///
+    /// - `children` contains the arguments.
+    CallDirect,
+
+    /// Call a function indirectly using a function pointer.
+    ///
+    /// - `children` contains the callee expression and the arguments.
+    CallIndirect,
 };
 
 class Node {
@@ -614,6 +627,8 @@ public:
 
     void transmute_to_unscoped_group(
         std::span<Node *> allocated_unscoped_items);
+    void transmute_to_call_direct(Decl             *callee,
+                                  std::span<Node *> allocated_args);
 
 private:
     NodeKind          kind{};
@@ -731,6 +746,8 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::DeclLocalVarDirectPack:
             name = "DeclLocalVarDirectPack";
             break;
+        case NodeKind::CallDirect: name = "CallDirect"; break;
+        case NodeKind::CallIndirect: name = "CallIndirect"; break;
     }
 
     return name;

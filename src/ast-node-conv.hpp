@@ -288,6 +288,15 @@ struct DeclLocalVarDirectPack {
     Node*            init{};
 };
 
+struct CallDirect {
+    std::span<Node*> args;
+};
+
+struct CallIndirect {
+    Node*            callee{};
+    std::span<Node*> args;
+};
+
 // ------------------------------------------------------------------
 
 [[nodiscard]] constexpr auto id(Node const& n) -> Id {
@@ -601,6 +610,16 @@ struct DeclLocalVarDirectPack {
         .names = n.get_children().subspan(0, size - 1),
         .init = n.get_child(size - 1),
     };
+}
+
+[[nodiscard]] constexpr auto call_direct(Node const& n) -> CallDirect {
+    ASSERT(n.get_kind() == NodeKind::CallDirect);
+    return {.args = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto call_indirect(Node const& n) -> CallIndirect {
+    ASSERT(n.get_kind() == NodeKind::CallIndirect);
+    return {.callee = n.get_child(0), .args = n.get_children().subspan(1)};
 }
 
 // ==================================================================

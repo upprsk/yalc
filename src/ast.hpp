@@ -319,6 +319,19 @@ public:
                         new_node_array_with(ids, init));
     }
 
+    auto new_call_direct(Location loc, Decl* decl, std::span<Node* const> args)
+        -> Node* {
+        auto d = new_node(NodeKind::CallDirect, loc, new_node_array_with(args));
+        d->set_decl(decl);
+        return d;
+    }
+
+    auto new_call_indirect(Location loc, Node* callee,
+                           std::span<Node* const> args) -> Node* {
+        return new_node(NodeKind::CallIndirect, loc,
+                        new_node_array_with(callee, args));
+    }
+
     // ------------------------------------------------------------------------
 
     auto allocate_node_span(std::span<Node* const> nodes) -> std::span<Node*> {

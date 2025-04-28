@@ -176,6 +176,45 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Cast)) {
+        auto data = conv::binary(*node);
+        auto source = data.lhs->get_type();
+        auto target = node->get_type();
+
+        compile_expr(ast, data.lhs, ctx);
+        if (source->is_integral() && target->is_integral()) {
+            // both are integers
+            if (source->size() < target->size()) {
+                // don't need to do anything because of subtyping in qbe
+            }
+
+            else {
+                auto tmp = ctx.pop_tmp();
+                auto res = ctx.push_tmp();
+                auto ty = to_qbe_integer(*target);
+
+                // need to extend
+                if (target->is_signed()) {
+                    println(o, "    {} ={} exts{} {}", res, ty, ty, tmp);
+                } else {
+                    println(o, "    {} ={} extu{} {}", res, ty, ty, tmp);
+                }
+            }
+        }
+
+        else if ((source->is_ptr() && target->is_ptr()) ||
+                 (source->is_mptr() && target->is_mptr())) {
+            // don't need to do anything because pointers always have the same
+            // size
+        }
+
+        else {
+            PANIC("other conversions not implemented");
+        }
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Int)) {
         auto data = conv::integers(*node);
         auto tmp = ctx.push_tmp();
@@ -237,9 +276,9 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    if (node->is_oneof(ast::NodeKind::Call)) {
-        auto data = conv::call(*node);
-        auto func_type = data.callee->get_type()->as_func();
+    if (node->is_oneof(ast::NodeKind::CallDirect)) {
+        auto data = conv::call_direct(*node);
+        auto func_type = node->get_decl()->get_type()->as_func();
 
         if (func_type.get_ret().size() != 1) {
             ctx.er->report_bug(node->get_loc(),
@@ -266,17 +305,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
             print(o, "    ");
         }
 
-        // direct call to a function
-        if (data.callee->is_oneof(ast::NodeKind::Id)) {
-            print(o, "call ${}", data.callee->get_decl()->link_name);
-        }
-
-        // method or indirect call
-        else {
-            ctx.er->report_bug(node->get_loc(),
-                               "indirect calls have not been implemented");
-            PANIC("not implemented");
-        }
+        print(o, "call ${}", node->get_decl()->link_name);
 
         std::vector<Tmp> args;
         for (size_t i = 0; i < data.args.size(); i++) {
@@ -293,6 +322,63 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
 
         return;
     }
+
+    // if (node->is_oneof(ast::NodeKind::Call)) {
+    //     auto data = conv::call(*node);
+    //     auto func_type = data.callee->get_type()->as_func();
+    //
+    //     if (func_type.get_ret().size() != 1) {
+    //         ctx.er->report_bug(node->get_loc(),
+    //                            "calls to functions that return multiple
+    //                            values " "have not been implemented");
+    //         PANIC("not implemented");
+    //     }
+    //
+    //     auto tmp = ctx.push_tmp();
+    //     for (auto arg : data.args) compile_expr(ast, arg, ctx);
+    //
+    //     auto r = func_type.get_ret()[0];
+    //     if (!r->is_void()) {
+    //         if (!r->is_integral()) {
+    //             ctx.er->report_bug(
+    //                 node->get_loc(),
+    //                 "calls to functions that return non-integral "
+    //                 "values have not been implemented");
+    //             PANIC("not implemented");
+    //         }
+    //
+    //         print(o, "    {} ={} ", tmp, to_qbe_integer(*r));
+    //     } else {
+    //         print(o, "    ");
+    //     }
+    //
+    //     // direct call to a function
+    //     if (data.callee->is_oneof(ast::NodeKind::Id)) {
+    //         print(o, "call ${}", data.callee->get_decl()->link_name);
+    //     }
+    //
+    //     // method or indirect call
+    //     else {
+    //         ctx.er->report_bug(node->get_loc(),
+    //                            "indirect calls have not been implemented");
+    //         PANIC("not implemented");
+    //     }
+    //
+    //     std::vector<Tmp> args;
+    //     for (size_t i = 0; i < data.args.size(); i++) {
+    //         args.push_back(ctx.pop_tmp());
+    //     }
+    //
+    //     print(o, "(");
+    //
+    //     for (auto [tmp, arg] : rv::zip(rv::reverse(args), data.args)) {
+    //         print(o, "{} {}, ", to_qbe_integer(*arg->get_type()), tmp);
+    //     }
+    //
+    //     println(o, ")");
+    //
+    //     return;
+    // }
 
     PANIC("invalid node in compile_expr", node->get_kind(),
           fmt::to_string(node->get_kind()));
@@ -368,6 +454,10 @@ void compile_flat_module(Ast& ast, Node* node, Context& ctx) {
         if (child->is_oneof(ast::NodeKind::FuncDecl,
                             ast::NodeKind::FuncDeclWithCVarArgs)) {
             compile_func(ast, child, ctx);
+        }
+
+        else if (child->is_oneof(ast::NodeKind::TopDefDecl)) {
+            // ignore defs
         }
 
         else {

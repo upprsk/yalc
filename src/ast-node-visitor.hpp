@@ -12,7 +12,7 @@
 
 namespace yal::ast {
 
-// NOLINTNEXTLINE()
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
     if (node == nullptr) return;
 
@@ -415,6 +415,25 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
 
             visitor(ast, data.init, std::forward<decltype(visitor)>(visitor),
                     std::forward<decltype(args)>(args)...);
+        } break;
+
+        case NodeKind::CallDirect: {
+            auto data = conv::call_direct(*node);
+            for (auto c : data.args) {
+                visitor(ast, c, std::forward<decltype(visitor)>(visitor),
+                        std::forward<decltype(args)>(args)...);
+            }
+        } break;
+
+        case NodeKind::CallIndirect: {
+            auto data = conv::call_indirect(*node);
+            visitor(ast, data.callee, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+
+            for (auto c : data.args) {
+                visitor(ast, c, std::forward<decltype(visitor)>(visitor),
+                        std::forward<decltype(args)>(args)...);
+            }
         } break;
     }
 }

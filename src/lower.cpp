@@ -1,6 +1,7 @@
 #include "lower.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <ranges>
 
 #include "ast-node-conv.hpp"
@@ -191,6 +192,57 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
     node->transmute_to_unscoped_group(ast.allocate_node_span(items));
 }
 
+void visit_call(Ast& ast, Node* node, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+
+    auto& ts = *ctx.ts;
+    auto& er = *ctx.er;
+
+    auto data = conv::call(*node);
+    auto func_type = data.callee->get_type()->as_func();
+
+    // direct call
+    if (data.callee->is_oneof(ast::NodeKind::Id)) {
+        auto decl = data.callee->get_decl();
+        ASSERT(decl != nullptr);
+
+        node->transmute_to_call_direct(decl, data.args);
+    }
+
+    // method call
+    else if (data.callee->is_oneof(ast::NodeKind::Field) &&
+             func_type.is_bound) {
+        auto decl = data.callee->get_decl();
+        ASSERT(decl != nullptr);
+
+        auto params = func_type.get_params_direct();
+        ASSERT(params.size() > 0);
+
+        auto first_type = params[0];
+        auto receiver = conv::field(*data.callee).receiver;
+        auto receiver_type = receiver->get_type();
+
+        if (*first_type == *receiver_type) {
+            // both are the same, just transmute to a direct call
+            std::vector args{receiver};
+            std::ranges::copy(data.args, std::back_inserter(args));
+            node->transmute_to_call_direct(decl, ast.allocate_node_span(args));
+        }
+
+        else {
+            PANIC(
+                "automatic conversion on method calls have not been "
+                "implemented");
+        }
+    }
+
+    // indirect call
+    else {
+        er.report_error(node->get_loc(), "indirect calls not implemented");
+        PANIC("not implemented");
+    }
+}
+
 void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node == nullptr) return;
 
@@ -215,6 +267,11 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Assign)) {
         visit_assign(ast, node, ctx);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Call)) {
+        visit_call(ast, node, ctx);
         return;
     }
 
