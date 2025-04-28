@@ -67,16 +67,16 @@ enum class TypeKind {
     /// Nil type, will coerce to any optional type.
     Nil,
 
-    // Function type.
-    //
-    // The `inner` field contains:
-    //
-    // 1. `Pack` with parameter types.
-    // 2. `Pack` with return types.
+    /// Function type.
+    ///
+    /// The `inner` field contains:
+    ///
+    /// 1. `Pack` with parameter types.
+    /// 2. `Pack` with return types.
     Func,
     FuncWithVarArgs,
 
-    // Method type. Very similar to `Func`
+    /// Method type. Very similar to `Func`
     BoundFunc,
 
     Pack,
