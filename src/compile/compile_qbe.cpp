@@ -7,6 +7,7 @@
 #include "ast-node-conv.hpp"
 #include "ast-node.hpp"
 #include "file-store.hpp"
+#include "fmt/base.h"
 #include "fmt/ranges.h"
 #include "types.hpp"
 
@@ -105,6 +106,23 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::ExprStmt)) {
+        auto data = conv::unary(*node);
+        compile_expr(ast, data.child, ctx);
+        (void)ctx.pop_tmp();
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::DeclLocalVarDirect)) {
+        auto data = conv::decl_local_var_direct(*node);
+        compile_expr(ast, data.init, ctx);
+        auto tmp = ctx.pop_tmp();
+
+        println(o, "    %{} ={} copy {}", node->get_decl()->link_name,
+                to_qbe_integer(*data.init->get_type()), tmp);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::DeclLocalVarDirectPack)) {
         auto data = conv::decl_local_var_direct_pack(*node);
         if (data.names.size() != 1) {
@@ -116,7 +134,7 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
 
         compile_expr(ast, data.init, ctx);
         auto tmp = ctx.pop_tmp();
-        println(o, "    %{} ={} copy {}", conv::id(*data.names[0]).name,
+        println(o, "    %{} ={} copy {}", data.names[0]->get_decl()->link_name,
                 to_qbe_integer(*data.names[0]->get_type()), tmp);
 
         return;
@@ -124,9 +142,14 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
-        compile_expr(ast, data.child, ctx);
-        auto tmp = ctx.pop_tmp();
-        println(o, "    ret {}", tmp);
+        if (data.child) {
+            compile_expr(ast, data.child, ctx);
+            auto tmp = ctx.pop_tmp();
+            println(o, "    ret {}", tmp);
+        } else {
+            println(o, "    ret");
+        }
+
         return;
     }
 
@@ -160,8 +183,21 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
         auto tmp = ctx.push_tmp();
-        println(o, "    {} ={} copy %{}", tmp, to_qbe_integer(*node->get_type()),
-                data.name);
+        println(o, "    {} ={} copy %{}", tmp,
+                to_qbe_integer(*node->get_type()), node->get_decl()->link_name);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Add)) {
+        auto data = conv::binary(*node);
+        compile_expr(ast, data.lhs, ctx);
+        compile_expr(ast, data.rhs, ctx);
+
+        auto b = ctx.pop_tmp();
+        auto a = ctx.pop_tmp();
+        auto tmp = ctx.push_tmp();
+        println(o, "    {} ={} add {}, {}", tmp,
+                to_qbe_integer(*node->get_type()), a, b);
         return;
     }
 
@@ -191,12 +227,12 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
 
             print(o, "    {} ={} ", tmp, to_qbe_integer(*r));
         } else {
-            PANIC("not implemented");
+            print(o, "    ");
         }
 
         // direct call to a function
         if (data.callee->is_oneof(ast::NodeKind::Id)) {
-            print(o, "call ${}", conv::id(*data.callee).name);
+            print(o, "call ${}", data.callee->get_decl()->link_name);
         }
 
         // method or indirect call
@@ -257,18 +293,24 @@ void compile_func(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    if (!ret_type[0]->is_integral()) {
-        ctx.er->report_bug(node->get_loc(),
-                           "non-integer returns not implemeted (found {})",
-                           *ret_type[0]);
+    print(o, "function ");
+
+    if (ret_type[0]->is_integral()) {
+        print(o, "{} ", to_qbe_integer(*ret_type[0]));
+    } else if (ret_type[0]->is_void()) {
+    } else {
+        ctx.er->report_bug(
+            node->get_loc(),
+            "non-integer or void returns not implemeted (found {})",
+            *ret_type[0]);
         return;
     }
 
-    print(o, "function {} ${}(", to_qbe_integer(*ret_type[0]), decl->link_name);
+    print(o, "${}(", decl->link_name);
 
-    if (!data.get_args().params.empty()) {
-        ctx.er->report_bug(data.args->get_loc(),
-                           "function arguments not implemented");
+    for (auto p : data.get_args().params) {
+        print(o, "{} %{},", to_qbe_integer(*p->get_type()),
+              p->get_decl()->link_name);
     }
 
     println(o, ") {{");

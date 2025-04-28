@@ -1,58 +1,46 @@
 module main;
 
-func int.fib(n: int) int {
-    if n.v == 0 or n.v == 1 { return .{ 1 }; }
-    return (n - 1).fib() + (n - 2).fib();
+def Counter = struct { cnt: i32 = 0, total: i32 };
+func Counter.next(
+    c: *Counter,
+) (i32, bool) {
+    if c.cnt == c.total {
+        return c.cnt, false;
+    }
+
+    var v = c.cnt;
+    c.cnt += 1;
+    return v, true;
 }
 
 func main() {
-    var i: int = .{ 10 };
-    i.yay();
+    var c: Counter = .{ .total = 10 };
+    c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
+
+    while true {
+        var it, ok = c.next();
+        if !ok { break; }
+
+        c_printf("it=%d\n", it);
+    }
 }
 
-// module main;
-// 
-// def Counter = struct { cnt: i32 = 0, total: i32 };
-// func Counter.next(
-//     c: *Counter,
-// ) (i32, bool) {
-//     if c.cnt == c.total {
-//         return c.cnt, false;
-//     }
-// 
-//     var v = c.cnt;
-//     c.cnt += 1;
-//     return v, true;
-// }
-// 
-// func main() {
-//     var c: Counter = .{ .total = 10 };
-//     c_printf("c.cnt=%d, c.total=%d\n", c.cnt, c.total);
-// 
-//     while true {
-//         var it, ok = c.next();
-//         if !ok { break; }
-// 
-//         c_printf("it=%d\n", it);
-//     }
-// }
-// 
-// @extern(link_name="printf")
-// func c_printf(fmt: [*]const u8, ...);
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
 
-// def STDIN_FILENO  = 0;
-// def STDOUT_FILENO = 1;
-// def STDERR_FILENO = 2;
-// 
-// @extern
-// func write(fd: i32, buf: [*]const u8, nbyte: usize);
-// 
-// func main() {
-//     // this has a terminating null byte, but it is not included in the `len`
-//     var x = "Hello, World!\n"; // string_view
-//     write(
-//         STDOUT_FILENO,
-//         x.ptr, // [*]const u8
-//         x.len, // usize
-//     );
-// }
+def STDIN_FILENO  = 0;
+def STDOUT_FILENO = 1;
+def STDERR_FILENO = 2;
+
+@extern
+func write(fd: i32, buf: [*]const u8, nbyte: usize);
+
+func main() {
+    // this has a terminating null byte, but it is not included in the `len`
+    var x = "Hello, World!\n"; // string_view
+    write(
+        STDOUT_FILENO,
+        x.ptr, // [*]const u8
+        x.len, // usize
+    );
+}

@@ -1,7 +1,16 @@
-module test;
+module main;
 
-func a() *i32 {}
-
-func test() {
-    var a = a().*;
+func sum(a: i32, b: i32) i32 {
+    return a + b;
 }
+
+@export
+func main() {
+    var i = 2;
+    var v = sum(i, 2);
+    print_int(v);
+    return;
+}
+
+@extern
+func print_int(v: i32);
