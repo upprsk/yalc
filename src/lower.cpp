@@ -122,7 +122,9 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
                 auto lhs_item = lhs[lhs_idx];
 
                 if (conv::is_discard_id(*lhs_item)) {
-                    lhs_items.push_back(ast.new_discarded(lhs_item->get_loc()));
+                    auto d = ast.new_discarded(lhs_item->get_loc());
+                    d->set_type(ts.get_void());
+                    lhs_items.push_back(d);
                     lhs_idx++;
                     continue;
                 }
@@ -146,8 +148,11 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
 
             auto loc = lhs_items.at(0)->get_loc().extend(
                 lhs_items.at(lhs_items.size() - 1)->get_loc());
-            // FIXME: add types to the expr pack
             auto new_lhs_pack = ast.new_expr_pack(loc, lhs_items);
+            new_lhs_pack->set_type(ts.new_pack(
+                lhs_items |
+                rv::transform([](Node* n) { return n->get_type(); }) |
+                std::ranges::to<std::vector>()));
 
             auto d = ast.new_assign_stmt(node->get_loc(),
                                          ast::NodeKind::AssignDirectPack,
