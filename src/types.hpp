@@ -79,6 +79,7 @@ enum class TypeKind {
     /// Method type. Very similar to `Func`
     BoundFunc,
 
+    /// A pack of types (kinda of a tuple) that functions return.
     Pack,
 };
 
