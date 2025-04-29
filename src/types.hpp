@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <ranges>
 #include <string_view>
 #include <vector>
@@ -16,7 +17,7 @@ struct Decl;
 namespace yal::types {
 using json = nlohmann::json;
 
-enum class TypeKind {
+enum class TypeKind : uint16_t {
     Err,
 
     /// The type of types. As types can be used as types, we need a type for
