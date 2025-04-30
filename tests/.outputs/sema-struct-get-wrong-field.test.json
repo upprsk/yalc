@@ -1,0 +1,1 @@
+{"stderr":":memory::6:9: error: type #test.S(struct {a: i32}) does not have a field named \"b\"\n  0005 |     var s: S = .{.a=0};\n> 0006 |     _ = s.b;\n                 ^^^\n  0007 | }\n"}

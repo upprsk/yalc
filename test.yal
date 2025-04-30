@@ -2,5 +2,6 @@ module main;
 
 def S = struct { a: i32 };
 func test() {
-    var s: S = .{.b=0};
+    var s: S = .{.a=0};
+    _ = s.b;
 }

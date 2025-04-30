@@ -625,6 +625,24 @@ func test() {
 }
 )");
 
+    run_test(ctx, p, "get field", R"(
+module test;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{.a=0};
+    _ = s.a;
+}
+)");
+
+    run_test(ctx, p, "get wrong field", R"(
+module test;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{.a=0};
+    _ = s.b;
+}
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("examples");
 
