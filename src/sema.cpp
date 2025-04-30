@@ -184,6 +184,49 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
         return {.type = ts.get_type(), .data = ty};
     }
 
+    if (node->is_oneof(ast::NodeKind::StructType)) {
+        auto data = conv::struct_type(*node);
+
+        std::vector<types::Type*> fields;
+        for (auto field : data.fields) {
+            auto v = eval_node(ast, field, ctx);
+            if (!v.type->is_type()) {
+                er.report_warn(field->get_loc(),
+                               "can not use non-type in field");
+                continue;
+            }
+
+            auto ty = v.get_data_type();
+            ASSERT(ty->kind == types::TypeKind::StructField);
+            fields.push_back(ty);
+        }
+
+        return {.type = ts.get_type(), .data = ts.new_struct(fields)};
+    }
+
+    if (node->is_oneof(ast::NodeKind::StructField)) {
+        auto data = conv::struct_field(*node);
+
+        if (data.init) {
+            auto v = eval_node(ast, data.init, ctx);
+            er.report_bug(
+                data.init->get_loc(),
+                "default initializer for fields has not been implemented");
+            er.report_note(data.init->get_loc(), "got value: {}", v);
+        }
+
+        auto type = eval_node(ast, data.type, ctx);
+        if (!type.type->is_type()) {
+            er.report_error(data.type->get_loc(),
+                            "can not use non-type {} as type for field",
+                            *type.type);
+            return {.type = ts.get_error()};
+        }
+
+        return {.type = ts.get_type(),
+                .data = ts.new_struct_field(data.name, type.get_data_type())};
+    }
+
     if (node->is_oneof(ast::NodeKind::FuncParams)) {
         return eval_node_func_params(ast, node, ctx);
     }
@@ -831,6 +874,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
 
 // ----------------------------------------------------------------------------
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
                          std::span<Node*> inits, Context& ctx) {
     auto& er = *ctx.er;
@@ -1284,6 +1328,34 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                        ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst)) {
         visit_children(ctx, node);
         node->set_type(ts.get_type());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::StructType)) {
+        visit_children(ctx, node);
+        node->set_type(ts.get_type());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::StructField)) {
+        auto data = conv::struct_field(*node);
+        visit(ctx, data.type);
+        visit(ctx, data.init);
+
+        node->set_type(ts.get_type());
+
+        auto type = data.type->get_type();
+        ASSERT(type != nullptr);
+
+        if (data.init) {
+            auto init = data.init->get_type();
+            ASSERT(init != nullptr);
+
+            auto [_, coerce] = coerce_check_and_fixup_source_ints(
+                ast, type, init, data.type, data.init, ctx);
+            if (coerce) node->set_child(1, coerce);
+        }
+
         return;
     }
 

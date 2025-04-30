@@ -65,6 +65,13 @@ enum class TypeKind : uint16_t {
     /// bytes.
     StrView,
 
+    /// A struct.
+    ///
+    /// - `inner` contains a list of `StructField`.
+    Struct,
+    /// A struct field.
+    StructField,
+
     /// Nil type, will coerce to any optional type.
     Nil,
 
@@ -253,6 +260,13 @@ struct Type {
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
 
+            case TypeKind::Struct: {
+                size_t total{};
+                for (auto it : inner) total += it->size();
+                return total;
+            }
+            case TypeKind::StructField: return inner[0]->size();
+
             case TypeKind::Nil:
             case TypeKind::Func:
             case TypeKind::FuncWithVarArgs:
@@ -414,6 +428,15 @@ public:
 
     [[nodiscard]] auto new_pack(std::span<Type* const> inner) -> Type*;
 
+    [[nodiscard]] auto new_struct(std::span<Type* const> fields) -> Type* {
+        return new_type(TypeKind::Struct, fields);
+    }
+
+    [[nodiscard]] auto new_struct_field(std::string_view name, Type* type)
+        -> Type* {
+        return new_type(TypeKind::StructField, std::array{type}, name);
+    }
+
     [[nodiscard]] auto new_func(Type* params, Type* ret, bool has_var_args)
         -> Type* {
         return new_type(
@@ -532,6 +555,8 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Float32: name = "f32"; break;
         case TypeKind::Float64: name = "f64"; break;
         case TypeKind::StrView: name = "string_view"; break;
+        case TypeKind::Struct: name = "struct"; break;
+        case TypeKind::StructField: name = "struct.field"; break;
         case TypeKind::Ptr: name = "Ptr"; break;
         case TypeKind::PtrConst: name = "PtrConst"; break;
         case TypeKind::MultiPtr: name = "MultiPtr"; break;

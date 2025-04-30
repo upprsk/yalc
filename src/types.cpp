@@ -272,6 +272,17 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
             ASSERT(ty.inner.size() == 1);
             return fmt::format_to(ctx.out(), "[*]const {}", *ty.inner[0]);
 
+        case TypeKind::Struct:
+            return fmt::format_to(
+                ctx.out(), "struct {{{}}}",
+                fmt::join(
+                    ty.inner | rv::transform([](Type *it) -> Type const & {
+                        return *it;
+                    }),
+                    ", "));
+        case TypeKind::StructField:
+            return fmt::format_to(ctx.out(), "{}: {}", ty.id, *ty.inner[0]);
+
         case TypeKind::Func:
             ASSERT(ty.inner.size() == 2);
             ASSERT(ty.inner[0]->kind == TypeKind::Pack);
