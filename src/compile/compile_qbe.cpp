@@ -245,6 +245,28 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::WhileStmt)) {
+        auto data = conv::while_stmt(*node);
+
+        auto start = ctx.new_block();
+        println(o, "{}", start);
+
+        compile_expr(ast, data.cond, ctx);
+
+        auto then = ctx.new_block();
+        auto after = ctx.new_block();
+
+        auto tmp = ctx.pop_tmp();
+        println(o, "    jnz {}, {}, {}", tmp, then, after);
+        println(o, "{}", then);
+
+        compile_stmt(ast, data.body, ctx);
+        println(o, "    jmp {}", start);
+        println(o, "{}", after);
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
         if (data.child) {
@@ -253,6 +275,26 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
             println(o, "    ret {}", tmp);
         } else {
             println(o, "    ret");
+        }
+
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::AssignDirect)) {
+        auto data = conv::assign(*node);
+
+        if (data.lhs->is_oneof(ast::NodeKind::Id)) {
+            auto lhs = conv::id(*data.lhs);
+            compile_expr(ast, data.rhs, ctx);
+            auto rhs = ctx.pop_tmp();
+
+            println(o, "    %{} ={} copy {}", lhs.to->link_name,
+                    to_qbe_integer_tmp(*data.lhs->get_type()), rhs);
+        }
+
+        else {
+            PANIC("other assigmemt kinds not implemented",
+                  data.lhs->get_kind());
         }
 
         return;
@@ -380,7 +422,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
             case ast::NodeKind::Add: op = "add"; break;
             case ast::NodeKind::Sub: op = "sub"; break;
             case ast::NodeKind::Less:
-                if (node->get_type()->is_signed())
+                if (data.lhs->get_type()->is_signed())
                     op = fmt::format("cslt{}",
                                      to_qbe_integer_tmp(*node->get_type()));
                 else
@@ -388,7 +430,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
                                      to_qbe_integer_tmp(*node->get_type()));
                 break;
             case ast::NodeKind::Greater:
-                if (node->get_type()->is_signed())
+                if (data.lhs->get_type()->is_signed())
                     op = fmt::format("csgt{}",
                                      to_qbe_integer_tmp(*node->get_type()));
                 else

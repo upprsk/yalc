@@ -4,12 +4,9 @@ module main;
 func main() {
     // get digit character and convert to actual integer
     var i = c_getchar() - 0x30;
-    if i > 5 {
-        c_print_cstr("larger than 5".ptr);
-    } else if i < 5 {
-        c_print_cstr("smaller than 5".ptr);
-    } else {
-        c_print_cstr("equal to 5".ptr);
+    while i > 0 {
+        c_print_cstr("loop".ptr);
+        i = i - 1;
     }
 
     c_print_cstr("DONE".ptr);
