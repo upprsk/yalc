@@ -64,12 +64,16 @@ auto TypeStore::new_bound_from(Type const *ty) -> Type * {
     return new_type(TypeKind::BoundFunc, std::array{data.params, data.ret});
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     ASSERT(dst != nullptr);
     ASSERT(src != nullptr);
 
     // errors are forwarded
     if (dst->is_err()) return dst;
+
+    // unpack single sized packs
+    if (dst->is_pack() && dst->inner.size() == 1) dst = dst->inner[0];
 
     if (dst->is_integral()) {
         if (!src->is_integral()) return nullptr;
