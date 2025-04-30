@@ -2,6 +2,7 @@
 
 #include <ranges>
 #include <utility>
+#include <vector>
 
 #include "ast-node-conv.hpp"
 #include "ast-node-visitor.hpp"
@@ -33,6 +34,9 @@ struct Context {
                 .ts = ts,
                 .er = er};
     }
+
+    // NOLINTNEXTLINE(readability-redundant-member-init)
+    std::vector<Node*> pending_functions{};
 
     types::Type* current_function{};
     bool         is_lvalue{};
@@ -404,12 +408,16 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
             ASSERT(ty_decl->value.type->is_type());
 
             auto ty = ty_decl->value.get_data_type();
-            ts.add_function_to_type(ty, conv::id(*ids[1]).name, d);
+            ts.add_function_to_type(*ty, conv::id(*ids[1]).name, d);
         }
     }
 
-    auto sctx = ctx.child(ty);
-    visit(sctx, data.body);
+    // we only process the body later, so that all functions have already been
+    // processed by the time we reach their bodies.
+    ctx.pending_functions.push_back(node);
+
+    // auto sctx = ctx.child(ty);
+    // visit(sctx, data.body);
 }
 
 // ============================================================================
@@ -1067,9 +1075,24 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                     node->get_kind());
     }
 
-    if (node->is_oneof(NodeKind::FlatModule, NodeKind::Decorators,
-                       NodeKind::Decorator, NodeKind::FuncParams,
-                       NodeKind::FuncRetPack, NodeKind::Block)) {
+    if (node->is_oneof(ast::NodeKind::FlatModule)) {
+        node->set_type(ts.get_void());
+
+        visit_children(ctx, node);
+
+        for (auto const& node : ctx.pending_functions) {
+            auto data = conv::func_decl(*node);
+            auto sctx = ctx.child(node->get_type());
+            visit(sctx, data.body);
+        }
+
+        ctx.pending_functions.clear();
+        return;
+    }
+
+    if (node->is_oneof(NodeKind::Decorators, NodeKind::Decorator,
+                       NodeKind::FuncParams, NodeKind::FuncRetPack,
+                       NodeKind::Block)) {
         node->set_type(ts.get_void());
         visit_children(ctx, node);
         return;
@@ -1320,7 +1343,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         }
 
         // methods
-        auto d = ts.get_function_from_type(rty, data.name);
+        auto d = ts.get_function_from_type(*rty, data.name);
         if (d == nullptr) {
             er.report_error(node->get_loc(),
                             "type {} does not have field named {:?}", *rty,

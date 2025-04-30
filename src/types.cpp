@@ -40,16 +40,15 @@ auto TypeStore::new_pack(std::span<Type *const> inner) -> Type * {
     return new_type(TypeKind::Pack, expanded);
 }
 
-void TypeStore::add_function_to_type(Type const *ty, std::string_view name,
+void TypeStore::add_function_to_type(Type const &ty, std::string_view name,
                                      Decl *d) {
-    // fmt::println(stderr, "add to in {} ({}) method {:?}", fmt::ptr(ty), *ty,
-    //              name);
+    // fmt::println(stderr, "add method {:?} to {}", name, ty);
     namespaced[ty][name] = d;
 }
 
-auto TypeStore::get_function_from_type(Type const      *ty,
+auto TypeStore::get_function_from_type(Type const      &ty,
                                        std::string_view name) const -> Decl * {
-    // fmt::println(stderr, "find in {} ({})", fmt::ptr(ty), *ty);
+    // fmt::println(stderr, "find in {}", ty);
     if (auto it = namespaced.find(ty); it != std::end(namespaced)) {
         if (auto fn = it->second.find(name); fn != std::end(it->second))
             return fn->second;

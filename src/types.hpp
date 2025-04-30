@@ -274,6 +274,24 @@ struct Type {
     std::span<Type*> inner;
 };
 
+}  // namespace yal::types
+
+template <>
+struct std::hash<yal::types::Type> {
+    auto operator()(yal::types::Type const& type) const -> std::size_t {
+        auto v = std::hash<uint16_t>{}(static_cast<uint16_t>(type.kind)) ^
+                 std::hash<uint16_t>{}(type.id);
+
+        for (auto const& inner : type.inner) {
+            v ^= std::hash<yal::types::Type>{}(*inner);
+        }
+
+        return v;
+    }
+};
+
+namespace yal::types {
+
 struct TypeStore {
     struct TypeItem {
         TypeItem* next;
@@ -410,9 +428,9 @@ public:
 
     // ------------------------------------------------------------------------
 
-    void add_function_to_type(Type const* ty, std::string_view name, Decl* d);
+    void add_function_to_type(Type const& ty, std::string_view name, Decl* d);
 
-    auto get_function_from_type(Type const* ty, std::string_view name) const
+    auto get_function_from_type(Type const& ty, std::string_view name) const
         -> Decl*;
 
     auto new_bound_from(Type const* ty) -> Type*;
@@ -459,7 +477,7 @@ private:
 private:
     TypeItem* head{};
 
-    std::unordered_map<Type const*, std::unordered_map<std::string_view, Decl*>>
+    std::unordered_map<Type, std::unordered_map<std::string_view, Decl*>>
         namespaced;
 
     mem::Arena types;
