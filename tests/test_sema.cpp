@@ -1,5 +1,7 @@
 #include "test_sema.hpp"
 
+#include <vector>
+
 #include "error_reporter.hpp"
 #include "name-res.hpp"
 #include "nlohmann/json.hpp"
@@ -9,6 +11,7 @@
 #include "utils.hpp"
 
 using json = nlohmann::json;
+namespace rv = std::ranges::views;
 
 auto gen_ast_typed(std::string source) -> json {
     yal::MemStream ms;
@@ -42,6 +45,44 @@ auto gen_ast_typed(std::string source) -> json {
     return j;
 }
 
+auto gen_ast_typed_many(std::vector<std::string> sources) -> json {
+    yal::MemStream ms;
+
+    auto fs = yal::FileStore{};
+    auto er = yal::ErrorReporter{fs, ms.f};
+
+    std::unordered_set<yal::FileId> filenames;
+    for (auto const& [idx, source] : rv::enumerate(sources)) {
+        filenames.insert(fs.add(fmt::format(":memory-{}:", idx), source));
+    }
+
+    (void)fs.add_dir(":memory-dir:", filenames);
+
+    auto root = fs.add(":memory-0:");
+    auto fer = er.for_file(root);
+    auto tokens = yal::tokenize(fer.get_source(), fer);
+
+    auto [ast, ast_root] = yal::parse(tokens, fer);
+    er.update_error_count(fer);
+
+    auto ts = yal::types::TypeStore{};
+    auto prj_root = yal::resolve_names(ast, ast_root, er, fs, ts, {});
+
+    yal::sema::sema_ast(ast, prj_root, er, ts, {});
+    ms.flush();
+
+    if (er.had_error()) {
+        return json{
+            {"stderr", ms.str()}
+        };
+    }
+
+    json j = *prj_root;
+    j["ds"] = *ast.get_decl_store();
+
+    return j;
+}
+
 static void run_test(Context& ctx, TestParams const& p, std::string name,
                      std::string source, bool skip = false) {
     if (skip) {
@@ -51,6 +92,18 @@ static void run_test(Context& ctx, TestParams const& p, std::string name,
     }
 
     run_checks_for_test(ctx, p, name, [&]() { return gen_ast_typed(source); });
+}
+
+static void run_test(Context& ctx, TestParams const& p, std::string name,
+                     std::vector<std::string> sources, bool skip = false) {
+    if (skip) {
+        fmt::print(fmt::bg(fmt::color::orange), "SKIP");
+        fmt::println(" '{}' skipped", name);
+        return;
+    }
+
+    run_checks_for_test(ctx, p, name,
+                        [&]() { return gen_ast_typed_many(sources); });
 }
 
 auto test_sema(TestParams const& p) -> std::pair<int, int> {
@@ -566,6 +619,38 @@ func c_print_str(s: [*]const u8, len: i32);
 @extern(link_name="print_cstr")
 func c_print_cstr(s: [*]const u8);
 )");
+
+    run_test(ctx, p, "hello method",
+             std::vector<std::string>{
+                 R"(
+module main;
+
+def cstr_t = [*]const u8;
+func cstr_t.print(s: cstr_t) {
+    c_print_cstr(s as [*]const u8);
+    return;
+}
+
+@export
+func main() {
+    var v = "Hello, World!".ptr as cstr_t;
+    v.print();
+    return;
+}
+)",
+                 R"(
+module main;
+
+@extern(link_name="print_int")
+func c_print_int(v: i32);
+
+@extern(link_name="print_str")
+func c_print_str(s: [*]const u8, len: i32);
+
+@extern(link_name="print_cstr")
+func c_print_cstr(s: [*]const u8);
+)",
+             });
 
     ctx.tags.pop_back();
 
