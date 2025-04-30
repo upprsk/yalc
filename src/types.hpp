@@ -72,6 +72,14 @@ enum class TypeKind : uint16_t {
     /// A struct field.
     StructField,
 
+    /// A struct literal, the type of a struct before inference.
+    ///
+    /// - `inner` contains a list of either `LitField` or another type
+    /// directly. `LitField` encodes a named field and anything else a
+    /// positional initializer.
+    Lit,
+    LitField,
+
     /// Nil type, will coerce to any optional type.
     Nil,
 
@@ -152,17 +160,17 @@ struct Type {
         return kind == TypeKind::UntypedInt;
     }
 
-    [[nodiscard]] constexpr auto contains_untyped_int() const -> bool {
+    [[nodiscard]] constexpr auto contains_untyped() const -> bool {
         namespace r = std::ranges;
         namespace rv = std::ranges::views;
-        return kind == TypeKind::UntypedInt ||
+        return kind == TypeKind::UntypedInt || kind == TypeKind::Lit ||
                (kind == TypeKind::Pack
-                    ? r::any_of(rv::transform(
-                                    inner,
-                                    [](Type* inner) {
-                                        return inner->contains_untyped_int();
-                                    }),
-                                [](bool v) { return v; })
+                    ? r::any_of(
+                          rv::transform(inner,
+                                        [](Type* inner) {
+                                            return inner->contains_untyped();
+                                        }),
+                          [](bool v) { return v; })
                     : false);
     }
 
@@ -203,6 +211,22 @@ struct Type {
 
     [[nodiscard]] constexpr auto is_strview() const -> bool {
         return kind == TypeKind::StrView;
+    }
+
+    [[nodiscard]] constexpr auto is_struct() const -> bool {
+        return kind == TypeKind::Struct;
+    }
+
+    [[nodiscard]] constexpr auto is_struct_field() const -> bool {
+        return kind == TypeKind::StructField;
+    }
+
+    [[nodiscard]] constexpr auto is_lit() const -> bool {
+        return kind == TypeKind::Lit;
+    }
+
+    [[nodiscard]] constexpr auto is_lit_field() const -> bool {
+        return kind == TypeKind::LitField;
     }
 
     struct Func {
@@ -260,12 +284,14 @@ struct Type {
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
 
-            case TypeKind::Struct: {
+            case TypeKind::Struct:
+            case TypeKind::Lit: {
                 size_t total{};
                 for (auto it : inner) total += it->size();
                 return total;
             }
-            case TypeKind::StructField: return inner[0]->size();
+            case TypeKind::StructField:
+            case TypeKind::LitField: return inner[0]->size();
 
             case TypeKind::Nil:
             case TypeKind::Func:
@@ -288,7 +314,7 @@ struct Type {
         namespace rv = std::ranges::views;
 
         auto toref = [](Type* o) -> Type const& { return *o; };
-        return kind == other.kind &&
+        return kind == other.kind && id == other.id &&
                r::equal(rv::transform(inner, toref),
                         rv::transform(other.inner, toref));
     }
@@ -437,6 +463,15 @@ public:
         return new_type(TypeKind::StructField, std::array{type}, name);
     }
 
+    [[nodiscard]] auto new_lit(std::span<Type* const> fields) -> Type* {
+        return new_type(TypeKind::Lit, fields);
+    }
+
+    [[nodiscard]] auto new_lit_field(std::string_view name, Type* type)
+        -> Type* {
+        return new_type(TypeKind::LitField, std::array{type}, name);
+    }
+
     [[nodiscard]] auto new_func(Type* params, Type* ret, bool has_var_args)
         -> Type* {
         return new_type(
@@ -557,6 +592,8 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::StrView: name = "string_view"; break;
         case TypeKind::Struct: name = "struct"; break;
         case TypeKind::StructField: name = "struct.field"; break;
+        case TypeKind::Lit: name = "Lit"; break;
+        case TypeKind::LitField: name = "LitField"; break;
         case TypeKind::Ptr: name = "Ptr"; break;
         case TypeKind::PtrConst: name = "PtrConst"; break;
         case TypeKind::MultiPtr: name = "MultiPtr"; break;

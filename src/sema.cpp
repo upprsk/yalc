@@ -477,8 +477,8 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
 // ============================================================================
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
-                                 types::Type* target) {
+void fixup_untyped_chain(types::TypeStore& ts, Node* chain,
+                         types::Type* target) {
     ASSERT(chain != nullptr);
     ASSERT(chain->get_type() != nullptr);
     // ASSERT(chain->get_type()->is_untyped_int(), *chain->get_type());
@@ -492,8 +492,7 @@ void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
                         ast::NodeKind::Mul, ast::NodeKind::Div,
                         ast::NodeKind::Mod)) {
         chain->set_type(target);
-        for (auto c : chain->get_children())
-            fixup_untyped_integer_chain(ts, c, target);
+        for (auto c : chain->get_children()) fixup_untyped_chain(ts, c, target);
         return;
     }
 
@@ -501,11 +500,33 @@ void fixup_untyped_integer_chain(types::TypeStore& ts, Node* chain,
         auto data = conv::expr_pack(*chain);
         ASSERT(data.items.size() == target->inner.size());
         ASSERT(target->kind == types::TypeKind::Pack);
-        ASSERT(!target->contains_untyped_int());
+        ASSERT(!target->contains_untyped());
 
         chain->set_type(target);
         for (auto [c, inner] : rv::zip(data.items, target->inner))
-            fixup_untyped_integer_chain(ts, c, inner);
+            fixup_untyped_chain(ts, c, inner);
+        return;
+    }
+
+    if (chain->is_oneof(ast::NodeKind::Lit)) {
+        ASSERT(target->kind == types::TypeKind::Struct);
+        auto data = conv::lit(*chain);
+
+        std::unordered_map<std::string_view, types::Type*> expected_items;
+        for (auto exp : target->inner) expected_items[exp->id] = exp;
+
+        for (auto item : data.items) {
+            if (item->is_oneof(ast::NodeKind::LitParam)) {
+                auto data = conv::lit_param(*item);
+                auto it = expected_items.at(data.key);
+                fixup_untyped_chain(ts, data.init, it->inner[0]);
+                item->set_type(it);
+            } else {
+                PANIC("not implemented (and also not possible for now)");
+            }
+        }
+
+        chain->set_type(target);
         return;
     }
 
@@ -576,11 +597,11 @@ auto coerce_check_and_fixup_source_ints(Ast& ast, types::Type* target,
     -> std::pair<types::Type*, Node*> {
     auto r = coerce_and_check(target, source, target_node, source_node, ctx);
 
-    if (source->is_untyped_int()) {
+    if (source->contains_untyped() && !r->is_err()) {
         ASSERT(!r->is_untyped_int());
 
         // fixup untyped integers
-        fixup_untyped_integer_chain(*ctx.ts, source_node, r);
+        fixup_untyped_chain(*ctx.ts, source_node, r);
     }
 
     if (!r->is_err() && *r != *source_node->get_type()) {
@@ -598,12 +619,12 @@ auto coerce_check_and_fixup_simetric_ints(Ast& ast, types::Type* target,
     -> std::pair<types::Type*, Node*> {
     auto r = coerce_and_check(target, source, target_node, source_node, ctx);
 
-    if (target->is_untyped_int() && !source->is_untyped_int()) {
-        fixup_untyped_integer_chain(*ctx.ts, target_node, r);
+    if (target->contains_untyped() && !source->contains_untyped()) {
+        fixup_untyped_chain(*ctx.ts, target_node, r);
     }
 
-    if (source->is_untyped_int() && !target->is_untyped_int()) {
-        fixup_untyped_integer_chain(*ctx.ts, source_node, r);
+    if (source->contains_untyped() && !target->contains_untyped()) {
+        fixup_untyped_chain(*ctx.ts, source_node, r);
     }
 
     if (!r->is_err() && !r->is_untyped_int() &&
@@ -621,17 +642,17 @@ auto coerce_check_and_fixup_simetric_ints_with_fallback(
     -> std::pair<types::Type*, Node*> {
     auto r = coerce_and_check(target, source, target_node, source_node, ctx);
 
-    if (target->is_untyped_int() && !source->is_untyped_int()) {
-        fixup_untyped_integer_chain(*ctx.ts, target_node, r);
+    if (target->contains_untyped() && !source->contains_untyped()) {
+        fixup_untyped_chain(*ctx.ts, target_node, r);
     }
 
-    if (source->is_untyped_int() && !target->is_untyped_int()) {
-        fixup_untyped_integer_chain(*ctx.ts, source_node, r);
+    if (source->contains_untyped() && !target->contains_untyped()) {
+        fixup_untyped_chain(*ctx.ts, source_node, r);
     }
 
-    if (source->is_untyped_int() && target->is_untyped_int()) {
-        fixup_untyped_integer_chain(*ctx.ts, target_node, fallback);
-        fixup_untyped_integer_chain(*ctx.ts, source_node, fallback);
+    if (source->contains_untyped() && target->contains_untyped()) {
+        fixup_untyped_chain(*ctx.ts, target_node, fallback);
+        fixup_untyped_chain(*ctx.ts, source_node, fallback);
     }
 
     if (!r->is_err() && !r->is_untyped_int() &&
@@ -758,10 +779,9 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
         // a simple initializer expression
         else {
             if (conv::id(*ids[name_idx]).is_discard()) {
-                if (init_type->is_untyped_int()) {
+                if (init_type->contains_untyped()) {
                     // fixup untyped integers
-                    fixup_untyped_integer_chain(*ctx.ts, init,
-                                                ts.get_default_int());
+                    fixup_untyped_chain(*ctx.ts, init, ts.get_default_int());
                 }
 
                 name_idx++;
@@ -850,18 +870,17 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
         // a simple initializer expression
         else {
             if (conv::id(*ids[name_idx]).is_discard()) {
-                if (init_type->is_untyped_int()) {
+                if (init_type->contains_untyped()) {
                     // fixup untyped integers
-                    fixup_untyped_integer_chain(*ctx.ts, init,
-                                                ts.get_default_int());
+                    fixup_untyped_chain(*ctx.ts, init, ts.get_default_int());
                 }
 
                 name_idx++;
                 continue;
             }
 
-            if (init_type->is_untyped_int()) {
-                fixup_untyped_integer_chain(ts, init, ts.get_default_int());
+            if (init_type->contains_untyped()) {
+                fixup_untyped_chain(ts, init, ts.get_default_int());
                 init_type = init->get_type();
             }
 
@@ -1081,9 +1100,8 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
         else {
             if (conv::is_discard_id(*lhs[lhs_idx])) {
                 // need to fixup
-                if (rhs_type->is_untyped_int()) {
-                    fixup_untyped_integer_chain(ts, rhs_item,
-                                                ts.get_default_int());
+                if (rhs_type->contains_untyped()) {
+                    fixup_untyped_chain(ts, rhs_item, ts.get_default_int());
                 }
 
                 lhs_idx++;
@@ -1359,6 +1377,32 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Lit)) {
+        auto data = conv::lit(*node);
+
+        std::vector<types::Type*> types;
+        for (auto it : data.items) {
+            visit(ctx, it);
+
+            ASSERT(it->get_type() != nullptr);
+            types.push_back(it->get_type());
+        }
+
+        node->set_type(ts.new_lit(types));
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::LitParam)) {
+        auto data = conv::lit_param(*node);
+        visit(ctx, data.init);
+
+        auto type = data.init->get_type();
+        ASSERT(type != nullptr);
+
+        node->set_type(ts.new_lit_field(data.key, type));
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Call)) {
         auto data = conv::call(*node);
         visit(ctx, data.callee);
@@ -1599,9 +1643,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
         ASSERT(rty->is_pack());
         ASSERT(r->is_pack());
-        if (rty->contains_untyped_int()) {
-            ASSERT(!r->contains_untyped_int());
-            fixup_untyped_integer_chain(ts, data.child, r);
+        if (rty->contains_untyped()) {
+            ASSERT(!r->contains_untyped());
+            fixup_untyped_chain(ts, data.child, r);
         }
 
         if (*r != *data.child->get_type()) {

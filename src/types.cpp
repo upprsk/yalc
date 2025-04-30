@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <ranges>
 #include <string_view>
+#include <utility>
 
 #include "fmt/base.h"
 #include "fmt/format.h"
@@ -140,6 +141,36 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
         }
 
         return new_pack(res);
+    }
+
+    if (dst->is_distinct() && src->is_lit()) {
+        while (dst->is_distinct()) dst = dst->inner[0];
+
+        std::unordered_map<std::string_view, Type *> expected_items;
+        for (auto exp : dst->inner) expected_items[exp->id] = exp->inner[0];
+
+        std::vector<Type *> results;
+        for (auto recv : src->inner) {
+            if (recv->is_lit_field()) {
+                auto it = expected_items.find(recv->id);
+                if (it == expected_items.end()) return nullptr;
+
+                auto ty = coerce(it->second, recv->inner[0]);
+                // TODO: do we want to abort completally here or keep the
+                // nullptr
+                if (!ty) return nullptr;
+
+                results.push_back(new_struct_field(recv->id, ty));
+            }
+
+            else {
+                // TODO: add support for positional arguments
+                return nullptr;
+            }
+        }
+
+        if (results.size() != expected_items.size()) return nullptr;
+        return new_struct(results);
     }
 
     return nullptr;
@@ -282,6 +313,17 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
                     ", "));
         case TypeKind::StructField:
             return fmt::format_to(ctx.out(), "{}: {}", ty.id, *ty.inner[0]);
+
+        case TypeKind::Lit:
+            return fmt::format_to(
+                ctx.out(), ".{{{}}}",
+                fmt::join(
+                    ty.inner | rv::transform([](Type *it) -> Type const & {
+                        return *it;
+                    }),
+                    ", "));
+        case TypeKind::LitField:
+            return fmt::format_to(ctx.out(), ".{}={}", ty.id, *ty.inner[0]);
 
         case TypeKind::Func:
             ASSERT(ty.inner.size() == 2);
