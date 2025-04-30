@@ -1,17 +1,6 @@
 module main;
 
-@export
-func main() {
-    // get digit character and convert to actual integer
-    var i = c_getchar() - 0x30;
-    while i > 0 {
-        c_print_cstr("loop".ptr);
-        if i == 5 { break; }
-
-        i = i - 1;
-    }
-
-    c_print_cstr("DONE".ptr);
-
-    return;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{.b=0};
 }

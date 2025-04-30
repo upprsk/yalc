@@ -581,6 +581,51 @@ func printf(fmt: [*]const u8, arg0: i32);
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("struct");
+
+    run_test(ctx, p, "minimal", R"(
+module test;
+def S = struct { a: i32 };
+)");
+
+    run_test(ctx, p, "minimal 2", R"(
+module test;
+def S = struct { a: i32, };
+)");
+
+    run_test(ctx, p, "instantiate", R"(
+module test;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{.a=0};
+}
+)");
+
+    run_test(ctx, p, "instantiate extra fields", R"(
+module test;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{.a=0, .b=0};
+}
+)");
+
+    run_test(ctx, p, "instantiate missing fields", R"(
+module test;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{};
+}
+)");
+
+    run_test(ctx, p, "instantiate wrong fields", R"(
+module test;
+def S = struct { a: i32 };
+func test() {
+    var s: S = .{.b=0};
+}
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("examples");
 
     run_test(ctx, p, "hello", R"(module main;

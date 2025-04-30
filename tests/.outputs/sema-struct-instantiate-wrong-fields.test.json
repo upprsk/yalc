@@ -1,0 +1,1 @@
+{"stderr":":memory::5:16: error: can not coerce value of type .{.b=untyped_int} to type #test.S(struct {a: i32})\n  0004 | func test() {\n> 0005 |     var s: S = .{.b=0};\n                        ^^^^^^^\n  0006 | }\n:memory::5:12: note: required #test.S(struct {a: i32}) from here\n  0004 | func test() {\n> 0005 |     var s: S = .{.b=0};\n                    ^\n  0006 | }\n"}
