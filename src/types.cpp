@@ -73,7 +73,8 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     if (dst->is_err()) return dst;
 
     // unpack single sized packs
-    if (dst->is_pack() && dst->inner.size() == 1) dst = dst->inner[0];
+    if (dst->is_pack() && !src->is_pack() && dst->inner.size() == 1)
+        dst = dst->inner[0];
 
     if (dst->is_integral()) {
         if (!src->is_integral()) return nullptr;
