@@ -23,9 +23,19 @@ namespace conv = ast::conv;
 namespace rv = std::ranges::views;
 
 struct Context {
+    [[nodiscard]] constexpr auto child(Node* current_loop) const -> Context {
+        return {.current_loop = current_loop,
+                .current_function = current_function,
+                .ts = ts,
+                .er = er};
+    }
+
     [[nodiscard]] constexpr auto child(types::Type* current_function) const
         -> Context {
-        return {.current_function = current_function, .ts = ts, .er = er};
+        return {.current_loop = current_loop,
+                .current_function = current_function,
+                .ts = ts,
+                .er = er};
     }
 
     [[nodiscard]] constexpr auto child_lvalue() const -> Context {
@@ -38,6 +48,7 @@ struct Context {
     // NOLINTNEXTLINE(readability-redundant-member-init)
     std::vector<Node*> pending_functions{};
 
+    Node*        current_loop{};
     types::Type* current_function{};
     bool         is_lvalue{};
 
@@ -1452,9 +1463,24 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                             *cty);
         }
 
-        visit(ctx, data.body);
+        auto sctx = ctx.child(node);
+        visit(sctx, data.body);
 
         node->set_type(ts.get_void());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Break)) {
+        node->set_type(ts.get_void());
+
+        if (ctx.current_loop == nullptr) {
+            er.report_error(node->get_loc(),
+                            "can not use break outside of loop");
+            return;
+        }
+
+        // er.report_debug(node->get_loc(), "got break");
+        // er.report_debug(ctx.current_loop->get_loc(), "for this loop");
         return;
     }
 

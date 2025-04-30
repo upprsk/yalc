@@ -6,6 +6,8 @@ func main() {
     var i = c_getchar() - 0x30;
     while i > 0 {
         c_print_cstr("loop".ptr);
+        if i == 5 { break; }
+
         i = i - 1;
     }
 

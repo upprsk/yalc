@@ -61,6 +61,8 @@ struct Context {
     std::vector<Tmp>              tmp_stack;
     std::vector<std::string_view> pending_string_literals;
 
+    Label end_of_current_loop{};
+
     [[nodiscard]] constexpr auto new_tmp() -> Tmp { return {next_tmp++}; }
 
     constexpr void               push_tmp(Tmp t) { tmp_stack.push_back(t); }
@@ -260,10 +262,17 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         println(o, "    jnz {}, {}, {}", tmp, then, after);
         println(o, "{}", then);
 
+        ctx.end_of_current_loop = after;
+
         compile_stmt(ast, data.body, ctx);
         println(o, "    jmp {}", start);
         println(o, "{}", after);
 
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Break)) {
+        println(o, "    jmp {}", ctx.end_of_current_loop);
         return;
     }
 
@@ -412,7 +421,8 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
-                       ast::NodeKind::Less, ast::NodeKind::Greater)) {
+                       ast::NodeKind::Equal, ast::NodeKind::Less,
+                       ast::NodeKind::Greater)) {
         auto data = conv::binary(*node);
         compile_expr(ast, data.lhs, ctx);
         compile_expr(ast, data.rhs, ctx);
@@ -421,6 +431,10 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         switch (node->get_kind()) {
             case ast::NodeKind::Add: op = "add"; break;
             case ast::NodeKind::Sub: op = "sub"; break;
+            case ast::NodeKind::Equal:
+                op =
+                    fmt::format("ceq{}", to_qbe_integer_tmp(*node->get_type()));
+                break;
             case ast::NodeKind::Less:
                 if (data.lhs->get_type()->is_signed())
                     op = fmt::format("cslt{}",
