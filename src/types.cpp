@@ -28,6 +28,16 @@ auto Type::as_func() const -> Func {
     };
 }
 
+auto Type::as_struct_get_fields() const
+    -> std::unordered_map<std::string_view, Type *> {
+    ASSERT(is_struct());
+
+    std::unordered_map<std::string_view, Type *> fields;
+    for (auto exp : inner) fields[exp->id] = exp->inner[0];
+
+    return fields;
+}
+
 auto TypeStore::new_pack(std::span<Type *const> inner) -> Type * {
     std::vector<Type *> expanded;
     for (auto it : inner) {
@@ -144,10 +154,10 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
     }
 
     if (dst->is_distinct() && src->is_lit()) {
+        auto original_dst = dst;
         while (dst->is_distinct()) dst = dst->inner[0];
 
-        std::unordered_map<std::string_view, Type *> expected_items;
-        for (auto exp : dst->inner) expected_items[exp->id] = exp->inner[0];
+        auto expected_items = dst->as_struct_get_fields();
 
         std::vector<Type *> results;
         for (auto recv : src->inner) {
@@ -170,7 +180,15 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
         }
 
         if (results.size() != expected_items.size()) return nullptr;
-        return new_struct(results);
+
+        auto result = new_struct(results);
+        auto dst = original_dst;
+        while (dst->is_distinct()) {
+            result = new_distinct_of(dst->id, result);
+            dst = dst->inner[0];
+        }
+
+        return result;
     }
 
     return nullptr;

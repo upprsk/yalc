@@ -509,11 +509,14 @@ void fixup_untyped_chain(types::TypeStore& ts, Node* chain,
     }
 
     if (chain->is_oneof(ast::NodeKind::Lit)) {
-        ASSERT(target->kind == types::TypeKind::Struct);
+        auto unw = target;
+        while (unw->is_distinct()) unw = unw->inner[0];
+
+        ASSERT(unw->kind == types::TypeKind::Struct);
         auto data = conv::lit(*chain);
 
         std::unordered_map<std::string_view, types::Type*> expected_items;
-        for (auto exp : target->inner) expected_items[exp->id] = exp;
+        for (auto exp : unw->inner) expected_items[exp->id] = exp;
 
         for (auto item : data.items) {
             if (item->is_oneof(ast::NodeKind::LitParam)) {
@@ -1457,7 +1460,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         auto rty = data.receiver->get_type();
         ASSERT(rty != nullptr);
 
-        if (rty->is_strview()) {
+        auto unw = rty->unwrapped();
+
+        if (unw->is_strview()) {
             if (data.name == "ptr") {
                 node->set_type(ts.new_mptr(ts.get_u8(), true));
                 return;
@@ -1472,6 +1477,22 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
                             "type {} does not have a field named {:?}", *rty,
                             data.name);
             node->set_type(ts.get_error());
+            return;
+        }
+
+        // struct fields
+        if (unw->is_struct()) {
+            auto fields = unw->as_struct_get_fields();
+            auto it = fields.find(data.name);
+            if (it == fields.end()) {
+                er.report_error(node->get_loc(),
+                                "type {} does not have a field named {:?}",
+                                *rty, data.name);
+                node->set_type(ts.get_error());
+                return;
+            }
+
+            node->set_type(it->second);
             return;
         }
 

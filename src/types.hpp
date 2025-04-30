@@ -252,6 +252,16 @@ struct Type {
 
     [[nodiscard]] auto as_func() const -> Func;
 
+    /// Return a map of field name to field type
+    [[nodiscard]] auto as_struct_get_fields() const
+        -> std::unordered_map<std::string_view, Type*>;
+
+    [[nodiscard]] auto unwrapped() -> Type* {
+        auto t = this;
+        while (t->is_distinct()) t = t->inner[0];
+        return t;
+    }
+
     // ========================================================================
 
     [[nodiscard]] constexpr auto size() const -> size_t {
