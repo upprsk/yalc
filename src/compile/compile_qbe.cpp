@@ -329,63 +329,6 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    // if (node->is_oneof(ast::NodeKind::Call)) {
-    //     auto data = conv::call(*node);
-    //     auto func_type = data.callee->get_type()->as_func();
-    //
-    //     if (func_type.get_ret().size() != 1) {
-    //         ctx.er->report_bug(node->get_loc(),
-    //                            "calls to functions that return multiple
-    //                            values " "have not been implemented");
-    //         PANIC("not implemented");
-    //     }
-    //
-    //     auto tmp = ctx.push_tmp();
-    //     for (auto arg : data.args) compile_expr(ast, arg, ctx);
-    //
-    //     auto r = func_type.get_ret()[0];
-    //     if (!r->is_void()) {
-    //         if (!r->is_integral()) {
-    //             ctx.er->report_bug(
-    //                 node->get_loc(),
-    //                 "calls to functions that return non-integral "
-    //                 "values have not been implemented");
-    //             PANIC("not implemented");
-    //         }
-    //
-    //         print(o, "    {} ={} ", tmp, to_qbe_integer(*r));
-    //     } else {
-    //         print(o, "    ");
-    //     }
-    //
-    //     // direct call to a function
-    //     if (data.callee->is_oneof(ast::NodeKind::Id)) {
-    //         print(o, "call ${}", data.callee->get_decl()->link_name);
-    //     }
-    //
-    //     // method or indirect call
-    //     else {
-    //         ctx.er->report_bug(node->get_loc(),
-    //                            "indirect calls have not been implemented");
-    //         PANIC("not implemented");
-    //     }
-    //
-    //     std::vector<Tmp> args;
-    //     for (size_t i = 0; i < data.args.size(); i++) {
-    //         args.push_back(ctx.pop_tmp());
-    //     }
-    //
-    //     print(o, "(");
-    //
-    //     for (auto [tmp, arg] : rv::zip(rv::reverse(args), data.args)) {
-    //         print(o, "{} {}, ", to_qbe_integer(*arg->get_type()), tmp);
-    //     }
-    //
-    //     println(o, ")");
-    //
-    //     return;
-    // }
-
     PANIC("invalid node in compile_expr", node->get_kind(),
           fmt::to_string(node->get_kind()));
 }
