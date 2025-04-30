@@ -23,6 +23,11 @@ namespace rv = std::ranges::views;
 struct Tmp {
     uint32_t v{};
 };
+
+struct Label {
+    uint32_t v{};
+};
+
 }  // namespace yal::compile::qbe
 
 template <>
@@ -35,6 +40,16 @@ struct fmt::formatter<yal::compile::qbe::Tmp> : formatter<string_view> {
     }
 };
 
+template <>
+struct fmt::formatter<yal::compile::qbe::Label> : formatter<string_view> {
+    // parse is inherited from formatter<string_view>.
+
+    auto format(yal::compile::qbe::Label const& label,
+                format_context& ctx) const -> format_context::iterator {
+        return fmt::format_to(ctx.out(), "@l{}", label.v);
+    }
+};
+
 namespace yal::compile::qbe {
 
 struct Context {
@@ -42,6 +57,7 @@ struct Context {
     ErrorReporter* er{};
 
     uint32_t                      next_tmp{};
+    uint32_t                      next_block{};
     std::vector<Tmp>              tmp_stack;
     std::vector<std::string_view> pending_string_literals;
 
@@ -59,13 +75,45 @@ struct Context {
         tmp_stack.pop_back();
         return last;
     }
+
+    [[nodiscard]] constexpr auto new_block() -> Label { return {next_block++}; }
 };
 
 auto ptr_to_qbe_integer() -> std::string_view {
     return sizeof(void*) == 4 ? "w" : "l";
 }
 
-auto to_qbe_integer(types::Type const& type) -> std::string_view {
+auto to_qbe_integer_tmp(types::Type const& type) -> std::string_view {
+    auto type_ptr = &type;
+    while (type_ptr->is_distinct()) type_ptr = type_ptr->inner[0];
+
+    std::string_view ptr_type = ptr_to_qbe_integer();
+
+    switch (type_ptr->kind) {
+        case types::TypeKind::Uint64:
+        case types::TypeKind::Int64: return "l";
+        case types::TypeKind::Uint32:
+        case types::TypeKind::Int32:
+        case types::TypeKind::Uint16:
+        case types::TypeKind::Int16:
+        case types::TypeKind::Uint8:
+        case types::TypeKind::Int8: return "w";
+        case types::TypeKind::Usize:
+        case types::TypeKind::Isize: return ptr_type;
+        case types::TypeKind::Bool: return "w";
+        case types::TypeKind::Float32: return "f";
+        case types::TypeKind::Float64: return "d";
+        case types::TypeKind::Ptr:
+        case types::TypeKind::PtrConst:
+        case types::TypeKind::MultiPtr:
+        case types::TypeKind::MultiPtrConst: return ptr_type;
+        default:
+            PANIC("not a valid integer type for qbe", type_ptr->kind,
+                  fmt::to_string(type_ptr->kind));
+    }
+}
+
+auto to_qbe_integer_exact(types::Type const& type) -> std::string_view {
     auto type_ptr = &type;
     while (type_ptr->is_distinct()) type_ptr = type_ptr->inner[0];
 
@@ -98,6 +146,7 @@ auto to_qbe_integer(types::Type const& type) -> std::string_view {
 void compile_stmt(Ast& ast, Node* node, Context& ctx);
 void compile_expr(Ast& ast, Node* node, Context& ctx);
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void compile_stmt(Ast& ast, Node* node, Context& ctx) {
     auto o = ctx.out;
 
@@ -127,7 +176,7 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         auto tmp = ctx.pop_tmp();
 
         println(o, "    %{} ={} copy {}", node->get_decl()->link_name,
-                to_qbe_integer(*data.init->get_type()), tmp);
+                to_qbe_integer_tmp(*data.init->get_type()), tmp);
         return;
     }
 
@@ -143,7 +192,55 @@ void compile_stmt(Ast& ast, Node* node, Context& ctx) {
         compile_expr(ast, data.init, ctx);
         auto tmp = ctx.pop_tmp();
         println(o, "    %{} ={} copy {}", data.names[0]->get_decl()->link_name,
-                to_qbe_integer(*data.names[0]->get_type()), tmp);
+                to_qbe_integer_tmp(*data.names[0]->get_type()), tmp);
+
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Block)) {
+        auto data = conv::block(*node);
+        for (auto child : data.items) {
+            compile_stmt(ast, child, ctx);
+        }
+
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::IfStmt)) {
+        auto data = conv::if_stmt(*node);
+        compile_expr(ast, data.cond, ctx);
+
+        // no else
+        if (data.wf == nullptr) {
+            auto wt = ctx.new_block();
+            auto after = ctx.new_block();
+
+            auto tmp = ctx.pop_tmp();
+            println(o, "    jnz {}, {}, {}", tmp, wt, after);
+            println(o, "{}", wt);
+
+            compile_stmt(ast, data.wt, ctx);
+            println(o, "{}", after);
+        }
+
+        // got else
+        else {
+            auto wt = ctx.new_block();
+            auto wf = ctx.new_block();
+            auto after = ctx.new_block();
+
+            auto tmp = ctx.pop_tmp();
+            println(o, "    jnz {}, {}, {}", tmp, wt, wf);
+            println(o, "{}", wt);
+
+            compile_stmt(ast, data.wt, ctx);
+            println(o, "    jmp {}", after);
+            println(o, "{}", wf);
+
+            compile_stmt(ast, data.wf, ctx);
+
+            println(o, "{}", after);
+        }
 
         return;
     }
@@ -170,6 +267,7 @@ void compile_block(Ast& ast, Node* node, Context& ctx) {
     for (auto child : data.items) compile_stmt(ast, child, ctx);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void compile_expr(Ast& ast, Node* node, Context& ctx) {
     auto o = ctx.out;
 
@@ -197,13 +295,14 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
             else {
                 auto tmp = ctx.pop_tmp();
                 auto res = ctx.push_tmp();
-                auto ty = to_qbe_integer(*target);
+                auto ty_exact = to_qbe_integer_exact(*target);
+                auto ty = to_qbe_integer_tmp(*target);
 
                 // need to extend
                 if (target->is_signed()) {
-                    println(o, "    {} ={} exts{} {}", res, ty, ty, tmp);
+                    println(o, "    {} ={} exts{} {}", res, ty, ty_exact, tmp);
                 } else {
-                    println(o, "    {} ={} extu{} {}", res, ty, ty, tmp);
+                    println(o, "    {} ={} extu{} {}", res, ty, ty_exact, tmp);
                 }
             }
         }
@@ -224,8 +323,8 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::Int)) {
         auto data = conv::integers(*node);
         auto tmp = ctx.push_tmp();
-        println(o, "    {} ={} copy {}", tmp, to_qbe_integer(*node->get_type()),
-                data.value);
+        println(o, "    {} ={} copy {}", tmp,
+                to_qbe_integer_tmp(*node->get_type()), data.value);
 
         return;
     }
@@ -234,7 +333,8 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         // auto data = conv::id(*node);
         auto tmp = ctx.push_tmp();
         println(o, "    {} ={} copy %{}", tmp,
-                to_qbe_integer(*node->get_type()), node->get_decl()->link_name);
+                to_qbe_integer_tmp(*node->get_type()),
+                node->get_decl()->link_name);
         return;
     }
 
@@ -269,16 +369,37 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    if (node->is_oneof(ast::NodeKind::Add)) {
+    if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Less,
+                       ast::NodeKind::Greater)) {
         auto data = conv::binary(*node);
         compile_expr(ast, data.lhs, ctx);
         compile_expr(ast, data.rhs, ctx);
 
+        std::string_view op;
+        switch (node->get_kind()) {
+            case ast::NodeKind::Add: op = "add"; break;
+            case ast::NodeKind::Less:
+                if (node->get_type()->is_signed())
+                    op = "slt";
+                else
+                    op = "ult";
+                break;
+            case ast::NodeKind::Greater:
+                if (node->get_type()->is_signed())
+                    op = "sgt";
+                else
+                    op = "ugt";
+                break;
+            default:
+                UNREACHABLE("invalid node kind in binary", node->get_kind());
+        }
+
         auto b = ctx.pop_tmp();
         auto a = ctx.pop_tmp();
         auto tmp = ctx.push_tmp();
-        println(o, "    {} ={} add {}, {}", tmp,
-                to_qbe_integer(*node->get_type()), a, b);
+        println(o, "    {} ={} c{}{} {}, {}", tmp,
+                to_qbe_integer_tmp(*node->get_type()), op,
+                to_qbe_integer_tmp(*node->get_type()), a, b);
         return;
     }
 
@@ -306,7 +427,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
                 PANIC("not implemented");
             }
 
-            print(o, "    {} ={} ", tmp, to_qbe_integer(*r));
+            print(o, "    {} ={} ", tmp, to_qbe_integer_tmp(*r));
         } else {
             print(o, "    ");
         }
@@ -321,7 +442,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         print(o, "(");
 
         for (auto [tmp, arg] : rv::zip(rv::reverse(args), data.args)) {
-            print(o, "{} {}, ", to_qbe_integer(*arg->get_type()), tmp);
+            print(o, "{} {}, ", to_qbe_integer_tmp(*arg->get_type()), tmp);
         }
 
         println(o, ")");
@@ -367,7 +488,7 @@ void compile_func(Ast& ast, Node* node, Context& ctx) {
     print(o, "function ");
 
     if (ret_type[0]->is_integral()) {
-        print(o, "{} ", to_qbe_integer(*ret_type[0]));
+        print(o, "{} ", to_qbe_integer_tmp(*ret_type[0]));
     } else if (ret_type[0]->is_void()) {
     } else {
         ctx.er->report_bug(
@@ -380,7 +501,7 @@ void compile_func(Ast& ast, Node* node, Context& ctx) {
     print(o, "${}(", decl->link_name);
 
     for (auto p : data.get_args().params) {
-        print(o, "{} %{},", to_qbe_integer(*p->get_type()),
+        print(o, "{} %{},", to_qbe_integer_tmp(*p->get_type()),
               p->get_decl()->link_name);
     }
 
