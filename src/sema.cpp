@@ -851,7 +851,7 @@ void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
 
         // wen we eval and define a type, create a distinct copy
         if (v.type->is_type()) {
-            v.data = ts.new_distinct(v.get_data_type());
+            v.data = ts.new_distinct_of(d->full_name, v.get_data_type());
         }
 
         d->value = v;

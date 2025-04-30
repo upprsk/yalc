@@ -56,6 +56,8 @@ auto Arena::new_block() -> Block* {
 }
 
 auto Arena::alloc_string(std::string_view s) -> std::span<char> {
+    if (s.size() == 0) return {};
+
     auto      mem = static_cast<char*>(mem_alloc(s.size()));
     std::span dst{mem, mem + s.size()};
     std::ranges::copy(s, dst.begin());

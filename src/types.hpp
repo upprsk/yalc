@@ -280,7 +280,7 @@ struct Type {
     }
 
     TypeKind         kind;
-    uint16_t         id{};
+    std::string_view id;
     std::span<Type*> inner;
 };
 
@@ -290,7 +290,7 @@ template <>
 struct std::hash<yal::types::Type> {
     auto operator()(yal::types::Type const& type) const -> std::size_t {
         auto v = std::hash<uint16_t>{}(static_cast<uint16_t>(type.kind)) ^
-                 std::hash<uint16_t>{}(type.id);
+                 std::hash<std::string_view>{}(type.id);
 
         for (auto const& inner : type.inner) {
             v ^= std::hash<yal::types::Type>{}(*inner);
@@ -425,14 +425,17 @@ public:
         return new_type(TypeKind::Distinct, std::array{inner});
     }
 
-    [[nodiscard]] auto new_distinct_of(uint16_t id, Type* inner) -> Type* {
+    [[nodiscard]] auto new_distinct_of(std::string_view id, Type* inner)
+        -> Type* {
         return new_type(TypeKind::Distinct, std::array{inner}, id);
     }
 
     [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner,
-                                uint16_t id = 0) -> Type* {
+                                std::string_view id = "") -> Type* {
         auto ty = types.create<TypeItem>(
-            head, Type{.kind = kind, .id = id, .inner = new_array(inner)});
+            head, Type{.kind = kind,
+                       .id = strings.alloc_string_view(id),
+                       .inner = new_array(inner)});
         head = ty;
 
         return &ty->type;
@@ -498,6 +501,7 @@ private:
     std::unordered_map<Type, std::unordered_map<std::string_view, Decl*>>
         namespaced;
 
+    mem::Arena strings;
     mem::Arena types;
     mem::Arena arrays;
     Builtin    builtin;

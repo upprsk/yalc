@@ -318,7 +318,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
             return fmt::format_to(ctx.out(), "({})", comma_separate(ty.inner));
 
         case yal::types::TypeKind::Distinct:
-            return fmt::format_to(ctx.out(), "distinct#{} {}", ty.id,
+            return fmt::format_to(ctx.out(), "#{}({})", ty.id,
                                   comma_separate(ty.inner));
     }
 
