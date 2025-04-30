@@ -82,6 +82,9 @@ enum class TypeKind : uint16_t {
 
     /// A pack of types (kinda of a tuple) that functions return.
     Pack,
+
+    /// A distinct type. It is only coercible to itself.
+    Distinct,
 };
 
 struct Type {
@@ -187,6 +190,10 @@ struct Type {
         return kind == TypeKind::MultiPtr || kind == TypeKind::MultiPtrConst;
     }
 
+    [[nodiscard]] constexpr auto is_distinct() const -> bool {
+        return kind == TypeKind::Distinct;
+    }
+
     [[nodiscard]] constexpr auto is_strview() const -> bool {
         return kind == TypeKind::StrView;
     }
@@ -253,6 +260,8 @@ struct Type {
 
             // this can't be instantiated, so it should not have size
             case TypeKind::Pack: return 0;
+
+            case TypeKind::Distinct: return inner[0]->size();
         }
 
         return 0;
@@ -271,6 +280,7 @@ struct Type {
     }
 
     TypeKind         kind;
+    uint16_t         id{};
     std::span<Type*> inner;
 };
 
@@ -411,10 +421,18 @@ public:
             std::array{params, ret});
     }
 
-    [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner)
-        -> Type* {
+    [[nodiscard]] auto new_distinct(Type* inner) -> Type* {
+        return new_type(TypeKind::Distinct, std::array{inner});
+    }
+
+    [[nodiscard]] auto new_distinct_of(uint16_t id, Type* inner) -> Type* {
+        return new_type(TypeKind::Distinct, std::array{inner}, id);
+    }
+
+    [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner,
+                                uint16_t id = 0) -> Type* {
         auto ty = types.create<TypeItem>(
-            head, Type{.kind = kind, .inner = new_array(inner)});
+            head, Type{.kind = kind, .id = id, .inner = new_array(inner)});
         head = ty;
 
         return &ty->type;
@@ -519,6 +537,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::FuncWithVarArgs: name = "FuncWithVarArgs"; break;
         case TypeKind::Pack: name = "(pack)"; break;
         case TypeKind::BoundFunc: name = "BoundFunc"; break;
+        case TypeKind::Distinct: name = "Distinct"; break;
     }
 
     return name;

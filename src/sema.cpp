@@ -823,6 +823,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
 void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
                          std::span<Node*> inits, Context& ctx) {
     auto& er = *ctx.er;
+    auto& ts = *ctx.ts;
     if (ids.size() != inits.size()) {
         er.report_bug(decl->get_loc(),
                       "using multiple returns in def has not been implemented");
@@ -836,6 +837,11 @@ void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
         ASSERT(d->value.has_data() == false);
         ASSERT(d->value.type != nullptr);
         ASSERT(*d->value.type == *v.type);
+
+        // wen we eval and define a type, create a distinct copy
+        if (v.type->is_type()) {
+            v.data = ts.new_distinct(v.get_data_type());
+        }
 
         d->value = v;
     }

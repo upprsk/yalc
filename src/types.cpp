@@ -150,6 +150,11 @@ auto TypeStore::cast(Type *dst, Type *src) -> Type * {
 
     if (dst->is_integral() && src->is_integral()) return dst;
 
+    if (src->is_distinct()) return cast(dst, src->inner[0]);
+    if (dst->is_distinct()) {
+        return new_distinct_of(dst->id, cast(dst->inner[0], src));
+    }
+
     return nullptr;
 }
 
@@ -166,6 +171,10 @@ void to_json(json &j, Type const &t) {
         { "kind", fmt::to_string(t.kind)},
         {"inner",                    arr},
     };
+
+    if (t.is_distinct()) {
+        j["id"] = t.id;
+    }
 }
 
 void to_json(json &j, TypeStore const &ts) {
@@ -302,6 +311,10 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
 
         case TypeKind::Pack:
             return fmt::format_to(ctx.out(), "({})", comma_separate(ty.inner));
+
+        case yal::types::TypeKind::Distinct:
+            return fmt::format_to(ctx.out(), "distinct#{} {}", ty.id,
+                                  comma_separate(ty.inner));
     }
 
     return fmt::format_to(ctx.out(), "<invalid kind>");
