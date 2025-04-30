@@ -66,9 +66,12 @@ auto ptr_to_qbe_integer() -> std::string_view {
 }
 
 auto to_qbe_integer(types::Type const& type) -> std::string_view {
+    auto type_ptr = &type;
+    while (type_ptr->is_distinct()) type_ptr = type_ptr->inner[0];
+
     std::string_view ptr_type = ptr_to_qbe_integer();
 
-    switch (type.kind) {
+    switch (type_ptr->kind) {
         case types::TypeKind::Uint64:
         case types::TypeKind::Int64: return "l";
         case types::TypeKind::Uint32:
@@ -87,8 +90,8 @@ auto to_qbe_integer(types::Type const& type) -> std::string_view {
         case types::TypeKind::MultiPtr:
         case types::TypeKind::MultiPtrConst: return ptr_type;
         default:
-            PANIC("not a valid integer type for qbe", type.kind,
-                  fmt::to_string(type.kind));
+            PANIC("not a valid integer type for qbe", type_ptr->kind,
+                  fmt::to_string(type_ptr->kind));
     }
 }
 
@@ -181,6 +184,9 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         auto source = data.lhs->get_type();
         auto target = node->get_type();
 
+        while (target->is_distinct()) target = target->inner[0];
+        while (source->is_distinct()) source = source->inner[0];
+
         compile_expr(ast, data.lhs, ctx);
         if (source->is_integral() && target->is_integral()) {
             // both are integers
@@ -209,7 +215,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         }
 
         else {
-            PANIC("other conversions not implemented");
+            PANIC("other conversions not implemented", *target, *source);
         }
 
         return;
