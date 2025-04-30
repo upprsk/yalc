@@ -369,26 +369,31 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
-    if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Less,
-                       ast::NodeKind::Greater)) {
+    if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
+                       ast::NodeKind::Less, ast::NodeKind::Greater)) {
         auto data = conv::binary(*node);
         compile_expr(ast, data.lhs, ctx);
         compile_expr(ast, data.rhs, ctx);
 
-        std::string_view op;
+        std::string op;
         switch (node->get_kind()) {
             case ast::NodeKind::Add: op = "add"; break;
+            case ast::NodeKind::Sub: op = "sub"; break;
             case ast::NodeKind::Less:
                 if (node->get_type()->is_signed())
-                    op = "slt";
+                    op = fmt::format("cslt{}",
+                                     to_qbe_integer_tmp(*node->get_type()));
                 else
-                    op = "ult";
+                    op = fmt::format("cult{}",
+                                     to_qbe_integer_tmp(*node->get_type()));
                 break;
             case ast::NodeKind::Greater:
                 if (node->get_type()->is_signed())
-                    op = "sgt";
+                    op = fmt::format("csgt{}",
+                                     to_qbe_integer_tmp(*node->get_type()));
                 else
-                    op = "ugt";
+                    op = fmt::format("cugt{}",
+                                     to_qbe_integer_tmp(*node->get_type()));
                 break;
             default:
                 UNREACHABLE("invalid node kind in binary", node->get_kind());
@@ -397,9 +402,8 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
         auto b = ctx.pop_tmp();
         auto a = ctx.pop_tmp();
         auto tmp = ctx.push_tmp();
-        println(o, "    {} ={} c{}{} {}, {}", tmp,
-                to_qbe_integer_tmp(*node->get_type()), op,
-                to_qbe_integer_tmp(*node->get_type()), a, b);
+        println(o, "    {} ={} {} {}, {}", tmp,
+                to_qbe_integer_tmp(*node->get_type()), op, a, b);
         return;
     }
 
