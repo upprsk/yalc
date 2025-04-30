@@ -231,7 +231,7 @@ void compile_expr(Ast& ast, Node* node, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Id)) {
-        auto data = conv::id(*node);
+        // auto data = conv::id(*node);
         auto tmp = ctx.push_tmp();
         println(o, "    {} ={} copy %{}", tmp,
                 to_qbe_integer(*node->get_type()), node->get_decl()->link_name);
