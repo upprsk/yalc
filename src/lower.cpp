@@ -192,10 +192,12 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
     node->transmute_to_unscoped_group(ast.allocate_node_span(items));
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_call(Ast& ast, Node* node, Context& ctx) {
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+    // auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx);
+    // };
 
-    auto& ts = *ctx.ts;
+    // auto& ts = *ctx.ts;
     auto& er = *ctx.er;
 
     auto data = conv::call(*node);
@@ -246,7 +248,7 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
 void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node == nullptr) return;
 
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+    // auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
 
     auto visit_children = [&](Context& ctx, Node* node) {
         ast::visit_children(
@@ -258,7 +260,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     };
 
     auto& er = *ctx.er;
-    auto& ts = *ctx.ts;
+    // auto& ts = *ctx.ts;
 
     if (node->is_oneof(ast::NodeKind::VarDecl)) {
         visit_var_decl(ast, node, ctx);

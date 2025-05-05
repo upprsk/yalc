@@ -14,6 +14,7 @@
 namespace yal::types {
 namespace rv = std::ranges::views;
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto Type::as_func() const -> Func {
     ASSERT(is_func());
     ASSERT(inner.size() == 2);
@@ -244,6 +245,7 @@ void to_json(json &j, TypeStore const &ts) {
 
 }  // namespace yal::types
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
                                               format_context  &ctx) const
     -> format_context::iterator {
