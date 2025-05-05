@@ -301,7 +301,7 @@ func c_print_cstr(s: [*]const u8);
 
     ctx.tags.pop_back();
 
-    fmt::println("sema tests, {} tests, {} success, {} failed", ctx.total(),
+    fmt::println("lower tests, {} tests, {} success, {} failed", ctx.total(),
                  ctx.ok, ctx.failed);
     return {ctx.ok, ctx.failed};
 }
