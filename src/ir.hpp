@@ -41,9 +41,12 @@ struct Type {
 enum class OpCode {
     Err,
     IntConst,
+    Param,
 
     Call,
     CallVoid,
+
+    GetLocal,
 };
 
 struct Inst {
@@ -116,6 +119,7 @@ struct Func {
     std::string_view link_name;
 
     std::span<Type*> params;
+    std::span<Inst*> param_insts;
     // May be null when return type is void. In case of multiple returns, this
     // should become a tuple/struct.
     Type* ret{};
@@ -142,6 +146,10 @@ public:
         return new_inst(OpCode::IntConst, type, value, std::span<Inst*>{});
     }
 
+    [[nodiscard]] auto new_inst_param(Type* type) -> Inst* {
+        return new_inst(OpCode::Param, type, {}, std::span<Inst*>{});
+    }
+
     [[nodiscard]] auto new_inst_call(Type* type, std::string_view symbol,
                                      std::span<Inst* const> args) -> Inst* {
         return new_inst(OpCode::Call, type, symbol, args);
@@ -151,6 +159,10 @@ public:
                                           std::span<Inst* const> args)
         -> Inst* {
         return new_inst(OpCode::CallVoid, nullptr, symbol, args);
+    }
+
+    [[nodiscard]] auto new_inst_get_local(Type* type, Inst* local) -> Inst* {
+        return new_inst(OpCode::GetLocal, type, {}, local);
     }
 
     [[nodiscard]] auto new_inst(
@@ -259,8 +271,10 @@ constexpr auto format_as(OpCode op) {
     switch (op) {
         case OpCode::Err: name = "Err"; break;
         case OpCode::IntConst: name = "IntConst"; break;
+        case OpCode::Param: name = "Param"; break;
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;
+        case OpCode::GetLocal: name = "GetLocal"; break;
     }
 
     return name;

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <ranges>
 #include <string_view>
 
 #include "fmt/ranges.h"
@@ -61,12 +62,26 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         to_qbe_type(*inst->type), inst->get_value_u64());
                 break;
 
+            case ir::OpCode::Call:
+                print(out, "    %l{} ={} call ${}(", inst->uid,
+                      to_qbe_type(*inst->type), inst->get_value_str());
+                for (auto arg : inst->get_args()) {
+                    print(out, "{} %l{}, ", to_qbe_type(*arg->type), arg->uid);
+                }
+                println(out, ")");
+                break;
+
             case ir::OpCode::CallVoid:
                 print(out, "    call ${}(", inst->get_value_str());
                 for (auto arg : inst->get_args()) {
                     print(out, "{} %l{}, ", to_qbe_type(*arg->type), arg->uid);
                 }
                 println(out, ")");
+                break;
+
+            case ir::OpCode::GetLocal:
+                println(out, "    %l{} ={} copy %l{}", inst->uid,
+                        to_qbe_type(*inst->type), inst->get_arg(0)->uid);
                 break;
 
             default: PANIC("invalid instruction opcode", inst->op);
@@ -104,11 +119,13 @@ void codegen_func(ir::Func const& fn, State& state, Context& ctx) {
         print(out, "function ${}", fn.link_name);
     }
 
-    if (fn.params.size() > 0) {
-        PANIC("arguments not implemented", fn.link_name);
+    print(out, "(");
+
+    for (auto [idx, p] : rv::enumerate(fn.params)) {
+        print(out, "{} %l{}, ", to_qbe_type(*p), idx);
     }
 
-    println(out, "() {{");
+    println(out, ") {{");
     println(out, "@start");
 
     std::unordered_set<ir::Block*> visited;

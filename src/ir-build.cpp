@@ -10,6 +10,7 @@
 #include "file-store.hpp"
 #include "fmt/ranges.h"
 #include "ir.hpp"
+#include "types.hpp"
 
 namespace yal::ir {
 using ast::Ast;
@@ -26,9 +27,22 @@ struct State {
         return inst;
     }
 
+    void add_local(Decl* decl, Inst* init) { locals[decl] = init; }
+    [[nodiscard]] auto get_local(Decl* decl) const -> Inst* {
+        return locals.at(decl);
+    }
+
+    void clear() {
+        current_block.clear();
+        blocks.clear();
+        locals.clear();
+    }
+
     Module module{};
 
     // NOLINTBEGIN(readability-redundant-member-init)
+    std::unordered_map<Decl*, Inst*> locals{};
+
     std::vector<Inst*>  shadow_stack{};
     std::vector<Inst*>  current_block{};
     std::vector<Block*> blocks{};
@@ -81,6 +95,9 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
                 return create_ir_type_from_general(mod, *ty.inner[0]);
             PANIC("packs not implemented");
 
+        case types::TypeKind::Distinct:
+            return create_ir_type_from_general(mod, *ty.inner[0]);
+
         default: PANIC("invalid type", ty.kind);
     }
 }
@@ -104,6 +121,17 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto type =
             create_ir_type_from_general(state.module, *node->get_type());
         auto inst = state.module.new_inst_int_const(type, node->get_data_u64());
+        state.current_block.push_back(inst);
+        state.sstack_push(inst);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        auto type =
+            create_ir_type_from_general(state.module, *node->get_type());
+        auto local = state.get_local(node->get_decl());
+        auto inst = state.module.new_inst_get_local(type, local);
+
         state.current_block.push_back(inst);
         state.sstack_push(inst);
         return;
@@ -167,6 +195,22 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         auto ending = state.shadow_stack.size();
         ASSERT(initial == ending);
 
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::UnscopedGroup)) {
+        auto data = conv::unscoped_group(*node);
+        for (auto item : data.items) visit_stmt(item, state, ctx);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::DeclLocalVarDirect)) {
+        auto data = conv::decl_local_var_direct(*node);
+
+        visit_expr(data.init, state, ctx);
+
+        auto init = state.sstack_pop();
+        state.add_local(node->get_decl(), init);
         return;
     }
 
@@ -240,11 +284,20 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
     auto params = create_func_params(ty.get_params(), state);
     auto ret = create_func_ret(data.ret, ty.get_ret(), state);
 
+    std::vector<Inst*> params_insts;
+    for (auto param : data.get_args().params) {
+        auto type =
+            create_ir_type_from_general(state.module, *param->get_type());
+        auto inst = state.module.new_inst_param(type);
+        state.add_local(param->get_decl(), inst);
+        params_insts.push_back(inst);
+    }
+
     Block* body = nullptr;
     if (data.body) {
         visit_stmt(data.body, state, ctx);
 
-        if (ty.is_void() && state.current_block.size() > 0) {
+        if (ty.is_void() && state.blocks.size() == 0) {
             // in case the function returns void and does not have an explicit
             // return, add it
             auto block = state.module.new_block(BlockOp::RetVoid, nullptr,
@@ -269,6 +322,7 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
     state.module.add_func({
         .link_name = decl->link_name,
         .params = params,
+        .param_insts = state.module.new_inst_span(params_insts),
         .ret = ret,
         .body = body,
         .all_blocks = state.blocks,
@@ -276,8 +330,7 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
         .flags = flags,
     });
 
-    state.current_block.clear();
-    state.blocks.clear();
+    state.clear();
 }
 
 // ----------------------------------------------------------------------------
@@ -285,6 +338,11 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
 void visit_top(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::FuncDecl)) {
         visit_func_decl(node, state, ctx);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::TopDefDecl)) {
+        // ignore these
         return;
     }
 

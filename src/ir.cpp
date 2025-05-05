@@ -67,9 +67,12 @@ void disasm_func(FILE* out, Func const& fn) {
     if (fn.is_export()) fmt::print(out, "export ");
     if (fn.is_extern()) fmt::print(out, "extern ");
 
-    auto t = rv::transform([](Type* type) -> Type const& { return *type; });
-    fmt::print(out, "func {:?} ({})", fn.link_name,
-               fmt::join(fn.params | t, ", "));
+    fmt::print(out, "func {:?}(", fn.link_name);
+    for (auto [idx, p, pi] : rv::zip(rv::iota(0), fn.params, fn.param_insts)) {
+        if (idx) fmt::print(out, ", ");
+        fmt::print(out, "%{}: {}", pi->uid, *p);
+    }
+    fmt::print(out, ")");
     if (fn.ret) {
         fmt::print(out, " {}", *fn.ret);
     }
