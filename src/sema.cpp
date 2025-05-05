@@ -22,50 +22,43 @@ namespace conv = ast::conv;
 
 namespace rv = std::ranges::views;
 
+struct State {
+    // NOLINTNEXTLINE(readability-redundant-member-init)
+    std::vector<Node*> pending_functions{};
+
+    types::TypeStore* ts;
+    ErrorReporter*    er;
+    Options const*    opt;
+};
+
 struct Context {
     [[nodiscard]] constexpr auto child(Node* current_loop) const -> Context {
         return {.current_loop = current_loop,
-                .current_function = current_function,
-                .ts = ts,
-                .er = er};
+                .current_function = current_function};
     }
 
     [[nodiscard]] constexpr auto child(types::Type* current_function) const
         -> Context {
         return {.current_loop = current_loop,
-                .current_function = current_function,
-                .ts = ts,
-                .er = er};
+                .current_function = current_function};
     }
-
-    [[nodiscard]] constexpr auto child_lvalue() const -> Context {
-        return {.current_function = current_function,
-                .is_lvalue = true,
-                .ts = ts,
-                .er = er};
-    }
-
-    // NOLINTNEXTLINE(readability-redundant-member-init)
-    std::vector<Node*> pending_functions{};
 
     Node*        current_loop{};
     types::Type* current_function{};
-    bool         is_lvalue{};
-
-    types::TypeStore* ts{};
-    ErrorReporter*    er{};
 };
 
-auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value;
-auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type*;
-void visit_node(Ast& ast, Node* node, Context& ctx);
+auto eval_node(Ast& ast, Node* node, State& state, Context& ctx) -> Value;
+auto eval_node_to_type(Ast& ast, Node* node, State& state, Context& ctx)
+    -> types::Type*;
+void visit_node(Ast& ast, Node* node, State& state, Context& ctx);
 
 // ============================================================================
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+auto eval_node_func_params(Ast& ast, Node* node, State& state, Context& ctx)
+    -> Value {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto data = conv::func_params(*node);
 
@@ -79,7 +72,7 @@ auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
             continue;
         }
 
-        auto ty = eval_node_to_type(ast, param.type, ctx);
+        auto ty = eval_node_to_type(ast, param.type, state, ctx);
         types.emplace_back(child, ty);
     }
 
@@ -111,9 +104,10 @@ auto eval_node_func_params(Ast& ast, Node* node, Context& ctx) -> Value {
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-auto eval_node_func_ret_pack(Ast& ast, Node* node, Context& ctx) -> Value {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+auto eval_node_func_ret_pack(Ast& ast, Node* node, State& state, Context& ctx)
+    -> Value {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto data = conv::func_ret_pack(*node);
 
@@ -128,12 +122,12 @@ auto eval_node_func_ret_pack(Ast& ast, Node* node, Context& ctx) -> Value {
                 continue;
             }
 
-            auto ty = eval_node_to_type(ast, param.type, ctx);
+            auto ty = eval_node_to_type(ast, param.type, state, ctx);
             types.emplace_back(child, ty);
             continue;
         }
 
-        auto ty = eval_node_to_type(ast, child, ctx);
+        auto ty = eval_node_to_type(ast, child, state, ctx);
         types.emplace_back(child, ty);
     }
 
@@ -166,20 +160,21 @@ auto eval_node_func_ret_pack(Ast& ast, Node* node, Context& ctx) -> Value {
                                 std::ranges::to<std::vector>())};
 }
 
-auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+auto eval_node(Ast& ast, Node* node, State& state, Context& ctx) -> Value {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     if (node->is_oneof(ast::NodeKind::Ptr, ast::NodeKind::PtrConst)) {
         auto data = conv::ptr(*node);
-        auto inner_ty = eval_node_to_type(ast, data.inner, ctx);
+        auto inner_ty = eval_node_to_type(ast, data.inner, state, ctx);
         auto ty = ts.new_ptr(inner_ty, data.is_const);
         return {.type = ts.get_type(), .data = ty};
     }
 
     if (node->is_oneof(ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst)) {
         auto data = conv::mptr(*node);
-        auto inner_ty = eval_node_to_type(ast, data.inner, ctx);
+        auto inner_ty = eval_node_to_type(ast, data.inner, state, ctx);
         auto ty = ts.new_mptr(inner_ty, data.is_const);
         return {.type = ts.get_type(), .data = ty};
     }
@@ -189,7 +184,7 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
 
         std::vector<types::Type*> fields;
         for (auto field : data.fields) {
-            auto v = eval_node(ast, field, ctx);
+            auto v = eval_node(ast, field, state, ctx);
             if (!v.type->is_type()) {
                 er.report_warn(field->get_loc(),
                                "can not use non-type in field");
@@ -208,14 +203,14 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
         auto data = conv::struct_field(*node);
 
         if (data.init) {
-            auto v = eval_node(ast, data.init, ctx);
+            auto v = eval_node(ast, data.init, state, ctx);
             er.report_bug(
                 data.init->get_loc(),
                 "default initializer for fields has not been implemented");
             er.report_note(data.init->get_loc(), "got value: {}", v);
         }
 
-        auto type = eval_node(ast, data.type, ctx);
+        auto type = eval_node(ast, data.type, state, ctx);
         if (!type.type->is_type()) {
             er.report_error(data.type->get_loc(),
                             "can not use non-type {} as type for field",
@@ -228,11 +223,11 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
     }
 
     if (node->is_oneof(ast::NodeKind::FuncParams)) {
-        return eval_node_func_params(ast, node, ctx);
+        return eval_node_func_params(ast, node, state, ctx);
     }
 
     if (node->is_oneof(ast::NodeKind::FuncRetPack)) {
-        return eval_node_func_ret_pack(ast, node, ctx);
+        return eval_node_func_ret_pack(ast, node, state, ctx);
     }
 
     if (node->is_oneof(NodeKind::Str)) {
@@ -264,22 +259,25 @@ auto eval_node(Ast& ast, Node* node, Context& ctx) -> Value {
     PANIC("cant eval node of type", node->get_kind());
 }
 
-auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type* {
+auto eval_node_to_type(Ast& ast, Node* node, State& state, Context& ctx)
+    -> types::Type* {
     ASSERT(node != nullptr);
 
-    auto v = eval_node(ast, node, ctx);
+    auto& ts = *state.ts;
+    auto& er = *state.er;
+
+    auto v = eval_node(ast, node, state, ctx);
     ASSERT(v.type != nullptr);
 
     if (!v.type->is_type()) {
-        ctx.er->report_error(node->get_loc(),
-                             "can not use value of type {} as type", *v.type);
-        return ctx.ts->get_error();
+        er.report_error(node->get_loc(), "can not use value of type {} as type",
+                        *v.type);
+        return ts.get_error();
     }
 
     if (!v.has_data()) {
-        ctx.er->report_bug(node->get_loc(), "no data in compile-time value: {}",
-                           v);
-        return ctx.ts->get_error();
+        er.report_bug(node->get_loc(), "no data in compile-time value: {}", v);
+        return ts.get_error();
     }
 
     return v.get_data_type();
@@ -288,8 +286,9 @@ auto eval_node_to_type(Ast& ast, Node* node, Context& ctx) -> types::Type* {
 // ============================================================================
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_decorators(Ast& ast, Node* decorators, Decl* decl, Context& ctx) {
-    auto& er = *ctx.er;
+void visit_decorators(Ast& ast, Node* decorators, Decl* decl, State& state,
+                      Context& ctx) {
+    auto& er = *state.er;
 
     for (auto decorator : conv::decorators(*decorators).items) {
         auto dec = conv::decorator(*decorator);
@@ -308,7 +307,7 @@ void visit_decorators(Ast& ast, Node* decorators, Decl* decl, Context& ctx) {
             else if (dec.params.size() == 1) {
                 auto param = conv::decorator_param(*dec.params[0]);
                 if (param.key == "link_name") {
-                    auto v = eval_node(ast, param.value, ctx);
+                    auto v = eval_node(ast, param.value, state, ctx);
                     ASSERT(v.type != nullptr);
 
                     if (v.type->is_strview()) {
@@ -350,7 +349,7 @@ void visit_decorators(Ast& ast, Node* decorators, Decl* decl, Context& ctx) {
             else if (dec.params.size() == 1) {
                 auto param = conv::decorator_param(*dec.params[0]);
                 if (param.key == "link_name") {
-                    auto v = eval_node(ast, param.value, ctx);
+                    auto v = eval_node(ast, param.value, state, ctx);
                     ASSERT(v.type != nullptr);
 
                     if (v.type->is_strview()) {
@@ -395,21 +394,23 @@ void visit_decorators(Ast& ast, Node* decorators, Decl* decl, Context& ctx) {
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+void visit_func_decl(Ast& ast, Node* node, State& state, Context& ctx) {
+    auto visit = [&](State& state, Context& ctx, Node* node) {
+        visit_node(ast, node, state, ctx);
+    };
 
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+    auto& ts = *state.ts;
+    auto& er = *state.er;
     auto  data = conv::func_decl(*node);
     auto  decl = node->get_decl();
     ASSERT(decl != nullptr);
 
-    visit(ctx, data.decorators);
-    visit(ctx, data.gargs);
-    visit(ctx, data.args);
-    visit(ctx, data.ret);
+    visit(state, ctx, data.decorators);
+    visit(state, ctx, data.gargs);
+    visit(state, ctx, data.args);
+    visit(state, ctx, data.ret);
 
-    visit_decorators(ast, data.decorators, decl, ctx);
+    visit_decorators(ast, data.decorators, decl, state, ctx);
 
     // extern should not have body
     if (decl->flags.has_extern() && data.body != nullptr) {
@@ -427,11 +428,11 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
                       "Generic args have not been implemented");
     }
 
-    auto params = eval_node_to_type(ast, data.args, ctx);
+    auto params = eval_node_to_type(ast, data.args, state, ctx);
 
     types::Type* ret = nullptr;
     if (data.ret)
-        ret = eval_node_to_type(ast, data.ret, ctx);
+        ret = eval_node_to_type(ast, data.ret, state, ctx);
     else
         ret = ts.new_pack(std::array{ts.get_void()});
 
@@ -468,7 +469,7 @@ void visit_func_decl(Ast& ast, Node* node, Context& ctx) {
 
     // we only process the body later, so that all functions have already been
     // processed by the time we reach their bodies.
-    ctx.pending_functions.push_back(node);
+    state.pending_functions.push_back(node);
 
     // auto sctx = ctx.child(ty);
     // visit(sctx, data.body);
@@ -558,9 +559,11 @@ auto count_init_exprs(conv::ExprPack const& pack) -> size_t {
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void set_type_of_id(Node* id_node, types::Type* type, Context& ctx) {
+void set_type_of_id(Node* id_node, types::Type* type, State& state) {
     ASSERT(type != nullptr);
     ASSERT(id_node != nullptr);
+
+    auto& er = *state.er;
 
     ASSERT(id_node->get_type() == nullptr);
     id_node->set_type(type);
@@ -570,16 +573,17 @@ void set_type_of_id(Node* id_node, types::Type* type, Context& ctx) {
         ASSERT(name.to->get_type() == nullptr);
         name.to->value = {.type = type};
     } else {
-        ctx.er->report_bug(id_node->get_loc(), "id has no decl: {:?}",
-                           name.name);
+        er.report_bug(id_node->get_loc(), "id has no decl: {:?}", name.name);
     }
 }
 
 auto coerce_and_check(types::Type* target, types::Type* source,
-                      Node* target_node, Node* source_node, Context& ctx)
-    -> types::Type* {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+                      Node* target_node, Node* source_node, State& state,
+                      Context& ctx) -> types::Type* {
+    (void)ctx;
+
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto r = ts.coerce(target, source);
     if (!r) {
@@ -596,15 +600,17 @@ auto coerce_and_check(types::Type* target, types::Type* source,
 
 auto coerce_check_and_fixup_source_ints(Ast& ast, types::Type* target,
                                         types::Type* source, Node* target_node,
-                                        Node* source_node, Context& ctx)
+                                        Node* source_node, State& state,
+                                        Context& ctx)
     -> std::pair<types::Type*, Node*> {
-    auto r = coerce_and_check(target, source, target_node, source_node, ctx);
+    auto r =
+        coerce_and_check(target, source, target_node, source_node, state, ctx);
 
     if (source->contains_untyped() && !r->is_err()) {
         ASSERT(!r->is_untyped_int());
 
         // fixup untyped integers
-        fixup_untyped_chain(*ctx.ts, source_node, r);
+        fixup_untyped_chain(*state.ts, source_node, r);
     }
 
     if (!r->is_err() && *r != *source_node->get_type()) {
@@ -618,16 +624,17 @@ auto coerce_check_and_fixup_source_ints(Ast& ast, types::Type* target,
 auto coerce_check_and_fixup_simetric_ints(Ast& ast, types::Type* target,
                                           types::Type* source,
                                           Node* target_node, Node* source_node,
-                                          Context& ctx)
+                                          State& state, Context& ctx)
     -> std::pair<types::Type*, Node*> {
-    auto r = coerce_and_check(target, source, target_node, source_node, ctx);
+    auto r =
+        coerce_and_check(target, source, target_node, source_node, state, ctx);
 
     if (target->contains_untyped() && !source->contains_untyped()) {
-        fixup_untyped_chain(*ctx.ts, target_node, r);
+        fixup_untyped_chain(*state.ts, target_node, r);
     }
 
     if (source->contains_untyped() && !target->contains_untyped()) {
-        fixup_untyped_chain(*ctx.ts, source_node, r);
+        fixup_untyped_chain(*state.ts, source_node, r);
     }
 
     if (!r->is_err() && !r->is_untyped_int() &&
@@ -641,21 +648,22 @@ auto coerce_check_and_fixup_simetric_ints(Ast& ast, types::Type* target,
 
 auto coerce_check_and_fixup_simetric_ints_with_fallback(
     Ast& ast, types::Type* target, types::Type* source, types::Type* fallback,
-    Node* target_node, Node* source_node, Context& ctx)
+    Node* target_node, Node* source_node, State& state, Context& ctx)
     -> std::pair<types::Type*, Node*> {
-    auto r = coerce_and_check(target, source, target_node, source_node, ctx);
+    auto r =
+        coerce_and_check(target, source, target_node, source_node, state, ctx);
 
     if (target->contains_untyped() && !source->contains_untyped()) {
-        fixup_untyped_chain(*ctx.ts, target_node, r);
+        fixup_untyped_chain(*state.ts, target_node, r);
     }
 
     if (source->contains_untyped() && !target->contains_untyped()) {
-        fixup_untyped_chain(*ctx.ts, source_node, r);
+        fixup_untyped_chain(*state.ts, source_node, r);
     }
 
     if (source->contains_untyped() && target->contains_untyped()) {
-        fixup_untyped_chain(*ctx.ts, target_node, fallback);
-        fixup_untyped_chain(*ctx.ts, source_node, fallback);
+        fixup_untyped_chain(*state.ts, target_node, fallback);
+        fixup_untyped_chain(*state.ts, source_node, fallback);
     }
 
     if (!r->is_err() && !r->is_untyped_int() &&
@@ -708,9 +716,10 @@ void fixup_expr_pack_lvalue(types::TypeStore& ts, Node* pack) {
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
-                                     Node* inits_node, Context& ctx) {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+                                     Node* inits_node, State& state,
+                                     Context& ctx) {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto ids = conv::id_pack(*ids_node).ids;
     auto types = conv::expr_pack(*types_node).items;
@@ -757,8 +766,9 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                     continue;
                 }
 
-                auto type = eval_node_to_type(ast, types[ty_idx], ctx);
-                auto r = coerce_and_check(type, i, types[ty_idx], init, ctx);
+                auto type = eval_node_to_type(ast, types[ty_idx], state, ctx);
+                auto r =
+                    coerce_and_check(type, i, types[ty_idx], init, state, ctx);
 
                 // a function should not be able to return this
                 ASSERT(!i->is_untyped_int());
@@ -768,7 +778,7 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                     requires_coercion = true;
                 }
 
-                set_type_of_id(ids[name_idx], r, ctx);
+                set_type_of_id(ids[name_idx], r, state);
 
                 name_idx++;
                 ty_idx++;
@@ -784,7 +794,7 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
             if (conv::id(*ids[name_idx]).is_discard()) {
                 if (init_type->contains_untyped()) {
                     // fixup untyped integers
-                    fixup_untyped_chain(*ctx.ts, init, ts.get_default_int());
+                    fixup_untyped_chain(*state.ts, init, ts.get_default_int());
                 }
 
                 name_idx++;
@@ -792,12 +802,12 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
                 continue;
             }
 
-            auto type = eval_node_to_type(ast, types[ty_idx], ctx);
+            auto type = eval_node_to_type(ast, types[ty_idx], state, ctx);
             auto [r, coerce] = coerce_check_and_fixup_source_ints(
-                ast, type, init_type, types[ty_idx], init, ctx);
+                ast, type, init_type, types[ty_idx], init, state, ctx);
             if (coerce) inits[init_idx] = coerce;
 
-            set_type_of_id(ids[name_idx], r, ctx);
+            set_type_of_id(ids[name_idx], r, state);
 
             name_idx++;
             ty_idx++;
@@ -806,8 +816,8 @@ void visit_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
 }
 
 void visit_decl_with_types(Ast& ast, Node* ids_node, Node* types_node,
-                           Context& ctx) {
-    auto& er = *ctx.er;
+                           State& state, Context& ctx) {
+    auto& er = *state.er;
 
     auto ids = conv::id_pack(*ids_node).ids;
     auto types = conv::expr_pack(*types_node).items;
@@ -825,16 +835,19 @@ void visit_decl_with_types(Ast& ast, Node* ids_node, Node* types_node,
         auto name = conv::id(*id);
         if (name.is_discard()) continue;
 
-        auto type = eval_node_to_type(ast, ty, ctx);
-        set_type_of_id(id, type, ctx);
+        auto type = eval_node_to_type(ast, ty, state, ctx);
+        set_type_of_id(id, type, state);
     }
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
-                           Context& ctx) {
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+                           State& state, Context& ctx) {
+    (void)ast;
+    (void)ctx;
+
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto ids = conv::id_pack(*ids_node).ids;
     auto inits = conv::expr_pack(*inits_node).items;
@@ -864,7 +877,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
                     continue;
                 }
 
-                set_type_of_id(ids[name_idx], i, ctx);
+                set_type_of_id(ids[name_idx], i, state);
 
                 name_idx++;
             }
@@ -875,7 +888,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
             if (conv::id(*ids[name_idx]).is_discard()) {
                 if (init_type->contains_untyped()) {
                     // fixup untyped integers
-                    fixup_untyped_chain(*ctx.ts, init, ts.get_default_int());
+                    fixup_untyped_chain(ts, init, ts.get_default_int());
                 }
 
                 name_idx++;
@@ -887,7 +900,7 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
                 init_type = init->get_type();
             }
 
-            set_type_of_id(ids[name_idx], init_type, ctx);
+            set_type_of_id(ids[name_idx], init_type, state);
 
             name_idx++;
         }
@@ -898,9 +911,9 @@ void visit_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
-                         std::span<Node*> inits, Context& ctx) {
-    auto& er = *ctx.er;
-    auto& ts = *ctx.ts;
+                         std::span<Node*> inits, State& state, Context& ctx) {
+    auto& er = *state.er;
+    auto& ts = *state.ts;
     if (ids.size() != inits.size()) {
         er.report_bug(decl->get_loc(),
                       "using multiple returns in def has not been implemented");
@@ -908,7 +921,7 @@ void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
     }
 
     for (auto [id, init] : rv::zip(ids, inits)) {
-        auto v = eval_node(ast, init, ctx);
+        auto v = eval_node(ast, init, state, ctx);
         auto d = id->get_decl();
         ASSERT(d != nullptr);
         ASSERT(d->value.has_data() == false);
@@ -924,11 +937,13 @@ void eval_defined_values(Ast& ast, Node* decl, std::span<Node*> ids,
     }
 }
 
-void visit_top_def_decl(Ast& ast, Node* node, Context& ctx) {
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+void visit_top_def_decl(Ast& ast, Node* node, State& state, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) {
+        visit_node(ast, node, state, ctx);
+    };
 
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto top_data = conv::top_def_decl(*node);
 
@@ -946,9 +961,9 @@ void visit_top_def_decl(Ast& ast, Node* node, Context& ctx) {
     // we have explicit types
     if (data.types && data.inits) {
         visit_decl_with_types_and_inits(ast, data.ids, data.types, data.inits,
-                                        ctx);
+                                        state, ctx);
         eval_defined_values(ast, top_data.decl, data.get_ids().ids,
-                            data.get_inits().items, ctx);
+                            data.get_inits().items, state, ctx);
     }
 
     // just types, not inits
@@ -962,9 +977,9 @@ void visit_top_def_decl(Ast& ast, Node* node, Context& ctx) {
 
     // no explicit types but got inits
     else if (data.inits) {
-        visit_decl_with_inits(ast, data.ids, data.inits, ctx);
+        visit_decl_with_inits(ast, data.ids, data.inits, state, ctx);
         eval_defined_values(ast, top_data.decl, data.get_ids().ids,
-                            data.get_inits().items, ctx);
+                            data.get_inits().items, state, ctx);
     }
 
     // nothing given
@@ -973,7 +988,7 @@ void visit_top_def_decl(Ast& ast, Node* node, Context& ctx) {
 
         auto ids = data.get_ids();
         for (auto const& id : ids.ids) {
-            set_type_of_id(id, ts.get_error(), ctx);
+            set_type_of_id(id, ts.get_error(), state);
         }
     }
 
@@ -984,11 +999,13 @@ void visit_top_def_decl(Ast& ast, Node* node, Context& ctx) {
 // ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+void visit_var_decl(Ast& ast, Node* node, State& state, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) {
+        visit_node(ast, node, state, ctx);
+    };
 
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto data = conv::var_decl(*node);
     visit(ctx, data.types);
@@ -999,17 +1016,17 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
     // we have explicit types
     if (data.types && data.inits) {
         visit_decl_with_types_and_inits(ast, data.ids, data.types, data.inits,
-                                        ctx);
+                                        state, ctx);
     }
 
     // just types, not inits
     else if (data.types) {
-        visit_decl_with_types(ast, data.ids, data.types, ctx);
+        visit_decl_with_types(ast, data.ids, data.types, state, ctx);
     }
 
     // no explicit types but got inits
     else if (data.inits) {
-        visit_decl_with_inits(ast, data.ids, data.inits, ctx);
+        visit_decl_with_inits(ast, data.ids, data.inits, state, ctx);
     }
 
     // nothing given
@@ -1018,7 +1035,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
         auto ids = data.get_ids();
         for (auto const& id : ids.ids) {
-            set_type_of_id(id, ts.get_error(), ctx);
+            set_type_of_id(id, ts.get_error(), state);
         }
     }
 
@@ -1028,11 +1045,14 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
 
 // ============================================================================
 
-void visit_assign(Ast& ast, Node* node, Context& ctx) {
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void visit_assign(Ast& ast, Node* node, State& state, Context& ctx) {
+    auto visit = [&](Context& ctx, Node* node) {
+        visit_node(ast, node, state, ctx);
+    };
 
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     auto data = conv::assign(*node);
     auto lhs = data.get_lhs().items;
@@ -1081,7 +1101,7 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
                 visit(ctx, lhs[lhs_idx]);
 
                 auto r = coerce_and_check(lhs[lhs_idx]->get_type(), ty,
-                                          lhs[lhs_idx], rhs_item, ctx);
+                                          lhs[lhs_idx], rhs_item, state, ctx);
 
                 // a function should not be able to return this
                 ASSERT(!ty->is_untyped_int());
@@ -1115,7 +1135,7 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
 
             auto [r, coerce] = coerce_check_and_fixup_source_ints(
                 ast, lhs[lhs_idx]->get_type(), rhs_item->get_type(),
-                lhs[lhs_idx], rhs_item, ctx);
+                lhs[lhs_idx], rhs_item, state, ctx);
             if (coerce) rhs[rhs_idx] = coerce;
 
             lhs_idx++;
@@ -1130,25 +1150,27 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
 // ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_node(Ast& ast, Node* node, Context& ctx) {
+void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
     if (node == nullptr) return;
 
-    auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+    auto visit = [&](Context& ctx, Node* node) {
+        visit_node(ast, node, state, ctx);
+    };
     auto visit_span = [&](Context& ctx, std::span<Node* const> nodes) {
-        for (auto node : nodes) visit_node(ast, node, ctx);
+        for (auto node : nodes) visit_node(ast, node, state, ctx);
     };
 
     auto visit_children = [&](Context& ctx, Node* node) {
         ast::visit_children(
             ast, node,
-            [](Ast& ast, Node* node, auto&&, Context& ctx) {
-                visit_node(ast, node, ctx);
+            [](Ast& ast, Node* node, auto&&, State& state, Context& ctx) {
+                visit_node(ast, node, state, ctx);
             },
-            ctx);
+            state, ctx);
     };
 
-    auto& ts = *ctx.ts;
-    auto& er = *ctx.er;
+    auto& ts = *state.ts;
+    auto& er = *state.er;
 
     // These should not reach sema
     if (node->is_oneof(ast::NodeKind::Module, ast::NodeKind::SourceFile,
@@ -1162,13 +1184,13 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
         visit_children(ctx, node);
 
-        for (auto const& node : ctx.pending_functions) {
+        for (auto const& node : state.pending_functions) {
             auto data = conv::func_decl(*node);
             auto sctx = ctx.child(node->get_type());
             visit(sctx, data.body);
         }
 
-        ctx.pending_functions.clear();
+        state.pending_functions.clear();
         return;
     }
 
@@ -1181,7 +1203,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     }
 
     if (node->is_oneof(NodeKind::FuncDecl, NodeKind::FuncDeclWithCVarArgs)) {
-        visit_func_decl(ast, node, ctx);
+        visit_func_decl(ast, node, state, ctx);
         return;
     }
 
@@ -1212,7 +1234,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             return;
         }
 
-        auto type = eval_node_to_type(ast, data.type, ctx);
+        auto type = eval_node_to_type(ast, data.type, state, ctx);
         node->set_type(type);
         return;
     }
@@ -1283,7 +1305,8 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         node->set_type(ts.get_bool());
 
         auto [r, coerce] = coerce_check_and_fixup_simetric_ints_with_fallback(
-            ast, lhs, rhs, ts.get_default_int(), data.lhs, data.rhs, ctx);
+            ast, lhs, rhs, ts.get_default_int(), data.lhs, data.rhs, state,
+            ctx);
         if (coerce) node->set_child(1, coerce);
 
         return;
@@ -1302,7 +1325,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         ASSERT(rhs != nullptr);
 
         auto [r, coerce] = coerce_check_and_fixup_simetric_ints(
-            ast, lhs, rhs, data.lhs, data.rhs, ctx);
+            ast, lhs, rhs, data.lhs, data.rhs, state, ctx);
         if (coerce) node->set_child(1, coerce);
 
         node->set_type(r);
@@ -1321,10 +1344,10 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto data = conv::id(*node);
-        if (data.is_discard() && ctx.is_lvalue) {
-            node->set_type(ts.get_void());
-            return;
-        }
+        // if (data.is_discard() && ctx.is_lvalue) {
+        //     node->set_type(ts.get_void());
+        //     return;
+        // }
 
         if (!data.to) {
             node->set_type(ts.get_error());
@@ -1373,7 +1396,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             ASSERT(init != nullptr);
 
             auto [_, coerce] = coerce_check_and_fixup_source_ints(
-                ast, type, init, data.type, data.init, ctx);
+                ast, type, init, data.type, data.init, state, ctx);
             if (coerce) node->set_child(1, coerce);
         }
 
@@ -1445,7 +1468,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
             arg->set_type(arg->get_type());
 
             auto [r, coerce] = coerce_check_and_fixup_source_ints(
-                ast, param, arg->get_type(), data.callee, arg, ctx);
+                ast, param, arg->get_type(), data.callee, arg, state, ctx);
             if (coerce) node->set_child(i, coerce);
         }
 
@@ -1522,7 +1545,7 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         auto src = data.lhs->get_type();
         ASSERT(src != nullptr);
 
-        auto target = eval_node_to_type(ast, data.rhs, ctx);
+        auto target = eval_node_to_type(ast, data.rhs, state, ctx);
         auto r = ts.cast(target, src);
         if (!r) {
             er.report_error(node->get_loc(),
@@ -1537,17 +1560,17 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::TopDefDecl)) {
-        visit_top_def_decl(ast, node, ctx);
+        visit_top_def_decl(ast, node, state, ctx);
         return;
     }
 
     if (node->is_oneof(ast::NodeKind::VarDecl)) {
-        visit_var_decl(ast, node, ctx);
+        visit_var_decl(ast, node, state, ctx);
         return;
     }
 
     if (node->is_oneof(ast::NodeKind::Assign)) {
-        visit_assign(ast, node, ctx);
+        visit_assign(ast, node, state, ctx);
         return;
     }
 
@@ -1684,8 +1707,9 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
 
 void sema_ast(Ast& ast, Node* root, ErrorReporter& er, types::TypeStore& ts,
               Options const& opt) {
-    auto ctx = Context{.ts = &ts, .er = &er};
-    visit_node(ast, root, ctx);
+    auto state = State{.ts = &ts, .er = &er, .opt = &opt};
+    auto ctx = Context{};
+    visit_node(ast, root, state, ctx);
 }
 
 }  // namespace yal::sema
