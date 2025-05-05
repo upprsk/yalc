@@ -15,6 +15,7 @@ struct Options {
     bool dump_each_ast_json = false;
     bool single_file = false;
     bool dump_type_store = false;
+    bool verbose_sema = false;
     bool verbose_lowering = false;
 };
 

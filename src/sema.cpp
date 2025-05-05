@@ -1700,8 +1700,11 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
-    er.report_warn(node->get_loc(), "node not sema analized ({})",
-                   node->get_kind());
+    if (state.opt->verbose_sema) {
+        er.report_warn(node->get_loc(), "node not sema analized ({})",
+                       node->get_kind());
+    }
+
     visit_children(ctx, node);
 }
 
