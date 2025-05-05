@@ -1,0 +1,1 @@
+{"stdout":"extern func \"print_int\" (i32);\nexport func \"main\" () i32 {\n@0\n    %0 = IntConst<i32> 69\n    CallVoid print_int(%0)\n    %2 = IntConst<i32> 0\n    ret %2\n}\nextern func \"print_str\" (ptr, i32);\nextern func \"print_cstr\" (ptr);\nextern func \"getchar\" () i32;\n"}

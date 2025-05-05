@@ -1,7 +1,11 @@
 module main;
 
+func print_answer() {
+    c_print_int(42);
+}
+
 @export
 func main() i32 {
-    c_print_int(69);
+    print_answer();
     return 0;
 }
