@@ -6,6 +6,7 @@
 
 #include "argparser.hpp"
 #include "ast.hpp"
+#include "codegen/codegen_qbe.hpp"
 #include "compile/compile_qbe.hpp"
 #include "cpptrace/from_current.hpp"
 #include "error_reporter.hpp"
@@ -13,6 +14,8 @@
 #include "fmt/base.h"
 #include "fmt/color.h"
 #include "fmt/ranges.h"
+#include "ir-build.hpp"
+#include "ir.hpp"
 #include "lower.hpp"
 #include "name-res.hpp"
 #include "nlohmann/json.hpp"
@@ -61,7 +64,23 @@ auto real_main(yalc::Args const& args) -> int {
 
     if (er.had_error()) return 1;
 
-    yal::compile::qbe::compile(ast, prj_root, er, ts, opt);
+    auto module = yal::ir::build(ast, prj_root, er, ts, opt);
+    if (er.had_error()) return 1;
+
+    if (args.dump_ir_module) {
+        yal::ir::disasm_module(stdout, module);
+    }
+
+    auto out = stdout;
+    if (!args.output.empty()) {
+        out = fopen(args.output.c_str(), "wb");
+    }
+
+    yal::codegen::qbe::codegen(out, module, er, ts, opt);
+
+    if (!args.output.empty()) {
+        fclose(out);
+    }
 
     return er.had_error() ? 1 : 0;
 }

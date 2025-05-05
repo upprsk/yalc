@@ -9,6 +9,8 @@ add_library(yal
     ast-node.hpp
     ast.cpp
     ast.hpp
+    codegen/codegen_qbe.cpp
+    codegen/codegen_qbe.hpp
     compile/compile_qbe.cpp
     compile/compile_qbe.hpp
     decl-store.cpp
@@ -17,6 +19,10 @@ add_library(yal
     error_reporter.hpp
     file-store.cpp
     file-store.hpp
+    ir-build.cpp
+    ir-build.hpp
+    ir.cpp
+    ir.hpp
     lower.cpp
     lower.hpp
     name-order.cpp

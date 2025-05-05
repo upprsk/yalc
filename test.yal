@@ -1,7 +1,7 @@
 module main;
 
-def S = struct { a: i32 };
-func test() {
-    var s: S = .{.a=0};
-    _ = s.b;
+@export
+func main() i32 {
+    c_print_int(69);
+    return 0;
 }

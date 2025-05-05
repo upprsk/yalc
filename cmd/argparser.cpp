@@ -30,8 +30,11 @@ void print_help(std::string_view self) {
     println(stderr, "    --dump-ast-dot: dump parsed AST as a dot graph.");
     println(stderr,
             "    --dump-type-store-json: dump the entire type store as json.");
+    println(stderr, "    --dump-ir-module: dump the entire IR module.");
+    println(stderr, "    -o,--output: path to output file (QBE)");
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto argparse(int argc, char** argv) -> Args {
     auto it = yal::ArgIterator{.argc = argc, .argv = argv};
 
@@ -66,6 +69,20 @@ auto argparse(int argc, char** argv) -> Args {
             args.dump_ast_dot = true;
         } else if (arg == "--dump-type-store-json") {
             args.dump_type_store_json = true;
+        } else if (arg == "--dump-ir-module") {
+            args.dump_ir_module = true;
+        } else if (arg == "-o" || arg == "--output") {
+            if (!args.output.empty()) {
+                fmt::println(stderr, "error: output already provided");
+                exit(1);
+            }
+
+            if (!it.next(arg)) {
+                fmt::println(stderr, "error: missing output file path");
+                exit(1);
+            }
+
+            args.output = arg;
         } else if (args.program.empty()) {
             args.program = arg;
         } else {

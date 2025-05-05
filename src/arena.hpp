@@ -64,6 +64,8 @@ public:
 
     template <typename T, typename U>
     [[nodiscard]] auto alloc(U&& from) -> std::span<T> {
+        if (std::ranges::size(from) == 0) return {};
+
         auto data =
             static_cast<T*>(mem_alloc(std::ranges::size(from) * sizeof(T)));
         std::span to{data, std::ranges::size(from)};
@@ -74,6 +76,8 @@ public:
 
     template <typename T>
     [[nodiscard]] auto alloc_size(std::size_t sz) -> std::span<T> {
+        if (sz == 0) return {};
+
         auto      data = static_cast<T*>(mem_alloc(sz * sizeof(T)));
         std::span to{data, sz};
         return to;

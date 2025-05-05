@@ -17,6 +17,7 @@ struct Options {
     bool dump_type_store = false;
     bool verbose_sema = false;
     bool verbose_lowering = false;
+    bool verbose_ir_build = true;
 };
 
 auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
