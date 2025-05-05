@@ -140,6 +140,21 @@ auto test_ir(TestParams const& p) -> std::pair<int, int> {
 
     ctx.tags.emplace_back("minimal");
 
+    run_test(ctx, p, "function call and return",
+             R"(
+module main;
+
+func id(x: i32) i32 {
+    return x;
+}
+
+@export
+func main() i32 {
+    var x = 68;
+    return id(x);
+}
+)");
+
     run_test(ctx, p, "print_int very simple",
              std::vector<std::string>{
                  R"(

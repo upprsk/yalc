@@ -1,11 +1,11 @@
 module main;
 
-func print_answer() {
-    c_print_int(42);
+func id(x: i32) i32 {
+    return x;
 }
 
 @export
 func main() i32 {
-    print_answer();
-    return 0;
+    var x = 68;
+    return id(x);
 }
