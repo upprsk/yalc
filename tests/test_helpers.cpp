@@ -45,6 +45,7 @@ auto ask_for_updates(std::string_view name) -> bool {
 
 auto json_to_pretty_string(json const& j) -> std::string {
     if (j.contains("stderr")) return j.at("stderr").get<std::string>();
+    if (j.contains("stdout")) return j.at("stdout").get<std::string>();
     return j.dump(2);
 }
 
