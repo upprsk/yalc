@@ -244,7 +244,16 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
     if (data.body) {
         visit_stmt(data.body, state, ctx);
 
-        // FIXME: implicit returns on void functions.
+        if (ty.is_void() && state.current_block.size() > 0) {
+            // in case the function returns void and does not have an explicit
+            // return, add it
+            auto block = state.module.new_block(BlockOp::RetVoid, nullptr,
+                                                state.current_block, {});
+
+            state.current_block.clear();
+            state.blocks.push_back(block);
+        }
+
         body = state.blocks[0];
     }
 
