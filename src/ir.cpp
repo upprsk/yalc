@@ -20,7 +20,7 @@ void disasm_inst(FILE* out, Inst const& inst) {
     if (inst.type) {
         fmt::print(out, "    %{} = {}<{}> ", inst.uid, inst.op, *inst.type);
     } else {
-        fmt::print(out, "    ", inst.uid, inst.op, *inst.type);
+        fmt::print(out, "    {} ", inst.op);
     }
 
     if (inst.has_u64()) {
@@ -30,11 +30,15 @@ void disasm_inst(FILE* out, Inst const& inst) {
     }
 
     if (!inst.get_args().empty()) {
-        auto t = rv::transform([](Inst* inst) -> Inst const& { return *inst; });
-        fmt::println(out, " {}", fmt::join(inst.get_args() | t, ", "));
-    } else {
-        fmt::println(out, "");
+        fmt::print(out, "(");
+        for (auto [idx, arg] : rv::enumerate(inst.get_args())) {
+            if (idx) fmt::print(out, ", ");
+            fmt::print(out, "%{}", arg->uid);
+        }
+        fmt::print(out, ")");
     }
+
+    fmt::println(out, "");
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -60,6 +64,9 @@ void disasm_block(FILE* out, Block const& blk) {
 }
 
 void disasm_func(FILE* out, Func const& fn) {
+    if (fn.is_export()) fmt::print(out, "export ");
+    if (fn.is_extern()) fmt::print(out, "extern ");
+
     auto t = rv::transform([](Type* type) -> Type const& { return *type; });
     fmt::print(out, "func {:?} ({})", fn.link_name,
                fmt::join(fn.params | t, ", "));
@@ -67,9 +74,9 @@ void disasm_func(FILE* out, Func const& fn) {
         fmt::print(out, " {}", *fn.ret);
     }
 
-    fmt::println(out, " {{");
-
     if (fn.body != nullptr) {
+        fmt::println(out, " {{");
+
         std::unordered_set<Block*> visited;
         std::list<Block*>          pending{fn.body};
 
@@ -82,9 +89,11 @@ void disasm_func(FILE* out, Func const& fn) {
 
             disasm_block(out, *blk);
         }
-    }
 
-    fmt::println(out, "}}");
+        fmt::println(out, "}}");
+    } else {
+        fmt::println(out, ";");
+    }
 }
 
 void disasm_module(FILE* out, Module const& mod) {

@@ -248,6 +248,10 @@ struct Type {
         [[nodiscard]] constexpr auto get_ret() const -> std::span<Type*> {
             return ret->inner;
         }
+
+        [[nodiscard]] constexpr auto is_void() const -> bool {
+            return get_ret().size() == 1 && get_ret()[0]->is_void();
+        }
     };
 
     [[nodiscard]] auto as_func() const -> Func;
