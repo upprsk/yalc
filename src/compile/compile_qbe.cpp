@@ -56,10 +56,12 @@ struct Context {
     FILE*          out{};
     ErrorReporter* er{};
 
+    // NOLINTBEGIN(readability-redundant-member-init)
     uint32_t                      next_tmp{};
     uint32_t                      next_block{};
-    std::vector<Tmp>              tmp_stack;
-    std::vector<std::string_view> pending_string_literals;
+    std::vector<Tmp>              tmp_stack{};
+    std::vector<std::string_view> pending_string_literals{};
+    // NOLINTEND(readability-redundant-member-init)
 
     Label end_of_current_loop{};
 
@@ -600,8 +602,8 @@ void compile_flat_module(Ast& ast, Node* node, Context& ctx) {
     }
 }
 
-void compile(Ast& ast, Node* root, ErrorReporter& er, types::TypeStore& ts,
-             Options const& opt) {
+void compile(Ast& ast, Node* root, ErrorReporter& er, Options const& opt) {
+    (void)opt;
     auto ctx = Context{.out = stdout, .er = &er};
     compile_flat_module(ast, root, ctx);
 }
