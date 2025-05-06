@@ -84,6 +84,24 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         to_qbe_type(*inst->type), inst->get_arg(0)->uid);
                 break;
 
+            case ir::OpCode::Add:
+            case ir::OpCode::Sub:
+            case ir::OpCode::Div:
+            case ir::OpCode::Mul: {
+                std::string_view op;
+                switch (inst->op) {
+                    case ir::OpCode::Add: op = "add"; break;
+                    case ir::OpCode::Sub: op = "sub"; break;
+                    case ir::OpCode::Div: op = "div"; break;
+                    case ir::OpCode::Mul: op = "mul"; break;
+                    default: UNREACHABLE("invalid op for arith", inst->op);
+                }
+
+                println(out, "    %l{} ={} {} %l{}, %l{}", inst->uid,
+                        to_qbe_type(*inst->type), op, inst->get_arg(0)->uid,
+                        inst->get_arg(1)->uid);
+            } break;
+
             default: PANIC("invalid instruction opcode", inst->op);
         }
     }
@@ -121,8 +139,8 @@ void codegen_func(ir::Func const& fn, State& state, Context& ctx) {
 
     print(out, "(");
 
-    for (auto [idx, p] : rv::enumerate(fn.params)) {
-        print(out, "{} %l{}, ", to_qbe_type(*p), idx);
+    for (auto [inst, ty] : rv::zip(fn.param_insts, fn.params)) {
+        print(out, "{} %l{}, ", to_qbe_type(*ty), inst->uid);
     }
 
     println(out, ") {{");

@@ -169,6 +169,43 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
+                       ast::NodeKind::Div, ast::NodeKind::Mul)) {
+        auto data = conv::binary(*node);
+        visit_expr(data.lhs, state, ctx);
+        visit_expr(data.rhs, state, ctx);
+        auto rhs = state.sstack_pop();
+        auto lhs = state.sstack_pop();
+
+        OpCode op;
+        switch (node->get_kind()) {
+            case ast::NodeKind::Add: op = OpCode::Add; break;
+            case ast::NodeKind::Sub: op = OpCode::Sub; break;
+            case ast::NodeKind::Div: op = OpCode::Div; break;
+            case ast::NodeKind::Mul: op = OpCode::Mul; break;
+            default:
+                UNREACHABLE("invalid node kind in arith", node->get_kind());
+        }
+
+        auto type =
+            create_ir_type_from_general(state.module, *node->get_type());
+        auto inst = state.module.new_inst_arith(op, type, lhs, rhs);
+
+        state.current_block.push_back(inst);
+        state.sstack_push(inst);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Coerce)) {
+        auto data = conv::coerce(*node);
+        visit_expr(data.child, state, ctx);
+
+        if (*data.target == *node->get_type()) return;
+
+        PANIC("not implemented");
+        return;
+    }
+
     state.er->report_bug(node->get_loc(), "expression not implemented");
     PANIC("not implemented", node->get_kind());
 }

@@ -47,6 +47,11 @@ enum class OpCode {
     CallVoid,
 
     GetLocal,
+
+    Add,
+    Sub,
+    Div,
+    Mul,
 };
 
 struct Inst {
@@ -165,6 +170,11 @@ public:
         return new_inst(OpCode::GetLocal, type, {}, local);
     }
 
+    [[nodiscard]] auto new_inst_arith(OpCode op, Type* type, Inst* lhs,
+                                      Inst* rhs) -> Inst* {
+        return new_inst(op, type, {}, std::array{lhs, rhs});
+    }
+
     [[nodiscard]] auto new_inst(
         OpCode op, Type* type,
         std::variant<std::monostate, uint64_t, std::string_view> value,
@@ -275,6 +285,10 @@ constexpr auto format_as(OpCode op) {
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;
         case OpCode::GetLocal: name = "GetLocal"; break;
+        case OpCode::Add: name = "Add"; break;
+        case OpCode::Sub: name = "Sub"; break;
+        case OpCode::Div: name = "Div"; break;
+        case OpCode::Mul: name = "Mul"; break;
     }
 
     return name;
