@@ -197,6 +197,15 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
     // auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx);
     // };
 
+    auto visit_children = [&](Context& ctx, Node* node) {
+        ast::visit_children(
+            ast, node,
+            [](Ast& ast, Node* node, auto&&, Context& ctx) {
+                visit_node(ast, node, ctx);
+            },
+            ctx);
+    };
+
     // auto& ts = *ctx.ts;
     auto& er = *ctx.er;
 
@@ -209,6 +218,7 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
         ASSERT(decl != nullptr);
 
         node->transmute_to_call_direct(decl, data.args);
+        visit_children(ctx, node);
     }
 
     // method call
@@ -229,6 +239,7 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
             std::vector args{receiver};
             std::ranges::copy(data.args, std::back_inserter(args));
             node->transmute_to_call_direct(decl, ast.allocate_node_span(args));
+            visit_children(ctx, node);
         }
 
         else {
@@ -248,7 +259,8 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
 void visit_node(Ast& ast, Node* node, Context& ctx) {
     if (node == nullptr) return;
 
-    // auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx); };
+    // auto visit = [&](Context& ctx, Node* node) { visit_node(ast, node, ctx);
+    // };
 
     auto visit_children = [&](Context& ctx, Node* node) {
         ast::visit_children(
