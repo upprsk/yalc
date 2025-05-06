@@ -1,11 +1,16 @@
 module main;
 
-func id(x: i32) i32 {
-    return x;
-}
+func add(x: i32, y: i32) i32 { return x + y; }
+func sub(x: i32, y: i32) i32 { return x - y; }
+func div(x: i32, y: i32) i32 { return x / y; }
+func mul(x: i32, y: i32) i32 { return x * y; }
 
 @export
 func main() i32 {
-    var x = 68;
-    return id(x);
+    var x = 42;
+    var y = 69;
+    return div(
+        add(x, sub(y, 1)),
+        mul(2, 1),
+    );
 }

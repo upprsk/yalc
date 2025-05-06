@@ -155,6 +155,26 @@ func main() i32 {
 }
 )");
 
+    run_test(ctx, p, "many calls and basic arithmetic",
+             R"(
+module main;
+
+func add(x: i32, y: i32) i32 { return x + y; }
+func sub(x: i32, y: i32) i32 { return x - y; }
+func div(x: i32, y: i32) i32 { return x / y; }
+func mul(x: i32, y: i32) i32 { return x * y; }
+
+@export
+func main() i32 {
+    var x = 42;
+    var y = 69;
+    return div(
+        add(x, sub(y, 1)),
+        mul(2, 1),
+    );
+}
+)");
+
     run_test(ctx, p, "print_int very simple",
              std::vector<std::string>{
                  R"(
