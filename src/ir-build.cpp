@@ -105,6 +105,8 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 // ============================================================================
 
 void visit_expr(Node* node, State& state, Context& ctx) {
+    auto& module = state.module;
+
     if (node->is_oneof(ast::NodeKind::ExprPack)) {
         auto data = conv::expr_pack(*node);
         if (data.items.size() > 1) {
@@ -118,19 +120,17 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Int)) {
-        auto type =
-            create_ir_type_from_general(state.module, *node->get_type());
-        auto inst = state.module.new_inst_int_const(type, node->get_data_u64());
+        auto type = create_ir_type_from_general(module, *node->get_type());
+        auto inst = module.new_inst_int_const(type, node->get_data_u64());
         state.current_block.push_back(inst);
         state.sstack_push(inst);
         return;
     }
 
     if (node->is_oneof(ast::NodeKind::Id)) {
-        auto type =
-            create_ir_type_from_general(state.module, *node->get_type());
+        auto type = create_ir_type_from_general(module, *node->get_type());
         auto local = state.get_local(node->get_decl());
-        auto inst = state.module.new_inst_get_local(type, local);
+        auto inst = module.new_inst_get_local(type, local);
 
         state.current_block.push_back(inst);
         state.sstack_push(inst);
@@ -150,8 +150,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
         // void return
         if (ty->is_pack() && ty->inner[0]->is_void()) {
-            auto inst = state.module.new_inst_call_void(
-                node->get_decl()->link_name, args);
+            auto inst =
+                module.new_inst_call_void(node->get_decl()->link_name, args);
 
             state.current_block.push_back(inst);
             state.sstack_push(nullptr);  // FIXME: is this ok?
@@ -160,9 +160,9 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
         // returns something
 
-        auto type = create_ir_type_from_general(state.module, *ty);
+        auto type = create_ir_type_from_general(module, *ty);
         auto inst =
-            state.module.new_inst_call(type, node->get_decl()->link_name, args);
+            module.new_inst_call(type, node->get_decl()->link_name, args);
 
         state.current_block.push_back(inst);
         state.sstack_push(inst);
@@ -187,9 +187,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
                 UNREACHABLE("invalid node kind in arith", node->get_kind());
         }
 
-        auto type =
-            create_ir_type_from_general(state.module, *node->get_type());
-        auto inst = state.module.new_inst_arith(op, type, lhs, rhs);
+        auto type = create_ir_type_from_general(module, *node->get_type());
+        auto inst = module.new_inst_arith(op, type, lhs, rhs);
 
         state.current_block.push_back(inst);
         state.sstack_push(inst);
@@ -213,6 +212,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 // ----------------------------------------------------------------------------
 
 void visit_stmt(Node* node, State& state, Context& ctx) {
+    auto& module = state.module;
+
     // auto& ts = *state.ts;
     auto& er = *state.er;
 
@@ -254,8 +255,8 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
         if (data.child == nullptr) {
-            auto block = state.module.new_block(BlockOp::RetVoid, nullptr,
-                                                state.current_block, {});
+            auto block = module.new_block(BlockOp::RetVoid, nullptr,
+                                          state.current_block, {});
 
             state.current_block.clear();
             state.blocks.push_back(block);
@@ -266,7 +267,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         auto expr = state.sstack_pop();
 
         auto block =
-            state.module.new_block(BlockOp::Ret, expr, state.current_block, {});
+            module.new_block(BlockOp::Ret, expr, state.current_block, {});
 
         state.current_block.clear();
         state.blocks.push_back(block);
@@ -288,12 +289,13 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
 auto create_func_params(std::span<types::Type*> types, State& state)
     -> std::span<Type*> {
-    auto out = state.module.new_type_span(types.size());
+    auto& module = state.module;
+    auto  out = module.new_type_span(types.size());
     for (auto [idx, param] : rv::enumerate(types)) {
-        out[idx] = create_ir_type_from_general(state.module, *param);
+        out[idx] = create_ir_type_from_general(module, *param);
     }
 
-    return state.module.new_type_span(out);
+    return module.new_type_span(out);
 }
 
 auto create_func_ret(Node* node, std::span<types::Type*> types, State& state)
@@ -311,6 +313,7 @@ auto create_func_ret(Node* node, std::span<types::Type*> types, State& state)
 }
 
 void visit_func_decl(Node* node, State& state, Context& ctx) {
+    auto& module = state.module;
     // auto& ts = *state.ts;
     // auto& er = *state.er;
 
@@ -323,9 +326,8 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
 
     std::vector<Inst*> params_insts;
     for (auto param : data.get_args().params) {
-        auto type =
-            create_ir_type_from_general(state.module, *param->get_type());
-        auto inst = state.module.new_inst_param(type);
+        auto type = create_ir_type_from_general(module, *param->get_type());
+        auto inst = module.new_inst_param(type);
         state.add_local(param->get_decl(), inst);
         params_insts.push_back(inst);
     }
@@ -337,8 +339,8 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
         if (ty.is_void() && state.blocks.size() == 0) {
             // in case the function returns void and does not have an explicit
             // return, add it
-            auto block = state.module.new_block(BlockOp::RetVoid, nullptr,
-                                                state.current_block, {});
+            auto block = module.new_block(BlockOp::RetVoid, nullptr,
+                                          state.current_block, {});
 
             state.current_block.clear();
             state.blocks.push_back(block);
@@ -356,10 +358,10 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
         flags = static_cast<Func::Flags>(flags | Func::FlagExtern);
     }
 
-    state.module.add_func({
+    module.add_func({
         .link_name = decl->link_name,
         .params = params,
-        .param_insts = state.module.new_inst_span(params_insts),
+        .param_insts = module.new_inst_span(params_insts),
         .ret = ret,
         .body = body,
         .all_blocks = state.blocks,
