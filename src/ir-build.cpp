@@ -104,6 +104,7 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
 // ============================================================================
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_expr(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
 
