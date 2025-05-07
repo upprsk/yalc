@@ -1590,6 +1590,14 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::DeferStmt)) {
+        auto data = conv::defer_stmt(*node);
+        visit(ctx, data.stmt);
+
+        node->set_type(ts.get_void());
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::IfStmt)) {
         auto data = conv::if_stmt(*node);
         visit(ctx, data.cond);
