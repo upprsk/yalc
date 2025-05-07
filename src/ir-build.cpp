@@ -54,9 +54,8 @@ struct State {
 };
 
 struct Context {
-    [[nodiscard]] auto with_defers(std::vector<Node*>& defers) const
-        -> Context {
-        return {.defers = &defers};
+    [[nodiscard]] auto with_defers(std::vector<Node*>& defers) -> Context {
+        return {.parent = this, .defers = &defers};
     }
 
     void add_defer(Node* node) {
@@ -64,6 +63,23 @@ struct Context {
         defers->push_back(node);
     }
 
+    void for_all_defers(auto&& f) {
+        if (defers == nullptr) return;
+
+        if (parent) parent->for_all_defers(std::forward<decltype(f)>(f));
+        for (auto d : rv::reverse(*defers)) f(d);
+    }
+
+    void clear_defers() const {
+        if (defers) defers->clear();
+    }
+
+    void clear_all_defers() const {
+        clear_defers();
+        if (parent) parent->clear_defers();
+    }
+
+    Context*            parent{};
     std::vector<Node*>* defers{};
 };
 
@@ -212,6 +228,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
 // ----------------------------------------------------------------------------
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_stmt(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
 
@@ -227,13 +244,12 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         for (auto item : data.items) visit_stmt(item, state, sctx);
 
-        for (auto d : defers) {
-            er.report_bug(d->get_loc(), "defer not handled");
+        for (auto d : rv::reverse(defers)) {
+            visit_stmt(d, state, sctx);
         }
 
         auto ending = state.shadow_stack.size();
         ASSERT(initial == ending);
-
         return;
     }
 
@@ -253,9 +269,35 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::DeclLocalVarDirectPack)) {
+        auto data = conv::decl_local_var_direct_pack(*node);
+
+        visit_expr(data.init, state, ctx);
+
+        if (data.names.size() == 1) {
+            auto init = state.sstack_pop();
+            state.add_local(data.names[0]->get_decl(), init);
+            return;
+        }
+
+        PANIC("var decl with multiple returns not implemented");
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::DeferStmt)) {
+        auto data = conv::defer_stmt(*node);
+        ctx.add_defer(data.stmt);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
+
         if (data.child == nullptr) {
+            ctx.for_all_defers(
+                [&](Node* stmt) { visit_stmt(stmt, state, ctx); });
+            ctx.clear_all_defers();
+
             auto block = module.new_block(BlockOp::RetVoid, nullptr,
                                           state.current_block, {});
 
@@ -266,6 +308,9 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         visit_expr(data.child, state, ctx);
         auto expr = state.sstack_pop();
+
+        ctx.for_all_defers([&](Node* stmt) { visit_stmt(stmt, state, ctx); });
+        ctx.clear_all_defers();
 
         auto block =
             module.new_block(BlockOp::Ret, expr, state.current_block, {});
