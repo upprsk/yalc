@@ -1,16 +1,26 @@
 module main;
 
-func add(x: i32, y: i32) i32 { return x + y; }
-func sub(x: i32, y: i32) i32 { return x - y; }
-func div(x: i32, y: i32) i32 { return x / y; }
-func mul(x: i32, y: i32) i32 { return x * y; }
+func thingy() {
+    c_print_int(42);
+    defer c_print_int(420);
+
+    c_print_int(69);
+}
 
 @export
 func main() i32 {
-    var x = 42;
-    var y = 69;
-    return div(
-        add(x, sub(y, 1)),
-        mul(2, 1),
-    );
+    var buf = c_malloc(256);
+    defer {
+        c_print_int(2);
+        c_free(buf);
+    }
+
+    c_print_int(0);
+    defer c_print_int(1);
+
+    {
+        thingy();
+
+        return 0;
+    }
 }

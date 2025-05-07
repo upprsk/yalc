@@ -11,3 +11,9 @@ func c_print_cstr(s: [*]const u8);
 
 @extern(link_name="getchar")
 func c_getchar() i32;
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) [*]u8;
+
+@extern(link_name="free")
+func c_free(ptr: [*]u8);

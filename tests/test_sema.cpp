@@ -644,6 +644,62 @@ func test() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("defer");
+
+    run_test(ctx, p, "malloc and free",
+             std::vector<std::string>{
+                 R"(
+module main;
+
+func thingy() {
+    c_print_int(42);
+    defer c_print_int(420);
+
+    c_print_int(69);
+}
+
+@export
+func main() i32 {
+    var buf = c_malloc(256);
+    defer {
+        c_print_int(2);
+        c_free(buf);
+    }
+
+    c_print_int(0);
+    defer c_print_int(1);
+
+    {
+        thingy();
+
+        return 0;
+    }
+}
+)",
+                 R"(
+module main;
+
+@extern(link_name="print_int")
+func c_print_int(v: i32);
+
+@extern(link_name="print_str")
+func c_print_str(s: [*]const u8, len: i32);
+
+@extern(link_name="print_cstr")
+func c_print_cstr(s: [*]const u8);
+
+@extern(link_name="getchar")
+func c_getchar() i32;
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) [*]u8;
+
+@extern(link_name="free")
+func c_free(ptr: [*]u8);
+)",
+             });
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("examples");
 
     run_test(ctx, p, "hello", R"(module main;
