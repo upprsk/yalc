@@ -226,6 +226,11 @@ struct Field {
     Node*            receiver{};
 };
 
+struct Index {
+    Node* receiver{};
+    Node* index{};
+};
+
 struct Block {
     std::span<Node*> items;
 };
@@ -542,6 +547,11 @@ struct CallIndirect {
 [[nodiscard]] constexpr auto field(Node const& n) -> Field {
     ASSERT(n.get_kind() == NodeKind::Field);
     return {.name = n.get_data_str(), .receiver = n.get_child(0)};
+}
+
+[[nodiscard]] constexpr auto index(Node const& n) -> Index {
+    ASSERT(n.get_kind() == NodeKind::Index);
+    return {.receiver = n.get_child(0), .index = n.get_child(1)};
 }
 
 [[nodiscard]] constexpr auto block(Node const& n) -> Block {

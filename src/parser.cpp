@@ -627,6 +627,7 @@ struct Parser {
         if (t.type == TokenType::DotStar)
             return ast->new_unary_expr(left->get_loc().extend(prev_span()),
                                        ast::NodeKind::Deref, left);
+        if (t.type == TokenType::Lbracket) return parse_index(left);
 
         auto kind = ast::NodeKind::Err;
         auto right = parse_prec_expr(get_precedence(t));
@@ -957,6 +958,12 @@ struct Parser {
 
         return ast->new_field(left->get_loc().extend(prev_span()), left,
                               name.str(source));
+    }
+
+    auto parse_index(ast::Node* left) -> ast::Node* {
+        auto index = parse_expr();
+        try(consume(TokenType::Rbracket));
+        return ast->new_index(left->get_loc().extend(prev_span()), left, index);
     }
 
     // ------------------------------------------------------------------------

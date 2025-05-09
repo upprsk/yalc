@@ -224,6 +224,11 @@ public:
                         new_string(name));
     }
 
+    auto new_index(Location loc, Node* receiver, Node* index) -> Node* {
+        return new_node(NodeKind::Index, loc,
+                        new_node_array_with(receiver, index));
+    }
+
     // ----------
     // Statements
     // ----------

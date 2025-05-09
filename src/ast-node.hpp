@@ -349,6 +349,12 @@ enum class NodeKind : uint16_t {
     /// - `children` has the receiver.
     Field,
 
+    /// Indexing.
+    ///
+    /// - `children` contains the receiver (thing beeing indexed) and then the
+    ///   index expression.
+    Index,
+
     /// ----------
     /// Statements
     /// ----------
@@ -714,6 +720,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::LitParam: name = "LitParam"; break;
         case NodeKind::Call: name = "Call"; break;
         case NodeKind::Field: name = "Field"; break;
+        case NodeKind::Index: name = "Index"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;
