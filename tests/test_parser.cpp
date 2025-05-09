@@ -844,7 +844,29 @@ func main() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("indexing");
 
+    run_test(ctx, p, "index with constant", R"(
+module test;
+func test() { arr[0]; }
+)");
+
+    run_test(ctx, p, "index with expr", R"(
+module test;
+func test() { arr[1+ y + (10 * 3) / x]; }
+)");
+
+    run_test(ctx, p, "expr with constant", R"(
+module test;
+func test() { (ptr + 10 * 4)[0x8000]; }
+)");
+
+    run_test(ctx, p, "expr with expr", R"(
+module test;
+func test() { (ptr + 10 * 4)[1+ y + (10 * 3) / x]; }
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("break/continue");
 
     run_test(ctx, p, "break", R"(module test;

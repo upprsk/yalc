@@ -771,6 +771,46 @@ func c_print_cstr(s: [*]const u8);
 )",
              });
 
+    run_test(ctx, p, "indexing argv",
+             std::vector<std::string>{
+                 R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    c_printf("Hello, World! (%s)\n".ptr, argv[0]);
+    return 0;
+}
+)",
+                 R"(
+module main;
+
+@extern(link_name="print_int")
+func c_print_int(v: i32);
+
+@extern(link_name="print_str")
+func c_print_str(s: [*]const u8, len: i32);
+
+@extern(link_name="print_cstr")
+func c_print_cstr(s: [*]const u8);
+
+@extern(link_name="getchar")
+func c_getchar() i32;
+
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) [*]u8;
+
+@extern(link_name="free")
+func c_free(ptr: [*]u8);
+
+@extern(link_name="exit")
+func c_exit(code: i32);
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)",
+             });
+
     ctx.tags.pop_back();
 
     fmt::println("sema tests, {} tests, {} success, {} failed", ctx.total(),
