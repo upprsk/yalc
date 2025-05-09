@@ -144,6 +144,18 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    // FIXME: THIS IS A TEMPORARY HACK TO GET STRINGS TO WORK!
+    if (node->is_oneof(ast::NodeKind::Field) &&
+        node->get_child(0)->is_oneof(ast::NodeKind::Str) &&
+        conv::field(*node).name == "ptr") {
+        auto type = module.new_type(TypeKind::Ptr);
+        auto inst = module.new_inst_str_const(
+            type, conv::str(*node->get_child(0)).value);
+        state.current_block.push_back(inst);
+        state.sstack_push(inst);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto type = create_ir_type_from_general(module, *node->get_type());
         auto local = state.get_local(node->get_decl());
@@ -421,7 +433,8 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
 // ----------------------------------------------------------------------------
 
 void visit_top(Node* node, State& state, Context& ctx) {
-    if (node->is_oneof(ast::NodeKind::FuncDecl)) {
+    if (node->is_oneof(ast::NodeKind::FuncDecl,
+                       ast::NodeKind::FuncDeclWithCVarArgs)) {
         visit_func_decl(node, state, ctx);
         return;
     }

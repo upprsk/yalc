@@ -19,6 +19,9 @@ func c_malloc(size: usize) [*]u8;
 @extern(link_name="free")
 func c_free(ptr: [*]u8);
 
+@extern(link_name="exit")
+func c_exit(code: i32);
+
 @extern(link_name="printf")
 func c_printf(fmt: [*]const u8, ...);
 

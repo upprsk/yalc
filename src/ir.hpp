@@ -41,6 +41,7 @@ struct Type {
 enum class OpCode {
     Err,
     IntConst,
+    StrConst,
     Param,
 
     Call,
@@ -151,6 +152,12 @@ public:
         return new_inst(OpCode::IntConst, type, value, std::span<Inst*>{});
     }
 
+    [[nodiscard]] auto new_inst_str_const(Type*            type,
+                                          std::string_view raw_value) -> Inst* {
+        auto value = add_string(raw_value);
+        return new_inst(OpCode::StrConst, type, value, std::span<Inst*>{});
+    }
+
     [[nodiscard]] auto new_inst_param(Type* type) -> Inst* {
         return new_inst(OpCode::Param, type, {}, std::span<Inst*>{});
     }
@@ -222,6 +229,23 @@ public:
 
     // ------------------------------------------------------------------------
 
+    auto add_string(std::string_view str) -> size_t {
+        auto s = string_buffer.alloc_string_view(str);
+        auto id = strings.size();
+        strings.push_back(s);
+
+        return id;
+    }
+
+    [[nodiscard]] auto get_string(size_t id) const -> std::string_view {
+        return strings.at(id);
+    }
+
+    [[nodiscard]] auto get_strings() const
+        -> std::span<std::string_view const> {
+        return strings;
+    }
+
     void add_func(Func const& fn) { funcs.push_back(fn); }
 
     [[nodiscard]] auto get_funcs() const -> std::span<Func const> {
@@ -232,8 +256,10 @@ private:
     mem::Arena insts;
     mem::Arena blocks;
     mem::Arena types;
+    mem::Arena string_buffer;
 
-    std::vector<Func> funcs;
+    std::vector<Func>             funcs;
+    std::vector<std::string_view> strings;
 
     uint32_t next_inst_uid{};
     uint32_t next_block_uid{};
@@ -281,6 +307,7 @@ constexpr auto format_as(OpCode op) {
     switch (op) {
         case OpCode::Err: name = "Err"; break;
         case OpCode::IntConst: name = "IntConst"; break;
+        case OpCode::StrConst: name = "StrConst"; break;
         case OpCode::Param: name = "Param"; break;
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;

@@ -62,6 +62,11 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         to_qbe_type(*inst->type), inst->get_value_u64());
                 break;
 
+            case ir::OpCode::StrConst:
+                println(out, "    %l{} ={} copy $str_{}", inst->uid,
+                        to_qbe_type(*inst->type), inst->get_value_u64());
+                break;
+
             case ir::OpCode::Call:
                 print(out, "    %l{} ={} call ${}(", inst->uid,
                       to_qbe_type(*inst->type), inst->get_value_str());
@@ -169,6 +174,10 @@ void codegen(FILE* out, ir::Module const& module, ErrorReporter& er,
 
     for (auto const& fn : module.get_funcs()) {
         codegen_func(fn, state, ctx);
+    }
+
+    for (auto const& [id, str] : rv::enumerate(module.get_strings())) {
+        println(out, "data $str_{} = {{ b {:?}, b 0 }}", id, str);
     }
 }
 

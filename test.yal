@@ -1,7 +1,7 @@
 module main;
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    c_printf("Hello, World!\n".ptr);
+    c_printf("Hello, %s\n".ptr, "World!".ptr);
 
     return 0;
 }
