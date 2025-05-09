@@ -156,6 +156,33 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Index)) {
+        auto data = conv::index(*node);
+        visit_expr(data.receiver, state, ctx);
+        visit_expr(data.index, state, ctx);
+
+        auto type = create_ir_type_from_general(module, *node->get_type());
+
+        auto index = state.sstack_pop();
+        auto receiver = state.sstack_pop();
+
+        // receiver + (index * sizeof(*receiver))
+        auto inst_sizeof_receiver =
+            module.new_inst_int_const(index->type, receiver->type->size());
+        auto inst_index_mult = module.new_inst_arith(
+            OpCode::Mul, index->type, index, inst_sizeof_receiver);
+        auto ptr = module.new_inst_arith(OpCode::Add, receiver->type, receiver,
+                                         inst_index_mult);
+        auto inst = module.new_inst_get_ptr(type, ptr);
+
+        state.current_block.push_back(inst_sizeof_receiver);
+        state.current_block.push_back(inst_index_mult);
+        state.current_block.push_back(ptr);
+        state.current_block.push_back(inst);
+        state.sstack_push(inst);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto type = create_ir_type_from_general(module, *node->get_type());
         auto local = state.get_local(node->get_decl());
@@ -199,7 +226,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
-                       ast::NodeKind::Div, ast::NodeKind::Mul)) {
+                       ast::NodeKind::Div, ast::NodeKind::Mul,
+                       ast::NodeKind::Equal, ast::NodeKind::NotEqual)) {
         auto data = conv::binary(*node);
         visit_expr(data.lhs, state, ctx);
         visit_expr(data.rhs, state, ctx);
@@ -212,6 +240,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
             case ast::NodeKind::Sub: op = OpCode::Sub; break;
             case ast::NodeKind::Div: op = OpCode::Div; break;
             case ast::NodeKind::Mul: op = OpCode::Mul; break;
+            case ast::NodeKind::Equal: op = OpCode::Eq; break;
+            case ast::NodeKind::NotEqual: op = OpCode::Neq; break;
             default:
                 UNREACHABLE("invalid node kind in arith", node->get_kind());
         }
