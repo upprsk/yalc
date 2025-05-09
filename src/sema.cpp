@@ -1458,6 +1458,7 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::Call)) {
         auto data = conv::call(*node);
         visit(ctx, data.callee);
+        visit_span(ctx, data.args);
 
         auto cty = data.callee->get_type();
         ASSERT(cty != nullptr);
@@ -1496,7 +1497,6 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
 
         for (auto const& [i, param, arg] :
              rv::zip(rv::iota(1), fn.get_params(), data.args)) {
-            visit(ctx, arg);
             ASSERT(arg->get_type() != nullptr);
 
             arg->set_type(arg->get_type());
