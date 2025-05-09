@@ -331,6 +331,53 @@ func c_printf(fmt: [*]const u8, ...);
 )",
              });
 
+    run_test(ctx, p, "if statement without else",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    if argc != 2 {
+        c_printf("usage: %s <name>\n".ptr, argv[0]);
+        return 1;
+    }
+
+    c_printf("Hello, %s!\n".ptr, argv[1]);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "if statement without else 2",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    if argc != 2 {
+        c_printf("usage: %s <name>\n".ptr, argv[0]);
+
+        if argc < 2 {
+            c_printf("note: missing required argument\n".ptr);
+        }
+
+        if argc > 2 {
+            c_printf("note: found %d extra arguments\n".ptr, argc - 2);
+        }
+
+        return 1;
+    }
+
+    c_printf("Hello, %s!\n".ptr, argv[1]);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
 
     fmt::println("ir tests, {} tests, {} success, {} failed", ctx.total(),
