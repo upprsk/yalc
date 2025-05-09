@@ -69,6 +69,8 @@ auto real_main(yalc::Args const& args) -> int {
 
     if (args.dump_ir_module) {
         yal::ir::disasm_module(stdout, module);
+        // NOTE: when dumping IR module, do not compile down to QBE
+        return 0;
     }
 
     auto out = stdout;
