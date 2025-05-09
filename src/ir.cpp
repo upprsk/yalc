@@ -30,12 +30,16 @@ void disasm_inst(FILE* out, Inst const& inst) {
     }
 
     if (!inst.get_args().empty()) {
-        fmt::print(out, "(");
+        if (inst.op == OpCode::Call || inst.op == OpCode::CallVoid)
+            fmt::print(out, "(");
+
         for (auto [idx, arg] : rv::enumerate(inst.get_args())) {
             if (idx) fmt::print(out, ", ");
             fmt::print(out, "%{}", arg->uid);
         }
-        fmt::print(out, ")");
+
+        if (inst.op == OpCode::Call || inst.op == OpCode::CallVoid)
+            fmt::print(out, ")");
     }
 
     fmt::println(out, "");
