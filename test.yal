@@ -1,7 +1,12 @@
 module main;
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    c_printf("Hello, %s\n".ptr, "World!".ptr);
+    // if argc != 2 {
+    //     c_printf("usage: %s <name>".ptr, argv[0]);
+    //     return 1;
+    // }
+
+    c_printf("Hello, World! (%s)\n".ptr, argv[0]);
 
     return 0;
 }

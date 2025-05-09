@@ -1570,6 +1570,40 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Index)) {
+        auto data = conv::index(*node);
+        visit(ctx, data.receiver);
+        visit(ctx, data.index);
+
+        auto rty = data.receiver->get_type();
+        ASSERT(rty != nullptr);
+
+        auto ity = data.index->get_type();
+        ASSERT(ity != nullptr);
+
+        if (!ity->is_integral()) {
+            er.report_error(node->get_loc(),
+                            "can not use non integral type {} as index", *ity);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        if (ity->contains_untyped()) {
+            fixup_untyped_chain(ts, data.index, ts.get_usize());
+        }
+
+        auto unw = rty->unwrapped();
+        if (unw->is_mptr()) {
+            node->set_type(unw->inner[0]);
+            return;
+        }
+
+        er.report_error(node->get_loc(), "type {} does not support indexing",
+                        *rty);
+        node->set_type(ts.get_error());
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Cast)) {
         auto data = conv::binary(*node);
         visit(ctx, data.lhs);
