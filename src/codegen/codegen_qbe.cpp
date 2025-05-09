@@ -56,6 +56,25 @@ auto to_qbe_type(ir::Type const& type) -> std::string_view {
     }
 }
 
+auto to_qbe_temp(ir::Type const& type) -> std::string_view {
+    switch (type.kind) {
+        case ir::TypeKind::Uint64:
+        case ir::TypeKind::Int64: return "l";
+        case ir::TypeKind::Uint32:
+        case ir::TypeKind::Int32:
+        case ir::TypeKind::Uint16:
+        case ir::TypeKind::Int16:
+        case ir::TypeKind::Uint8:
+        case ir::TypeKind::Int8: return "w";
+        case ir::TypeKind::Usize:
+        case ir::TypeKind::Isize:
+        case ir::TypeKind::Ptr: return machine_ptr_type();
+        case ir::TypeKind::Float32: return "f";
+        case ir::TypeKind::Float64: return "d";
+        default: PANIC("invalid type kind", type.kind);
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -67,17 +86,17 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
         switch (inst->op) {
             case ir::OpCode::IntConst:
                 println(out, "    %l{} ={} copy {}", inst->uid,
-                        to_qbe_type(*inst->type), inst->get_value_u64());
+                        to_qbe_temp(*inst->type), inst->get_value_u64());
                 break;
 
             case ir::OpCode::StrConst:
                 println(out, "    %l{} ={} copy $str_{}", inst->uid,
-                        to_qbe_type(*inst->type), inst->get_value_u64());
+                        to_qbe_temp(*inst->type), inst->get_value_u64());
                 break;
 
             case ir::OpCode::Call:
                 print(out, "    %l{} ={} call ${}(", inst->uid,
-                      to_qbe_type(*inst->type), inst->get_value_str());
+                      to_qbe_temp(*inst->type), inst->get_value_str());
                 for (auto arg : inst->get_args()) {
                     print(out, "{} %l{}, ", to_qbe_type(*arg->type), arg->uid);
                 }
@@ -87,14 +106,14 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             case ir::OpCode::CallVoid:
                 print(out, "    call ${}(", inst->get_value_str());
                 for (auto arg : inst->get_args()) {
-                    print(out, "{} %l{}, ", to_qbe_type(*arg->type), arg->uid);
+                    print(out, "{} %l{}, ", to_qbe_temp(*arg->type), arg->uid);
                 }
                 println(out, ")");
                 break;
 
             case ir::OpCode::GetLocal:
                 println(out, "    %l{} ={} copy %l{}", inst->uid,
-                        to_qbe_type(*inst->type), inst->get_arg(0)->uid);
+                        to_qbe_temp(*inst->type), inst->get_arg(0)->uid);
                 break;
 
             case ir::OpCode::GetPtr: {
@@ -119,7 +138,7 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 }
 
                 println(out, "    %l{} ={} {} %l{}", inst->uid,
-                        to_qbe_type(*inst->type), op, inst->get_arg(0)->uid);
+                        to_qbe_temp(*inst->type), op, inst->get_arg(0)->uid);
             } break;
 
             case ir::OpCode::Add:
@@ -136,7 +155,7 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 }
 
                 println(out, "    %l{} ={} {} %l{}, %l{}", inst->uid,
-                        to_qbe_type(*inst->type), op, inst->get_arg(0)->uid,
+                        to_qbe_temp(*inst->type), op, inst->get_arg(0)->uid,
                         inst->get_arg(1)->uid);
             } break;
 
