@@ -38,6 +38,15 @@ struct State {
         locals.clear();
     }
 
+    auto push_new_block(BlockOp op, Inst* value,
+                        std::span<Block* const> next = {}) -> Block* {
+        auto block = module.new_block(op, value, current_block, next);
+        current_block.clear();
+        blocks.push_back(block);
+
+        return block;
+    }
+
     Module module{};
 
     // NOLINTBEGIN(readability-redundant-member-init)
@@ -275,7 +284,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
 
     // auto& ts = *state.ts;
-    auto& er = *state.er;
+    // auto& er = *state.er;
 
     if (node->is_oneof(ast::NodeKind::Block)) {
         auto data = conv::block(*node);
@@ -340,11 +349,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
                 [&](Node* stmt) { visit_stmt(stmt, state, ctx); });
             ctx.clear_all_defers();
 
-            auto block = module.new_block(BlockOp::RetVoid, nullptr,
-                                          state.current_block, {});
-
-            state.current_block.clear();
-            state.blocks.push_back(block);
+            state.push_new_block(BlockOp::RetVoid, nullptr);
             return;
         }
 
@@ -354,11 +359,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         ctx.for_all_defers([&](Node* stmt) { visit_stmt(stmt, state, ctx); });
         ctx.clear_all_defers();
 
-        auto block =
-            module.new_block(BlockOp::Ret, expr, state.current_block, {});
-
-        state.current_block.clear();
-        state.blocks.push_back(block);
+        state.push_new_block(BlockOp::Ret, expr);
         return;
     }
 
