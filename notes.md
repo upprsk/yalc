@@ -19,3 +19,18 @@ walk(if type == "object" then del(.loc) else . end)
 ```jq
 jq -s .
 ```
+
+## CMake
+
+```bash
+cmake -B build -S . -GNinja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+```
+
+### Get AST
+
+Get the AST and remove `.loc` and declaration store from json objects.
+
+```bash
+cmake --build build && ./build/cmd/yalc test.yal --dump-ast-json --single-file | jq 'walk(if type == "object" then del(.loc, .ds) else . end)' | wl-copy
+```
