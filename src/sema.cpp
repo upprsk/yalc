@@ -1475,11 +1475,19 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         }
 
         auto fn = cty->as_func();
+
+        node->set_type(fn.ret);
+
         if (fn.is_var_args) {
-            er.report_bug(node->get_loc(), "varargs have not been implemented");
+            if (data.args.size() < fn.get_params().size()) {
+                er.report_error(node->get_loc(),
+                                "wrong number of arguments in call. Expected "
+                                "at least {} but got {}",
+                                fn.get_params().size(), data.args.size());
+            }
         }
 
-        if (fn.get_params().size() != data.args.size()) {
+        else if (fn.get_params().size() != data.args.size()) {
             er.report_error(
                 node->get_loc(),
                 "wrong number of arguments in call. Expected {} but got {}",
@@ -1498,7 +1506,6 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
             if (coerce) node->set_child(i, coerce);
         }
 
-        node->set_type(fn.ret);
         return;
     }
 

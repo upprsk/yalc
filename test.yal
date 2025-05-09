@@ -1,26 +1,9 @@
 module main;
 
-func thingy() {
-    c_print_int(42);
-    defer c_print_int(420);
+func main(argc: i32, argv: [*][*]u8) i32 {
+    c_printf("Hello, World!\n".ptr);
 
-    c_print_int(69);
+    return 0;
 }
 
-@export
-func main() i32 {
-    var buf = c_malloc(256);
-    defer {
-        c_print_int(2);
-        c_free(buf);
-    }
-
-    c_print_int(0);
-    defer c_print_int(1);
-
-    {
-        thingy();
-
-        return 0;
-    }
-}
+// vim: ft=yal
