@@ -214,6 +214,7 @@ void codegen_func(ir::Func const& fn, State& state, Context& ctx) {
         visited.insert(blk);
 
         codegen_block(*blk, state, ctx);
+        pending.insert(pending.end(), blk->next.begin(), blk->next.end());
     }
 
     println(out, "}}");

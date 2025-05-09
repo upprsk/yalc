@@ -91,6 +91,7 @@ void disasm_func(FILE* out, Func const& fn) {
             visited.insert(blk);
 
             disasm_block(out, *blk);
+            pending.insert(pending.end(), blk->next.begin(), blk->next.end());
         }
 
         fmt::println(out, "}}");
