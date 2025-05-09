@@ -63,6 +63,18 @@ void disasm_block(FILE* out, Block const& blk) {
             ASSERT(blk.next.empty());
             fmt::println(out, "    ret");
             break;
+        case BlockOp::Jmp:
+            ASSERT(blk.value == nullptr);
+            ASSERT(blk.next.size() == 1);
+            fmt::println(out, "    jmp @{}",
+                         blk.next.empty() ? 420 : blk.next[0]->uid);
+            break;
+        case BlockOp::Branch:
+            ASSERT(blk.value != nullptr);
+            ASSERT(blk.next.size() == 2);
+            fmt::println(out, "    branch %{}, @{} @{}", blk.value->uid,
+                         blk.next[0]->uid, blk.next[1]->uid);
+            break;
         default: UNREACHABLE("invalid block operation");
     }
 }
@@ -107,6 +119,10 @@ void disasm_func(FILE* out, Func const& fn) {
 void disasm_module(FILE* out, Module const& mod) {
     for (auto const& fn : mod.get_funcs()) {
         disasm_func(out, fn);
+    }
+
+    for (auto [idx, str] : rv::enumerate(mod.get_strings())) {
+        fmt::println(out, "data $str_{} = {:?}", idx, str);
     }
 }
 

@@ -32,19 +32,49 @@ struct State {
         return locals.at(decl);
     }
 
-    void clear() {
-        current_block.clear();
+    void clear_all_data() {
+        pending_insts.clear();
         blocks.clear();
         locals.clear();
     }
 
-    auto push_new_block(BlockOp op, Inst* value,
-                        std::span<Block* const> next = {}) -> Block* {
-        auto block = module.new_block(op, value, current_block, next);
-        current_block.clear();
+    auto new_empty_block(BlockOp op) -> Block* {
+        return module.new_block(op, nullptr, {}, {});
+    }
+
+    void add_inst(Inst* inst) { pending_insts.push_back(inst); }
+    void add_and_push_inst(Inst* inst) {
+        add_inst(inst);
+        sstack_push(inst);
+    }
+
+    void close_into_block(Block* block) {
+        block->body = module.new_inst_span(pending_insts);
         blocks.push_back(block);
 
-        return block;
+        pending_insts.clear();
+    }
+
+    void close_into_pending_block_prepared() {
+        pending_block->body = module.new_inst_span(pending_insts);
+        blocks.push_back(pending_block);
+
+        pending_insts.clear();
+        pending_block = nullptr;
+    }
+
+    void close_into_pending_block(BlockOp op, Inst* value,
+                                  std::span<Block* const> next) {
+        ASSERT(pending_block != nullptr);
+
+        pending_block->op = op;
+        pending_block->value = value;
+        pending_block->next = module.new_block_span(next);
+        pending_block->body = module.new_inst_span(pending_insts);
+        blocks.push_back(pending_block);
+
+        pending_insts.clear();
+        pending_block = nullptr;
     }
 
     Module module{};
@@ -53,8 +83,10 @@ struct State {
     std::unordered_map<Decl*, Inst*> locals{};
 
     std::vector<Inst*>  shadow_stack{};
-    std::vector<Inst*>  current_block{};
+    std::vector<Inst*>  pending_insts{};
     std::vector<Block*> blocks{};
+
+    Block* pending_block{};
     // NOLINTEND(readability-redundant-member-init)
 
     types::TypeStore* ts;
@@ -148,8 +180,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::Int)) {
         auto type = create_ir_type_from_general(module, *node->get_type());
         auto inst = module.new_inst_int_const(type, node->get_data_u64());
-        state.current_block.push_back(inst);
-        state.sstack_push(inst);
+        state.add_and_push_inst(inst);
         return;
     }
 
@@ -160,8 +191,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto type = module.new_type(TypeKind::Ptr);
         auto inst = module.new_inst_str_const(
             type, conv::str(*node->get_child(0)).value);
-        state.current_block.push_back(inst);
-        state.sstack_push(inst);
+        state.add_and_push_inst(inst);
         return;
     }
 
@@ -184,11 +214,10 @@ void visit_expr(Node* node, State& state, Context& ctx) {
                                          inst_index_mult);
         auto inst = module.new_inst_get_ptr(type, ptr);
 
-        state.current_block.push_back(inst_sizeof_receiver);
-        state.current_block.push_back(inst_index_mult);
-        state.current_block.push_back(ptr);
-        state.current_block.push_back(inst);
-        state.sstack_push(inst);
+        state.add_inst(inst_sizeof_receiver);
+        state.add_inst(inst_index_mult);
+        state.add_inst(ptr);
+        state.add_and_push_inst(inst);
         return;
     }
 
@@ -197,8 +226,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto local = state.get_local(node->get_decl());
         auto inst = module.new_inst_get_local(type, local);
 
-        state.current_block.push_back(inst);
-        state.sstack_push(inst);
+        state.add_and_push_inst(inst);
         return;
     }
 
@@ -218,8 +246,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
             auto inst =
                 module.new_inst_call_void(node->get_decl()->link_name, args);
 
-            state.current_block.push_back(inst);
-            state.sstack_push(nullptr);  // FIXME: is this ok?
+            // FIXME: there is actually no value to push here?
+            state.add_and_push_inst(inst);
             return;
         }
 
@@ -229,8 +257,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto inst =
             module.new_inst_call(type, node->get_decl()->link_name, args);
 
-        state.current_block.push_back(inst);
-        state.sstack_push(inst);
+        state.add_and_push_inst(inst);
         return;
     }
 
@@ -258,8 +285,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto type = create_ir_type_from_general(module, *node->get_type());
         auto inst = module.new_inst_arith(op, type, lhs, rhs);
 
-        state.current_block.push_back(inst);
-        state.sstack_push(inst);
+        state.add_and_push_inst(inst);
         return;
     }
 
@@ -341,6 +367,41 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::IfStmt)) {
+        auto data = conv::if_stmt(*node);
+
+        // without else
+        if (data.wf == nullptr) {
+            visit_expr(data.cond, state, ctx);
+            auto cond = state.sstack_pop();
+
+            auto wt = state.new_empty_block(BlockOp::Jmp);
+            auto after = state.new_empty_block(BlockOp::Err);
+
+            // mark that after comes after the then branch
+            wt->next = module.new_block_span(std::array{after});
+
+            // finish the current block using a branch op
+            state.close_into_pending_block(BlockOp::Branch, cond,
+                                           std::array{wt, after});
+
+            // set then branch as the current pending block
+            state.pending_block = wt;
+
+            // fill the then branch and finish it with a simple jump
+            visit_stmt(data.wt, state, ctx);
+            if (state.pending_block) state.close_into_pending_block_prepared();
+
+            // set after as the current block
+            state.pending_block = after;
+            return;
+        }
+
+        // with else
+        PANIC("not implemented");
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
 
@@ -349,7 +410,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
                 [&](Node* stmt) { visit_stmt(stmt, state, ctx); });
             ctx.clear_all_defers();
 
-            state.push_new_block(BlockOp::RetVoid, nullptr);
+            state.close_into_pending_block(BlockOp::RetVoid, nullptr, {});
             return;
         }
 
@@ -359,7 +420,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         ctx.for_all_defers([&](Node* stmt) { visit_stmt(stmt, state, ctx); });
         ctx.clear_all_defers();
 
-        state.push_new_block(BlockOp::Ret, expr);
+        state.close_into_pending_block(BlockOp::Ret, expr, {});
         return;
     }
 
@@ -423,16 +484,14 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
 
     Block* body = nullptr;
     if (data.body) {
+        state.pending_block = state.new_empty_block(BlockOp::Err);
+
         visit_stmt(data.body, state, ctx);
 
         if (ty.is_void() && state.blocks.size() == 0) {
             // in case the function returns void and does not have an explicit
             // return, add it
-            auto block = module.new_block(BlockOp::RetVoid, nullptr,
-                                          state.current_block, {});
-
-            state.current_block.clear();
-            state.blocks.push_back(block);
+            state.close_into_pending_block(BlockOp::RetVoid, nullptr, {});
         }
 
         body = state.blocks[0];
@@ -458,7 +517,7 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
         .flags = flags,
     });
 
-    state.clear();
+    state.clear_all_data();
 }
 
 // ----------------------------------------------------------------------------

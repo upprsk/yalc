@@ -135,6 +135,8 @@ enum class BlockOp {
     Err,
     Ret,
     RetVoid,
+    Jmp,
+    Branch,
 };
 
 struct Block {
@@ -327,6 +329,8 @@ constexpr auto format_as(BlockOp op) {
         case BlockOp::Err: name = "Err"; break;
         case BlockOp::Ret: name = "Ret"; break;
         case BlockOp::RetVoid: name = "RetVoid"; break;
+        case BlockOp::Jmp: name = "Jmp"; break;
+        case BlockOp::Branch: name = "Branch"; break;
     }
 
     return name;

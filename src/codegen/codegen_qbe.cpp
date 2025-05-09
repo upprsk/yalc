@@ -82,6 +82,8 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
     (void)ctx;
     auto out = state.out;
 
+    println(out, "@b{}", block.uid);
+
     for (auto const& inst : block.body) {
         switch (inst->op) {
             case ir::OpCode::IntConst:
@@ -159,6 +161,22 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         inst->get_arg(1)->uid);
             } break;
 
+            case ir::OpCode::Eq:
+            case ir::OpCode::Neq: {
+                std::string_view op;
+                switch (inst->op) {
+                    case ir::OpCode::Eq: op = "eq"; break;
+                    case ir::OpCode::Neq: op = "ne"; break;
+                    default: UNREACHABLE("invalid op for comparison", inst->op);
+                }
+
+                println(out, "    %l{} ={} c{}{} %l{}, %l{}", inst->uid,
+                        to_qbe_temp(*inst->type), op,
+                        to_qbe_type(*inst->get_arg(0)->type),
+                        inst->get_arg(0)->uid, inst->get_arg(1)->uid);
+
+            } break;
+
             default: PANIC("invalid instruction opcode", inst->op);
         }
     }
@@ -173,6 +191,18 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             ASSERT(block.value == nullptr);
             ASSERT(block.next.empty());
             println(out, "    ret");
+            break;
+
+        case ir::BlockOp::Jmp:
+            ASSERT(block.value == nullptr);
+            ASSERT(block.next.size() == 1);
+            println(out, "    jmp @b{}", block.next[0]->uid);
+            break;
+        case ir::BlockOp::Branch:
+            ASSERT(block.value != nullptr);
+            ASSERT(block.next.size() == 2);
+            println(out, "    jnz %l{}, @b{}, @b{}", block.value->uid,
+                    block.next[0]->uid, block.next[1]->uid);
             break;
 
         default: PANIC("invalid block opcode", block.op);
