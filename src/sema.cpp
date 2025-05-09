@@ -32,17 +32,33 @@ struct State {
 };
 
 struct Context {
+    [[nodiscard]] constexpr auto with_module(Node* current_module) const
+        -> Context {
+        return {
+            .current_module = current_module,
+            .current_loop = current_loop,
+            .current_function = current_function,
+        };
+    }
+
     [[nodiscard]] constexpr auto child(Node* current_loop) const -> Context {
-        return {.current_loop = current_loop,
-                .current_function = current_function};
+        return {
+            .current_module = current_module,
+            .current_loop = current_loop,
+            .current_function = current_function,
+        };
     }
 
     [[nodiscard]] constexpr auto child(types::Type* current_function) const
         -> Context {
-        return {.current_loop = current_loop,
-                .current_function = current_function};
+        return {
+            .current_module = current_module,
+            .current_loop = current_loop,
+            .current_function = current_function,
+        };
     }
 
+    Node*        current_module{};
     Node*        current_loop{};
     types::Type* current_function{};
 };
@@ -411,6 +427,14 @@ void visit_func_decl(Ast& ast, Node* node, State& state, Context& ctx) {
     visit(state, ctx, data.ret);
 
     visit_decorators(ast, data.decorators, decl, state, ctx);
+
+    // handle main function, it needs to be handled specially. It should be
+    // exported even without `@export`
+    if (ctx.current_module && decl->local_name == "main" &&
+        conv::flat_module(*ctx.current_module).name == "main") {
+        decl->flags.set_export();
+        decl->link_name = decl->local_name;
+    }
 
     // extern should not have body
     if (decl->flags.has_extern() && data.body != nullptr) {
@@ -1182,11 +1206,13 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::FlatModule)) {
         node->set_type(ts.get_void());
 
-        visit_children(ctx, node);
+        auto mctx = ctx.with_module(node);
+
+        visit_children(mctx, node);
 
         for (auto const& node : state.pending_functions) {
             auto data = conv::func_decl(*node);
-            auto sctx = ctx.child(node->get_type());
+            auto sctx = mctx.child(node->get_type());
             visit(sctx, data.body);
         }
 
