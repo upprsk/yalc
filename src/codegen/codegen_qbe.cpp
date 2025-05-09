@@ -29,6 +29,14 @@ auto machine_ptr_type() -> std::string_view {
     return sizeof(uintptr_t) == 4 ? "w" : "l";
 }
 
+auto machine_load_ptr_op() -> std::string_view {
+    return sizeof(uintptr_t) == 4 ? "loaduw" : "loadl";
+}
+
+auto machine_load_sptr_op() -> std::string_view {
+    return sizeof(uintptr_t) == 4 ? "loadsw" : "loadl";
+}
+
 auto to_qbe_type(ir::Type const& type) -> std::string_view {
     switch (type.kind) {
         case ir::TypeKind::Uint64:
@@ -88,6 +96,31 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 println(out, "    %l{} ={} copy %l{}", inst->uid,
                         to_qbe_type(*inst->type), inst->get_arg(0)->uid);
                 break;
+
+            case ir::OpCode::GetPtr: {
+                std::string_view op;
+                switch (inst->type->kind) {
+                    case ir::TypeKind::Uint64:
+                    case ir::TypeKind::Int64: op = "loadl"; break;
+                    case ir::TypeKind::Uint32: op = "loaduw"; break;
+                    case ir::TypeKind::Int32: op = "loadsw"; break;
+                    case ir::TypeKind::Uint16: op = "loaduh"; break;
+                    case ir::TypeKind::Int16: op = "loadsh"; break;
+                    case ir::TypeKind::Uint8: op = "loadub"; break;
+                    case ir::TypeKind::Int8: op = "loadsb"; break;
+                    case ir::TypeKind::Float32: op = "loads"; break;
+                    case ir::TypeKind::Float64: op = "loadd"; break;
+                    case ir::TypeKind::Usize: op = machine_load_ptr_op(); break;
+                    case ir::TypeKind::Isize:
+                        op = machine_load_sptr_op();
+                        break;
+                    case ir::TypeKind::Ptr: op = machine_load_ptr_op(); break;
+                    default: PANIC("bad type kind", inst->type->kind);
+                }
+
+                println(out, "    %l{} ={} {} %l{}", inst->uid,
+                        to_qbe_type(*inst->type), op, inst->get_arg(0)->uid);
+            } break;
 
             case ir::OpCode::Add:
             case ir::OpCode::Sub:
