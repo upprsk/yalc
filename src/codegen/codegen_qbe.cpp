@@ -162,11 +162,26 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             } break;
 
             case ir::OpCode::Eq:
-            case ir::OpCode::Neq: {
+            case ir::OpCode::Neq:
+            case ir::OpCode::Lt:
+            case ir::OpCode::Le: {
                 std::string_view op;
                 switch (inst->op) {
                     case ir::OpCode::Eq: op = "eq"; break;
                     case ir::OpCode::Neq: op = "ne"; break;
+                    case ir::OpCode::Lt:
+                        if (inst->type->is_signed())
+                            op = "slt";
+                        else
+                            op = "ult";
+                        break;
+                    case ir::OpCode::Le:
+                        if (inst->type->is_signed())
+                            op = "sle";
+                        else
+                            op = "ule";
+                        break;
+
                     default: UNREACHABLE("invalid op for comparison", inst->op);
                 }
 

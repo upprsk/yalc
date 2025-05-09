@@ -222,6 +222,9 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Id)) {
+        // state.er->report_debug(node->get_loc(), "id={:?}, decl: {}",
+        //                        conv::id(*node).name, *node->get_decl());
+
         auto type = create_ir_type_from_general(module, *node->get_type());
         auto local = state.get_local(node->get_decl());
         auto inst = module.new_inst_get_local(type, local);
@@ -263,7 +266,9 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
                        ast::NodeKind::Div, ast::NodeKind::Mul,
-                       ast::NodeKind::Equal, ast::NodeKind::NotEqual)) {
+                       ast::NodeKind::Equal, ast::NodeKind::NotEqual,
+                       ast::NodeKind::Less, ast::NodeKind::LessEqual,
+                       ast::NodeKind::Greater, ast::NodeKind::GreaterEqual)) {
         auto data = conv::binary(*node);
         visit_expr(data.lhs, state, ctx);
         visit_expr(data.rhs, state, ctx);
@@ -278,6 +283,19 @@ void visit_expr(Node* node, State& state, Context& ctx) {
             case ast::NodeKind::Mul: op = OpCode::Mul; break;
             case ast::NodeKind::Equal: op = OpCode::Eq; break;
             case ast::NodeKind::NotEqual: op = OpCode::Neq; break;
+            case ast::NodeKind::Less: op = OpCode::Lt; break;
+            case ast::NodeKind::LessEqual: op = OpCode::Le; break;
+
+            case ast::NodeKind::Greater:
+                op = OpCode::Le;
+                std::swap(lhs, rhs);
+                break;
+
+            case ast::NodeKind::GreaterEqual:
+                op = OpCode::Lt;
+                std::swap(lhs, rhs);
+                break;
+
             default:
                 UNREACHABLE("invalid node kind in arith", node->get_kind());
         }
@@ -343,6 +361,9 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         auto init = state.sstack_pop();
         state.add_local(node->get_decl(), init);
+
+        // state.er->report_debug(node->get_loc(), "decl var direct {}",
+        //                        *node->get_decl());
         return;
     }
 

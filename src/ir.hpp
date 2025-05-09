@@ -37,6 +37,28 @@ enum class TypeKind {
 struct Type {
     TypeKind kind;
 
+    [[nodiscard]] constexpr auto is_signed() const -> bool {
+        bool r;
+        switch (kind) {
+            case TypeKind::Uint64:
+            case TypeKind::Uint32:
+            case TypeKind::Uint16:
+            case TypeKind::Uint8:
+            case TypeKind::Usize:
+            case TypeKind::Ptr: r = false; break;
+
+            case TypeKind::Int64:
+            case TypeKind::Int32:
+            case TypeKind::Int16:
+            case TypeKind::Int8:
+            case TypeKind::Isize: r = true; break;
+
+            default: PANIC("invalid kind", kind);
+        }
+
+        return r;
+    }
+
     [[nodiscard]] constexpr auto size() const -> size_t {
         size_t sz;
         switch (kind) {
@@ -79,6 +101,8 @@ enum class OpCode {
 
     Eq,
     Neq,
+    Lt,
+    Le,
 };
 
 struct Inst {
@@ -354,6 +378,8 @@ constexpr auto format_as(OpCode op) {
         case OpCode::Mul: name = "Mul"; break;
         case OpCode::Eq: name = "Eq"; break;
         case OpCode::Neq: name = "Neq"; break;
+        case OpCode::Lt: name = "Lt"; break;
+        case OpCode::Le: name = "Le"; break;
     }
 
     return name;
