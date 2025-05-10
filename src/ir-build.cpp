@@ -49,18 +49,12 @@ struct State {
     }
 
     void close_into_block(Block* block) {
+        ASSERT(block->op != BlockOp::Err);
+
         block->body = module.new_inst_span(pending_insts);
         blocks.push_back(block);
 
         pending_insts.clear();
-    }
-
-    void close_into_pending_block_prepared() {
-        pending_block->body = module.new_inst_span(pending_insts);
-        blocks.push_back(pending_block);
-
-        pending_insts.clear();
-        pending_block = nullptr;
     }
 
     void close_into_pending_block(BlockOp op, Inst* value,
@@ -413,9 +407,6 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
             auto wt = state.new_empty_block(BlockOp::Jmp);
             auto after = state.new_empty_block(BlockOp::Err);
 
-            // mark that after comes after the then branch
-            wt->next = module.new_block_span(std::array{after});
-
             // finish the current block using a branch op
             state.close_into_pending_block(BlockOp::Branch, cond,
                                            std::array{wt, after});
@@ -425,7 +416,9 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
             // fill the then branch and finish it with a simple jump
             visit_stmt(data.wt, state, ctx);
-            if (state.pending_block) state.close_into_pending_block_prepared();
+            if (state.pending_block)
+                state.close_into_pending_block(BlockOp::Jmp, nullptr,
+                                               std::array{after});
 
             // set after as the current block
             state.pending_block = after;
@@ -459,9 +452,6 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         auto body = state.new_empty_block(BlockOp::Jmp);
         auto after = state.new_empty_block(BlockOp::Err);
 
-        // mark that cond comes after the body branch
-        body->next = module.new_block_span(std::array{cond_block});
-
         // finish the current block using a branch op, either into the body or
         // after it
         state.close_into_pending_block(BlockOp::Branch, cond,
@@ -472,7 +462,9 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         // fill the body and finish it with a simple jump back to cond
         visit_stmt(data.body, state, ctx);
-        if (state.pending_block) state.close_into_pending_block_prepared();
+        if (state.pending_block)
+            state.close_into_pending_block(BlockOp::Jmp, nullptr,
+                                           std::array{cond_block});
 
         // set after as the current block
         state.pending_block = after;
