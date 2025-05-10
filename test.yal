@@ -1,7 +1,7 @@
 module main;
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    var a, b = 1, 2;
+    var a, b = 2, 2;
 
     c_printf("a == b :: %d\n".ptr, a == b);
     c_printf("a != b :: %d\n".ptr, a != b);
