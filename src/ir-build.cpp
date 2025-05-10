@@ -71,9 +71,9 @@ struct State {
         pending_block = nullptr;
     }
 
+    // NOLINTBEGIN(readability-redundant-member-init)
     Module module{};
 
-    // NOLINTBEGIN(readability-redundant-member-init)
     std::unordered_map<Decl*, Inst*> locals{};
 
     std::vector<Inst*>  shadow_stack{};
