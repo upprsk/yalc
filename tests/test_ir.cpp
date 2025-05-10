@@ -291,6 +291,9 @@ func c_free(ptr: [*]u8);
 )",
              });
 
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("big examples");
+
     run_test(ctx, p, "indexing",
              std::vector<std::string>{
                  R"(
@@ -370,6 +373,26 @@ func main(argc: i32, argv: [*][*]u8) i32 {
     }
 
     c_printf("Hello, %s!\n".ptr, argv[1]);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("assign");
+
+    run_test(ctx, p, "simple assign",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var i = 0;
+    c_printf("i=%d\n".ptr, i);
+    i = i + 1;
+    c_printf("i=%d\n".ptr, i);
 
     return 0;
 }
