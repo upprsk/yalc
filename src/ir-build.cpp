@@ -284,12 +284,12 @@ void visit_expr(Node* node, State& state, Context& ctx) {
             case ast::NodeKind::LessEqual: op = OpCode::Le; break;
 
             case ast::NodeKind::Greater:
-                op = OpCode::Le;
+                op = OpCode::Lt;
                 std::swap(lhs, rhs);
                 break;
 
             case ast::NodeKind::GreaterEqual:
-                op = OpCode::Lt;
+                op = OpCode::Le;
                 std::swap(lhs, rhs);
                 break;
 
