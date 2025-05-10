@@ -1,3 +1,5 @@
+CMAKE_J=1
+
 all: test
 
 test: test.yal.o test.c.o
@@ -19,7 +21,7 @@ test.yal.qbe: yalc test.yal test_c.yal
 
 .PHONY: yalc
 yalc:
-	cmake --build build
+	cmake --build build -j${CMAKE_J}
 
 .PHONY: json
 json: yalc
