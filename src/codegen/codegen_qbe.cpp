@@ -113,11 +113,6 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 println(out, ")");
                 break;
 
-            case ir::OpCode::GetLocal:
-                println(out, "    %l{} ={} copy %l{}", inst->uid,
-                        to_qbe_temp(*inst->type), inst->get_arg(0)->uid);
-                break;
-
             case ir::OpCode::Load: {
                 std::string_view op;
                 switch (inst->type->kind) {

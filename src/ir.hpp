@@ -91,7 +91,6 @@ enum class OpCode {
     Call,
     CallVoid,
 
-    GetLocal,
     Load,
 
     Add,
@@ -223,10 +222,6 @@ public:
                                           std::span<Inst* const> args)
         -> Inst* {
         return new_inst(OpCode::CallVoid, nullptr, symbol, args);
-    }
-
-    [[nodiscard]] auto new_inst_get_local(Type* type, Inst* local) -> Inst* {
-        return new_inst(OpCode::GetLocal, type, {}, local);
     }
 
     // NOTE: `type` should be the resulting type of the dereference
@@ -370,7 +365,6 @@ constexpr auto format_as(OpCode op) {
         case OpCode::Param: name = "Param"; break;
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;
-        case OpCode::GetLocal: name = "GetLocal"; break;
         case OpCode::Load: name = "Load"; break;
         case OpCode::Add: name = "Add"; break;
         case OpCode::Sub: name = "Sub"; break;

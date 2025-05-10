@@ -222,11 +222,12 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Id)) {
-        auto type = create_ir_type_from_general(module, *node->get_type());
+        // auto type = create_ir_type_from_general(module, *node->get_type());
         auto local = state.get_local(node->get_decl());
-        auto inst = module.new_inst_get_local(type, local);
+        // auto inst = module.new_inst_get_local(type, local);
 
-        state.add_and_push_inst(inst);
+        // state.add_and_push_inst(inst);
+        state.sstack_push(local);
         return;
     }
 
