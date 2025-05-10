@@ -439,6 +439,24 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
+    run_test(ctx, p, "while statement 3",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var i = 0;
+    while i < argc {
+        defer i = i + 1;
+        c_printf("- %d: %s\n".ptr, i, argv[i]);
+    }
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
 
     fmt::println("ir tests, {} tests, {} success, {} failed", ctx.total(),
