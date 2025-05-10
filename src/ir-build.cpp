@@ -205,6 +205,13 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto index = state.sstack_pop();
         auto receiver = state.sstack_pop();
 
+        // in case the index type is smaller then the pointer size, we need to
+        // extend it
+        if (index->type->size() < module.get_type_isize()->size()) {
+            index = module.new_inst_ext(module.get_type_isize(), index);
+            state.add_inst(index);
+        }
+
         // receiver + (index * sizeof(*receiver))
         auto inst_sizeof_receiver =
             module.new_inst_int_const(index->type, receiver->type->size());
