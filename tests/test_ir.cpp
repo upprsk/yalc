@@ -353,6 +353,41 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
+    run_test(ctx, p, "if statement with else else",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var i = 1;
+    while i < argc {
+        defer i = i + 1;
+        // c_printf("# %d: %s\n".ptr, i, argv[i]);
+
+        if streq(argv[i], "--help".ptr) {
+            c_printf("usage: %s [options]\n".ptr, argv[0]);
+            c_printf("options:\n".ptr);
+            c_printf("    --help: show this message\n".ptr);
+        }
+
+        else {
+            c_printf("error: unknown option '%s'\n".ptr, argv[i]);
+        }
+    }
+
+    return 0;
+}
+
+func streq(lhs: [*]const u8, rhs: [*]const u8) bool {
+    return c_strcmp(lhs, rhs) == 0;
+}
+
+@extern(link_name="strcmp")
+func c_strcmp(a: [*]const u8, b: [*]const u8) i32;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     run_test(ctx, p, "if statement without else 2",
              R"(
 module main;
