@@ -377,6 +377,18 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::AssignDirect)) {
+        auto data = conv::assign(*node);
+        auto lhs = state.get_local(conv::id(*data.lhs).to);
+
+        visit_expr(data.rhs, state, ctx);
+        auto rhs = state.sstack_pop();
+
+        auto inst = module.new_inst_settmp(lhs, rhs);
+        state.add_inst(inst);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::DeferStmt)) {
         auto data = conv::defer_stmt(*node);
         ctx.add_defer(data.stmt);
