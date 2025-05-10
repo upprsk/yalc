@@ -119,6 +119,20 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         inst->get_arg(1)->uid);
                 break;
 
+            case ir::OpCode::Ext: {
+                std::string_view is_signed;
+
+                if (inst->get_arg(0)->type->is_signed())
+                    is_signed = "s";
+                else
+                    is_signed = "u";
+
+                println(out, "    %l{} ={} ext{}{} %l{}", inst->uid,
+                        to_qbe_temp(*inst->type), is_signed,
+                        to_qbe_type(*inst->get_arg(0)->type),
+                        inst->get_arg(0)->uid);
+            } break;
+
             case ir::OpCode::Load: {
                 std::string_view op;
                 switch (inst->type->kind) {

@@ -95,6 +95,8 @@ enum class OpCode {
 
     Load,
 
+    Ext,
+
     Add,
     Sub,
     Div,
@@ -200,7 +202,21 @@ struct Func {
 };
 
 struct Module {
+    struct TypeCache {
+        Type* usize;
+        Type* isize;
+        Type* ptr;
+    };
+
 public:
+    Module() {
+        cache = {
+            .usize = new_type(TypeKind::Usize),
+            .isize = new_type(TypeKind::Isize),
+            .ptr = new_type(TypeKind::Ptr),
+        };
+    }
+
     [[nodiscard]] auto new_inst_int_const(Type* type, uint64_t value) -> Inst* {
         return new_inst(OpCode::IntConst, type, value, std::span<Inst*>{});
     }
@@ -233,6 +249,10 @@ public:
     // NOTE: `type` should be the resulting type of the dereference
     [[nodiscard]] auto new_inst_load(Type* type, Inst* ptr) -> Inst* {
         return new_inst(OpCode::Load, type, {}, ptr);
+    }
+
+    [[nodiscard]] auto new_inst_ext(Type* type, Inst* src) -> Inst* {
+        return new_inst(OpCode::Ext, type, {}, src);
     }
 
     [[nodiscard]] auto new_inst_arith(OpCode op, Type* type, Inst* lhs,
@@ -285,6 +305,18 @@ public:
         return types.alloc_size<Type*>(sz);
     }
 
+    [[nodiscard]] constexpr auto get_type_usize() const -> Type* {
+        return cache.usize;
+    }
+
+    [[nodiscard]] constexpr auto get_type_isize() const -> Type* {
+        return cache.isize;
+    }
+
+    [[nodiscard]] constexpr auto get_type_ptr() const -> Type* {
+        return cache.ptr;
+    }
+
     // ------------------------------------------------------------------------
 
     auto add_string(std::string_view str) -> size_t {
@@ -321,6 +353,8 @@ private:
 
     uint32_t next_inst_uid{};
     uint32_t next_block_uid{};
+
+    TypeCache cache{};
 };
 
 constexpr auto format_as(TypeKind kind) {
@@ -373,6 +407,7 @@ constexpr auto format_as(OpCode op) {
         case OpCode::CallVoid: name = "CallVoid"; break;
         case OpCode::SetTmp: name = "SetTmp"; break;
         case OpCode::Load: name = "Load"; break;
+        case OpCode::Ext: name = "Ext"; break;
         case OpCode::Add: name = "Add"; break;
         case OpCode::Sub: name = "Sub"; break;
         case OpCode::Div: name = "Div"; break;
