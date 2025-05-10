@@ -92,7 +92,7 @@ enum class OpCode {
     CallVoid,
 
     GetLocal,
-    GetPtr,  // deref
+    Load,
 
     Add,
     Sub,
@@ -230,8 +230,8 @@ public:
     }
 
     // NOTE: `type` should be the resulting type of the dereference
-    [[nodiscard]] auto new_inst_get_ptr(Type* type, Inst* ptr) -> Inst* {
-        return new_inst(OpCode::GetPtr, type, {}, ptr);
+    [[nodiscard]] auto new_inst_load(Type* type, Inst* ptr) -> Inst* {
+        return new_inst(OpCode::Load, type, {}, ptr);
     }
 
     [[nodiscard]] auto new_inst_arith(OpCode op, Type* type, Inst* lhs,
@@ -371,7 +371,7 @@ constexpr auto format_as(OpCode op) {
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;
         case OpCode::GetLocal: name = "GetLocal"; break;
-        case OpCode::GetPtr: name = "GetPtr"; break;
+        case OpCode::Load: name = "Load"; break;
         case OpCode::Add: name = "Add"; break;
         case OpCode::Sub: name = "Sub"; break;
         case OpCode::Div: name = "Div"; break;

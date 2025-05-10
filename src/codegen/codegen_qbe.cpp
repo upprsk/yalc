@@ -118,7 +118,7 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         to_qbe_temp(*inst->type), inst->get_arg(0)->uid);
                 break;
 
-            case ir::OpCode::GetPtr: {
+            case ir::OpCode::Load: {
                 std::string_view op;
                 switch (inst->type->kind) {
                     case ir::TypeKind::Uint64:

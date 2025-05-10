@@ -212,7 +212,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
             OpCode::Mul, index->type, index, inst_sizeof_receiver);
         auto ptr = module.new_inst_arith(OpCode::Add, receiver->type, receiver,
                                          inst_index_mult);
-        auto inst = module.new_inst_get_ptr(type, ptr);
+        auto inst = module.new_inst_load(type, ptr);
 
         state.add_inst(inst_sizeof_receiver);
         state.add_inst(inst_index_mult);
