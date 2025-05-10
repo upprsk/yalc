@@ -1672,7 +1672,9 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         auto cty = data.cond->get_type();
         ASSERT(cty != nullptr);
 
-        if (!cty->is_bool()) {
+        auto r =
+            coerce_and_check(ts.get_bool(), cty, node, data.cond, state, ctx);
+        if (!r->is_bool()) {
             er.report_error(data.cond->get_loc(),
                             "wrong type for condition: {}, expected boolean",
                             *cty);
@@ -1692,7 +1694,9 @@ void visit_node(Ast& ast, Node* node, State& state, Context& ctx) {
         auto cty = data.cond->get_type();
         ASSERT(cty != nullptr);
 
-        if (!cty->is_bool()) {
+        auto r =
+            coerce_and_check(ts.get_bool(), cty, node, data.cond, state, ctx);
+        if (!r->is_bool()) {
             er.report_error(data.cond->get_loc(),
                             "wrong type for condition: {}, expected boolean",
                             *cty);
