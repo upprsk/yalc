@@ -85,6 +85,7 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
                 d->set_type(ts.get_void());
                 items.push_back(d);
                 id_idx++;
+                init_idx++;
                 continue;
             }
 
@@ -94,7 +95,10 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
             d->set_type(ts.get_void());
             d->set_decl(id->get_decl());
             items.push_back(d);
+            id_idx++;
         }
+
+        init_idx++;
     }
 
     node->transmute_to_unscoped_group(ast.allocate_node_span(items));
