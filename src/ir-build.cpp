@@ -425,8 +425,37 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
             return;
         }
 
-        // with else
-        PANIC("not implemented");
+        visit_expr(data.cond, state, ctx);
+        auto cond = state.sstack_pop();
+
+        auto wt = state.new_empty_block(BlockOp::Jmp);
+        auto wf = state.new_empty_block(BlockOp::Jmp);
+        auto after = state.new_empty_block(BlockOp::Err);
+
+        // finish the current block using the branch op
+        state.close_into_pending_block(BlockOp::Branch, cond,
+                                       std::array{wt, wf});
+
+        // set the then branch as the current pending block
+        state.pending_block = wt;
+
+        // fill the then branch and finish it with a simple jump to after
+        visit_stmt(data.wt, state, ctx);
+        if (state.pending_block)
+            state.close_into_pending_block(BlockOp::Jmp, nullptr,
+                                           std::array{after});
+
+        // set the else branch as the current pending block
+        state.pending_block = wf;
+
+        // fill the else branch and finish it with a simple jump to after
+        visit_stmt(data.wf, state, ctx);
+        if (state.pending_block)
+            state.close_into_pending_block(BlockOp::Jmp, nullptr,
+                                           std::array{after});
+
+        // set after as the current block
+        state.pending_block = after;
         return;
     }
 
