@@ -430,6 +430,48 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::WhileStmt)) {
+        auto data = conv::while_stmt(*node);
+
+        // @cond
+        //     branch %cond, @begin, @after
+        // @begin
+        //     <body>
+        //     jmp @cond
+        // @after
+
+        // create a new block just for the condition
+        auto cond_block = state.new_empty_block(BlockOp::Jmp);
+        state.close_into_pending_block(BlockOp::Jmp, nullptr,
+                                       std::array{cond_block});
+
+        state.pending_block = cond_block;
+        visit_expr(data.cond, state, ctx);
+        auto cond = state.sstack_pop();
+
+        auto body = state.new_empty_block(BlockOp::Jmp);
+        auto after = state.new_empty_block(BlockOp::Err);
+
+        // mark that cond comes after the body branch
+        body->next = module.new_block_span(std::array{cond_block});
+
+        // finish the current block using a branch op, either into the body or
+        // after it
+        state.close_into_pending_block(BlockOp::Branch, cond,
+                                       std::array{body, after});
+
+        // set body branch as the current pending block
+        state.pending_block = body;
+
+        // fill the body and finish it with a simple jump back to cond
+        visit_stmt(data.body, state, ctx);
+        if (state.pending_block) state.close_into_pending_block_prepared();
+
+        // set after as the current block
+        state.pending_block = after;
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ReturnStmt)) {
         auto data = conv::unary(*node);
 
