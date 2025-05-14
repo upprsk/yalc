@@ -54,6 +54,13 @@ auto real_main(yalc::Args const& args) -> int {
         return 1;
     }
 
+    if (args.dont_lower && args.dump_ast_json) {
+        json j = *prj_root;
+        j["ds"] = *ast.get_decl_store();
+        fmt::println("{}", j.dump());
+        return 0;
+    }
+
     yal::lower::lower_ast(ast, prj_root, er, ts, opt);
     if (args.dump_ast_json) {
         json j = *prj_root;
