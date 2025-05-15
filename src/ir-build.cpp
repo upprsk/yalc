@@ -310,9 +310,30 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto data = conv::coerce(*node);
         visit_expr(data.child, state, ctx);
 
-        if (*data.target == *node->get_type()) return;
+        if (*data.target == *data.child->get_type()) return;
 
-        PANIC("not implemented");
+        auto arg = state.sstack_pop();
+
+        auto target = data.target;
+        auto source = data.child->get_type();
+        if (target->is_integral()) {
+            if (source->is_integral()) {
+                if (target->size() > source->size()) {
+                    auto type = create_ir_type_from_general(module, *target);
+                    auto inst = module.new_inst_ext(type, arg);
+                    state.add_and_push_inst(inst);
+                    return;
+                }
+
+                // TODO: when target is smaller
+            }
+
+            // TODO: when source is not an integer
+        }
+
+        // TODO: when target is not an integer
+
+        PANIC("not implemented", *target, *source);
         return;
     }
 

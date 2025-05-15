@@ -563,6 +563,10 @@ public:
         ASSERT(at < children.size());
         return children[at];
     }
+    [[nodiscard]] constexpr auto get_child_ptrref(size_t at) const -> Node *& {
+        ASSERT(at < children.size());
+        return children[at];
+    }
 
     // ------------------------------------------------------------------------
 

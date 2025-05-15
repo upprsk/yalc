@@ -40,7 +40,8 @@ void to_json(json& j, Node const& n) {
     };
 
     if (n.get_decl()) {
-        j["decl"] = n.get_decl()->uid;
+        j["decl"] =
+            fmt::format("[{}] {}", n.get_decl()->uid, n.get_decl()->full_name);
     }
 
     if (n.get_type()) {

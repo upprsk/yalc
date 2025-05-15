@@ -504,6 +504,35 @@ func test() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("casting");
+
+    run_test(ctx, p, "cast untyped to u8",
+             R"(
+module test;
+func test() {
+    var a = 10 as u8;
+}
+)");
+
+    run_test(ctx, p, "many casts on integers and pointers",
+             R"(
+module test;
+func test() {
+    var a = 10;
+    var b = a as u64;
+    var c = b as u8;
+
+    var d: [*]u8;
+    var e = d as usize as u32;
+    var f = e as usize as [*]const u16;
+
+    var g: *u32;
+    var h = g as *u16;
+    var i = (g as usize + 4) as [*]u32;
+}
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("while stmt");
 
     run_test(ctx, p, "minimal", R"(
@@ -581,6 +610,63 @@ func printf(fmt: [*]const u8, arg0: i32);
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("if stmt");
+
+    run_test(ctx, p, "if statement without else",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    if argc != 2 {
+        c_printf("usage: %s <name>\n".ptr, argv[0]);
+        return 1;
+    }
+
+    c_printf("Hello, %s!\n".ptr, argv[1]);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "if statement with else",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var i = 1;
+    while i < argc {
+        defer i = i + 1;
+        // c_printf("# %d: %s\n".ptr, i, argv[i]);
+
+        if streq(argv[i], "--help".ptr) {
+            c_printf("usage: %s [options]\n".ptr, argv[0]);
+            c_printf("options:\n".ptr);
+            c_printf("    --help: show this message\n".ptr);
+        }
+
+        else {
+            c_printf("error: unknown option '%s'\n".ptr, argv[i]);
+        }
+    }
+
+    return 0;
+}
+
+func streq(lhs: [*]const u8, rhs: [*]const u8) bool {
+    return c_strcmp(lhs, rhs) == 0;
+}
+
+@extern(link_name="strcmp")
+func c_strcmp(a: [*]const u8, b: [*]const u8) i32;
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("struct");
 
     run_test(ctx, p, "minimal", R"(
@@ -642,6 +728,74 @@ func test() {
     _ = s.b;
 }
 )");
+
+    ctx.tags.pop_back();
+    ctx.tags.emplace_back("methods and coercion");
+
+    run_test(ctx, p, "requires value and gets value", R"(
+module main;
+
+def S = struct { a: u32 };
+func S.print(s: S) {}
+func S.print_ptr(s: *S) {}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var s: S = .{ .a = 0 };
+    s.print();
+
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "requires value and gets mut pointer", R"(
+module main;
+
+def S = struct { a: u32 };
+func S.print(s: S) {}
+func S.print_ptr(s: *S) {}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var s: S = .{ .a = 0 };
+    var sp = &s;
+    sp.print();
+
+    return 0;
+}
+)",
+             true);
+
+    run_test(ctx, p, "requires const pointer and gets value", R"(
+module main;
+
+def S = struct { a: u32 };
+func S.print(s: S) {}
+func S.print_ptr(s: *S) {}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var s: S = .{ .a = 0 };
+    s.print_ptr();
+
+    return 0;
+}
+)",
+             true);
+
+    run_test(ctx, p, "requires const pointer and gets mut pointer", R"(
+module main;
+
+def S = struct { a: u32 };
+func S.print(s: S) {}
+func S.print_ptr(s: *S) {}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var s: S = .{ .a = 0 };
+    var sp = &s;
+    sp.print_ptr();
+
+    return 0;
+}
+)",
+             true);
 
     ctx.tags.pop_back();
     ctx.tags.emplace_back("defer");

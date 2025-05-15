@@ -1,0 +1,27 @@
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var i = 1;
+    while i < argc {
+        defer i = i + 1;
+        // c_printf("# %d: %s\n".ptr, i, argv[i]);
+
+        if streq(argv[i], "-h".ptr) or streq(argv[i], "--help".ptr) {
+            c_printf("usage: %s [options]\n".ptr, argv[0]);
+            c_printf("options:\n".ptr);
+            c_printf("    --help: show this message\n".ptr);
+        }
+
+        else {
+            c_printf("error: unknown option '%s'\n".ptr, argv[i]);
+        }
+    }
+
+    return 0;
+}
+
+func streq(lhs: [*]const u8, rhs: [*]const u8) bool {
+    return c_strcmp(lhs, rhs) == 0;
+}
+
+// vim: ft=yal

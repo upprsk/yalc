@@ -247,9 +247,40 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
         }
 
         else {
-            PANIC(
-                "automatic conversion on method calls have not been "
-                "implemented");
+            // the receiver is a pointer, but the expected value is not a
+            // pointer
+            if (receiver_type->is_ptr() && !first_type->is_ptr()) {
+                PANIC("not implemented: pointer receiver but value param",
+                      *receiver_type, *first_type);
+            }
+
+            // the receiver is a value, but the expected value is a pointer.
+            // Needs to take the address of the receiver
+            else if (!receiver_type->is_ptr() && first_type->is_ptr()) {
+                // TODO: need to check if the resulting pointer is const by
+                // checking for lvalues
+
+                // convert `a.print()` to
+                // print(&a)
+
+                // FIXME: just setting it to the receiver type may be a problem
+                // FIXME: need to set the receiving decl to be a stack-var
+                auto new_receiver = ast.new_unary_expr(
+                    receiver->get_loc(), ast::NodeKind::AddrOf, receiver);
+                new_receiver->set_type(receiver_type);
+
+                std::vector args{new_receiver};
+                std::ranges::copy(data.args, std::back_inserter(args));
+                node->transmute_to_call_direct(decl,
+                                               ast.allocate_node_span(args));
+                visit_children(ctx, node);
+            }
+
+            else {
+                PANIC(
+                    "automatic conversion on method calls have not been "
+                    "implemented");
+            }
         }
     }
 

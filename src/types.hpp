@@ -152,6 +152,10 @@ struct Type {
         }
     }
 
+    [[nodiscard]] constexpr auto is_size() const -> bool {
+        return kind == TypeKind::Usize || kind == TypeKind::Isize;
+    }
+
     [[nodiscard]] constexpr auto is_err() const -> bool {
         return kind == TypeKind::Err;
     }
@@ -203,6 +207,14 @@ struct Type {
 
     [[nodiscard]] constexpr auto is_mptr() const -> bool {
         return kind == TypeKind::MultiPtr || kind == TypeKind::MultiPtrConst;
+    }
+
+    [[nodiscard]] constexpr auto is_mptr_mut() const -> bool {
+        return kind == TypeKind::MultiPtr;
+    }
+
+    [[nodiscard]] constexpr auto is_mptr_const() const -> bool {
+        return kind == TypeKind::MultiPtrConst;
     }
 
     [[nodiscard]] constexpr auto is_distinct() const -> bool {
@@ -260,9 +272,15 @@ struct Type {
     [[nodiscard]] auto as_struct_get_fields() const
         -> std::unordered_map<std::string_view, Type*>;
 
-    [[nodiscard]] auto unwrapped() -> Type* {
+    [[nodiscard]] auto undistinct() -> Type* {
         auto t = this;
         while (t->is_distinct()) t = t->inner[0];
+        return t;
+    }
+
+    [[nodiscard]] auto unpacked() -> Type* {
+        auto t = this;
+        while (t->is_pack() && t->inner.size() == 1) t = t->inner[0];
         return t;
     }
 
@@ -493,9 +511,9 @@ public:
             std::array{params, ret});
     }
 
-    [[nodiscard]] auto new_distinct(Type* inner) -> Type* {
-        return new_type(TypeKind::Distinct, std::array{inner});
-    }
+    // [[nodiscard]] auto new_distinct(Type* inner) -> Type* {
+    //     return new_type(TypeKind::Distinct, std::array{inner});
+    // }
 
     [[nodiscard]] auto new_distinct_of(std::string_view id, Type* inner)
         -> Type* {
@@ -527,6 +545,11 @@ public:
         -> Decl*;
 
     auto new_bound_from(Type const* ty) -> Type*;
+
+    auto get_namespaced_functions() const -> std::unordered_map<
+        Type, std::unordered_map<std::string_view, Decl*>> const& {
+        return namespaced;
+    }
 
     // ========================================================================
 
