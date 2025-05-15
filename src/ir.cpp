@@ -75,7 +75,7 @@ void disasm_block(FILE* out, Block const& blk) {
             fmt::println(out, "    branch %{}, @{} @{}", blk.value->uid,
                          blk.next[0]->uid, blk.next[1]->uid);
             break;
-        default: UNREACHABLE("invalid block operation");
+        case BlockOp::Err: fmt::println(out, "    <ERROR>"); break;
     }
 }
 
