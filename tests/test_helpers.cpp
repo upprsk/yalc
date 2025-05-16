@@ -159,3 +159,33 @@ void handle_assertion(libassert::assertion_info const& info) {
 
     throw AssertionError{"Assertion failed"};
 }
+
+void print_test_results(std::string_view name, Context const& ctx) {
+    print_test_results(name, ctx.total(), ctx.ok, ctx.failed, ctx.skipped);
+}
+
+void print_test_results(std::string_view name, int total, int ok, int failed,
+                        int skipped) {
+    fmt::print("{} tests: {} total, ", name, total);
+
+    if (ok > 0)
+        fmt::print(fmt::fg(fmt::color::green), "{} success", ok);
+    else
+        fmt::print("{} success", ok);
+
+    fmt::print(", ");
+
+    if (failed > 0)
+        fmt::print(fmt::fg(fmt::color::red), "{} failed", failed);
+    else
+        fmt::print("{} failed", failed);
+
+    fmt::print(", ");
+
+    if (skipped > 0)
+        fmt::print(fmt::fg(fmt::color::orange), "{} skipped", skipped);
+    else
+        fmt::print("{} skipped", skipped);
+
+    fmt::println("");
+}

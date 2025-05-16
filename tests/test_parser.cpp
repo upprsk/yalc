@@ -42,16 +42,10 @@ auto gen_ast(std::string source) -> json {
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,
                      std::string source, bool skip = false) {
-    if (skip) {
-        fmt::print(fmt::bg(fmt::color::orange), "SKIP");
-        fmt::println(" '{}' skipped", name);
-        return;
-    }
-
-    run_checks_for_test(ctx, p, name, [&]() { return gen_ast(source); });
+    run_checks_for_test(ctx, p, name, skip, [&]() { return gen_ast(source); });
 }
 
-auto test_parser(TestParams const& p) -> std::pair<int, int> {
+auto test_parser(TestParams const& p) -> std::tuple<int, int, int> {
     Context ctx{.tags = {"parser"}, .filters = p.filters, .tests_ran = {}};
 
     fmt::println("==============================");
@@ -931,7 +925,6 @@ func main() {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
-    fmt::println("parser tests, {} tests, {} success, {} failed", ctx.total(),
-                 ctx.ok, ctx.failed);
-    return {ctx.ok, ctx.failed};
+    print_test_results("parser", ctx);
+    return {ctx.ok, ctx.failed, ctx.skipped};
 }

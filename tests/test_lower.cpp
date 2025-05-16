@@ -102,13 +102,7 @@ auto gen_ast_lowered_many(std::vector<std::string> sources) -> json {
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,
                      std::string source, bool skip = false) {
-    if (skip) {
-        fmt::print(fmt::bg(fmt::color::orange), "SKIP");
-        fmt::println(" '{}' skipped", name);
-        return;
-    }
-
-    run_checks_for_test(ctx, p, name,
+    run_checks_for_test(ctx, p, name, skip,
                         [&]() { return gen_ast_lowered(source); });
 }
 
@@ -120,11 +114,11 @@ static void run_test(Context& ctx, TestParams const& p, std::string name,
         return;
     }
 
-    run_checks_for_test(ctx, p, name,
+    run_checks_for_test(ctx, p, name, skip,
                         [&]() { return gen_ast_lowered_many(sources); });
 }
 
-auto test_lower(TestParams const& p) -> std::pair<int, int> {
+auto test_lower(TestParams const& p) -> std::tuple<int, int, int> {
     Context ctx{.tags = {"lower"}, .filters = p.filters, .tests_ran = {}};
 
     fmt::println("==============================");
@@ -301,7 +295,6 @@ func c_print_cstr(s: [*]const u8);
 
     ctx.tags.pop_back();
 
-    fmt::println("lower tests, {} tests, {} success, {} failed", ctx.total(),
-                 ctx.ok, ctx.failed);
-    return {ctx.ok, ctx.failed};
+    print_test_results("lower", ctx);
+    return {ctx.ok, ctx.failed, ctx.skipped};
 }

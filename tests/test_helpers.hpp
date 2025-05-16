@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <exception>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 #include "file-store.hpp"
@@ -19,13 +20,17 @@ struct Context {
 
     int failed{};
     int ok{};
+    int skipped{};
 
     void           mark_run(std::string name) { tests_ran.insert(name); }
     constexpr auto has_run(std::string const& name) const -> bool {
         return tests_ran.contains(name);
     }
 
-    [[nodiscard]] constexpr auto total() const -> int { return ok + failed; }
+    [[nodiscard]] constexpr auto total() const -> int {
+        return ok + failed + skipped;
+    }
+
     constexpr auto should_run(std::string const& name) const -> bool {
         if (filters.size() == 0 || filters.contains(name)) return true;
 
@@ -74,7 +79,15 @@ auto run_checks_for_test_output(Context& ctx, TestParams const& p,
 /// If the test had success, increments `ctx.ok`, otherwise, increments
 /// `ctx.failed`.
 inline void run_checks_for_test(Context& ctx, TestParams const& p,
-                                std::string name, auto&& get_output) {
+                                std::string name, bool skip,
+                                auto&& get_output) {
+    if (skip) {
+        fmt::print(fmt::bg(fmt::color::orange), "SKIP");
+        fmt::println(" '{}' skipped", name);
+        ctx.skipped++;
+        return;
+    }
+
     if (!ctx.should_run(name)) return;
 
     auto ok = false;
@@ -94,3 +107,7 @@ inline void run_checks_for_test(Context& ctx, TestParams const& p,
 
 /// Handler for libassert assertion failures.
 void handle_assertion(libassert::assertion_info const& info);
+
+void print_test_results(std::string_view name, Context const& ctx);
+void print_test_results(std::string_view name, int total, int ok, int failed,
+                        int skipped);

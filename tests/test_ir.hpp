@@ -2,4 +2,4 @@
 
 #include "test_helpers.hpp"
 
-auto test_ir(TestParams const& p) -> std::pair<int, int>;
+auto test_ir(TestParams const& p) -> std::tuple<int, int, int>;

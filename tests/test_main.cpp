@@ -100,6 +100,7 @@ auto real_main(Args args) -> int {
 
     int ok{};
     int failed{};
+    int skipped{};
 
     TestParams p{.filters = {},
                  .verbose = args.verbose,
@@ -109,42 +110,48 @@ auto real_main(Args args) -> int {
     for (auto const& s : args.filters) p.filters.insert(s);
 
     {
-        auto [tok, tfailed] = test_tokenizer(p);
+        auto [tok, tfailed, tskipped] = test_tokenizer(p);
         ok += tok;
         failed += tfailed;
+        skipped += tskipped;
     }
 
     {
-        auto [tok, tfailed] = test_parser(p);
+        auto [tok, tfailed, tskipped] = test_parser(p);
         ok += tok;
         failed += tfailed;
+        skipped += tskipped;
     }
 
     {
-        auto [tok, tfailed] = test_name_res(p);
+        auto [tok, tfailed, tskipped] = test_name_res(p);
         ok += tok;
         failed += tfailed;
+        skipped += tskipped;
     }
 
     {
-        auto [tok, tfailed] = test_sema(p);
+        auto [tok, tfailed, tskipped] = test_sema(p);
         ok += tok;
         failed += tfailed;
+        skipped += tskipped;
     }
 
     {
-        auto [tok, tfailed] = test_lower(p);
+        auto [tok, tfailed, tskipped] = test_lower(p);
         ok += tok;
         failed += tfailed;
+        skipped += tskipped;
     }
 
     {
-        auto [tok, tfailed] = test_ir(p);
+        auto [tok, tfailed, tskipped] = test_ir(p);
         ok += tok;
         failed += tfailed;
+        skipped += tskipped;
     }
 
-    fmt::println("{} tests, {} success, {} failed", ok + failed, ok, failed);
+    print_test_results("all", ok + failed + skipped, ok, failed, skipped);
     return failed > 0;
 }
 

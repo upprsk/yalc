@@ -33,11 +33,12 @@ auto gen_tokens(std::string source) -> json {
 }
 
 static void run_test(Context& ctx, TestParams const& p, std::string name,
-                     std::string source) {
-    run_checks_for_test(ctx, p, name, [&]() { return gen_tokens(source); });
+                     std::string source, bool skip = false) {
+    run_checks_for_test(ctx, p, name, skip,
+                        [&]() { return gen_tokens(source); });
 }
 
-auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
+auto test_tokenizer(TestParams const& p) -> std::tuple<int, int, int> {
     Context ctx{.tags = {"tokenizer"}, .filters = p.filters, .tests_ran = {}};
 
     fmt::println("==============================");
@@ -79,7 +80,6 @@ auto test_tokenizer(TestParams const& p) -> std::pair<int, int> {
     run_test(ctx, p, "shbang", R"(#!/usr/local/bin/yalc
 yay!)");
 
-    fmt::println("tokenizer tests, {} tests, {} success, {} failed",
-                 ctx.total(), ctx.ok, ctx.failed);
-    return {ctx.ok, ctx.failed};
+    print_test_results("tokenizer", ctx);
+    return {ctx.ok, ctx.failed, ctx.skipped};
 }
