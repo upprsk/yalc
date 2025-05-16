@@ -485,6 +485,77 @@ func main() {
              )",
              });
 
+    ctx.tags.emplace_back("from sema");
+
+    run_test(ctx, p, "requires value and gets value", R"(
+module main;
+
+def S = struct { a: u32 };
+func S.print(s: S) {}
+func S.print_ptr(s: *S) {}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var s: S = .{ .a = 0 };
+    s.print();
+
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "malloc and free",
+             std::vector<std::string>{
+                 R"(
+module main;
+
+func thingy() {
+    c_print_int(42);
+    defer c_print_int(420);
+
+    c_print_int(69);
+}
+
+@export
+func main() i32 {
+    var buf = c_malloc(256);
+    defer {
+        c_print_int(2);
+        c_free(buf);
+    }
+
+    c_print_int(0);
+    defer c_print_int(1);
+
+    {
+        thingy();
+
+        return 0;
+    }
+}
+)",
+                 R"(
+module main;
+
+@extern(link_name="print_int")
+func c_print_int(v: i32);
+
+@extern(link_name="print_str")
+func c_print_str(s: [*]const u8, len: i32);
+
+@extern(link_name="print_cstr")
+func c_print_cstr(s: [*]const u8);
+
+@extern(link_name="getchar")
+func c_getchar() i32;
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) [*]u8;
+
+@extern(link_name="free")
+func c_free(ptr: [*]u8);
+)",
+             });
+
+    ctx.tags.pop_back();
     ctx.tags.pop_back();
     ctx.tags.emplace_back("discarding names");
 
