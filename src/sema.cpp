@@ -1845,7 +1845,6 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                 }
 
                 sema_expr(ast, lhs_item, state, ctx);
-                fixup_untyped(ast, lhs_item->get_type(), rhs_item, state);
 
                 auto d = lhs_item->get_decl();
 
