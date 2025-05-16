@@ -1088,6 +1088,63 @@ func c_printf(fmt: [*]const u8, ...);
 )",
              });
 
+    run_test(ctx, p, "assign to mptr",
+             std::vector<std::string>{
+                 R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var n: usize = 4;
+    var arr = c_malloc(10 * n) as [*]i32;
+    defer c_free(arr);
+
+    var i = 0;
+    while i < n {
+        defer i = i + 1;
+
+        arr[i] = i * 2;
+    }
+
+    var i = 0;
+    while i < n {
+        defer i = i + 1;
+
+        c_printf("arr[%d] = %d\n".ptr, i, arr[i]);
+    }
+
+    return 0;
+}
+)",
+                 R"(
+module main;
+
+@extern(link_name="print_int")
+func c_print_int(v: i32);
+
+@extern(link_name="print_str")
+func c_print_str(s: [*]const u8, len: i32);
+
+@extern(link_name="print_cstr")
+func c_print_cstr(s: [*]const u8);
+
+@extern(link_name="getchar")
+func c_getchar() i32;
+
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) [*]u8;
+
+@extern(link_name="free")
+func c_free(ptr: [*]u8);
+
+@extern(link_name="exit")
+func c_exit(code: i32);
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)",
+             });
+
     ctx.tags.pop_back();
 
     print_test_results("sema", ctx);
