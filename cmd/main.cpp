@@ -7,7 +7,6 @@
 #include "argparser.hpp"
 #include "ast.hpp"
 #include "codegen/codegen_qbe.hpp"
-#include "compile/compile_qbe.hpp"
 #include "cpptrace/from_current.hpp"
 #include "error_reporter.hpp"
 #include "file-store.hpp"

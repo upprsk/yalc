@@ -11,8 +11,6 @@ add_library(yal
     ast.hpp
     codegen/codegen_qbe.cpp
     codegen/codegen_qbe.hpp
-    compile/compile_qbe.cpp
-    compile/compile_qbe.hpp
     decl-store.cpp
     decl-store.hpp
     error_reporter.cpp
