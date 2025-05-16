@@ -36,6 +36,9 @@ struct State {
         pending_insts.clear();
         blocks.clear();
         locals.clear();
+
+        module.reset_inst_uid_counter();
+        module.reset_block_uid_counter();
     }
 
     auto new_empty_block(BlockOp op) -> Block* {
