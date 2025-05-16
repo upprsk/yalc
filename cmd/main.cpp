@@ -37,7 +37,8 @@ auto real_main(yalc::Args const& args) -> int {
                             .single_file = args.single_file,
                             .dump_type_store = args.dump_type_store_json};
 
-    auto [ast, root] = yal::load_and_parse(fs, er, args.program, opt);
+    auto program = fs.add(args.program);
+    auto [ast, root] = yal::load_and_parse(fs, er, program, opt);
     if (!root) return 1;
 
     auto ts = yal::types::TypeStore{};

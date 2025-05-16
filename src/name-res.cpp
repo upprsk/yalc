@@ -36,15 +36,15 @@ namespace conv = ast::conv;
 
 namespace rv = std::ranges::views;
 
-auto parse_and_load_module_into_ast(std::filesystem::path const& filepath,
-                                    Node const& mod_decl, ast::Ast& ast,
-                                    FileStore& fs, ErrorReporter& er,
-                                    Options const& opt) -> Node* {
-    auto src_file = load_and_parse_into_ast(fs, er, filepath, ast, opt);
+auto parse_and_load_module_into_ast(FileId fileid, Node const& mod_decl,
+                                    ast::Ast& ast, FileStore& fs,
+                                    ErrorReporter& er, Options const& opt)
+    -> Node* {
+    auto src_file = load_and_parse_into_ast(fs, er, fileid, ast, opt);
     if (!src_file) {
         er.report_bug(mod_decl.get_loc(),
                       "when scanning for module files, failed to get {}",
-                      filepath.string());
+                      fs.get_filename(fileid));
         return nullptr;
     }
 
@@ -91,9 +91,8 @@ auto parse_all_files_into_module(ast::Ast& ast, ast::Node& start_node,
         // don't re-parse ourselves
         if (start_file == file) continue;
 
-        // FIXME: use the file id and not the filename for this function
-        auto src_file = parse_and_load_module_into_ast(
-            fs.get_filename(file), mod_decl, ast, fs, er, opt);
+        auto src_file =
+            parse_and_load_module_into_ast(file, mod_decl, ast, fs, er, opt);
         if (src_file) files.push_back(src_file);
     }
 

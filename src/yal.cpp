@@ -7,19 +7,11 @@
 
 namespace yal {
 
-auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
-                             std::filesystem::path filepath, ast::Ast& dst_ast,
-                             Options const& opt) -> ast::Node* {
-    auto fileid = fs.add(filepath);
-    if (!fileid.is_valid()) {
-        fmt::println(stderr, "error: failed to open/read {}",
-                     filepath.string());
-
-        return nullptr;
-    }
-
+auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er, FileId fileid,
+                             ast::Ast& dst_ast, Options const& opt)
+    -> ast::Node* {
     auto erf = er.for_file(fileid);
-    auto tokens = tokenize(erf.get_source(), erf);
+    auto tokens = tokenize(fs.get_contents(fileid), erf);
     er.update_error_count(erf);
 
     if (opt.dump_tokens) {
@@ -48,11 +40,10 @@ auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
     return file_root;
 }
 
-auto load_and_parse(FileStore& fs, ErrorReporter& er,
-                    std::filesystem::path filepath, Options const& opt)
-    -> std::pair<ast::Ast, ast::Node*> {
+auto load_and_parse(FileStore& fs, ErrorReporter& er, FileId fileid,
+                    Options const& opt) -> std::pair<ast::Ast, ast::Node*> {
     ast::Ast ast;
-    auto     root = load_and_parse_into_ast(fs, er, filepath, ast, opt);
+    auto     root = load_and_parse_into_ast(fs, er, fileid, ast, opt);
     return std::make_pair(std::move(ast), root);
 }
 

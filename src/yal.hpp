@@ -20,12 +20,11 @@ struct Options {
     bool verbose_ir_build = true;
 };
 
-auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er,
-                             std::filesystem::path filepath, ast::Ast& dst_ast,
-                             Options const& opt) -> ast::Node*;
+auto load_and_parse_into_ast(FileStore& fs, ErrorReporter& er, FileId fileid,
+                             ast::Ast& dst_ast, Options const& opt)
+    -> ast::Node*;
 
-auto load_and_parse(FileStore& fs, ErrorReporter& er,
-                    std::filesystem::path filepath, Options const& opt)
-    -> std::pair<ast::Ast, ast::Node*>;
+auto load_and_parse(FileStore& fs, ErrorReporter& er, FileId fileid,
+                    Options const& opt) -> std::pair<ast::Ast, ast::Node*>;
 
 }  // namespace yal
