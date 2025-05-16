@@ -1,28 +1,19 @@
 module main;
 
-func thingy() {
-    c_print_int(42);
-    defer c_print_int(420);
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var x = 33 + 36;
+    var y = 400 + 20;
 
-    c_print_int(69);
-}
+    var p = &x;
+    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
 
-@export
-func main() i32 {
-    var buf = c_malloc(256);
-    defer {
-        c_print_int(2);
-        c_free(buf);
-    }
+    p = &y;
+    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
 
-    c_print_int(0);
-    defer c_print_int(1);
+    p.* = 42;
+    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
 
-    {
-        thingy();
-
-        return 0;
-    }
+    return 0;
 }
 
 // vim: ft=yal

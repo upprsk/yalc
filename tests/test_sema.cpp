@@ -503,6 +503,78 @@ func test() {
 }
 )");
 
+    run_test(ctx, p, "assign to pointer",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var x = 0;
+    var y = &x;
+    c_printf("x=%d, y=%d\n".ptr, x, y.*);
+
+    x = 10;
+    c_printf("x=%d, y=%d\n".ptr, x, y.*);
+
+    y.* = 35 + 34;
+    c_printf("x=%d, y=%d\n".ptr, x, y.*);
+
+    return y.*;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "assign to pointer 2",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var x = 0;
+    var y = &x;
+    var z = y;
+    c_printf("x=%d, y=%d, z=%d\n".ptr, x, y.*, z.*);
+
+    x = 10;
+    c_printf("x=%d, y=%d, z=%d\n".ptr, x, y.*, z.*);
+
+    y.* = 35 + 34;
+    c_printf("x=%d, y=%d, z=%d\n".ptr, x, y.*, z.*);
+
+    z.* = 11;
+    c_printf("x=%d, y=%d, z=%d\n".ptr, x, y.*, z.*);
+
+    return y.*;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "assign to pointer 3",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var x = 33 + 36;
+    var y = 400 + 20;
+
+    var p = &x;
+    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
+
+    p = &y;
+    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
+
+    p.* = 42;
+    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("pointers");
 
