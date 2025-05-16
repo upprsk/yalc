@@ -225,6 +225,10 @@ struct Type {
         return kind == TypeKind::MultiPtrConst;
     }
 
+    [[nodiscard]] constexpr auto is_const_ref() const -> bool {
+        return is_ptr_const() || is_mptr_const();
+    }
+
     [[nodiscard]] constexpr auto is_distinct() const -> bool {
         return kind == TypeKind::Distinct;
     }

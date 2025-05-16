@@ -158,6 +158,47 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
 // ============================================================================
 
+void build_expr(Node* node, State& state, Context& ctx);
+
+// source expression value comes from the stack (a POP)
+void build_cast(types::Type* target, types::Type* source, State& state) {
+    auto& module = state.module;
+
+    target = target->unpacked();
+    source = source->unpacked();
+
+    if (*target == *source) return;
+    auto arg = state.sstack_pop();
+
+    if (target->is_integral()) {
+        if (source->is_integral()) {
+            if (target->size() > source->size()) {
+                auto type = create_ir_type_from_general(module, *target);
+                auto inst = module.new_inst_ext(type, arg);
+                state.add_and_push_inst(inst);
+                return;
+            }
+
+            // TODO: when target is smaller
+        }
+
+        // TODO: when source is not an integer
+    }
+
+    else if (target->is_ptr() || target->is_mptr()) {
+        // if both sides are pointers, at the IR level there is not
+        // difference, push the inst back in the stack
+        if (source->is_ptr() || source->is_mptr()) {
+            state.sstack_push(arg);
+            return;
+        }
+    }
+
+    // TODO: when target is not an integer or pointer
+
+    PANIC("not implemented", *target, *source);
+}
+
 void build_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto local = state.get_local(node->get_decl());
@@ -167,6 +208,41 @@ void build_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
     else {
         UNREACHABLE("invalid l-value", node->get_kind());
     }
+}
+
+auto build_index_ptr(Node* node, State& state, Context& ctx)
+    -> std::pair<Inst*, Type*> {
+    auto& module = state.module;
+
+    auto data = conv::index(*node);
+    build_expr(data.receiver, state, ctx);
+    build_expr(data.index, state, ctx);
+
+    auto type = create_ir_type_from_general(module, *node->get_type());
+
+    auto index = state.sstack_pop();
+    auto receiver = state.sstack_pop();
+
+    // in case the index type is smaller then the pointer size, we need to
+    // extend it
+    if (index->type->size() < module.get_type_isize()->size()) {
+        index = module.new_inst_ext(module.get_type_isize(), index);
+        state.add_inst(index);
+    }
+
+    // receiver + (index * sizeof(*receiver))
+    auto inst_sizeof_receiver =
+        module.new_inst_int_const(index->type, receiver->type->size());
+    auto inst_index_mult = module.new_inst_arith(OpCode::Mul, index->type,
+                                                 index, inst_sizeof_receiver);
+    auto ptr = module.new_inst_arith(OpCode::Add, receiver->type, receiver,
+                                     inst_index_mult);
+
+    state.add_inst(inst_sizeof_receiver);
+    state.add_inst(inst_index_mult);
+    state.add_inst(ptr);
+
+    return {ptr, type};
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -237,34 +313,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Index)) {
-        auto data = conv::index(*node);
-        build_expr(data.receiver, state, ctx);
-        build_expr(data.index, state, ctx);
+        auto [ptr, type] = build_index_ptr(node, state, ctx);
 
-        auto type = create_ir_type_from_general(module, *node->get_type());
-
-        auto index = state.sstack_pop();
-        auto receiver = state.sstack_pop();
-
-        // in case the index type is smaller then the pointer size, we need to
-        // extend it
-        if (index->type->size() < module.get_type_isize()->size()) {
-            index = module.new_inst_ext(module.get_type_isize(), index);
-            state.add_inst(index);
-        }
-
-        // receiver + (index * sizeof(*receiver))
-        auto inst_sizeof_receiver =
-            module.new_inst_int_const(index->type, receiver->type->size());
-        auto inst_index_mult = module.new_inst_arith(
-            OpCode::Mul, index->type, index, inst_sizeof_receiver);
-        auto ptr = module.new_inst_arith(OpCode::Add, receiver->type, receiver,
-                                         inst_index_mult);
         auto inst = module.new_inst_load(type, ptr);
-
-        state.add_inst(inst_sizeof_receiver);
-        state.add_inst(inst_index_mult);
-        state.add_inst(ptr);
         state.add_and_push_inst(inst);
         return;
     }
@@ -364,30 +415,15 @@ void build_expr(Node* node, State& state, Context& ctx) {
         auto data = conv::coerce(*node);
         build_expr(data.child, state, ctx);
 
-        if (*data.target == *data.child->get_type()) return;
+        build_cast(data.target, data.child->get_type(), state);
+        return;
+    }
 
-        auto arg = state.sstack_pop();
+    if (node->is_oneof(ast::NodeKind::Cast)) {
+        auto data = conv::binary(*node);
+        build_expr(data.lhs, state, ctx);
 
-        auto target = data.target;
-        auto source = data.child->get_type();
-        if (target->is_integral()) {
-            if (source->is_integral()) {
-                if (target->size() > source->size()) {
-                    auto type = create_ir_type_from_general(module, *target);
-                    auto inst = module.new_inst_ext(type, arg);
-                    state.add_and_push_inst(inst);
-                    return;
-                }
-
-                // TODO: when target is smaller
-            }
-
-            // TODO: when source is not an integer
-        }
-
-        // TODO: when target is not an integer
-
-        PANIC("not implemented", *target, *source);
+        build_cast(node->get_type(), data.lhs->get_type(), state);
         return;
     }
 
@@ -480,14 +516,15 @@ void build_stmt(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::AssignDirect)) {
         auto data = conv::assign(*node);
+        auto assign_lhs = data.lhs;
 
-        if (data.lhs->is_oneof(ast::NodeKind::Id)) {
-            auto lhs = state.get_local(conv::id(*data.lhs).to);
+        if (assign_lhs->is_oneof(ast::NodeKind::Id)) {
+            auto lhs = state.get_local(conv::id(*assign_lhs).to);
 
             build_expr(data.rhs, state, ctx);
             auto rhs = state.sstack_pop();
 
-            auto d = data.lhs->get_decl();
+            auto d = assign_lhs->get_decl();
 
             // target is a stack variable, need to use a store
             if (d->is_stack_var()) {
@@ -502,8 +539,8 @@ void build_stmt(Node* node, State& state, Context& ctx) {
             }
         }
 
-        else if (data.lhs->is_oneof(ast::NodeKind::Deref)) {
-            build_expr_lvalue(conv::unary(*data.lhs).child, state, ctx);
+        else if (assign_lhs->is_oneof(ast::NodeKind::Deref)) {
+            build_expr_lvalue(conv::unary(*assign_lhs).child, state, ctx);
             build_expr(data.rhs, state, ctx);
 
             auto rhs = state.sstack_pop();
@@ -514,8 +551,19 @@ void build_stmt(Node* node, State& state, Context& ctx) {
             state.add_inst(inst);
         }
 
+        else if (assign_lhs->is_oneof(ast::NodeKind::Index)) {
+            auto [ptr, type] = build_index_ptr(assign_lhs, state, ctx);
+            build_expr(data.rhs, state, ctx);
+
+            auto rhs = state.sstack_pop();
+            ASSERT(*rhs->type == *type);
+
+            auto inst = module.new_inst_store(ptr, rhs);
+            state.add_inst(inst);
+        }
+
         else {
-            UNREACHABLE("invalid lhs in AssignDirect", data.lhs->get_kind());
+            UNREACHABLE("invalid lhs in AssignDirect", assign_lhs->get_kind());
         }
 
         return;

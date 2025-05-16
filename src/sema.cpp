@@ -1891,13 +1891,41 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                 auto inner_type = inner->get_type();
                 ASSERT(inner_type->is_ptr());
 
-                if (inner_type->is_ptr_const()) {
+                if (inner_type->is_const_ref()) {
                     er.report_error(
                         lhs_item->get_loc(),
                         "can not assign to constant value of type {}",
                         *lhs_item->get_type());
                     er.report_note(inner->get_loc(),
                                    "dereferenced pointer has type {}",
+                                   *inner_type);
+                }
+
+                coerce_types_and_fixup_untyped(ast, lhs_item->get_type(),
+                                               rhs_item->get_type(), lhs_item,
+                                               rhs_item, state);
+            }
+
+            else if (lhs_item->is_oneof(ast::NodeKind::Index)) {
+                sema_expr(ast, lhs_item, state, ctx);
+
+                auto inner = conv::index(*lhs_item).receiver;
+                auto inner_type = inner->get_type();
+
+                // FIXME: when we have slices and such this will need to be
+                // expanded
+                ASSERT(inner_type->is_mptr());
+
+                if (inner_type->is_const_ref()) {
+                    er.report_error(
+                        lhs_item->get_loc(),
+                        "can not assign to constant value of type {}",
+                        *lhs_item->get_type());
+
+                    // FIXME: when we have other indexables we need to update
+                    // this message
+                    er.report_note(inner->get_loc(),
+                                   "multi-pointer inner element has type {}",
                                    *inner_type);
                 }
 
