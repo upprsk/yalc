@@ -52,7 +52,7 @@ auto gen_ast_resolved_many(std::vector<std::string> sources) -> json {
     auto fs = yal::FileStore{};
     auto er = yal::ErrorReporter{fs, ms.f};
 
-    std::unordered_set<yal::FileId> filenames;
+    std::set<yal::FileId> filenames;
     for (uint32_t idx = 0; auto const& source : sources) {
         filenames.insert(fs.add(fmt::format(":memory-{}:", idx), source));
         idx++;
