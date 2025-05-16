@@ -1,1 +1,1 @@
-{"stdout":"func \"main_id\"(%0: i32) i32 {\n@0\n    ret %0\n}\nexport func \"main\"() i32 {\n@1\n    %1 = IntConst<i32> 68\n    %2 = Copy<i32> %1\n    %3 = Call<i32> main_id(%2)\n    ret %3\n}\n"}
+{"stdout":"func \"main_id\"(%0: i32) i32 {\n@0\n    ret %0\n}\nexport func \"main\"() i32 {\n@0\n    %0 = IntConst<i32> 68\n    %1 = Copy<i32> %0\n    %2 = Call<i32> main_id(%1)\n    ret %2\n}\n"}

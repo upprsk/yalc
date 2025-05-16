@@ -587,6 +587,56 @@ func test() {
 }
 )");
 
+    run_test(ctx, p, "swap integers",
+             R"(
+module main;
+
+func swap(lhs: *i32, rhs: *i32) {
+    var tmp = lhs.*;
+    lhs.* = rhs.*;
+    rhs.* = tmp;
+}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var x = 33 + 36;
+    var y = 400 + 20;
+
+    c_printf("x=%d, y=%d\n".ptr, x, y);
+    swap(&x, &y);
+
+    c_printf("x=%d, y=%d\n".ptr, x, y);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    run_test(ctx, p, "swap integers 2",
+             R"(
+module main;
+
+func swap(lhs: *i32, rhs: *i32) {
+    lhs.*, rhs.* = rhs.*, lhs.*;
+}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var x = 33 + 36;
+    var y = 400 + 20;
+
+    c_printf("x=%d, y=%d\n".ptr, x, y);
+    swap(&x, &y);
+
+    c_printf("x=%d, y=%d\n".ptr, x, y);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("casting");
 

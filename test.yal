@@ -1,17 +1,17 @@
 module main;
 
+func swap(lhs: *i32, rhs: *i32) {
+    lhs.*, rhs.* = rhs.*, lhs.*;
+}
+
 func main(argc: i32, argv: [*][*]u8) i32 {
     var x = 33 + 36;
     var y = 400 + 20;
 
-    var p = &x;
-    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
+    c_printf("x=%d, y=%d\n".ptr, x, y);
+    swap(&x, &y);
 
-    p = &y;
-    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
-
-    p.* = 42;
-    c_printf("x=%d, y=%d, p=%d @ %p\n".ptr, x, y, p.*, p);
+    c_printf("x=%d, y=%d\n".ptr, x, y);
 
     return 0;
 }
