@@ -156,6 +156,11 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         inst->get_arg(0)->uid);
             } break;
 
+            case ir::OpCode::Copy:
+                println(out, "    %l{} ={} copy %l{}", inst->uid,
+                        to_qbe_temp(*inst->type), inst->get_arg(0)->uid);
+                break;
+
             case ir::OpCode::Alloca: {
                 auto align = inst->value_2;
                 println(out, "    %l{} ={} alloc{} {}", inst->uid,
@@ -189,7 +194,9 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
 
             case ir::OpCode::Store: {
                 std::string_view op;
-                switch (inst->type->kind) {
+
+                // use rhs type as the type to store
+                switch (inst->get_arg(1)->type->kind) {
                     case ir::TypeKind::Uint64:
                     case ir::TypeKind::Int64: op = "storel"; break;
                     case ir::TypeKind::Uint32:

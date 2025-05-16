@@ -205,6 +205,14 @@ struct Type {
         return kind == TypeKind::Ptr || kind == TypeKind::PtrConst;
     }
 
+    [[nodiscard]] constexpr auto is_ptr_mut() const -> bool {
+        return kind == TypeKind::Ptr;
+    }
+
+    [[nodiscard]] constexpr auto is_ptr_const() const -> bool {
+        return kind == TypeKind::PtrConst;
+    }
+
     [[nodiscard]] constexpr auto is_mptr() const -> bool {
         return kind == TypeKind::MultiPtr || kind == TypeKind::MultiPtrConst;
     }

@@ -116,6 +116,7 @@ enum class OpCode : uint16_t {
     StrConst,
     Param,
 
+    Copy,
     Alloca,
 
     Call,
@@ -281,6 +282,10 @@ public:
         return new_inst(OpCode::Param, type, {}, std::span<Inst*>{});
     }
 
+    [[nodiscard]] auto new_inst_copy(Type* type, Inst* src) -> Inst* {
+        return new_inst(OpCode::Copy, type, {}, src);
+    }
+
     [[nodiscard]] auto new_inst_alloca(Type* type, uint16_t align, size_t size)
         -> Inst* {
         return new_inst(OpCode::Alloca, align, type, size, std::span<Inst*>{});
@@ -307,9 +312,8 @@ public:
     }
 
     // NOTE: `type` should be the resulting type of the dereference
-    [[nodiscard]] auto new_inst_store(Type* type, Inst* ptr, Inst* value)
-        -> Inst* {
-        return new_inst(OpCode::Store, type, {}, std::array{ptr, value});
+    [[nodiscard]] auto new_inst_store(Inst* ptr, Inst* value) -> Inst* {
+        return new_inst(OpCode::Store, nullptr, {}, std::array{ptr, value});
     }
 
     [[nodiscard]] auto new_inst_ext(Type* type, Inst* src) -> Inst* {
@@ -480,6 +484,7 @@ constexpr auto format_as(OpCode op) {
         case OpCode::IntConst: name = "IntConst"; break;
         case OpCode::StrConst: name = "StrConst"; break;
         case OpCode::Param: name = "Param"; break;
+        case OpCode::Copy: name = "Copy"; break;
         case OpCode::Alloca: name = "Alloca"; break;
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;

@@ -155,6 +155,17 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
 // ============================================================================
 
+void visit_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        auto local = state.get_local(node->get_decl());
+        state.sstack_push(local);
+    }
+
+    else {
+        UNREACHABLE("invalid l-value", node->get_kind());
+    }
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void visit_expr(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
@@ -256,10 +267,19 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Id)) {
+        auto d = node->get_decl();
         auto local = state.get_local(node->get_decl());
 
-        // state.add_and_push_inst(inst);
-        state.sstack_push(local);
+        if (d->is_stack_var()) {
+            ASSERT(local->type->is_ptr());
+
+            auto type = create_ir_type_from_general(module, *node->get_type());
+            auto inst = module.new_inst_load(type, local);
+            state.add_and_push_inst(inst);
+        } else {
+            state.sstack_push(local);
+        }
+
         return;
     }
 
@@ -412,6 +432,8 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         auto init = state.sstack_pop();
         auto d = node->get_decl();
+
+        // this variable must be stored in the stack
         if (d->is_stack_var()) {
             auto type = create_ir_type_from_general(module, *d->get_type());
             ASSERT(*init->type == *type);
@@ -419,15 +441,22 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
             auto alloc =
                 module.new_inst_alloca(module.new_type(TypeKind::Ptr),
                                        type->alignment(), type->size());
-            auto store = module.new_inst_store(type, alloc, init);
+            auto store = module.new_inst_store(alloc, init);
 
             state.add_inst(alloc);
             state.add_inst(store);
 
-            init = alloc;
+            state.add_local(d, alloc);
         }
 
-        state.add_local(d, init);
+        // this can just use a temporary
+        else {
+            auto inst = module.new_inst_copy(init->type, init);
+            state.add_inst(inst);
+
+            state.add_local(d, inst);
+        }
+
         return;
     }
 
@@ -448,13 +477,44 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::AssignDirect)) {
         auto data = conv::assign(*node);
-        auto lhs = state.get_local(conv::id(*data.lhs).to);
 
-        visit_expr(data.rhs, state, ctx);
-        auto rhs = state.sstack_pop();
+        if (data.lhs->is_oneof(ast::NodeKind::Id)) {
+            auto lhs = state.get_local(conv::id(*data.lhs).to);
 
-        auto inst = module.new_inst_settmp(lhs, rhs);
-        state.add_inst(inst);
+            visit_expr(data.rhs, state, ctx);
+            auto rhs = state.sstack_pop();
+
+            auto d = data.lhs->get_decl();
+
+            // target is a stack variable, need to use a store
+            if (d->is_stack_var()) {
+                auto inst = module.new_inst_store(lhs, rhs);
+                state.add_inst(inst);
+            }
+
+            // target is in a temporary, just set it
+            else {
+                auto inst = module.new_inst_settmp(lhs, rhs);
+                state.add_inst(inst);
+            }
+        }
+
+        else if (data.lhs->is_oneof(ast::NodeKind::Deref)) {
+            visit_expr_lvalue(conv::unary(*data.lhs).child, state, ctx);
+            visit_expr(data.rhs, state, ctx);
+
+            auto rhs = state.sstack_pop();
+            auto lhs = state.sstack_pop();
+            ASSERT(lhs->type->is_ptr(), *lhs->type);
+
+            auto inst = module.new_inst_store(lhs, rhs);
+            state.add_inst(inst);
+        }
+
+        else {
+            UNREACHABLE("invalid lhs in AssignDirect", data.lhs->get_kind());
+        }
+
         return;
     }
 

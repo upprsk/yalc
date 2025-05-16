@@ -87,6 +87,7 @@ struct Context {
 void fixup_untyped(Ast& ast, types::Type* desired_type, Node* node,
                    State& state) {
     if (node == nullptr) return;
+    if (desired_type->is_err()) return;  // nothing we can do
 
     auto& ts = *state.ts;
 
@@ -519,19 +520,39 @@ auto coerce_types(types::Type* target, types::Type* source, Node* target_node,
             // NOTE: could return target type here to avoid further ghost errors
             return {ts.get_error(), CoerceResult::Direct};
         }
-
-        er.report_error(source_node->get_loc(),
-                        "can not use value of type {} where {} is expected",
-                        *source, *target);
-        if (target_node != nullptr) {
-            er.report_note(target_node->get_loc(), "this requires {}", *target);
-        }
-
-        // NOTE: could return target type here to avoid further ghost errors
-        return {ts.get_error(), CoerceResult::Direct};
     }
 
-    PANIC("not implemented (coercion)", *target, *source);
+    if (target->is_ptr()) {
+        if (target->is_ptr_mut() && source->is_ptr_mut())
+            return {target, CoerceResult::Direct};
+        if (target->is_ptr_const() && source->is_ptr_mut())
+            return {target, CoerceResult::Direct};
+        if (target->is_ptr_const() && source->is_ptr_const())
+            return {target, CoerceResult::Direct};
+        if (target->is_ptr_mut() && source->is_ptr_mut()) {
+            er.report_error(
+                source_node->get_loc(),
+                "can not implicitly cast away constness of {} to {}", *source,
+                *target);
+            if (target_node != nullptr) {
+                er.report_note(target_node->get_loc(),
+                               "this requires mutable {}", *target);
+            }
+
+            // NOTE: could return target type here to avoid further ghost errors
+            return {ts.get_error(), CoerceResult::Direct};
+        }
+    }
+
+    er.report_error(source_node->get_loc(),
+                    "can not use value of type {} where {} is expected",
+                    *source, *target);
+    if (target_node != nullptr) {
+        er.report_note(target_node->get_loc(), "this requires {}", *target);
+    }
+
+    // NOTE: could return target type here to avoid further ghost errors
+    return {ts.get_error(), CoerceResult::Direct};
 }
 
 auto coerce_types_and_magic(Ast& ast, types::Type* target, types::Type* source,
@@ -1847,18 +1868,51 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                 sema_expr(ast, lhs_item, state, ctx);
 
                 auto d = lhs_item->get_decl();
+                if (d->is_const()) {
+                    er.report_error(
+                        lhs_item->get_loc(),
+                        "can not assign to constant value of type {}",
+                        *lhs_item->get_type());
+                    if (d->node) {
+                        er.report_note(d->node->get_loc(), "defined here");
+                    }
+                }
 
                 // NOTE: do we need to use `get_children_ptrref`?
                 coerce_types_and_fixup_untyped(ast, d->get_type(),
                                                rhs_item->get_type(), lhs_item,
                                                rhs_item, state);
+            }
 
-                lhs_idx++;
+            else if (lhs_item->is_oneof(ast::NodeKind::Deref)) {
+                sema_expr(ast, lhs_item, state, ctx);
+
+                auto inner = conv::unary(*lhs_item).child;
+                auto inner_type = inner->get_type();
+                ASSERT(inner_type->is_ptr());
+
+                if (inner_type->is_ptr_const()) {
+                    er.report_error(
+                        lhs_item->get_loc(),
+                        "can not assign to constant value of type {}",
+                        *lhs_item->get_type());
+                    er.report_note(inner->get_loc(),
+                                   "dereferenced pointer has type {}",
+                                   *inner_type);
+                }
+
+                coerce_types_and_fixup_untyped(ast, lhs_item->get_type(),
+                                               rhs_item->get_type(), lhs_item,
+                                               rhs_item, state);
             }
 
             else {
-                PANIC("not implemented", lhs_item->get_kind());
+                er.report_error(lhs_item->get_loc(),
+                                "can not assign to r-value expression {}",
+                                lhs_item->get_kind());
             }
+
+            lhs_idx++;
         }
     }
 
