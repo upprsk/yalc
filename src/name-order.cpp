@@ -1,6 +1,7 @@
 #include "name-order.hpp"
 
 #include <ranges>
+#include <set>
 #include <string_view>
 
 #include "ast-node-conv.hpp"
@@ -16,7 +17,7 @@ using ast::Ast;
 using ast::Node;
 namespace conv = ast::conv;
 
-using Dag = std::unordered_map<Node*, std::unordered_set<Node*>>;
+using Dag = std::unordered_map<Node*, std::set<Node*>>;
 using TopMap = std::unordered_map<std::string_view, Node*>;
 
 struct TopoSorter {
