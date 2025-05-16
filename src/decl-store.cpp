@@ -79,8 +79,8 @@ auto fmt::formatter<yal::DeclFlags>::format(yal::DeclFlags  flags,
     if (flags.has_extern()) fmt::format_to(ctx.out(), "extern,");
     if (flags.has_private()) fmt::format_to(ctx.out(), "private,");
     if (flags.has_private_file()) fmt::format_to(ctx.out(), "private_file,");
-    if (flags.has_export()) fmt::format_to(ctx.out(), "export");
-    if (flags.has_stack_var()) fmt::format_to(ctx.out(), "stack_var");
+    if (flags.has_export()) fmt::format_to(ctx.out(), "export,");
+    if (flags.has_stack_var()) fmt::format_to(ctx.out(), "stack_var,");
 
     return fmt::format_to(ctx.out(), ")");
 }
