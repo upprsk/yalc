@@ -158,7 +158,7 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
 // ============================================================================
 
-void visit_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
+void build_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto local = state.get_local(node->get_decl());
         state.sstack_push(local);
@@ -170,7 +170,7 @@ void visit_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_expr(Node* node, State& state, Context& ctx) {
+void build_expr(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
 
     if (node->is_oneof(ast::NodeKind::ExprPack)) {
@@ -181,7 +181,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
             PANIC("not implemented");
         }
 
-        visit_expr(data.items[0], state, ctx);
+        build_expr(data.items[0], state, ctx);
         return;
     }
 
@@ -225,7 +225,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Deref)) {
         auto data = conv::unary(*node);
-        visit_expr(data.child, state, ctx);
+        build_expr(data.child, state, ctx);
 
         auto ptr = state.sstack_pop();
         ASSERT(ptr->type->is_ptr());
@@ -238,8 +238,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Index)) {
         auto data = conv::index(*node);
-        visit_expr(data.receiver, state, ctx);
-        visit_expr(data.index, state, ctx);
+        build_expr(data.receiver, state, ctx);
+        build_expr(data.index, state, ctx);
 
         auto type = create_ir_type_from_general(module, *node->get_type());
 
@@ -290,7 +290,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         auto data = conv::call_direct(*node);
         auto ty = node->get_type();
 
-        for (auto arg : data.args) visit_expr(arg, state, ctx);
+        for (auto arg : data.args) build_expr(arg, state, ctx);
 
         std::vector<Inst*> args;
         for (size_t i = 0; i < data.args.size(); i++)
@@ -323,8 +323,8 @@ void visit_expr(Node* node, State& state, Context& ctx) {
                        ast::NodeKind::Less, ast::NodeKind::LessEqual,
                        ast::NodeKind::Greater, ast::NodeKind::GreaterEqual)) {
         auto data = conv::binary(*node);
-        visit_expr(data.lhs, state, ctx);
-        visit_expr(data.rhs, state, ctx);
+        build_expr(data.lhs, state, ctx);
+        build_expr(data.rhs, state, ctx);
         auto rhs = state.sstack_pop();
         auto lhs = state.sstack_pop();
 
@@ -362,7 +362,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Coerce)) {
         auto data = conv::coerce(*node);
-        visit_expr(data.child, state, ctx);
+        build_expr(data.child, state, ctx);
 
         if (*data.target == *data.child->get_type()) return;
 
@@ -398,7 +398,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
 // ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void visit_stmt(Node* node, State& state, Context& ctx) {
+void build_stmt(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
 
     // auto& ts = *state.ts;
@@ -411,10 +411,10 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         std::vector<Node*> defers;
         auto               sctx = ctx.with_defers(defers);
 
-        for (auto item : data.items) visit_stmt(item, state, sctx);
+        for (auto item : data.items) build_stmt(item, state, sctx);
 
         for (auto d : rv::reverse(defers)) {
-            visit_stmt(d, state, sctx);
+            build_stmt(d, state, sctx);
         }
 
         auto ending = state.shadow_stack.size();
@@ -424,14 +424,14 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::UnscopedGroup)) {
         auto data = conv::unscoped_group(*node);
-        for (auto item : data.items) visit_stmt(item, state, ctx);
+        for (auto item : data.items) build_stmt(item, state, ctx);
         return;
     }
 
     if (node->is_oneof(ast::NodeKind::DeclLocalVarDirect)) {
         auto data = conv::decl_local_var_direct(*node);
 
-        visit_expr(data.init, state, ctx);
+        build_expr(data.init, state, ctx);
 
         auto init = state.sstack_pop();
         auto d = node->get_decl();
@@ -466,7 +466,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::DeclLocalVarDirectPack)) {
         auto data = conv::decl_local_var_direct_pack(*node);
 
-        visit_expr(data.init, state, ctx);
+        build_expr(data.init, state, ctx);
 
         if (data.names.size() == 1) {
             auto init = state.sstack_pop();
@@ -484,7 +484,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         if (data.lhs->is_oneof(ast::NodeKind::Id)) {
             auto lhs = state.get_local(conv::id(*data.lhs).to);
 
-            visit_expr(data.rhs, state, ctx);
+            build_expr(data.rhs, state, ctx);
             auto rhs = state.sstack_pop();
 
             auto d = data.lhs->get_decl();
@@ -503,8 +503,8 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         }
 
         else if (data.lhs->is_oneof(ast::NodeKind::Deref)) {
-            visit_expr_lvalue(conv::unary(*data.lhs).child, state, ctx);
-            visit_expr(data.rhs, state, ctx);
+            build_expr_lvalue(conv::unary(*data.lhs).child, state, ctx);
+            build_expr(data.rhs, state, ctx);
 
             auto rhs = state.sstack_pop();
             auto lhs = state.sstack_pop();
@@ -532,7 +532,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         // without else
         if (data.wf == nullptr) {
-            visit_expr(data.cond, state, ctx);
+            build_expr(data.cond, state, ctx);
             auto cond = state.sstack_pop();
 
             auto wt = state.new_empty_block(BlockOp::Jmp);
@@ -546,7 +546,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
             state.pending_block = wt;
 
             // fill the then branch and finish it with a simple jump
-            visit_stmt(data.wt, state, ctx);
+            build_stmt(data.wt, state, ctx);
             if (state.pending_block)
                 state.close_into_pending_block(BlockOp::Jmp, nullptr,
                                                std::array{after});
@@ -556,7 +556,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
             return;
         }
 
-        visit_expr(data.cond, state, ctx);
+        build_expr(data.cond, state, ctx);
         auto cond = state.sstack_pop();
 
         auto wt = state.new_empty_block(BlockOp::Jmp);
@@ -571,7 +571,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         state.pending_block = wt;
 
         // fill the then branch and finish it with a simple jump to after
-        visit_stmt(data.wt, state, ctx);
+        build_stmt(data.wt, state, ctx);
         if (state.pending_block)
             state.close_into_pending_block(BlockOp::Jmp, nullptr,
                                            std::array{after});
@@ -580,7 +580,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         state.pending_block = wf;
 
         // fill the else branch and finish it with a simple jump to after
-        visit_stmt(data.wf, state, ctx);
+        build_stmt(data.wf, state, ctx);
         if (state.pending_block)
             state.close_into_pending_block(BlockOp::Jmp, nullptr,
                                            std::array{after});
@@ -606,7 +606,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
                                        std::array{cond_block});
 
         state.pending_block = cond_block;
-        visit_expr(data.cond, state, ctx);
+        build_expr(data.cond, state, ctx);
         auto cond = state.sstack_pop();
 
         auto body = state.new_empty_block(BlockOp::Jmp);
@@ -621,7 +621,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         state.pending_block = body;
 
         // fill the body and finish it with a simple jump back to cond
-        visit_stmt(data.body, state, ctx);
+        build_stmt(data.body, state, ctx);
         if (state.pending_block)
             state.close_into_pending_block(BlockOp::Jmp, nullptr,
                                            std::array{cond_block});
@@ -636,17 +636,17 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
         if (data.child == nullptr) {
             ctx.for_all_defers(
-                [&](Node* stmt) { visit_stmt(stmt, state, ctx); });
+                [&](Node* stmt) { build_stmt(stmt, state, ctx); });
             ctx.clear_all_defers();
 
             state.close_into_pending_block(BlockOp::RetVoid, nullptr, {});
             return;
         }
 
-        visit_expr(data.child, state, ctx);
+        build_expr(data.child, state, ctx);
         auto expr = state.sstack_pop();
 
-        ctx.for_all_defers([&](Node* stmt) { visit_stmt(stmt, state, ctx); });
+        ctx.for_all_defers([&](Node* stmt) { build_stmt(stmt, state, ctx); });
         ctx.clear_all_defers();
 
         state.close_into_pending_block(BlockOp::Ret, expr, {});
@@ -655,7 +655,7 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::ExprStmt)) {
         auto data = conv::unary(*node);
-        visit_expr(data.child, state, ctx);
+        build_expr(data.child, state, ctx);
         (void)state.sstack_pop();
         return;
     }
@@ -691,7 +691,7 @@ auto create_func_ret(Node* node, std::span<types::Type*> types, State& state)
     return create_ir_type_from_general(state.module, ty);
 }
 
-void visit_func_decl(Node* node, State& state, Context& ctx) {
+void build_func_decl(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
     // auto& ts = *state.ts;
     // auto& er = *state.er;
@@ -715,7 +715,7 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
     if (data.body) {
         state.pending_block = state.new_empty_block(BlockOp::Err);
 
-        visit_stmt(data.body, state, ctx);
+        build_stmt(data.body, state, ctx);
 
         if (ty.is_void() && state.blocks.size() == 0) {
             // in case the function returns void and does not have an explicit
@@ -759,10 +759,10 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
 
 // ----------------------------------------------------------------------------
 
-void visit_top(Node* node, State& state, Context& ctx) {
+void build_top(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::FuncDecl,
                        ast::NodeKind::FuncDeclWithCVarArgs)) {
-        visit_func_decl(node, state, ctx);
+        build_func_decl(node, state, ctx);
         return;
     }
 
@@ -776,10 +776,10 @@ void visit_top(Node* node, State& state, Context& ctx) {
 
 // ----------------------------------------------------------------------------
 
-void visit_flat_module(Node* node, State& state, Context& ctx) {
+void build_flat_module(Node* node, State& state, Context& ctx) {
     auto data = conv::flat_module(*node);
     for (auto top : data.children) {
-        visit_top(top, state, ctx);
+        build_top(top, state, ctx);
     }
 }
 
@@ -791,7 +791,7 @@ auto build(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
 
     auto state = State{.ts = &ts, .er = &er, .opt = &opt};
     auto ctx = Context{};
-    visit_flat_module(root, state, ctx);
+    build_flat_module(root, state, ctx);
 
     auto m = std::move(state.module);
     return m;
