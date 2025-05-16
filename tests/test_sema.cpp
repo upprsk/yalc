@@ -504,6 +504,18 @@ func test() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("pointers");
+
+    run_test(ctx, p, "take address of local",
+             R"(
+module test;
+func test() {
+    var x = 0;
+    var y = &x;
+}
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("casting");
 
     run_test(ctx, p, "cast untyped to u8",
