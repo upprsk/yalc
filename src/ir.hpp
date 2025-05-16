@@ -37,6 +37,10 @@ enum class TypeKind {
 struct Type {
     TypeKind kind;
 
+    [[nodiscard]] constexpr auto is_ptr() const -> bool {
+        return kind == TypeKind::Ptr;
+    }
+
     [[nodiscard]] constexpr auto is_signed() const -> bool {
         bool r;
         switch (kind) {
@@ -80,13 +84,39 @@ struct Type {
 
         return sz;
     }
+
+    [[nodiscard]] constexpr auto alignment() const -> size_t {
+        size_t align;
+        switch (kind) {
+            case TypeKind::Uint64: align = alignof(uint64_t); break;
+            case TypeKind::Int64: align = alignof(int64_t); break;
+            case TypeKind::Uint32: align = alignof(uint32_t); break;
+            case TypeKind::Int32: align = alignof(int32_t); break;
+            case TypeKind::Uint16: align = alignof(uint16_t); break;
+            case TypeKind::Int16: align = alignof(int16_t); break;
+            case TypeKind::Uint8: align = alignof(uint8_t); break;
+            case TypeKind::Int8: align = alignof(int8_t); break;
+            case TypeKind::Usize: align = alignof(uintptr_t); break;
+            case TypeKind::Isize: align = alignof(uintptr_t); break;
+            case TypeKind::Float32: align = alignof(float); break;
+            case TypeKind::Float64: align = alignof(double); break;
+            case TypeKind::Ptr: align = alignof(uintptr_t); break;
+            default: PANIC("invalid kind", kind);
+        }
+
+        return align;
+    }
+
+    constexpr auto operator==(Type const& o) const -> bool = default;
 };
 
-enum class OpCode {
+enum class OpCode : uint16_t {
     Err,
     IntConst,
     StrConst,
     Param,
+
+    Alloca,
 
     Call,
     CallVoid,
@@ -94,6 +124,7 @@ enum class OpCode {
     SetTmp,
 
     Load,
+    Store,
 
     Ext,
 
@@ -108,8 +139,27 @@ enum class OpCode {
     Le,
 };
 
+/// An instruction in the intermediate representation. It is meant to be heap
+/// allocated in the module (internal arena).
+///
+/// - `op`: The opcode for the instuction. This says how to interpret the rest
+/// of the data.
+/// - `uid`: A unique identifier for the instruction. Used to show links between
+/// instructions in textual form. And also on codegen.
+/// - `type`: The concrete type the instruction operates on. This is not
+/// intended to be used for safety, but mainly for size and alignment
+/// calculations.
+/// - `value`: An optional value attached to the instruction. This can be either
+/// a string (allocated in the module storage) or a 64bit integer.
+/// - `value_2`: Sometimes you need another value. For example, the `alloca`
+/// instruction requires both the size an alignment. In this case, this stores
+/// the alignment.
+/// - `args`: arguments to the instruction. For instructions that require a
+/// single argument, we use a pointer directly in the variant, otherwise a slice
+/// allocated in the module storage.
 struct Inst {
     OpCode                                                   op{};
+    uint16_t                                                 value_2{};
     uint32_t                                                 uid{};
     Type*                                                    type{};
     std::variant<std::monostate, uint64_t, std::string_view> value;
@@ -231,6 +281,11 @@ public:
         return new_inst(OpCode::Param, type, {}, std::span<Inst*>{});
     }
 
+    [[nodiscard]] auto new_inst_alloca(Type* type, uint16_t align, size_t size)
+        -> Inst* {
+        return new_inst(OpCode::Alloca, align, type, size, std::span<Inst*>{});
+    }
+
     [[nodiscard]] auto new_inst_call(Type* type, std::string_view symbol,
                                      std::span<Inst* const> args) -> Inst* {
         return new_inst(OpCode::Call, type, symbol, args);
@@ -251,6 +306,12 @@ public:
         return new_inst(OpCode::Load, type, {}, ptr);
     }
 
+    // NOTE: `type` should be the resulting type of the dereference
+    [[nodiscard]] auto new_inst_store(Type* type, Inst* ptr, Inst* value)
+        -> Inst* {
+        return new_inst(OpCode::Store, type, {}, std::array{ptr, value});
+    }
+
     [[nodiscard]] auto new_inst_ext(Type* type, Inst* src) -> Inst* {
         return new_inst(OpCode::Ext, type, {}, src);
     }
@@ -264,7 +325,7 @@ public:
         OpCode op, Type* type,
         std::variant<std::monostate, uint64_t, std::string_view> value,
         std::span<Inst* const> args) -> Inst* {
-        return insts.create<Inst>(op, next_inst_uid++, type, value,
+        return insts.create<Inst>(op, 0, next_inst_uid++, type, value,
                                   new_inst_span(args));
     }
 
@@ -272,7 +333,23 @@ public:
         OpCode op, Type* type,
         std::variant<std::monostate, uint64_t, std::string_view> value,
         Inst*                                                    arg) -> Inst* {
-        return insts.create<Inst>(op, next_inst_uid++, type, value, arg);
+        return insts.create<Inst>(op, 0, next_inst_uid++, type, value, arg);
+    }
+
+    [[nodiscard]] auto new_inst(
+        OpCode op, uint16_t value_2, Type* type,
+        std::variant<std::monostate, uint64_t, std::string_view> value,
+        std::span<Inst* const> args) -> Inst* {
+        return insts.create<Inst>(op, value_2, next_inst_uid++, type, value,
+                                  new_inst_span(args));
+    }
+
+    [[nodiscard]] auto new_inst(
+        OpCode op, uint16_t value_2, Type* type,
+        std::variant<std::monostate, uint64_t, std::string_view> value,
+        Inst*                                                    arg) -> Inst* {
+        return insts.create<Inst>(op, value_2, next_inst_uid++, type, value,
+                                  arg);
     }
 
     [[nodiscard]] auto new_inst_span(std::span<Inst* const> args)
@@ -403,10 +480,12 @@ constexpr auto format_as(OpCode op) {
         case OpCode::IntConst: name = "IntConst"; break;
         case OpCode::StrConst: name = "StrConst"; break;
         case OpCode::Param: name = "Param"; break;
+        case OpCode::Alloca: name = "Alloca"; break;
         case OpCode::Call: name = "Call"; break;
         case OpCode::CallVoid: name = "CallVoid"; break;
         case OpCode::SetTmp: name = "SetTmp"; break;
         case OpCode::Load: name = "Load"; break;
+        case OpCode::Store: name = "Store"; break;
         case OpCode::Ext: name = "Ext"; break;
         case OpCode::Add: name = "Add"; break;
         case OpCode::Sub: name = "Sub"; break;

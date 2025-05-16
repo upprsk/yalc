@@ -37,6 +37,10 @@ auto machine_load_sptr_op() -> std::string_view {
     return sizeof(uintptr_t) == 4 ? "loadsw" : "loadl";
 }
 
+auto machine_store_ptr_op() -> std::string_view {
+    return sizeof(uintptr_t) == 4 ? "storew" : "storel";
+}
+
 auto to_qbe_type(ir::Type const& type) -> std::string_view {
     switch (type.kind) {
         case ir::TypeKind::Uint64:
@@ -152,6 +156,12 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         inst->get_arg(0)->uid);
             } break;
 
+            case ir::OpCode::Alloca: {
+                auto align = inst->value_2;
+                println(out, "    %l{} ={} alloc{} {}", inst->uid,
+                        to_qbe_temp(*inst->type), align, inst->get_value_u64());
+            } break;
+
             case ir::OpCode::Load: {
                 std::string_view op;
                 switch (inst->type->kind) {
@@ -170,11 +180,36 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         op = machine_load_sptr_op();
                         break;
                     case ir::TypeKind::Ptr: op = machine_load_ptr_op(); break;
-                    default: PANIC("bad type kind", inst->type->kind);
+                    default: PANIC("bad type kind in Load", inst->type->kind);
                 }
 
                 println(out, "    %l{} ={} {} %l{}", inst->uid,
                         to_qbe_temp(*inst->type), op, inst->get_arg(0)->uid);
+            } break;
+
+            case ir::OpCode::Store: {
+                std::string_view op;
+                switch (inst->type->kind) {
+                    case ir::TypeKind::Uint64:
+                    case ir::TypeKind::Int64: op = "storel"; break;
+                    case ir::TypeKind::Uint32:
+                    case ir::TypeKind::Int32: op = "storew"; break;
+                    case ir::TypeKind::Uint16:
+                    case ir::TypeKind::Int16: op = "storeh"; break;
+                    case ir::TypeKind::Uint8:
+                    case ir::TypeKind::Int8: op = "storeb"; break;
+                    case ir::TypeKind::Usize:
+                    case ir::TypeKind::Isize:
+                        op = machine_store_ptr_op();
+                        break;
+                    case ir::TypeKind::Float32: op = "stores"; break;
+                    case ir::TypeKind::Float64: op = "stored"; break;
+                    case ir::TypeKind::Ptr: op = machine_store_ptr_op(); break;
+                    default: PANIC("bad type kind in Store", inst->type->kind);
+                }
+
+                println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,
+                        inst->get_arg(0)->uid);
             } break;
 
             case ir::OpCode::Add:

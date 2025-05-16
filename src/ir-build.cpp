@@ -189,6 +189,39 @@ void visit_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::AddrOf)) {
+        auto data = conv::unary(*node);
+
+        if (data.child->is_oneof(ast::NodeKind::Id)) {
+            auto d = data.child->get_decl();
+            auto local = state.get_local(d);
+
+            // FIXME: this is different for global variables
+            ASSERT(d->is_stack_var());
+            ASSERT(local->type->is_ptr());
+
+            state.sstack_push(local);
+            return;
+        }
+
+        PANIC("not implemented. AddrOf not implemented for {}",
+              data.child->get_kind());
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Deref)) {
+        auto data = conv::unary(*node);
+        visit_expr(data.child, state, ctx);
+
+        auto ptr = state.sstack_pop();
+        ASSERT(ptr->type->is_ptr());
+
+        auto type = create_ir_type_from_general(module, *node->get_type());
+        auto inst = module.new_inst_load(type, ptr);
+        state.add_and_push_inst(inst);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Index)) {
         auto data = conv::index(*node);
         visit_expr(data.receiver, state, ctx);
@@ -223,9 +256,7 @@ void visit_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Id)) {
-        // auto type = create_ir_type_from_general(module, *node->get_type());
         auto local = state.get_local(node->get_decl());
-        // auto inst = module.new_inst_get_local(type, local);
 
         // state.add_and_push_inst(inst);
         state.sstack_push(local);
@@ -380,7 +411,23 @@ void visit_stmt(Node* node, State& state, Context& ctx) {
         visit_expr(data.init, state, ctx);
 
         auto init = state.sstack_pop();
-        state.add_local(node->get_decl(), init);
+        auto d = node->get_decl();
+        if (d->is_stack_var()) {
+            auto type = create_ir_type_from_general(module, *d->get_type());
+            ASSERT(*init->type == *type);
+
+            auto alloc =
+                module.new_inst_alloca(module.new_type(TypeKind::Ptr),
+                                       type->alignment(), type->size());
+            auto store = module.new_inst_store(type, alloc, init);
+
+            state.add_inst(alloc);
+            state.add_inst(store);
+
+            init = alloc;
+        }
+
+        state.add_local(d, init);
         return;
     }
 
@@ -611,6 +658,14 @@ void visit_func_decl(Node* node, State& state, Context& ctx) {
             // in case the function returns void and does not have an explicit
             // return, add it
             state.close_into_pending_block(BlockOp::RetVoid, nullptr, {});
+        }
+
+        // should not be empty!!
+        // FIXME: this should produce an error message or something. Empty block
+        // means that we did not have a return in a function that has a single
+        // block as body.
+        if (state.blocks.empty()) {
+            state.close_into_pending_block(BlockOp::Err, nullptr, {});
         }
 
         body = state.blocks[0];

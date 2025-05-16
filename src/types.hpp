@@ -539,6 +539,16 @@ public:
 
     // ------------------------------------------------------------------------
 
+    [[nodiscard]] auto get_default_for(Type* ty) const -> Type* {
+        if (ty->is_integral() && ty->is_untyped_int()) {
+            return get_default_int();
+        }
+
+        return ty;
+    }
+
+    // ------------------------------------------------------------------------
+
     void add_function_to_type(Type const& ty, std::string_view name, Decl* d);
 
     auto get_function_from_type(Type const& ty, std::string_view name) const

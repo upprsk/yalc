@@ -212,9 +212,7 @@ void fixup_untyped(Ast& ast, types::Type* desired_type, Node* node,
             }
 
             else {
-                fixup_untyped(ast,
-                              ty->is_untyped_int() ? ts.get_default_int() : ty,
-                              node, state);
+                fixup_untyped(ast, ts.get_default_for(ty), node, state);
             }
         }
 
@@ -1080,6 +1078,46 @@ auto eval_function_decl_type(Node* node, State& state, Context& ctx)
 
 // ============================================================================
 
+struct ValueSide {
+    enum Side {
+        Right,      // rvalue
+        LeftMut,    // mutable lvalue
+        LeftConst,  // const lvalue
+    };
+
+    [[nodiscard]] constexpr auto is_rvalue() const -> bool {
+        return side == Right;
+    }
+
+    [[nodiscard]] constexpr auto is_lvalue() const -> bool {
+        return !is_rvalue();
+    }
+
+    [[nodiscard]] constexpr auto is_mut() const -> bool {
+        return side == LeftMut;
+    }
+
+    [[nodiscard]] constexpr auto is_const() const -> bool {
+        return side == LeftConst;
+    }
+
+    Side side;
+};
+
+auto calc_expr_side(Node* node) -> ValueSide {
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        auto d = node->get_decl();
+        if (d == nullptr) return {ValueSide::Right};
+
+        if (d->is_const()) return {ValueSide::LeftConst};
+        return {ValueSide::LeftMut};
+    }
+
+    return {ValueSide::Right};
+}
+
+// ============================================================================
+
 void sema_expr(Ast& ast, Node* node, State& state, Context& ctx);
 void sema_stmt(Ast& ast, Node* node, State& state, Context& ctx);
 
@@ -1315,15 +1353,29 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
-    // TODO: implement check of lvalues and constness for this to work correctly
     if (node->is_oneof(ast::NodeKind::AddrOf)) {
         auto data = conv::unary(*node);
         sema_expr(ast, data.child, state, ctx);
 
-        // FIXME: need to set the receiving decl to stack-var if any
+        auto side = calc_expr_side(data.child);
+        if (side.is_rvalue()) {
+            er.report_error(node->get_loc(),
+                            "can not take address of r-value expression {}",
+                            data.child->get_kind());
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        // in case our child is an id, mark that it's backing declaration needs
+        // to be allocated at the stack
+        if (data.child->is_oneof(ast::NodeKind::Id)) {
+            if (auto d = data.child->get_decl(); d) {
+                d->flags.set_stack_var();
+            }
+        }
 
         auto cty = data.child->get_type();
-        node->set_type(ts.new_ptr(cty, true));
+        node->set_type(ts.new_ptr(cty, side.is_const()));
         return;
     }
 
@@ -1620,12 +1672,7 @@ void sema_decl_with_inits(Ast& ast, Node* ids_node, Node* inits_node,
     for (size_t id_idx{}; auto [init_idx, init] : rv::enumerate(inits)) {
         if (id_idx >= ids.size()) break;
 
-        // FIXME: this needs to be better handled
-        if (init->get_type()->is_integral()) {
-            fixup_untyped(ast, ts.get_default_int(), init, state);
-        } else {
-            fixup_untyped(ast, init->get_type(), init, state);
-        }
+        fixup_untyped(ast, ts.get_default_for(init->get_type()), init, state);
 
         auto init_type = init->get_type();
 
@@ -1750,9 +1797,9 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                         coercions.push_back(ts.get_void());
                         lhs_idx++;
 
-                        // FIXME: maybe not just put default int here
-                        fixup_untyped(ast, ts.get_default_int(), rhs_item,
-                                      state);
+                        fixup_untyped(ast,
+                                      ts.get_default_for(rhs_item->get_type()),
+                                      rhs_item, state);
                         continue;
                     }
 
@@ -1791,8 +1838,8 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                     lhs_item->set_type(ts.get_void());
                     lhs_idx++;
 
-                    // FIXME: maybe not just put default int here
-                    fixup_untyped(ast, ts.get_default_int(), rhs_item, state);
+                    fixup_untyped(ast, ts.get_default_for(rhs_item->get_type()),
+                                  rhs_item, state);
 
                     continue;
                 }
@@ -2218,7 +2265,11 @@ void sema_func_decl_header(Ast& ast, Node* node, State& state, Context& ctx) {
 
     eval_decorators(ast, data.decorators, decl, state, ctx);
 
-    // handle main function. It should be exported with name `main` even without
+    // functions are always const
+    decl->flags.set_const();
+
+    // handle main function. It should be exported with name `main` even
+    // without
     // `@export`
     if (ctx.is_main_module() && decl->local_name == "main") {
         decl->flags.set_export();
@@ -2294,6 +2345,9 @@ void eval_defined_values(Node* decl, std::span<Node*> ids,
         }
 
         d->value = v;
+
+        // set the decl to const (as it was made with `def`)
+        d->flags.set_const();
     }
 }
 

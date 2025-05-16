@@ -21,6 +21,9 @@ struct DeclFlags {
         PrivateFile = 1 << 2,
         Export = 1 << 3,
 
+        // The value can not be assigned
+        Const = 1 << 5,
+
         // this flag is set when a local variable has it's address taken and
         // needs to be allocated on the stack
         StackVar = 1 << 4,
@@ -42,12 +45,17 @@ struct DeclFlags {
         return flags & Export;
     }
 
+    [[nodiscard]] constexpr auto has_const() const -> bool {
+        return flags & Const;
+    }
+
     [[nodiscard]] constexpr auto has_stack_var() const -> bool {
         return flags & StackVar;
     }
 
     constexpr void set_extern() { flags = static_cast<Flags>(flags | Extern); }
     constexpr void set_export() { flags = static_cast<Flags>(flags | Export); }
+    constexpr void set_const() { flags = static_cast<Flags>(flags | Const); }
     constexpr void set_stack_var() {
         flags = static_cast<Flags>(flags | StackVar);
     }
@@ -67,6 +75,10 @@ struct DeclFlags {
 
         [[nodiscard]] constexpr auto set_export() const -> Builder {
             return {static_cast<Flags>(flags | Export)};
+        }
+
+        [[nodiscard]] constexpr auto set_const() const -> Builder {
+            return {static_cast<Flags>(flags | Const)};
         }
 
         [[nodiscard]] constexpr auto set_stack_var() const -> Builder {
@@ -113,6 +125,10 @@ public:
 
     [[nodiscard]] constexpr auto is_private_file() const -> bool {
         return flags.has_private_file();
+    }
+
+    [[nodiscard]] constexpr auto is_const() const -> bool {
+        return flags.has_const();
     }
 
     [[nodiscard]] constexpr auto is_stack_var() const -> bool {
