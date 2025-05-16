@@ -24,6 +24,7 @@ struct Args {
     bool                     verbose = false;
     bool                     ask = false;
     bool                     diff = false;
+    bool                     show_ok = false;
     std::vector<std::string> filters;
 };
 
@@ -39,7 +40,10 @@ void print_help(std::string_view self) {
     println(stderr, "options:");
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
-    println(stderr, "    -v,--verbose: show output of all failed tests.");
+    println(
+        stderr,
+        "    -v,--verbose: show output of all failed tests. Implies --show-ok");
+    println(stderr, "    --show-ok: show a green OK for passed tests.");
     println(stderr,
             "    --ask: when a test fails, ask to update the expected value.");
     println(stderr,
@@ -66,6 +70,9 @@ auto argparse(int argc, char** argv) -> Args {
             args.diff = true;
         } else if (arg == "-v" || arg == "--verbose") {
             args.verbose = true;
+            args.show_ok = true;
+        } else if (arg == "--show-ok") {
+            args.show_ok = true;
         } else if (arg == "--filter" || arg == "-f") {
             if (!it.next(arg)) {
                 fmt::println(stderr, "error: missing argument to filter");
@@ -97,7 +104,8 @@ auto real_main(Args args) -> int {
     TestParams p{.filters = {},
                  .verbose = args.verbose,
                  .use_diff = args.diff,
-                 .ask_for_updates = args.ask};
+                 .ask_for_updates = args.ask,
+                 .show_ok = args.show_ok};
     for (auto const& s : args.filters) p.filters.insert(s);
 
     {

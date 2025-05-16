@@ -145,8 +145,11 @@ auto run_checks_for_test_output(Context& ctx, TestParams const& p,
         return false;
     }
 
-    fmt::print(fmt::bg(fmt::color::green), "OK");
-    fmt::println(" {}", fullname);
+    if (p.show_ok) {
+        fmt::print(fmt::bg(fmt::color::green), "OK");
+        fmt::println(" {}", fullname);
+    }
+
     return true;
 }
 

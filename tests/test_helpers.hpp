@@ -40,6 +40,7 @@ struct TestParams {
     bool verbose;
     bool use_diff;
     bool ask_for_updates;
+    bool show_ok;
 };
 
 struct AssertionError : public std::exception {
