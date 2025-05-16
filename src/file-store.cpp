@@ -104,12 +104,11 @@ auto FileStore::add_dir_for(std::string path) -> DirId {
     auto files =
         scan_dir_of_file(path) |
         rv::transform([&](fs::path const &path) { return add(path); }) |
-        std::ranges::to<std::unordered_set>();
+        std::ranges::to<std::set>();
     return add_dir(path, files);
 }
 
-auto FileStore::add_dir(std::string path, std::unordered_set<FileId> files)
-    -> DirId {
+auto FileStore::add_dir(std::string path, std::set<FileId> files) -> DirId {
     // dedup
     if (auto maybe_id = find_id_for_dir(path); maybe_id.is_valid()) {
         return maybe_id;
@@ -118,7 +117,7 @@ auto FileStore::add_dir(std::string path, std::unordered_set<FileId> files)
     return new_dir_id(path, files);
 }
 
-auto FileStore::get_files_in_dir(DirId id) const -> std::unordered_set<FileId> {
+auto FileStore::get_files_in_dir(DirId id) const -> std::set<FileId> const & {
     return dirs_to_files.at(id.value());
 }
 
@@ -148,8 +147,8 @@ auto FileStore::new_id(std::string filename, std::string filedata) -> FileId {
     return id;
 }
 
-auto FileStore::new_dir_id(std::string                dirname,
-                           std::unordered_set<FileId> children) -> DirId {
+auto FileStore::new_dir_id(std::string dirname, std::set<FileId> children)
+    -> DirId {
     auto sz = directories.size();
     auto id = DirId::from_raw_data(sz);
 

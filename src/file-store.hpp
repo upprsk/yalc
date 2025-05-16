@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <iterator>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -45,7 +46,8 @@ public:
     }
 
 public:
-    constexpr auto operator==(FileId const &o) const -> bool = default;
+    constexpr auto operator<=>(FileId const &o) const
+        -> std::strong_ordering = default;
 
     // ------------
 
@@ -188,12 +190,12 @@ public:
 
     /// Add a new directory to the list of directories. If the directory is
     /// already added, then the same id is returned again.
-    [[nodiscard]] auto add_dir(std::string                path,
-                               std::unordered_set<FileId> files) -> DirId;
+    [[nodiscard]] auto add_dir(std::string path, std::set<FileId> files)
+        -> DirId;
 
     /// Get all files (source files that is) in a directory.
     [[nodiscard]] auto get_files_in_dir(DirId id) const
-        -> std::unordered_set<FileId>;
+        -> std::set<FileId> const &;
 
 private:
     /// Use the reverse map to find the id for a given filename. Returns an
@@ -209,8 +211,8 @@ private:
         -> FileId;
 
     /// Adds a new directory to the store and get it's id.
-    [[nodiscard]] auto new_dir_id(std::string                dirname,
-                                  std::unordered_set<FileId> children) -> DirId;
+    [[nodiscard]] auto new_dir_id(std::string      dirname,
+                                  std::set<FileId> children) -> DirId;
 
 private:
     // TODO: use a more efficient way of storing strings. An arena for example,
@@ -232,7 +234,7 @@ private:
     // std::unordered_map<FileId, DirId> file_to_dir;
 
     /// Map each directory to the files it contains.
-    std::vector<std::unordered_set<FileId>> dirs_to_files;
+    std::vector<std::set<FileId>> dirs_to_files;
 
     // TODO: use a better hashmap implementation
     std::unordered_map<std::string, FileId> filename_to_id;
