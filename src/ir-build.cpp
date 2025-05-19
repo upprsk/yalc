@@ -286,14 +286,42 @@ void build_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
-    // FIXME: THIS IS A TEMPORARY HACK TO GET STRINGS TO WORK!
-    if (node->is_oneof(ast::NodeKind::Field) &&
-        node->get_child(0)->is_oneof(ast::NodeKind::Str) &&
-        conv::field(*node).name == "ptr") {
-        auto type = module.get_type_ptr();
-        auto inst = module.new_inst_str_const(
-            type, conv::str(*node->get_child(0)).value);
-        state.add_and_push_inst(inst);
+    if (node->is_oneof(ast::NodeKind::Str)) {
+        auto data = conv::str(*node);
+
+        // struct str_t { char* ptr; size_t len; };
+        // struct str_t s;
+        // s.ptr = <str>;
+        // s.len = <sizeof(str)>;
+
+        auto ptr_type = module.get_type_ptr();
+        auto usize_type = module.get_type_usize();
+
+        // struct str_t s;
+        auto ptr =
+            module.new_inst_alloca(module.new_type_of(TypeKind::Struct),
+                                   ptr_type->alignment(), ptr_type->size() * 2);
+        state.add_inst(ptr);
+
+        // s.ptr = <str>;
+        auto str_data_ptr = module.new_inst_str_const(ptr_type, data.value);
+        auto ptr_store = module.new_inst_store(ptr, str_data_ptr);
+        state.add_inst(str_data_ptr);
+        state.add_inst(ptr_store);
+
+        // s.len = <sizeof(str)>;
+        auto size_offset =
+            module.new_inst_int_const(usize_type, ptr_type->size());
+        auto size_ptr =
+            module.new_inst_arith(OpCode::Add, usize_type, ptr, size_offset);
+        auto size = module.new_inst_int_const(usize_type, data.value.size());
+        auto size_store = module.new_inst_store(size_ptr, size);
+        state.add_inst(size_offset);
+        state.add_inst(size_ptr);
+        state.add_inst(size);
+        state.add_inst(size_store);
+
+        state.sstack_push(ptr);
         return;
     }
 
@@ -323,6 +351,29 @@ void build_expr(Node* node, State& state, Context& ctx) {
             state.add_inst(offset_value);
             state.add_inst(offset_ptr);
             state.add_and_push_inst(load);
+        }
+
+        else if (receiver_type->is_strview()) {
+            if (data.name == "ptr") {
+                auto load =
+                    module.new_inst_load(module.get_type_ptr(), receiver);
+                state.add_and_push_inst(load);
+            }
+
+            else if (data.name == "len") {
+                auto offset_value = module.new_inst_int_const(
+                    module.get_type_usize(), module.get_type_ptr()->size());
+                auto offset_ptr = module.new_inst_arith(
+                    OpCode::Add, module.get_type_ptr(), receiver, offset_value);
+                auto load =
+                    module.new_inst_load(module.get_type_usize(), offset_ptr);
+                state.add_inst(offset_value);
+                state.add_inst(offset_ptr);
+                state.add_and_push_inst(load);
+            }
+
+            else
+                PANIC("invalid field for string view", data.name);
         }
 
         else
