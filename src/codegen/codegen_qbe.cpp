@@ -213,7 +213,9 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                     case ir::TypeKind::Float32: op = "stores"; break;
                     case ir::TypeKind::Float64: op = "stored"; break;
                     case ir::TypeKind::Ptr: op = machine_store_ptr_op(); break;
-                    default: PANIC("bad type kind in Store", inst->type->kind);
+                    default:
+                        PANIC("bad type kind in Store",
+                              inst->get_arg(1)->type->kind);
                 }
 
                 println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,
