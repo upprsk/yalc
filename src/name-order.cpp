@@ -69,6 +69,10 @@ auto topo_sort(Ast const& ast, ErrorReporter& er, Dag const& dag)
         unmarked.push_back(n);
     }
 
+    std::ranges::sort(unmarked, [](Node* l, Node* r) {
+        return l->get_loc().span.begin < r->get_loc().span.begin;
+    });
+
     auto ts = TopoSorter{
         .dag = &dag,
         .sorted = {},
