@@ -212,8 +212,6 @@ private:
                                   std::unordered_set<FileId> children) -> DirId;
 
 private:
-    // TODO: use a more efficient way of storing strings. An arena for example,
-    // as nothing will be removed from here
     std::vector<std::string> filenames;
     std::vector<std::string> directories;
 
