@@ -118,8 +118,13 @@ auto FileStore::add_dir(std::string path, std::unordered_set<FileId> files)
     return new_dir_id(path, files);
 }
 
-auto FileStore::get_files_in_dir(DirId id) const -> std::unordered_set<FileId> {
-    return dirs_to_files.at(id.value());
+auto FileStore::get_files_in_dir(DirId id) const -> std::vector<FileId> {
+    auto const         &files = dirs_to_files.at(id.value());
+    std::vector<FileId> result{files.begin(), files.end()};
+    std::ranges::sort(result,
+                      [](FileId l, FileId r) { return l.value() < r.value(); });
+
+    return result;
 }
 
 auto FileStore::find_id_for(std::string const &s) const -> FileId {

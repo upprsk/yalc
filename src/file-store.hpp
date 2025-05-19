@@ -192,8 +192,7 @@ public:
                                std::unordered_set<FileId> files) -> DirId;
 
     /// Get all files (source files that is) in a directory.
-    [[nodiscard]] auto get_files_in_dir(DirId id) const
-        -> std::unordered_set<FileId>;
+    [[nodiscard]] auto get_files_in_dir(DirId id) const -> std::vector<FileId>;
 
 private:
     /// Use the reverse map to find the id for a given filename. Returns an
