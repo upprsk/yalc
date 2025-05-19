@@ -288,6 +288,11 @@ void build_expr(Node* node, State& state, Context& ctx) {
         auto receiver = state.sstack_pop();
         auto receiver_type = data.receiver->get_type()->undistinct();
 
+        // automatic dereference of pointers to structs!
+        if (receiver_type->is_ptr()) {
+            receiver_type = receiver_type->inner[0]->undistinct();
+        }
+
         if (receiver_type->is_struct()) {
             auto field = receiver_type->as_struct_get_fields().at(data.name);
 
@@ -353,15 +358,30 @@ void build_expr(Node* node, State& state, Context& ctx) {
             auto d = data.child->get_decl();
             auto local = state.get_local(d);
 
-            // FIXME: this is different for global variables
-            ASSERT(d->is_stack_var());
-            ASSERT(local->type->is_ptr());
+            // stack variable
+            if (d->is_stack_var()) {
+                ASSERT(local->type->is_ptr());
 
-            state.sstack_push(local);
+                state.sstack_push(local);
+            }
+
+            // some stack-native type
+            else if (d->get_type()->undistinct()->is_struct()) {
+                ASSERT(local->type->is_struct());
+
+                state.sstack_push(local);
+            }
+
+            else {
+                // something else
+                PANIC(
+                    "not implemented. AddrOf not implemented for type of decl",
+                    *d);
+            }
             return;
         }
 
-        PANIC("not implemented. AddrOf not implemented for {}",
+        PANIC("not implemented. AddrOf not implemented for",
               data.child->get_kind());
         return;
     }
@@ -625,11 +645,14 @@ void build_stmt(Node* node, State& state, Context& ctx) {
 
         // this variable must be stored in the stack
         if (d->is_stack_var()) {
-            auto type = create_ir_type_from_general(module, *d->get_type());
+            auto dt = d->get_type();
+            auto align = dt->alignment();
+            auto size = dt->size();
+            auto type = create_ir_type_from_general(module, *dt);
             ASSERT(*init->type == *type);
 
-            auto alloc = module.new_inst_alloca(
-                module.get_type_ptr(), type->alignment(), type->size());
+            auto alloc =
+                module.new_inst_alloca(module.get_type_ptr(), align, size);
             auto store = module.new_inst_store(alloc, init);
 
             state.add_inst(alloc);

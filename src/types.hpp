@@ -152,6 +152,10 @@ struct Type {
         }
     }
 
+    [[nodiscard]] constexpr auto is_always_stack() const -> bool {
+        return kind == TypeKind::Struct;
+    }
+
     [[nodiscard]] constexpr auto is_size() const -> bool {
         return kind == TypeKind::Usize || kind == TypeKind::Isize;
     }

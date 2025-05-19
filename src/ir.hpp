@@ -41,6 +41,10 @@ struct Type {
         return kind == TypeKind::Ptr;
     }
 
+    [[nodiscard]] constexpr auto is_struct() const -> bool {
+        return kind == TypeKind::Struct;
+    }
+
     [[nodiscard]] constexpr auto is_signed() const -> bool {
         bool r;
         switch (kind) {

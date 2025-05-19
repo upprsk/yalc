@@ -1178,6 +1178,16 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
         }
     }
 
+    else if (unw->is_ptr() && unw->inner[0]->undistinct()->is_struct()) {
+        auto inner = unw->inner[0]->undistinct();
+        auto fields = inner->as_struct_get_fields();
+        auto it = fields.find(data.name);
+        if (it != fields.end()) {
+            node->set_type(it->second.type);
+            return;
+        }
+    }
+
     auto d = ts.get_function_from_type(*rty, data.name);
     if (d != nullptr) {
         node->set_type(ts.new_bound_from(d->value.type));
@@ -1391,9 +1401,12 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
         }
 
         // in case our child is an id, mark that it's backing declaration needs
-        // to be allocated at the stack
+        // to be allocated at the stack. This should only be done when the type
+        // is not already stored on the stack by default (like structs and
+        // arrays).
         if (data.child->is_oneof(ast::NodeKind::Id)) {
-            if (auto d = data.child->get_decl(); d) {
+            if (auto d = data.child->get_decl();
+                d && !d->get_type()->undistinct()->is_always_stack()) {
                 d->flags.set_stack_var();
             }
         }
