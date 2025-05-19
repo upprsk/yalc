@@ -430,13 +430,15 @@ auto coerce_types(types::Type* target, types::Type* source, Node* target_node,
 
     if (target->is_integral()) {
         if (!source->is_integral()) {
-            er.report_error(source_node->get_loc(),
-                            "can not use type non-integral type {} when "
-                            "integer of type {} is expected",
-                            *source, *target);
-            if (target_node != nullptr) {
-                er.report_note(target_node->get_loc(),
-                               "required type {} from here", *target);
+            if (!source->is_err()) {
+                er.report_error(source_node->get_loc(),
+                                "can not use type non-integral type {} when "
+                                "integer of type {} is expected",
+                                *source, *target);
+                if (target_node != nullptr) {
+                    er.report_note(target_node->get_loc(),
+                                   "required type {} from here", *target);
+                }
             }
 
             return {ts.get_error(), CoerceResult::Direct};
