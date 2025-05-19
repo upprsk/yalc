@@ -579,8 +579,6 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
-    // FIXME: the swap set does not work, as each part of the assigment is
-    // processed individually
     run_test(ctx, p, "swap integers 2",
              R"(
 module main;
@@ -603,8 +601,7 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 
 @extern(link_name="printf")
 func c_printf(fmt: [*]const u8, ...);
-)",
-             true);
+)");
 
     ctx.tags.pop_back();
 

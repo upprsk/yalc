@@ -485,8 +485,7 @@ void build_assign_direct(Node* node, State& state, Context& ctx) {
 }
 
 void build_unscoped_assign(Node* node, State& state, Context& ctx) {
-    auto& module = state.module;
-    auto  data = conv::unscoped_assign(*node);
+    auto data = conv::unscoped_assign(*node);
 
     // handle the rhs of all assignments
     for (auto item : data.items) {

@@ -1,23 +1,17 @@
 module main;
 
+func swap(lhs: *i32, rhs: *i32) {
+    lhs.*, rhs.* = rhs.*, lhs.*;
+}
+
 func main(argc: i32, argv: [*][*]u8) i32 {
-    var n: usize = 4;
-    var arr = c_malloc(10 * n) as [*]i32;
-    defer c_free(arr);
+    var x = 33 + 36;
+    var y = 400 + 20;
 
-    var i = 0;
-    while i < n {
-        defer i = i + 1;
+    c_printf("x=%d, y=%d\n".ptr, x, y);
+    swap(&x, &y);
 
-        arr[i] = i * 2;
-    }
-
-    var i = 0;
-    while i < n {
-        defer i = i + 1;
-
-        c_printf("arr[%d] = %d\n".ptr, i, arr[i]);
-    }
+    c_printf("x=%d, y=%d\n".ptr, x, y);
 
     return 0;
 }
