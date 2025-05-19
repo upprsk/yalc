@@ -735,6 +735,10 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
                         {});
     }
 
+    // move the next UID up to 100, so that adding a new builtin does not bump
+    // all decls up.
+    ast.get_decl_store()->set_next_uid(100);
+
     auto m = conv::module(*mod);
     auto top_env = root_env.with_name(std::string{m.name});
 

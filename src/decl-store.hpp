@@ -189,6 +189,11 @@ public:
     [[nodiscard]] auto begin() const -> Iterator { return {head}; }
     [[nodiscard]] auto end() const -> Iterator { return {}; }
 
+    void set_next_uid(uint32_t v) {
+        ASSERT(v > next_uid);
+        next_uid = v;
+    }
+
 private:
     auto new_string(std::string_view base) -> std::string_view {
         return names.alloc_string_view(base);
