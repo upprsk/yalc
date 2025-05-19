@@ -7,7 +7,7 @@ def Args = struct {
 
 func shift(args: *Args) {
     args.argc = args.argc - 1;
-    args.argv = (args.argv as usize + 8) as [*][*]u8;
+    args.argv = (args.argv as usize + sizeof([*][*]u8)) as [*][*]u8;
 
     return;
 }

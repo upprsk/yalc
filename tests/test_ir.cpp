@@ -676,6 +676,45 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
+    run_test(ctx, p, "assign to field with sizeof",
+             R"(
+module main;
+
+def Args = struct {
+    argc: i32,
+    argv: [*][*]u8,
+};
+
+func shift(args: *Args) {
+    args.argc = args.argc - 1;
+    args.argv = (args.argv as usize + sizeof([*][*]u8)) as [*][*]u8;
+
+    return;
+}
+
+func print_args(args: *Args) {
+    var i = 0;
+    while i < args.argc {
+        c_printf("- args[%d]: %s\n".ptr, i, args.argv[i]);
+
+        i = i + 1;
+    }
+
+    return;
+}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var args: Args = .{ .argc=argc, .argv=argv };
+
+    shift(&args);
+    print_args(&args);
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
 
     print_test_results("IR", ctx);
