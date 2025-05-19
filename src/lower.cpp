@@ -118,6 +118,7 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
         if (lhs_idx >= lhs.size()) break;
 
         auto rhs_type = rhs_item->get_type();
+        visit(ctx, rhs_item);
 
         // result of calling some function
         if (rhs_type->is_pack()) {
@@ -171,8 +172,6 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
             auto lhs_item = lhs[lhs_idx];
             if (conv::is_discard_id(*lhs_item)) {
                 // discarding the value, add with discard
-
-                visit(ctx, rhs_item);
 
                 auto d = ast.new_discard(rhs_item->get_loc(), rhs_item);
                 d->set_type(ts.get_void());
