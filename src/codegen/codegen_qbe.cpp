@@ -72,7 +72,8 @@ auto to_qbe_temp(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Int8: return "w";
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
-        case ir::TypeKind::Ptr: return machine_ptr_type();
+        case ir::TypeKind::Ptr:
+        case ir::TypeKind::Struct: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
         default: PANIC("invalid type kind", type.kind);

@@ -1,18 +1,14 @@
 module main;
 
-func swap(lhs: *i32, rhs: *i32) {
-    lhs.*, rhs.* = rhs.*, lhs.*;
-}
+def Args = struct {
+    argc: i32,
+    argv: [*][*]u8,
+};
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    var x = 33 + 36;
-    var y = 400 + 20;
+    var args: Args = .{ .argc=argc, .argv=argv };
 
-    c_printf("x=%d, y=%d\n".ptr, x, y);
-    swap(&x, &y);
-
-    c_printf("x=%d, y=%d\n".ptr, x, y);
-
+    print_args(args);
     return 0;
 }
 

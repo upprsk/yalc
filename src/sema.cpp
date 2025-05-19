@@ -205,7 +205,7 @@ void fixup_untyped(Ast& ast, types::Type* desired_type, Node* node,
 
                 auto ex_it = expected_fields.find(data.key);
                 if (ex_it == expected_fields.end()) continue;
-                auto ex = ex_it->second;
+                auto ex = ex_it->second.type;
 
                 node->set_type(ts.new_lit_field(ty->id, ex));
 
@@ -318,7 +318,8 @@ auto coerce_cast_lit_to_struct(types::Type* target, types::Type* source,
         // NOTE: getting rid of the target_node here as it might cause
         // confusion because it points to the wrong place after this
         // recursion
-        coerce_types(it->second, source_field->inner[0], nullptr, sn, state);
+        coerce_types(it->second.type, source_field->inner[0], nullptr, sn,
+                     state);
     }
 
     for (auto [field_name, ex] : expected_fields) {
@@ -326,7 +327,7 @@ auto coerce_cast_lit_to_struct(types::Type* target, types::Type* source,
             er.report_error(source_node->get_loc(),
                             "missing initializer for field {:?} of type {} in "
                             "struct initialization",
-                            field_name, *ex);
+                            field_name, *ex.type);
         }
     }
 
@@ -1172,7 +1173,7 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
         auto fields = unw->as_struct_get_fields();
         auto it = fields.find(data.name);
         if (it != fields.end()) {
-            node->set_type(it->second);
+            node->set_type(it->second.type);
             return;
         }
     }

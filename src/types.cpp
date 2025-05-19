@@ -30,11 +30,24 @@ auto Type::as_func() const -> Func {
 }
 
 auto Type::as_struct_get_fields() const
-    -> std::unordered_map<std::string_view, Type *> {
+    -> std::unordered_map<std::string_view, StructField> {
     ASSERT(is_struct());
 
-    std::unordered_map<std::string_view, Type *> fields;
-    for (auto exp : inner) fields[exp->id] = exp->inner[0];
+    std::unordered_map<std::string_view, StructField> fields;
+
+    size_t offset{};
+
+    for (auto it : inner) {
+        auto align = it->alignment();
+        offset = (offset + (align - 1)) & -align;
+
+        fields[it->id] = {
+            .offset = offset,
+            .type = it->inner[0],
+        };
+
+        offset += it->size();
+    }
 
     return fields;
 }
@@ -168,7 +181,7 @@ auto TypeStore::coerce(Type *dst, Type *src) -> Type * {
                 auto it = expected_items.find(recv->id);
                 if (it == expected_items.end()) return nullptr;
 
-                auto ty = coerce(it->second, recv->inner[0]);
+                auto ty = coerce(it->second.type, recv->inner[0]);
                 // TODO: do we want to abort completally here or keep the
                 // nullptr
                 if (!ty) return nullptr;

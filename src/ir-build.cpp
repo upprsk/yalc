@@ -279,6 +279,73 @@ void build_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Field)) {
+        auto data = conv::field(*node);
+
+        build_expr(data.receiver, state, ctx);
+        auto receiver = state.sstack_pop();
+        auto receiver_type = data.receiver->get_type()->undistinct();
+
+        if (receiver_type->is_struct()) {
+            auto field = receiver_type->as_struct_get_fields().at(data.name);
+
+            auto offset_value = module.new_inst_int_const(
+                module.new_type(TypeKind::Usize), field.offset);
+            auto offset_ptr = module.new_inst_arith(
+                OpCode::Add, module.new_type(TypeKind::Ptr), receiver,
+                offset_value);
+
+            auto type = create_ir_type_from_general(module, *field.type);
+            auto load = module.new_inst_load(type, offset_ptr);
+
+            state.add_inst(offset_value);
+            state.add_inst(offset_ptr);
+            state.add_and_push_inst(load);
+        }
+
+        else
+            PANIC("invalid receiver type for field", *receiver_type);
+
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Lit)) {
+        auto data = conv::lit(*node);
+        auto node_type = node->get_type();
+
+        if (node_type->is_struct()) {
+            auto fields = node_type->as_struct_get_fields();
+            auto ptr = module.new_inst_alloca(module.new_type(TypeKind::Struct),
+                                              node_type->alignment(),
+                                              node_type->size());
+            state.add_and_push_inst(ptr);
+
+            for (auto node : data.items) {
+                auto data = conv::lit_param(*node);
+                build_expr(data.init, state, ctx);
+
+                auto init = state.sstack_pop();
+
+                auto field = fields.at(data.key);
+                auto offset_value = module.new_inst_int_const(
+                    module.new_type(TypeKind::Usize), field.offset);
+                auto offset_ptr = module.new_inst_arith(
+                    OpCode::Add, module.new_type(TypeKind::Ptr), ptr,
+                    offset_value);
+                auto store = module.new_inst_store(offset_ptr, init);
+
+                state.add_inst(offset_value);
+                state.add_inst(offset_ptr);
+                state.add_inst(store);
+            }
+        }
+
+        else
+            PANIC("invalid type for lit", node_type->kind);
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::AddrOf)) {
         auto data = conv::unary(*node);
 

@@ -280,9 +280,14 @@ struct Type {
 
     [[nodiscard]] auto as_func() const -> Func;
 
+    struct StructField {
+        size_t offset;
+        Type*  type;
+    };
+
     /// Return a map of field name to field type
     [[nodiscard]] auto as_struct_get_fields() const
-        -> std::unordered_map<std::string_view, Type*>;
+        -> std::unordered_map<std::string_view, StructField>;
 
     [[nodiscard]] auto undistinct() -> Type* {
         auto t = this;
@@ -298,12 +303,66 @@ struct Type {
 
     // ========================================================================
 
+    [[nodiscard]] constexpr auto alignment() const -> size_t {
+        switch (kind) {
+            case TypeKind::Err:
+            case TypeKind::Type:
+            case TypeKind::Void:
+            case TypeKind::UntypedInt:
+            case TypeKind::Lit: return 0;
+            case TypeKind::Uint64:
+            case TypeKind::Int64: return alignof(uint64_t);
+            case TypeKind::Uint32:
+            case TypeKind::Int32: return alignof(uint32_t);
+            case TypeKind::Uint16:
+            case TypeKind::Int16: return alignof(uint16_t);
+            case TypeKind::Uint8:
+            case TypeKind::Int8: return alignof(uint8_t);
+            case TypeKind::Usize:
+            case TypeKind::Isize: return alignof(size_t);
+
+            case TypeKind::Bool: return alignof(bool);
+
+            case TypeKind::Float32: return alignof(float);
+            case TypeKind::Float64: return alignof(double);
+
+            // made of 2 pointers, so double the size of a pointer
+            case TypeKind::StrView: return alignof(uintptr_t) * 2; break;
+
+            case TypeKind::Ptr:
+            case TypeKind::PtrConst:
+            case TypeKind::MultiPtr:
+            case TypeKind::MultiPtrConst: return alignof(uintptr_t); break;
+
+            case TypeKind::Struct: {
+                size_t align = 1;
+                for (auto it : inner) align = std::max(align, it->alignment());
+                return align;
+            }
+            case TypeKind::StructField:
+            case TypeKind::LitField: return inner[0]->alignment();
+
+            case TypeKind::Nil:
+            case TypeKind::Func:
+            case TypeKind::FuncWithVarArgs:
+            case TypeKind::BoundFunc: return 0;
+
+            // this can't be instantiated, so it should not have alignment
+            case TypeKind::Pack: return 0;
+
+            case TypeKind::Distinct: return inner[0]->alignment();
+        }
+
+        return 0;
+    }
+
     [[nodiscard]] constexpr auto size() const -> size_t {
         switch (kind) {
             case TypeKind::Err:
             case TypeKind::Type:
             case TypeKind::Void:
-            case TypeKind::UntypedInt: return 0;
+            case TypeKind::UntypedInt:
+            case TypeKind::Lit: return 0;
             case TypeKind::Uint64:
             case TypeKind::Int64: return sizeof(uint64_t);
             case TypeKind::Uint32:
@@ -328,10 +387,15 @@ struct Type {
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
 
-            case TypeKind::Struct:
-            case TypeKind::Lit: {
+            case TypeKind::Struct: {
                 size_t total{};
-                for (auto it : inner) total += it->size();
+
+                for (auto it : inner) {
+                    auto align = it->alignment();
+                    total = (total + (align - 1)) & -align;
+                    total += it->size();
+                }
+
                 return total;
             }
             case TypeKind::StructField:
