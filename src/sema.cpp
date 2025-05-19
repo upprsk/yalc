@@ -1148,6 +1148,7 @@ void sema_stmt(Ast& ast, Node* node, State& state, Context& ctx);
 // ----------------------------------------------------------------------------
 
 // FIXME: this needs a lot of rework to be ok
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
     auto& ts = *state.ts;
     auto& er = *state.er;
@@ -1157,7 +1158,16 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
     auto rty = data.receiver->get_type();
     auto unw = rty->unpacked()->undistinct();
 
-    if (unw->is_strview()) {
+    if (unw->is_type()) {
+        auto ty = eval_expr_to_type(data.receiver, state, ctx);
+        auto fn = ts.get_function_from_type(*ty, data.name);
+        if (fn) {
+            node->set_type(fn->get_type());
+            return;
+        }
+    }
+
+    else if (unw->is_strview()) {
         if (data.name == "ptr") {
             node->set_type(ts.new_mptr(ts.get_u8(), true));
             return;

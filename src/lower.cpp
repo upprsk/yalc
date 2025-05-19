@@ -224,6 +224,13 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
         visit_children(ctx, node);
     }
 
+    // direct call of namespaced function
+    else if (data.callee->is_oneof(ast::NodeKind::Field) &&
+             conv::field(*data.callee).receiver->get_type()->is_type()) {
+        PANIC("calling namespaced functions has not been implemented",
+              conv::field(*data.callee).name);
+    }
+
     // method call
     else if (data.callee->is_oneof(ast::NodeKind::Field) &&
              func_type.is_bound) {
