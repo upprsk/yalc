@@ -5,14 +5,14 @@ def Args = struct {
     argv: [*][*]u8,
 };
 
-func shift(args: *Args) {
+func Args.shift(args: *Args) {
     args.argc = args.argc - 1;
     args.argv = (args.argv as usize + sizeof([*][*]u8)) as [*][*]u8;
 
     return;
 }
 
-func print_args(args: *Args) {
+func Args.print_args(args: *Args) {
     var i = 0;
     while i < args.argc {
         c_printf("- args[%d]: %s\n".ptr, i, args.argv[i]);
@@ -26,8 +26,8 @@ func print_args(args: *Args) {
 func main(argc: i32, argv: [*][*]u8) i32 {
     var args: Args = .{ .argc=argc, .argv=argv };
 
-    shift(&args);
-    print_args(&args);
+    args.shift();
+    args.print_args();
     return 0;
 }
 
