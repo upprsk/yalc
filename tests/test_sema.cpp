@@ -51,7 +51,7 @@ auto gen_ast_typed_many(std::vector<std::string> sources) -> json {
     auto fs = yal::FileStore{};
     auto er = yal::ErrorReporter{fs, ms.f};
 
-    std::set<yal::FileId> filenames;
+    std::unordered_set<yal::FileId> filenames;
     for (auto const& [idx, source] : rv::enumerate(sources)) {
         filenames.insert(fs.add(fmt::format(":memory-{}:", idx), source));
     }
