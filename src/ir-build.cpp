@@ -184,6 +184,14 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
             // TODO: when target is smaller
         }
 
+        // NOTE: just converting directly, which is not always correct...
+        // (although, if we allowed the cast in sema, then it should be usize of
+        // isize)
+        if (source->is_ptr() || source->is_mptr()) {
+            state.sstack_push(arg);
+            return;
+        }
+
         // TODO: when source is not an integer
     }
 
@@ -191,6 +199,14 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
         // if both sides are pointers, at the IR level there is not
         // difference, push the inst back in the stack
         if (source->is_ptr() || source->is_mptr()) {
+            state.sstack_push(arg);
+            return;
+        }
+
+        // NOTE: just converting directly, which is not always correct...
+        // (although, if we allowed the cast in sema, then it should be usize of
+        // isize)
+        if (source->is_integral()) {
             state.sstack_push(arg);
             return;
         }
@@ -564,6 +580,38 @@ void build_assign_direct(Node* node, State& state, Context& ctx) {
 
         auto inst = module.new_inst_store(ptr, rhs);
         state.add_inst(inst);
+    }
+
+    else if (assign_lhs->is_oneof(ast::NodeKind::Field)) {
+        auto data = conv::field(*assign_lhs);
+
+        build_expr(data.receiver, state, ctx);
+        auto receiver = state.sstack_pop();
+        auto receiver_type = data.receiver->get_type()->undistinct();
+
+        auto rhs = state.sstack_pop();
+
+        // automatic dereference of pointers to structs!
+        if (receiver_type->is_ptr()) {
+            receiver_type = receiver_type->inner[0]->undistinct();
+        }
+
+        if (receiver_type->is_struct()) {
+            auto field = receiver_type->as_struct_get_fields().at(data.name);
+
+            auto offset_value = module.new_inst_int_const(
+                module.get_type_usize(), field.offset);
+            auto offset_ptr = module.new_inst_arith(
+                OpCode::Add, module.get_type_ptr(), receiver, offset_value);
+            auto store = module.new_inst_store(offset_ptr, rhs);
+
+            state.add_inst(offset_value);
+            state.add_inst(offset_ptr);
+            state.add_inst(store);
+        }
+
+        else
+            PANIC("invalid receiver type for field", *receiver_type);
     }
 
     else {

@@ -1566,8 +1566,11 @@ void fixup_expr_pack(types::TypeStore& ts, Node* pack) {
     std::vector<types::Type*> types;
     for (auto n : inits) {
         ASSERT(n != nullptr);
-        ASSERT(n->get_type() != nullptr);
-        types.push_back(n->get_type());
+        if (n->get_type() == nullptr) {
+            types.push_back(ts.get_error());
+        } else {
+            types.push_back(n->get_type());
+        }
     }
 
     pack->set_type(ts.new_pack(types));
@@ -1944,6 +1947,14 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                                    "multi-pointer inner element has type {}",
                                    *inner_type);
                 }
+
+                coerce_types_and_fixup_untyped(ast, lhs_item->get_type(),
+                                               rhs_item->get_type(), lhs_item,
+                                               rhs_item, state);
+            }
+
+            else if (lhs_item->is_oneof(ast::NodeKind::Field)) {
+                sema_expr(ast, lhs_item, state, ctx);
 
                 coerce_types_and_fixup_untyped(ast, lhs_item->get_type(),
                                                rhs_item->get_type(), lhs_item,
