@@ -494,6 +494,11 @@ enum class NodeKind : uint16_t {
     /// - `children` contains the child statements.
     UnscopedGroup,
 
+    /// A group of assignments. This is needed so that `AssignDirect` works with
+    /// multiple assigments that read from the same variables (like a swap: x, y
+    /// = y, x;
+    UnscopedAssign,
+
     /// A de-sugared assignment, only has one item in the left hand side and one
     /// element in the right hand side.
     ///
@@ -637,6 +642,8 @@ public:
 
     void transmute_to_unscoped_group(
         std::span<Node *> allocated_unscoped_items);
+    void transmute_to_unscoped_assign(
+        std::span<Node *> allocated_unscoped_items);
     void transmute_to_call_direct(Decl             *callee,
                                   std::span<Node *> allocated_args);
 
@@ -751,6 +758,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Discard: name = "Discard"; break;
         case NodeKind::Discarded: name = "Discarded"; break;
         case NodeKind::UnscopedGroup: name = "UnscopedGroup"; break;
+        case NodeKind::UnscopedAssign: name = "UnscopedAssign"; break;
         case NodeKind::AssignDirect: name = "AssignDirect"; break;
         case NodeKind::AssignDirectPack: name = "AssignDirectPack"; break;
         case NodeKind::DeclLocalVarDirect: name = "DeclLocalVarDirect"; break;

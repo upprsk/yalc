@@ -434,6 +434,86 @@ void build_expr(Node* node, State& state, Context& ctx) {
 // ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void build_assign_direct(Node* node, State& state, Context& ctx) {
+    auto& module = state.module;
+    auto  data = conv::assign(*node);
+    auto  assign_lhs = data.lhs;
+
+    if (assign_lhs->is_oneof(ast::NodeKind::Id)) {
+        auto lhs = state.get_local(conv::id(*assign_lhs).to);
+        auto rhs = state.sstack_pop();
+
+        auto d = assign_lhs->get_decl();
+
+        // target is a stack variable, need to use a store
+        if (d->is_stack_var()) {
+            auto inst = module.new_inst_store(lhs, rhs);
+            state.add_inst(inst);
+        }
+
+        // target is in a temporary, just set it
+        else {
+            auto inst = module.new_inst_settmp(lhs, rhs);
+            state.add_inst(inst);
+        }
+    }
+
+    else if (assign_lhs->is_oneof(ast::NodeKind::Deref)) {
+        build_expr_lvalue(conv::unary(*assign_lhs).child, state, ctx);
+
+        auto lhs = state.sstack_pop();
+        auto rhs = state.sstack_pop();
+        ASSERT(lhs->type->is_ptr(), *lhs->type);
+
+        auto inst = module.new_inst_store(lhs, rhs);
+        state.add_inst(inst);
+    }
+
+    else if (assign_lhs->is_oneof(ast::NodeKind::Index)) {
+        auto [ptr, type] = build_index_ptr(assign_lhs, state, ctx);
+
+        auto rhs = state.sstack_pop();
+        ASSERT(*rhs->type == *type);
+
+        auto inst = module.new_inst_store(ptr, rhs);
+        state.add_inst(inst);
+    }
+
+    else {
+        UNREACHABLE("invalid lhs in AssignDirect", assign_lhs->get_kind());
+    }
+}
+
+void build_unscoped_assign(Node* node, State& state, Context& ctx) {
+    auto& module = state.module;
+    auto  data = conv::unscoped_assign(*node);
+
+    // handle the rhs of all assignments
+    for (auto item : data.items) {
+        if (item->is_oneof(ast::NodeKind::AssignDirect)) {
+            auto data = conv::assign(*item);
+            build_expr(data.rhs, state, ctx);
+        }
+
+        else {
+            PANIC("not implemented (unscoped assign)", item->get_kind());
+        }
+    }
+
+    // process the lhs of all assignments in reverse (because the results are in
+    // the shadow stack)
+    for (auto item : rv::reverse(data.items)) {
+        if (item->is_oneof(ast::NodeKind::AssignDirect)) {
+            build_assign_direct(item, state, ctx);
+        }
+
+        else {
+            PANIC("not implemented (unscoped assign)", item->get_kind());
+        }
+    }
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void build_stmt(Node* node, State& state, Context& ctx) {
     auto& module = state.module;
 
@@ -461,6 +541,11 @@ void build_stmt(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::UnscopedGroup)) {
         auto data = conv::unscoped_group(*node);
         for (auto item : data.items) build_stmt(item, state, ctx);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::UnscopedAssign)) {
+        build_unscoped_assign(node, state, ctx);
         return;
     }
 
@@ -511,61 +596,6 @@ void build_stmt(Node* node, State& state, Context& ctx) {
         }
 
         PANIC("var decl with multiple returns not implemented");
-        return;
-    }
-
-    if (node->is_oneof(ast::NodeKind::AssignDirect)) {
-        auto data = conv::assign(*node);
-        auto assign_lhs = data.lhs;
-
-        if (assign_lhs->is_oneof(ast::NodeKind::Id)) {
-            auto lhs = state.get_local(conv::id(*assign_lhs).to);
-
-            build_expr(data.rhs, state, ctx);
-            auto rhs = state.sstack_pop();
-
-            auto d = assign_lhs->get_decl();
-
-            // target is a stack variable, need to use a store
-            if (d->is_stack_var()) {
-                auto inst = module.new_inst_store(lhs, rhs);
-                state.add_inst(inst);
-            }
-
-            // target is in a temporary, just set it
-            else {
-                auto inst = module.new_inst_settmp(lhs, rhs);
-                state.add_inst(inst);
-            }
-        }
-
-        else if (assign_lhs->is_oneof(ast::NodeKind::Deref)) {
-            build_expr_lvalue(conv::unary(*assign_lhs).child, state, ctx);
-            build_expr(data.rhs, state, ctx);
-
-            auto rhs = state.sstack_pop();
-            auto lhs = state.sstack_pop();
-            ASSERT(lhs->type->is_ptr(), *lhs->type);
-
-            auto inst = module.new_inst_store(lhs, rhs);
-            state.add_inst(inst);
-        }
-
-        else if (assign_lhs->is_oneof(ast::NodeKind::Index)) {
-            auto [ptr, type] = build_index_ptr(assign_lhs, state, ctx);
-            build_expr(data.rhs, state, ctx);
-
-            auto rhs = state.sstack_pop();
-            ASSERT(*rhs->type == *type);
-
-            auto inst = module.new_inst_store(ptr, rhs);
-            state.add_inst(inst);
-        }
-
-        else {
-            UNREACHABLE("invalid lhs in AssignDirect", assign_lhs->get_kind());
-        }
-
         return;
     }
 

@@ -193,7 +193,7 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
         }
     }
 
-    node->transmute_to_unscoped_group(ast.allocate_node_span(items));
+    node->transmute_to_unscoped_assign(ast.allocate_node_span(items));
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)

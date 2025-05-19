@@ -10,9 +10,22 @@
 
 namespace yal::ast {
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void Node::transmute_to_unscoped_group(
     std::span<Node*> allocated_unscoped_items) {
     kind = NodeKind::UnscopedGroup;
+    children = allocated_unscoped_items;
+
+    ASSERT(decl == nullptr);
+    ASSERT(type != nullptr);
+    ASSERT(type->is_void());
+    ASSERT(std::holds_alternative<std::monostate>(data));
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void Node::transmute_to_unscoped_assign(
+    std::span<Node*> allocated_unscoped_items) {
+    kind = NodeKind::UnscopedAssign;
     children = allocated_unscoped_items;
 
     ASSERT(decl == nullptr);

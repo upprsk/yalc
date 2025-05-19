@@ -295,6 +295,10 @@ struct UnscopedGroup {
     std::span<Node*> items;
 };
 
+struct UnscopedAssign {
+    std::span<Node*> items;
+};
+
 struct DeclLocalVarDirect {
     Node* init{};
 };
@@ -637,6 +641,11 @@ struct CallIndirect {
 
 [[nodiscard]] constexpr auto unscoped_group(Node const& n) -> UnscopedGroup {
     ASSERT(n.get_kind() == NodeKind::UnscopedGroup);
+    return {.items = n.get_children()};
+}
+
+[[nodiscard]] constexpr auto unscoped_assign(Node const& n) -> UnscopedAssign {
+    ASSERT(n.get_kind() == NodeKind::UnscopedAssign);
     return {.items = n.get_children()};
 }
 

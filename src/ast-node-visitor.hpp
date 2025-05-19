@@ -399,6 +399,13 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
                         std::forward<decltype(args)>(args)...);
             }
         } break;
+        case NodeKind::UnscopedAssign: {
+            auto data = conv::unscoped_assign(*node);
+            for (auto c : data.items) {
+                visitor(ast, c, std::forward<decltype(visitor)>(visitor),
+                        std::forward<decltype(args)>(args)...);
+            }
+        } break;
 
         case NodeKind::AssignDirect:
         case NodeKind::AssignDirectPack: {
