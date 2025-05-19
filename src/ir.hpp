@@ -12,7 +12,7 @@
 
 namespace yal::ir {
 
-enum class TypeKind {
+enum class TypeKind : uint8_t {
     Err,
 
     Uint64,
@@ -254,17 +254,43 @@ struct Func {
 
 struct Module {
     struct TypeCache {
+        Type* uint64;
+        Type* int64;
+        Type* uint32;
+        Type* int32;
+        Type* uint16;
+        Type* int16;
+        Type* uint8;
+        Type* int8;
+
         Type* usize;
         Type* isize;
+
+        Type* float32;
+        Type* float64;
+
         Type* ptr;
     };
 
 public:
     Module() {
         cache = {
-            .usize = new_type(TypeKind::Usize),
-            .isize = new_type(TypeKind::Isize),
-            .ptr = new_type(TypeKind::Ptr),
+            .uint64 = new_type_of(TypeKind::Uint64),
+            .int64 = new_type_of(TypeKind::Int64),
+            .uint32 = new_type_of(TypeKind::Uint32),
+            .int32 = new_type_of(TypeKind::Int32),
+            .uint16 = new_type_of(TypeKind::Uint16),
+            .int16 = new_type_of(TypeKind::Int16),
+            .uint8 = new_type_of(TypeKind::Uint8),
+            .int8 = new_type_of(TypeKind::Int8),
+
+            .usize = new_type_of(TypeKind::Usize),
+            .isize = new_type_of(TypeKind::Isize),
+
+            .float32 = new_type_of(TypeKind::Float32),
+            .float64 = new_type_of(TypeKind::Float64),
+
+            .ptr = new_type_of(TypeKind::Ptr),
         };
     }
 
@@ -373,7 +399,7 @@ public:
         return blocks.alloc<Block*>(next);
     }
 
-    [[nodiscard]] auto new_type(TypeKind kind) -> Type* {
+    [[nodiscard]] auto new_type_of(TypeKind kind) -> Type* {
         return types.create<Type>(kind);
     }
 
@@ -386,12 +412,52 @@ public:
         return types.alloc_size<Type*>(sz);
     }
 
+    [[nodiscard]] constexpr auto get_type_uint64() const -> Type* {
+        return cache.uint64;
+    }
+
+    [[nodiscard]] constexpr auto get_type_int64() const -> Type* {
+        return cache.int64;
+    }
+
+    [[nodiscard]] constexpr auto get_type_uint32() const -> Type* {
+        return cache.uint32;
+    }
+
+    [[nodiscard]] constexpr auto get_type_int32() const -> Type* {
+        return cache.int32;
+    }
+
+    [[nodiscard]] constexpr auto get_type_uint16() const -> Type* {
+        return cache.uint16;
+    }
+
+    [[nodiscard]] constexpr auto get_type_int16() const -> Type* {
+        return cache.int16;
+    }
+
+    [[nodiscard]] constexpr auto get_type_uint8() const -> Type* {
+        return cache.uint8;
+    }
+
+    [[nodiscard]] constexpr auto get_type_int8() const -> Type* {
+        return cache.int8;
+    }
+
     [[nodiscard]] constexpr auto get_type_usize() const -> Type* {
         return cache.usize;
     }
 
     [[nodiscard]] constexpr auto get_type_isize() const -> Type* {
         return cache.isize;
+    }
+
+    [[nodiscard]] constexpr auto get_type_float32() const -> Type* {
+        return cache.float32;
+    }
+
+    [[nodiscard]] constexpr auto get_type_float64() const -> Type* {
+        return cache.float64;
     }
 
     [[nodiscard]] constexpr auto get_type_ptr() const -> Type* {

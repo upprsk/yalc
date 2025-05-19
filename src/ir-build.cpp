@@ -125,24 +125,24 @@ struct Context {
 
 auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
     switch (ty.kind) {
-        case types::TypeKind::Uint64: return mod.new_type(TypeKind::Uint64);
-        case types::TypeKind::Int64: return mod.new_type(TypeKind::Int64);
-        case types::TypeKind::Uint32: return mod.new_type(TypeKind::Uint32);
-        case types::TypeKind::Int32: return mod.new_type(TypeKind::Int32);
-        case types::TypeKind::Uint16: return mod.new_type(TypeKind::Uint16);
-        case types::TypeKind::Int16: return mod.new_type(TypeKind::Int16);
-        case types::TypeKind::Uint8: return mod.new_type(TypeKind::Uint8);
-        case types::TypeKind::Int8: return mod.new_type(TypeKind::Int8);
-        case types::TypeKind::Usize: return mod.new_type(TypeKind::Usize);
-        case types::TypeKind::Isize: return mod.new_type(TypeKind::Isize);
-        case types::TypeKind::Bool: return mod.new_type(TypeKind::Uint8);
-        case types::TypeKind::Float32: return mod.new_type(TypeKind::Float32);
-        case types::TypeKind::Float64: return mod.new_type(TypeKind::Float64);
+        case types::TypeKind::Uint64: return mod.get_type_uint64();
+        case types::TypeKind::Int64: return mod.get_type_int64();
+        case types::TypeKind::Uint32: return mod.get_type_uint32();
+        case types::TypeKind::Int32: return mod.get_type_int32();
+        case types::TypeKind::Uint16: return mod.get_type_uint16();
+        case types::TypeKind::Int16: return mod.get_type_int16();
+        case types::TypeKind::Uint8: return mod.get_type_uint8();
+        case types::TypeKind::Int8: return mod.get_type_int8();
+        case types::TypeKind::Usize: return mod.get_type_usize();
+        case types::TypeKind::Isize: return mod.get_type_isize();
+        case types::TypeKind::Bool: return mod.get_type_uint8();
+        case types::TypeKind::Float32: return mod.get_type_float32();
+        case types::TypeKind::Float64: return mod.get_type_float64();
 
         case types::TypeKind::Ptr:
         case types::TypeKind::PtrConst:
         case types::TypeKind::MultiPtr:
-        case types::TypeKind::MultiPtrConst: return mod.new_type(TypeKind::Ptr);
+        case types::TypeKind::MultiPtrConst: return mod.get_type_ptr();
 
         case types::TypeKind::Pack:
             if (ty.inner.size() == 1)
@@ -151,6 +151,8 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
         case types::TypeKind::Distinct:
             return create_ir_type_from_general(mod, *ty.inner[0]);
+
+        case types::TypeKind::Struct: return mod.new_type_of(TypeKind::Struct);
 
         default: PANIC("invalid type", ty.kind);
     }
@@ -272,7 +274,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::Field) &&
         node->get_child(0)->is_oneof(ast::NodeKind::Str) &&
         conv::field(*node).name == "ptr") {
-        auto type = module.new_type(TypeKind::Ptr);
+        auto type = module.get_type_ptr();
         auto inst = module.new_inst_str_const(
             type, conv::str(*node->get_child(0)).value);
         state.add_and_push_inst(inst);
@@ -290,10 +292,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
             auto field = receiver_type->as_struct_get_fields().at(data.name);
 
             auto offset_value = module.new_inst_int_const(
-                module.new_type(TypeKind::Usize), field.offset);
+                module.get_type_usize(), field.offset);
             auto offset_ptr = module.new_inst_arith(
-                OpCode::Add, module.new_type(TypeKind::Ptr), receiver,
-                offset_value);
+                OpCode::Add, module.get_type_ptr(), receiver, offset_value);
 
             auto type = create_ir_type_from_general(module, *field.type);
             auto load = module.new_inst_load(type, offset_ptr);
@@ -315,9 +316,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
         if (node_type->is_struct()) {
             auto fields = node_type->as_struct_get_fields();
-            auto ptr = module.new_inst_alloca(module.new_type(TypeKind::Struct),
-                                              node_type->alignment(),
-                                              node_type->size());
+            auto ptr = module.new_inst_alloca(
+                module.new_type_of(TypeKind::Struct), node_type->alignment(),
+                node_type->size());
             state.add_and_push_inst(ptr);
 
             for (auto node : data.items) {
@@ -328,10 +329,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
                 auto field = fields.at(data.key);
                 auto offset_value = module.new_inst_int_const(
-                    module.new_type(TypeKind::Usize), field.offset);
+                    module.get_type_usize(), field.offset);
                 auto offset_ptr = module.new_inst_arith(
-                    OpCode::Add, module.new_type(TypeKind::Ptr), ptr,
-                    offset_value);
+                    OpCode::Add, module.get_type_ptr(), ptr, offset_value);
                 auto store = module.new_inst_store(offset_ptr, init);
 
                 state.add_inst(offset_value);
@@ -628,9 +628,8 @@ void build_stmt(Node* node, State& state, Context& ctx) {
             auto type = create_ir_type_from_general(module, *d->get_type());
             ASSERT(*init->type == *type);
 
-            auto alloc =
-                module.new_inst_alloca(module.new_type(TypeKind::Ptr),
-                                       type->alignment(), type->size());
+            auto alloc = module.new_inst_alloca(
+                module.get_type_ptr(), type->alignment(), type->size());
             auto store = module.new_inst_store(alloc, init);
 
             state.add_inst(alloc);

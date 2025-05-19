@@ -5,10 +5,13 @@ def Args = struct {
     argv: [*][*]u8,
 };
 
+func print_args(args: *Args) {
+}
+
 func main(argc: i32, argv: [*][*]u8) i32 {
     var args: Args = .{ .argc=argc, .argv=argv };
 
-    print_args(args);
+    print_args(&args);
     return 0;
 }
 
