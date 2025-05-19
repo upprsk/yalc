@@ -644,6 +644,7 @@ public:
         std::span<Node *> allocated_unscoped_items);
     void transmute_to_unscoped_assign(
         std::span<Node *> allocated_unscoped_items);
+    void transmute_to_const_int(types::Type *new_type, uint64_t v);
     void transmute_to_call_direct(Decl             *callee,
                                   std::span<Node *> allocated_args);
 

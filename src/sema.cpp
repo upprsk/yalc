@@ -1285,6 +1285,16 @@ void sema_call(Ast& ast, Node* node, State& state, Context& ctx) {
         coerce_types_and_fixup_untyped(ast, param, arg->get_type(), nullptr,
                                        node->get_child_ptrref(i), state);
     }
+
+    // handle calls to `sizeof()`
+    if (data.callee->is_oneof(ast::NodeKind::Id)) {
+        if (auto d = data.callee->get_decl();
+            d && d->link_name == "sizeof" && data.args.size() > 0) {
+            auto arg = eval_expr_to_type(data.args[0], state, ctx);
+            auto size = arg->size();
+            node->transmute_to_const_int(ts.get_usize(), size);
+        }
+    }
 }
 
 void sema_lit(Ast& ast, Node* node, State& state, Context& ctx) {

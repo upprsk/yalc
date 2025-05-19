@@ -726,6 +726,13 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
 
         root_env.define(ds, "nil", nullptr, {.type = ts.get_nil(), .data = {}},
                         {});
+
+        root_env.define(ds, "sizeof", nullptr,
+                        {.type = ts.new_func(
+                             ts.new_pack(std::array{ts.get_type()}),
+                             ts.new_pack(std::array{ts.get_usize()}), false),
+                         .data = {}},
+                        {});
     }
 
     auto m = conv::module(*mod);

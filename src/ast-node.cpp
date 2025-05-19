@@ -42,6 +42,13 @@ void Node::transmute_to_call_direct(Decl*            callee,
     data = std::monostate{};
 }
 
+void Node::transmute_to_const_int(types::Type* new_type, uint64_t v) {
+    kind = NodeKind::Int;
+    type = new_type;
+    data = v;
+    children = {};
+}
+
 void to_json(json& j, Node const& n) {
     j = json{
         {"kind", fmt::to_string(n.get_kind())},
