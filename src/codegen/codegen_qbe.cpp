@@ -74,6 +74,7 @@ auto to_qbe_temp(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
         case ir::TypeKind::Ptr:
+        case ir::TypeKind::Array:
         case ir::TypeKind::Struct:
         case ir::TypeKind::StrView: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";

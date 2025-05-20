@@ -1161,6 +1161,18 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
         }
     }
 
+    else if (unw->is_array()) {
+        if (data.name == "ptr") {
+            node->set_type(ts.new_mptr(ts.get_u8(), true));
+            return;
+        }
+
+        if (data.name == "len") {
+            node->set_type(ts.get_usize());
+            return;
+        }
+    }
+
     else if (unw->is_struct()) {
         auto fields = unw->as_struct_get_fields();
         auto it = fields.find(data.name);
@@ -1224,6 +1236,11 @@ void sema_index(Ast& ast, Node* node, State& state, Context& ctx) {
 
     if (unw->is_strview()) {
         node->set_type(ts.get_u8());
+        return;
+    }
+
+    if (unw->is_array()) {
+        node->set_type(unw->inner[0]);
         return;
     }
 
@@ -1292,6 +1309,55 @@ void sema_call(Ast& ast, Node* node, State& state, Context& ctx) {
             node->transmute_to_const_int(ts.get_usize(), size);
         }
     }
+}
+
+void sema_array(Ast& ast, Node* node, State& state, Context& ctx) {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
+    auto  data = conv::array(*node);
+
+    sema_expr(ast, data.inner, state, ctx);
+    sema_expr(ast, data.size, state, ctx);
+
+    auto inner_ty = eval_expr_to_type(data.inner, state, ctx);
+
+    uint32_t count;
+    if (data.size) {
+        auto c = eval_expr(data.size, state, ctx);
+        if (!c.type->is_integral()) {
+            er.report_error(data.size->get_loc(),
+                            "can not use non-integral type {} for array size",
+                            *c.type);
+            count = data.items.size();
+        }
+
+        else {
+            fixup_untyped(ast, ts.get_usize(), data.size, state);
+
+            count = c.get_data_uint();
+        }
+
+        if (count != data.items.size()) {
+            er.report_error(node->get_loc(),
+                            "array expects {} items, but received {}", count,
+                            data.items.size());
+            er.report_note(data.size->get_loc(), "{} items here", count);
+        }
+    }
+
+    else {
+        count = data.items.size();
+    }
+
+    for (auto it : data.items) {
+        sema_expr(ast, it, state, ctx);
+
+        coerce_types_and_fixup_untyped(ast, inner_ty, it->get_type(),
+                                       data.inner, it, state);
+    }
+
+    auto ty = ts.new_array_type(inner_ty, count);
+    node->set_type(ty);
 }
 
 void sema_lit(Ast& ast, Node* node, State& state, Context& ctx) {
@@ -1482,6 +1548,11 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Call)) {
         sema_call(ast, node, state, ctx);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Array)) {
+        sema_array(ast, node, state, ctx);
         return;
     }
 

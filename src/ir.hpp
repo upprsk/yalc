@@ -32,6 +32,7 @@ enum class TypeKind : uint8_t {
 
     Ptr,
     StrView,
+    Array,
     Struct,
 };
 
@@ -44,6 +45,10 @@ struct Type {
 
     [[nodiscard]] constexpr auto is_strview() const -> bool {
         return kind == TypeKind::StrView;
+    }
+
+    [[nodiscard]] constexpr auto is_array() const -> bool {
+        return kind == TypeKind::Array;
     }
 
     [[nodiscard]] constexpr auto is_struct() const -> bool {
@@ -535,6 +540,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Float64: name = "Float64"; break;
         case TypeKind::Ptr: name = "Ptr"; break;
         case TypeKind::StrView: name = "StrView"; break;
+        case TypeKind::Array: name = "Array"; break;
         case TypeKind::Struct: name = "Struct"; break;
     }
 

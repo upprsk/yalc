@@ -65,6 +65,12 @@ enum class TypeKind : uint16_t {
     /// bytes.
     StrView,
 
+    /// An array.
+    ///
+    /// - `inner` contains the inner array type.
+    /// - `count` contains the size of the array.
+    Array,
+
     /// A struct.
     ///
     /// - `inner` contains a list of `StructField`.
@@ -241,6 +247,10 @@ struct Type {
         return kind == TypeKind::StrView;
     }
 
+    [[nodiscard]] constexpr auto is_array() const -> bool {
+        return kind == TypeKind::Array;
+    }
+
     [[nodiscard]] constexpr auto is_struct() const -> bool {
         return kind == TypeKind::Struct;
     }
@@ -338,6 +348,8 @@ struct Type {
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return alignof(uintptr_t); break;
 
+            case TypeKind::Array: return inner[0]->alignment();
+
             case TypeKind::Struct: {
                 size_t align = 1;
                 for (auto it : inner) align = std::max(align, it->alignment());
@@ -391,6 +403,8 @@ struct Type {
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
 
+            case TypeKind::Array: return inner[0]->size() * count;
+
             case TypeKind::Struct: {
                 size_t total{};
 
@@ -432,6 +446,7 @@ struct Type {
     }
 
     TypeKind         kind;
+    uint32_t         count{};
     std::string_view id;
     std::span<Type*> inner;
 };
@@ -566,6 +581,10 @@ public:
 
     [[nodiscard]] auto new_pack(std::span<Type* const> inner) -> Type*;
 
+    [[nodiscard]] auto new_array_type(Type* inner, uint32_t count) -> Type* {
+        return new_type(TypeKind::Array, std::array{inner}, "", count);
+    }
+
     [[nodiscard]] auto new_struct(std::span<Type* const> fields) -> Type* {
         return new_type(TypeKind::Struct, fields);
     }
@@ -601,9 +620,11 @@ public:
     }
 
     [[nodiscard]] auto new_type(TypeKind kind, std::span<Type* const> inner,
-                                std::string_view id = "") -> Type* {
+                                std::string_view id = "", uint32_t count = 0)
+        -> Type* {
         auto ty = types.create<TypeItem>(
             head, Type{.kind = kind,
+                       .count = count,
                        .id = strings.alloc_string_view(id),
                        .inner = new_array(inner)});
         head = ty;
@@ -717,6 +738,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Float32: name = "f32"; break;
         case TypeKind::Float64: name = "f64"; break;
         case TypeKind::StrView: name = "string_view"; break;
+        case TypeKind::Array: name = "Array"; break;
         case TypeKind::Struct: name = "struct"; break;
         case TypeKind::StructField: name = "struct.field"; break;
         case TypeKind::Lit: name = "Lit"; break;

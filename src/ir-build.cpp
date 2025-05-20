@@ -255,6 +255,11 @@ auto build_index_ptr(Node* node, State& state, Context& ctx)
         receiver = module.new_inst_load(module.get_type_ptr(), receiver);
 
         state.add_inst(receiver);
+    } else if (receiver->type->is_array()) {
+        auto receiver_type = data.receiver->get_type();
+        ASSERT(receiver_type->is_array());
+
+        sizeof_receiver = receiver_type->inner[0]->size();
     } else {
         sizeof_receiver = receiver->type->size();
     }
@@ -387,9 +392,52 @@ void build_expr(Node* node, State& state, Context& ctx) {
                 PANIC("invalid field for string view", data.name);
         }
 
+        else if (receiver_type->is_array()) {
+            if (data.name == "ptr") {
+                // no conversion needed, as we decay to a pointer in the IR
+                state.sstack_push(receiver);
+            }
+
+            else if (data.name == "len") {
+                auto len_value = module.new_inst_int_const(
+                    module.get_type_usize(), receiver_type->count);
+                state.add_and_push_inst(len_value);
+            } else
+                PANIC("invalid field for array", data.name);
+        }
+
         else
             PANIC("invalid receiver type for field", *receiver_type);
 
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Array)) {
+        auto data = conv::array(*node);
+        auto node_type = node->get_type();
+
+        auto type = module.new_type_of(TypeKind::Array);
+        auto ptr = module.new_inst_alloca(type, node_type->alignment(),
+                                          node_type->size());
+
+        state.add_inst(ptr);
+
+        for (auto [idx, it] : rv::enumerate(data.items)) {
+            build_expr(it, state, ctx);
+            auto v = state.sstack_pop();
+
+            auto offset_value = module.new_inst_int_const(
+                module.get_type_usize(), idx * it->get_type()->size());
+            auto offset = module.new_inst_arith(OpCode::Add, offset_value->type,
+                                                ptr, offset_value);
+            auto store = module.new_inst_store(offset, v);
+
+            state.add_inst(offset_value);
+            state.add_inst(offset);
+            state.add_inst(store);
+        }
+
+        state.sstack_push(ptr);
         return;
     }
 
