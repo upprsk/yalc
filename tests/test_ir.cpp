@@ -754,6 +754,31 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
+    run_test(ctx, p, "count spaces in string",
+             R"(
+module main;
+
+func main() i32 {
+    var s = "this is a test string!";
+
+    var spaces: usize = 0;
+    var i: usize = 0;
+    while i < s.len {
+        defer i = i + 1;
+
+        if s[i] == 0x20 {
+            spaces = spaces + 1;
+        }
+    }
+
+    c_printf("found %d spaces\n".ptr, spaces);
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
 
     print_test_results("IR", ctx);

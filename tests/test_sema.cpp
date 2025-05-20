@@ -1094,8 +1094,8 @@ func c_printf(fmt: [*]const u8, ...);
 module main;
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    var n: usize = 4;
-    var arr = c_malloc(10 * n) as [*]i32;
+    var n = 4;
+    var arr = c_malloc(10 * n as usize) as [*]i32;
     defer c_free(arr);
 
     var i = 0;
