@@ -1,33 +1,19 @@
 module main;
 
-def Args = struct {
-    argc: i32,
-    argv: [*][*]u8,
-};
+func main() i32 {
+    var s = "this is a test string!";
 
-func Args.shift(args: *Args) {
-    args.argc = args.argc - 1;
-    args.argv = (args.argv as usize + sizeof([*][*]u8)) as [*][*]u8;
+    var spaces: usize = 0;
+    var i: usize = 0;
+    while i < s.len {
+        defer i = i + 1;
 
-    return;
-}
-
-func Args.print_args(args: *Args) {
-    var i = 0;
-    while i < args.argc {
-        c_printf("- args[%d]: %s\n".ptr, i, args.argv[i]);
-
-        i = i + 1;
+        if s[i] == 0x20 {
+            spaces = spaces + 1;
+        }
     }
 
-    return;
-}
-
-func main(argc: i32, argv: [*][*]u8) i32 {
-    var args: Args = .{ .argc=argc, .argv=argv };
-
-    args.shift();
-    args.print_args();
+    c_printf("found %d spaces\n".ptr, spaces);
     return 0;
 }
 

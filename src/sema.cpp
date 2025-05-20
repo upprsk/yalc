@@ -468,39 +468,18 @@ auto coerce_types(types::Type* target, types::Type* source, Node* target_node,
             return {ts.get_error(), CoerceResult::Direct};
         }
 
-        // Target is unsigned but source is signed, they are compatible when the
-        // target size is larger than the source
-        if (target->is_unsigned() && source->is_signed()) {
-            er.report_error(source_node->get_loc(),
-                            "can not implicitly cast unsiged integer of type "
-                            "{} to signed integer of type {}",
-                            *source, *target);
-            if (target_node != nullptr) {
-                er.report_note(target_node->get_loc(),
-                               "required type {} from here", *target);
-            }
-
-            return {ts.get_error(), CoerceResult::Direct};
+        // Target is signed but source is unsigned (and vice-versa). This can
+        // not be done.
+        er.report_error(source_node->get_loc(),
+                        "can not implicitly cast integers of different "
+                        "signness: {} to {}",
+                        *source, *target);
+        if (target_node != nullptr) {
+            er.report_note(target_node->get_loc(), "required type {} from here",
+                           *target);
         }
 
-        // Target is signed but source is unsigned. This can not be done.
-        if (target->is_signed() && source->is_unsigned()) {
-            if (target->size() > source->size())
-                return {target, CoerceResult::RequiresCast};
-
-            er.report_error(source_node->get_loc(),
-                            "can not implicitly cast integer of type {} to {}",
-                            *source, *target);
-            if (target_node != nullptr) {
-                er.report_note(target_node->get_loc(),
-                               "required type {} from here", *target);
-            }
-
-            return {ts.get_error(), CoerceResult::Direct};
-        }
-
-        UNREACHABLE("all integer conditions should have been handled", *target,
-                    *source);
+        return {ts.get_error(), CoerceResult::Direct};
     }
 
     if (target->is_mptr()) {
@@ -835,15 +814,18 @@ auto check_types_arith_and_coerce_magic(Ast& ast, Node* comp, Node*& lhs,
 
 // ----------------------------------------------------------------------------
 
-auto check_types_comparable(Node* comp, Node* lhs, Node* rhs, State& state)
-    -> bool {
+auto check_types_comparable(Ast& ast, Node* comp, Node* lhs, Node* rhs,
+                            State& state) -> bool {
     auto& er = *state.er;
     auto  lhs_type = lhs->get_type()->unpacked();
     auto  rhs_type = rhs->get_type()->unpacked();
 
     // integers support everything
     if (lhs_type->is_integral()) {
-        if (rhs_type->is_integral()) return true;
+        if (rhs_type->is_integral()) {
+            check_types_arith_and_coerce_magic(ast, comp, lhs, rhs, state);
+            return true;
+        }
 
         er.report_error(
             comp->get_loc(),
@@ -1240,6 +1222,11 @@ void sema_index(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (unw->is_strview()) {
+        node->set_type(ts.get_u8());
+        return;
+    }
+
     er.report_error(node->get_loc(), "type {} does not support indexing", *rty);
     node->set_type(ts.get_error());
 }
@@ -1461,7 +1448,7 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
         sema_expr(ast, data.lhs, state, ctx);
         sema_expr(ast, data.rhs, state, ctx);
 
-        check_types_comparable(node, data.lhs, data.rhs, state);
+        check_types_comparable(ast, node, data.lhs, data.rhs, state);
         return;
     }
 
