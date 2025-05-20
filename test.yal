@@ -1,19 +1,14 @@
 module main;
 
 func main() i32 {
-    var s = "this is a test string!";
+    var arr = [3]i32{ 1, 2, 3 };
 
-    var spaces: usize = 0;
     var i: usize = 0;
-    while i < s.len {
+    while i < arr.len {
         defer i = i + 1;
-
-        if s[i] == 0x20 {
-            spaces = spaces + 1;
-        }
+        c_printf("arr[%zu]=%d\n".ptr, i, arr[i]);
     }
 
-    c_printf("found %d spaces\n".ptr, spaces);
     return 0;
 }
 

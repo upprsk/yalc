@@ -604,6 +604,35 @@ func c_printf(fmt: [*]const u8, ...);
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("arrays");
+
+    run_test(ctx, p, "instantiate", R"(
+module main;
+func main() i32 {
+    var arr = [3]i32{ 1, 2, 3 };
+    return 0;
+}
+)");
+
+    run_test(ctx, p, "loop", R"(
+module main;
+func main() i32 {
+    var arr = [3]i32{ 1, 2, 3 };
+
+    var i: usize = 0;
+    while i < arr.len {
+        defer i = i + 1;
+        c_printf("arr[%zu]=%d\n".ptr, i, arr[i]);
+    }
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("structs");
 
     run_test(ctx, p, "instantiate and read",
