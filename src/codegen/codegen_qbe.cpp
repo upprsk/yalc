@@ -53,7 +53,8 @@ auto to_qbe_type(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Int8: return "b";
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
-        case ir::TypeKind::Ptr: return machine_ptr_type();
+        case ir::TypeKind::Ptr:
+        case ir::TypeKind::StrView: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
         default: PANIC("invalid type kind", type.kind);
@@ -73,7 +74,8 @@ auto to_qbe_temp(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
         case ir::TypeKind::Ptr:
-        case ir::TypeKind::Struct: return machine_ptr_type();
+        case ir::TypeKind::Struct:
+        case ir::TypeKind::StrView: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
         default: PANIC("invalid type kind", type.kind);
@@ -266,7 +268,7 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
 
                 println(out, "    %l{} ={} c{}{} %l{}, %l{}", inst->uid,
                         to_qbe_temp(*inst->type), op,
-                        to_qbe_type(*inst->get_arg(0)->type),
+                        to_qbe_temp(*inst->get_arg(0)->type),
                         inst->get_arg(0)->uid, inst->get_arg(1)->uid);
 
             } break;

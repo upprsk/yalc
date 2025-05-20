@@ -1,6 +1,7 @@
 #include "ir-build.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <ranges>
 #include <vector>
 
@@ -248,9 +249,19 @@ auto build_index_ptr(Node* node, State& state, Context& ctx)
         state.add_inst(index);
     }
 
+    uint64_t sizeof_receiver;
+    if (receiver->type->is_strview()) {
+        sizeof_receiver = module.get_type_uint8()->size();
+        receiver = module.new_inst_load(module.get_type_ptr(), receiver);
+
+        state.add_inst(receiver);
+    } else {
+        sizeof_receiver = receiver->type->size();
+    }
+
     // receiver + (index * sizeof(*receiver))
     auto inst_sizeof_receiver =
-        module.new_inst_int_const(index->type, receiver->type->size());
+        module.new_inst_int_const(index->type, sizeof_receiver);
     auto inst_index_mult = module.new_inst_arith(OpCode::Mul, index->type,
                                                  index, inst_sizeof_receiver);
     auto ptr = module.new_inst_arith(OpCode::Add, receiver->type, receiver,
@@ -299,7 +310,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
         // struct str_t s;
         auto ptr =
-            module.new_inst_alloca(module.new_type_of(TypeKind::Struct),
+            module.new_inst_alloca(module.new_type_of(TypeKind::StrView),
                                    ptr_type->alignment(), ptr_type->size() * 2);
         state.add_inst(ptr);
 
