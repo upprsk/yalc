@@ -355,6 +355,17 @@ enum class NodeKind : uint16_t {
     ///   index expression.
     Index,
 
+    /// Slicing.
+    ///
+    ///     s[start:end] // both
+    ///     s[start:]    // just start
+    ///     s[:end]      // just end
+    ///     s[:]         // none
+    ///
+    /// - `children` contains the receiver (thing beeing sliced) and then the
+    /// start and end indexes. Both the start and end indexes may be null.
+    Slicing,
+
     /// ----------
     /// Statements
     /// ----------
@@ -733,6 +744,7 @@ constexpr auto format_as(NodeKind kind) {
         case NodeKind::Call: name = "Call"; break;
         case NodeKind::Field: name = "Field"; break;
         case NodeKind::Index: name = "Index"; break;
+        case NodeKind::Slicing: name = "Slicing"; break;
         case NodeKind::Block: name = "Block"; break;
         case NodeKind::ExprStmt: name = "ExprStmt"; break;
         case NodeKind::ReturnStmt: name = "ReturnStmt"; break;

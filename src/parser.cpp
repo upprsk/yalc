@@ -961,7 +961,33 @@ struct Parser {
     }
 
     auto parse_index(ast::Node* left) -> ast::Node* {
+        // if we have a ':', then this is a slicing operation with no start, we
+        // may or may not have an end
+        if (match(TokenType::Colon)) {
+            ast::Node* start = nullptr;
+            ast::Node* end = nullptr;
+            if (!check(TokenType::Rbracket)) end = parse_expr();
+
+            try(consume(TokenType::Rbracket));
+            return ast->new_slicing(left->get_loc().extend(prev_span()), left,
+                                    start, end);
+        }
+
         auto index = parse_expr();
+
+        // if we have a ':', then this is a slicing operation with a start, we
+        // may or may not have an end
+        if (match(TokenType::Colon)) {
+            auto       start = index;
+            ast::Node* end = nullptr;
+            if (!check(TokenType::Rbracket)) end = parse_expr();
+
+            try(consume(TokenType::Rbracket));
+            return ast->new_slicing(left->get_loc().extend(prev_span()), left,
+                                    start, end);
+        }
+
+        // this is just indexing
         try(consume(TokenType::Rbracket));
         return ast->new_index(left->get_loc().extend(prev_span()), left, index);
     }

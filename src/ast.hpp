@@ -229,6 +229,12 @@ public:
                         new_node_array_with(receiver, index));
     }
 
+    auto new_slicing(Location loc, Node* receiver, Node* start_index,
+                     Node* end_index) -> Node* {
+        return new_node(NodeKind::Slicing, loc,
+                        new_node_array_with(receiver, start_index, end_index));
+    }
+
     // ----------
     // Statements
     // ----------

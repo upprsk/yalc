@@ -290,6 +290,17 @@ auto visit_children(Ast& ast, Node* node, auto&& visitor, auto&&... args) {
                     std::forward<decltype(args)>(args)...);
         } break;
 
+        case NodeKind::Slicing: {
+            auto data = conv::slicing(*node);
+            visitor(ast, data.receiver,
+                    std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+            visitor(ast, data.start, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+            visitor(ast, data.end, std::forward<decltype(visitor)>(visitor),
+                    std::forward<decltype(args)>(args)...);
+        } break;
+
         case NodeKind::Block: {
             auto data = conv::block(*node);
             for (auto c : data.items) {

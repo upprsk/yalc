@@ -242,6 +242,12 @@ struct Index {
     Node* index{};
 };
 
+struct Slicing {
+    Node* receiver{};
+    Node* start{};
+    Node* end{};
+};
+
 struct Block {
     std::span<Node*> items;
 };
@@ -591,6 +597,15 @@ struct CallIndirect {
 [[nodiscard]] constexpr auto index(Node const& n) -> Index {
     ASSERT(n.get_kind() == NodeKind::Index);
     return {.receiver = n.get_child(0), .index = n.get_child(1)};
+}
+
+[[nodiscard]] constexpr auto slicing(Node const& n) -> Slicing {
+    ASSERT(n.get_kind() == NodeKind::Slicing);
+    return {
+        .receiver = n.get_child(0),
+        .start = n.get_child(1),
+        .end = n.get_child(2),
+    };
 }
 
 [[nodiscard]] constexpr auto block(Node const& n) -> Block {
