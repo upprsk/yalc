@@ -2,12 +2,7 @@ module main;
 
 func main() i32 {
     var arr = [3]i32{ 1, 2, 3 };
-
-    var i: usize = 0;
-    while i < arr.len {
-        defer i = i + 1;
-        c_printf("arr[%zu]=%d\n".ptr, i, arr[i]);
-    }
+    var s = arr[:];
 
     return 0;
 }

@@ -861,6 +861,29 @@ func test() { (ptr + 10 * 4)[1+ y + (10 * 3) / x]; }
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("slicing");
+
+    run_test(ctx, p, "start and end", R"(
+module test;
+func test() { arr[0:12]; }
+)");
+
+    run_test(ctx, p, "just start", R"(
+module test;
+func test() { arr[0:]; }
+)");
+
+    run_test(ctx, p, "just end", R"(
+module test;
+func test() { arr[:12]; }
+)");
+
+    run_test(ctx, p, "none", R"(
+module test;
+func test() { arr[:]; }
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("break/continue");
 
     run_test(ctx, p, "break", R"(module test;
