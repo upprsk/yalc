@@ -341,7 +341,7 @@ struct Type {
             case TypeKind::Float64: return alignof(double);
 
             // made of 2 pointers, so double the size of a pointer
-            case TypeKind::StrView: return alignof(uintptr_t) * 2; break;
+            case TypeKind::StrView: return alignof(uintptr_t); break;
 
             case TypeKind::Ptr:
             case TypeKind::PtrConst:
