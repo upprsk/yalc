@@ -882,6 +882,73 @@ func test() {
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("slicing");
+
+    run_test(ctx, p, "convert array to slice", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 };
+    var s = arr[:];
+}
+)");
+
+    run_test(ctx, p, "convert array to slice with start", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 };
+    var s = arr[1:];
+}
+)");
+
+    run_test(ctx, p, "convert array to slice with end", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 };
+    var s = arr[:2];
+}
+)");
+
+    run_test(ctx, p, "convert array to slice with both", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 };
+    var s = arr[1:2];
+}
+)");
+
+    run_test(ctx, p, "convert mptr to slice", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 }.ptr;
+    var s = arr[:];
+}
+)");
+
+    run_test(ctx, p, "convert mptr to slice with start", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 }.ptr;
+    var s = arr[1:];
+}
+)");
+
+    run_test(ctx, p, "convert mptr to slice with end", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 }.ptr;
+    var s = arr[:2];
+}
+)");
+
+    run_test(ctx, p, "convert mptr to slice with both", R"(
+module test;
+func test() {
+    var arr = [3]i32{ 1, 2, 3 }.ptr;
+    var s = arr[1:2];
+}
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("methods and coercion");
 
     run_test(ctx, p, "requires value and gets value", R"(
