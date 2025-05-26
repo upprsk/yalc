@@ -809,6 +809,30 @@ func c_printf(fmt: [*]const u8, ...);
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("slices");
+
+    run_test(ctx, p, "count spaces in string",
+             R"(
+module main;
+
+func main() i32 {
+    var arr = [_]i32{ 1, 2, 3, 4 };
+    var s = arr[:];
+
+    var i: usize = 0;
+    while i < s.len {
+        defer i = i + 1;
+        c_printf("s[%d] = %d\n".ptr, i, s[i]);
+    }
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    ctx.tags.pop_back();
 
     print_test_results("IR", ctx);
     return {ctx.ok, ctx.failed, ctx.skipped};

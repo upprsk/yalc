@@ -1,8 +1,14 @@
 module main;
 
 func main() i32 {
-    var arr = [3]i32{ 1, 2, 3 }.ptr;
-    var s = arr[:2];
+    var arr = [_]i32{ 1, 2, 3, 4 };
+    var s = arr[:];
+
+    var i: usize = 0;
+    while i < s.len {
+        defer i = i + 1;
+        c_printf("s[%d] = %d\n".ptr, i, s[i]);
+    }
 
     return 0;
 }
