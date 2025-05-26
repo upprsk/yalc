@@ -61,6 +61,10 @@ enum class TypeKind : uint16_t {
     MultiPtr,
     MultiPtrConst,
 
+    /// Slice types
+    Slice,
+    SliceConst,
+
     /// The type of immutable strings. Mutable strings should use slices of
     /// bytes.
     StrView,
@@ -340,8 +344,10 @@ struct Type {
             case TypeKind::Float32: return alignof(float);
             case TypeKind::Float64: return alignof(double);
 
-            // made of 2 pointers, so double the size of a pointer
-            case TypeKind::StrView: return alignof(uintptr_t); break;
+            // made of 2 pointers, so aligns to pointer
+            case TypeKind::StrView:
+            case TypeKind::Slice:
+            case TypeKind::SliceConst: return alignof(uintptr_t); break;
 
             case TypeKind::Ptr:
             case TypeKind::PtrConst:
@@ -396,7 +402,9 @@ struct Type {
             case TypeKind::Float64: return sizeof(double);
 
             // made of 2 pointers, so double the size of a pointer
-            case TypeKind::StrView: return sizeof(uintptr_t) * 2; break;
+            case TypeKind::StrView:
+            case TypeKind::Slice:
+            case TypeKind::SliceConst: return sizeof(uintptr_t) * 2; break;
 
             case TypeKind::Ptr:
             case TypeKind::PtrConst:
@@ -579,6 +587,11 @@ public:
                         std::array{inner});
     }
 
+    [[nodiscard]] auto new_slice(Type* inner, bool is_const) -> Type* {
+        return new_type(is_const ? TypeKind::SliceConst : TypeKind::Slice,
+                        std::array{inner});
+    }
+
     [[nodiscard]] auto new_pack(std::span<Type* const> inner) -> Type*;
 
     [[nodiscard]] auto new_array_type(Type* inner, uint32_t count) -> Type* {
@@ -753,6 +766,8 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::Pack: name = "(pack)"; break;
         case TypeKind::BoundFunc: name = "BoundFunc"; break;
         case TypeKind::Distinct: name = "Distinct"; break;
+        case TypeKind::Slice: name = "Slice"; break;
+        case TypeKind::SliceConst: name = "SliceConst"; break;
     }
 
     return name;

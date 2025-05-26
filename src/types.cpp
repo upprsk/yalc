@@ -338,6 +338,11 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
             ASSERT(ty.inner.size() == 1);
             return fmt::format_to(ctx.out(), "[*]const {}", *ty.inner[0]);
 
+        case TypeKind::Slice:
+            return fmt::format_to(ctx.out(), "[]{}", *ty.inner[0]);
+        case TypeKind::SliceConst:
+            return fmt::format_to(ctx.out(), "[]const {}", *ty.inner[0]);
+
         case TypeKind::Array:
             return fmt::format_to(ctx.out(), "[{}]{}", ty.count, *ty.inner[0]);
 

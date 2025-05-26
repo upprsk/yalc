@@ -1248,6 +1248,66 @@ void sema_index(Ast& ast, Node* node, State& state, Context& ctx) {
     node->set_type(ts.get_error());
 }
 
+void sema_slicing(Ast& ast, Node* node, State& state, Context& ctx) {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
+    auto  data = conv::slicing(*node);
+
+    sema_expr(ast, data.receiver, state, ctx);
+    sema_expr(ast, data.start, state, ctx);
+    sema_expr(ast, data.end, state, ctx);
+
+    auto rty = data.receiver->get_type();
+
+    if (data.start) {
+        auto sity = data.start->get_type();
+        if (!sity->is_integral()) {
+            er.report_error(
+                node->get_loc(),
+                "can not use non-integral type {} as index in slice operation",
+                *sity);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        fixup_untyped(ast, ts.get_usize(), data.start, state);
+    }
+
+    if (data.end) {
+        auto sity = data.end->get_type();
+        if (!sity->is_integral()) {
+            er.report_error(
+                node->get_loc(),
+                "can not use non-integral type {} as index in slice operation",
+                *sity);
+            node->set_type(ts.get_error());
+            return;
+        }
+
+        fixup_untyped(ast, ts.get_usize(), data.end, state);
+    }
+
+    auto unw = rty->unpacked()->undistinct();
+    if (unw->is_mptr()) {
+        node->set_type(ts.new_slice(unw->inner[0], unw->is_mptr_const()));
+        return;
+    }
+
+    if (unw->is_strview()) {
+        node->set_type(ts.get_strview());
+        return;
+    }
+
+    if (unw->is_array()) {
+        // FIXME: is the array constant or not? Need a type for contant arrays
+        node->set_type(ts.new_slice(unw->inner[0], false));
+        return;
+    }
+
+    er.report_error(node->get_loc(), "type {} does not support slicing", *rty);
+    node->set_type(ts.get_error());
+}
+
 void sema_call(Ast& ast, Node* node, State& state, Context& ctx) {
     auto& ts = *state.ts;
     auto& er = *state.er;
@@ -1457,6 +1517,11 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Index)) {
         sema_index(ast, node, state, ctx);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Slicing)) {
+        sema_slicing(ast, node, state, ctx);
         return;
     }
 
