@@ -222,8 +222,17 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                               fmt::to_string(inst->get_arg(1)->type->kind));
                 }
 
+                auto offset = inst->get_value_u64();
+                auto rhs = inst->get_arg(0)->uid;
+                if (offset > 0) {
+                    println(out, "    %l{} ={} add %l{}, {}", inst->uid,
+                            to_qbe_temp(*inst->get_arg(0)->type),
+                            inst->get_arg(0)->uid, offset);
+                    rhs = inst->uid;
+                }
+
                 println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,
-                        inst->get_arg(0)->uid);
+                        rhs);
             } break;
 
             case ir::OpCode::Add:

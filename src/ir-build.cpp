@@ -336,14 +336,8 @@ void build_expr(Node* node, State& state, Context& ctx) {
         state.add_inst(ptr_store);
 
         // s.len = <sizeof(str)>;
-        auto size_offset =
-            module.new_inst_int_const(usize_type, ptr_type->size());
-        auto size_ptr =
-            module.new_inst_arith(OpCode::Add, usize_type, ptr, size_offset);
         auto size = module.new_inst_int_const(usize_type, data.value.size());
-        auto size_store = module.new_inst_store(size_ptr, size);
-        state.add_inst(size_offset);
-        state.add_inst(size_ptr);
+        auto size_store = module.new_inst_store(ptr, size, ptr_type->size());
         state.add_inst(size);
         state.add_inst(size_store);
 
@@ -436,14 +430,8 @@ void build_expr(Node* node, State& state, Context& ctx) {
             build_expr(it, state, ctx);
             auto v = state.sstack_pop();
 
-            auto offset_value = module.new_inst_int_const(
-                module.get_type_usize(), idx * it->get_type()->size());
-            auto offset = module.new_inst_arith(OpCode::Add, offset_value->type,
-                                                ptr, offset_value);
-            auto store = module.new_inst_store(offset, v);
-
-            state.add_inst(offset_value);
-            state.add_inst(offset);
+            auto store =
+                module.new_inst_store(ptr, v, idx * it->get_type()->size());
             state.add_inst(store);
         }
 
@@ -469,14 +457,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
                 auto init = state.sstack_pop();
 
                 auto field = fields.at(data.key);
-                auto offset_value = module.new_inst_int_const(
-                    module.get_type_usize(), field.offset);
-                auto offset_ptr = module.new_inst_arith(
-                    OpCode::Add, module.get_type_ptr(), ptr, offset_value);
-                auto store = module.new_inst_store(offset_ptr, init);
-
-                state.add_inst(offset_value);
-                state.add_inst(offset_ptr);
+                auto store = module.new_inst_store(ptr, init, field.offset);
                 state.add_inst(store);
             }
         }
@@ -577,14 +558,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
             state.add_inst(ptr_store);
 
             // s.len = <arr>.len;
-            auto size_offset =
-                module.new_inst_int_const(usize_type, ptr_type->size());
-            auto size_ptr = module.new_inst_arith(OpCode::Add, usize_type, ptr,
-                                                  size_offset);
             auto size = module.new_inst_int_const(usize_type, inner->count);
-            auto size_store = module.new_inst_store(size_ptr, size);
-            state.add_inst(size_offset);
-            state.add_inst(size_ptr);
+            auto size_store =
+                module.new_inst_store(ptr, size, ptr_type->size());
             state.add_inst(size);
             state.add_inst(size_store);
 
@@ -777,15 +753,7 @@ void build_assign_direct(Node* node, State& state, Context& ctx) {
 
         if (receiver_type->is_struct()) {
             auto field = receiver_type->as_struct_get_fields().at(data.name);
-
-            auto offset_value = module.new_inst_int_const(
-                module.get_type_usize(), field.offset);
-            auto offset_ptr = module.new_inst_arith(
-                OpCode::Add, module.get_type_ptr(), receiver, offset_value);
-            auto store = module.new_inst_store(offset_ptr, rhs);
-
-            state.add_inst(offset_value);
-            state.add_inst(offset_ptr);
+            auto store = module.new_inst_store(receiver, rhs, field.offset);
             state.add_inst(store);
         }
 

@@ -357,8 +357,10 @@ public:
     }
 
     // NOTE: `type` should be the resulting type of the dereference
-    [[nodiscard]] auto new_inst_store(Inst* ptr, Inst* value) -> Inst* {
-        return new_inst(OpCode::Store, nullptr, {}, std::array{ptr, value});
+    [[nodiscard]] auto new_inst_store(Inst* ptr, Inst* value,
+                                      uint64_t const_offset = 0) -> Inst* {
+        return new_inst(OpCode::Store, nullptr, const_offset,
+                        std::array{ptr, value});
     }
 
     [[nodiscard]] auto new_inst_ext(Type* type, Inst* src) -> Inst* {
