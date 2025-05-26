@@ -1161,6 +1161,18 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
         }
     }
 
+    else if (unw->is_slice()) {
+        if (data.name == "ptr") {
+            node->set_type(ts.new_mptr(unw->inner[0], unw->is_slice_const()));
+            return;
+        }
+
+        if (data.name == "len") {
+            node->set_type(ts.get_usize());
+            return;
+        }
+    }
+
     else if (unw->is_array()) {
         if (data.name == "ptr") {
             node->set_type(ts.new_mptr(ts.get_u8(), true));
@@ -1230,6 +1242,11 @@ void sema_index(Ast& ast, Node* node, State& state, Context& ctx) {
 
     auto unw = rty->unpacked()->undistinct();
     if (unw->is_mptr()) {
+        node->set_type(unw->inner[0]);
+        return;
+    }
+
+    if (unw->is_slice()) {
         node->set_type(unw->inner[0]);
         return;
     }

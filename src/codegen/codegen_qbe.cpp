@@ -76,6 +76,7 @@ auto to_qbe_temp(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Ptr:
         case ir::TypeKind::Array:
         case ir::TypeKind::Struct:
+        case ir::TypeKind::Slice:
         case ir::TypeKind::StrView: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
@@ -218,7 +219,7 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                     case ir::TypeKind::Ptr: op = machine_store_ptr_op(); break;
                     default:
                         PANIC("bad type kind in Store",
-                              inst->get_arg(1)->type->kind);
+                              fmt::to_string(inst->get_arg(1)->type->kind));
                 }
 
                 println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,

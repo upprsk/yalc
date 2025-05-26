@@ -255,6 +255,14 @@ struct Type {
         return kind == TypeKind::Array;
     }
 
+    [[nodiscard]] constexpr auto is_slice() const -> bool {
+        return kind == TypeKind::Slice;
+    }
+
+    [[nodiscard]] constexpr auto is_slice_const() const -> bool {
+        return kind == TypeKind::SliceConst;
+    }
+
     [[nodiscard]] constexpr auto is_struct() const -> bool {
         return kind == TypeKind::Struct;
     }

@@ -147,6 +147,7 @@ auto fmt::formatter<yal::ir::Type>::format(yal::ir::Type const& n,
         case yal::ir::TypeKind::Float32: name = "f32"; break;
         case yal::ir::TypeKind::Float64: name = "f64"; break;
         case yal::ir::TypeKind::Ptr: name = "ptr"; break;
+        case yal::ir::TypeKind::Slice: name = "Slice"; break;
         case yal::ir::TypeKind::StrView: name = "string_view"; break;
         case yal::ir::TypeKind::Array: name = "Array"; break;
         case yal::ir::TypeKind::Struct: name = "struct"; break;

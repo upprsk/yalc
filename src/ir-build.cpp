@@ -255,6 +255,16 @@ auto build_index_ptr(Node* node, State& state, Context& ctx)
         receiver = module.new_inst_load(module.get_type_ptr(), receiver);
 
         state.add_inst(receiver);
+    } else if (receiver->type->is_slice()) {
+        auto receiver_type = data.receiver->get_type();
+        ASSERT(receiver_type->is_slice());
+
+        sizeof_receiver =
+            create_ir_type_from_general(module, *receiver_type->inner[0])
+                ->size();
+        receiver = module.new_inst_load(module.get_type_ptr(), receiver);
+
+        state.add_inst(receiver);
     } else if (receiver->type->is_array()) {
         auto receiver_type = data.receiver->get_type();
         ASSERT(receiver_type->is_array());
@@ -369,7 +379,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
             state.add_and_push_inst(load);
         }
 
-        else if (receiver_type->is_strview()) {
+        else if (receiver_type->is_strview() || receiver_type->is_slice()) {
             if (data.name == "ptr") {
                 auto load =
                     module.new_inst_load(module.get_type_ptr(), receiver);
@@ -530,6 +540,65 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
         auto inst = module.new_inst_load(type, ptr);
         state.add_and_push_inst(inst);
+        return;
+    }
+
+    if (node->is_oneof(ast::NodeKind::Slicing)) {
+        auto data = conv::slicing(*node);
+
+        build_expr(data.receiver, state, ctx);
+
+        auto inner = data.receiver->get_type()->unpacked()->undistinct();
+        if (inner->is_array()) {
+            if (data.start || data.end) {
+                PANIC("slicing: not implemented start/end (array)");
+            }
+
+            auto receiver = state.sstack_pop();
+
+            // struct slice_t { T* ptr; size_t len; };
+            // struct slice_t s;
+            // s.ptr = <arr>.ptr;
+            // s.len = <arr>.len;
+
+            auto ptr_type = module.get_type_ptr();
+            auto usize_type = module.get_type_usize();
+
+            // struct slice_t s;
+            auto ptr = module.new_inst_alloca(
+                module.new_type_of(TypeKind::Slice), ptr_type->alignment(),
+                ptr_type->size() * 2);
+            state.add_inst(ptr);
+
+            // s.ptr = <arr>.ptr;
+            auto slice_data_ptr = module.new_inst_copy(ptr_type, receiver);
+            auto ptr_store = module.new_inst_store(ptr, slice_data_ptr);
+            state.add_inst(slice_data_ptr);
+            state.add_inst(ptr_store);
+
+            // s.len = <arr>.len;
+            auto size_offset =
+                module.new_inst_int_const(usize_type, ptr_type->size());
+            auto size_ptr = module.new_inst_arith(OpCode::Add, usize_type, ptr,
+                                                  size_offset);
+            auto size = module.new_inst_int_const(usize_type, inner->count);
+            auto size_store = module.new_inst_store(size_ptr, size);
+            state.add_inst(size_offset);
+            state.add_inst(size_ptr);
+            state.add_inst(size);
+            state.add_inst(size_store);
+
+            state.sstack_push(ptr);
+        } else if (inner->is_mptr()) {
+            PANIC("slicing: not implemented (mptr)");
+        } else if (inner->is_strview()) {
+            PANIC("slicing: not implemented (string_view)");
+        } else if (inner->is_slice()) {
+            PANIC("slicing: not implemented (slice)");
+        } else {
+            PANIC("invalid receiver for slicing", *inner);
+        }
+
         return;
     }
 
