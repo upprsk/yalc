@@ -193,8 +193,19 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                     default: PANIC("bad type kind in Load", inst->type->kind);
                 }
 
-                println(out, "    %l{} ={} {} %l{}", inst->uid,
-                        to_qbe_temp(*inst->type), op, inst->get_arg(0)->uid);
+                auto offset = inst->get_value_u64();
+                if (offset > 0) {
+                    println(out, "    %at{} ={} add %l{}, {}", inst->uid,
+                            to_qbe_temp(*inst->get_arg(0)->type),
+                            inst->get_arg(0)->uid, offset);
+                    println(out, "    %l{} ={} {} %at{}", inst->uid,
+                            to_qbe_temp(*inst->type), op, inst->uid);
+                } else {
+                    println(out, "    %l{} ={} {} %l{}", inst->uid,
+                            to_qbe_temp(*inst->type), op,
+                            inst->get_arg(0)->uid);
+                }
+
             } break;
 
             case ir::OpCode::Store: {
@@ -223,16 +234,16 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 }
 
                 auto offset = inst->get_value_u64();
-                auto rhs = inst->get_arg(0)->uid;
                 if (offset > 0) {
-                    println(out, "    %l{} ={} add %l{}, {}", inst->uid,
+                    println(out, "    %at{} ={} add %l{}, {}", inst->uid,
                             to_qbe_temp(*inst->get_arg(0)->type),
                             inst->get_arg(0)->uid, offset);
-                    rhs = inst->uid;
+                    println(out, "    {} %l{}, %at{}", op,
+                            inst->get_arg(1)->uid, inst->uid);
+                } else {
+                    println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,
+                            inst->get_arg(0)->uid);
                 }
-
-                println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,
-                        rhs);
             } break;
 
             case ir::OpCode::Add:

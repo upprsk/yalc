@@ -360,16 +360,8 @@ void build_expr(Node* node, State& state, Context& ctx) {
         if (receiver_type->is_struct()) {
             auto field = receiver_type->as_struct_get_fields().at(data.name);
 
-            auto offset_value = module.new_inst_int_const(
-                module.get_type_usize(), field.offset);
-            auto offset_ptr = module.new_inst_arith(
-                OpCode::Add, module.get_type_ptr(), receiver, offset_value);
-
             auto type = create_ir_type_from_general(module, *field.type);
-            auto load = module.new_inst_load(type, offset_ptr);
-
-            state.add_inst(offset_value);
-            state.add_inst(offset_ptr);
+            auto load = module.new_inst_load(type, receiver, field.offset);
             state.add_and_push_inst(load);
         }
 
@@ -381,14 +373,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
             }
 
             else if (data.name == "len") {
-                auto offset_value = module.new_inst_int_const(
-                    module.get_type_usize(), module.get_type_ptr()->size());
-                auto offset_ptr = module.new_inst_arith(
-                    OpCode::Add, module.get_type_ptr(), receiver, offset_value);
                 auto load =
-                    module.new_inst_load(module.get_type_usize(), offset_ptr);
-                state.add_inst(offset_value);
-                state.add_inst(offset_ptr);
+                    module.new_inst_load(module.get_type_usize(), receiver,
+                                         module.get_type_ptr()->size());
                 state.add_and_push_inst(load);
             }
 

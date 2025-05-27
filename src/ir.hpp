@@ -352,8 +352,9 @@ public:
     }
 
     // NOTE: `type` should be the resulting type of the dereference
-    [[nodiscard]] auto new_inst_load(Type* type, Inst* ptr) -> Inst* {
-        return new_inst(OpCode::Load, type, {}, ptr);
+    [[nodiscard]] auto new_inst_load(Type* type, Inst* ptr,
+                                     uint64_t const_offset = 0) -> Inst* {
+        return new_inst(OpCode::Load, type, const_offset, ptr);
     }
 
     // NOTE: `type` should be the resulting type of the dereference

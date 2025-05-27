@@ -24,7 +24,7 @@ void disasm_inst(FILE* out, Inst const& inst) {
     }
 
     if (inst.has_u64()) {
-        if (inst.op == OpCode::Store)
+        if (inst.op == OpCode::Store || inst.op == OpCode::Load)
             fmt::print(out, "+{}, ", inst.get_value_u64());
         else
             fmt::print(out, "{}", inst.get_value_u64());
