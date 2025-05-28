@@ -652,7 +652,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
             else if (d->get_type()->undistinct()->is_struct()) {
                 ASSERT(local->type->is_struct());
 
-                state.sstack_push(local);
+                // convert to an actual pointer type and push
+                auto inst = module.new_inst_copy(module.get_type_ptr(), local);
+                state.add_and_push_inst(inst);
             }
 
             else {
