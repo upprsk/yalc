@@ -766,7 +766,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Id)) {
         auto d = node->get_decl();
-        auto local = state.get_local(node->get_decl());
+        auto local = state.get_local(d);
 
         if (d->is_stack_var()) {
             ASSERT(local->type->is_ptr());
