@@ -1307,6 +1307,16 @@ void sema_slicing(Ast& ast, Node* node, State& state, Context& ctx) {
     auto unw = rty->unpacked()->undistinct();
     if (unw->is_mptr()) {
         node->set_type(ts.new_slice(unw->inner[0], unw->is_mptr_const()));
+
+        // when slicing a multi-pointer, the end is necessary
+        if (data.end == nullptr) {
+            er.report_error(node->get_loc(),
+                            "missing end of slice for multi-pointer: {}", *rty);
+            er.report_note(
+                node->get_loc(),
+                "when slicing a multi-pointer, the end of slice is mandatory");
+        }
+
         return;
     }
 

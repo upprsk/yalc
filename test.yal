@@ -1,13 +1,12 @@
 module main;
 
-func main() i32 {
-    var arr = [_]i32{ 1, 2, 3, 4 };
-    var s = arr[:];
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var args = argv[1:argc];
 
     var i: usize = 0;
-    while i < s.len {
+    while i < args.len {
         defer i = i + 1;
-        c_printf("s[%d] = %d\n".ptr, i, s[i]);
+        c_printf("args[%d] = %s\n".ptr, i, args[i]);
     }
 
     return 0;
