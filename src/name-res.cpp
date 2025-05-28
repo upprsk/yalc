@@ -719,6 +719,8 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
 
         root_env.define(ds, "string_view", nullptr, mkty(ts.get_strview()), {});
 
+        root_env.define(ds, "rawptr", nullptr, mkty(ts.get_rawptr()), {});
+
         root_env.define(ds, "true", nullptr,
                         {.type = ts.get_bool(), .data = true}, {});
         root_env.define(ds, "false", nullptr,

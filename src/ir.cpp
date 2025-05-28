@@ -21,6 +21,7 @@ void disasm_inst(FILE* out, Inst const& inst) {
         fmt::print(out, "    %{} = {}<{}> ", inst.uid, inst.op, *inst.type);
     } else {
         fmt::print(out, "    {} ", inst.op);
+        if (inst.type) fmt::print(out, "<{}>", *inst.type);
     }
 
     if (inst.has_u64()) {

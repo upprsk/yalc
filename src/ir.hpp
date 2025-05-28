@@ -98,6 +98,8 @@ struct Type {
             case TypeKind::Float32: sz = sizeof(float); break;
             case TypeKind::Float64: sz = sizeof(double); break;
             case TypeKind::Ptr: sz = sizeof(uintptr_t); break;
+            case TypeKind::StrView: sz = sizeof(uintptr_t) * 2; break;
+            case TypeKind::Slice: sz = sizeof(uintptr_t) * 2; break;
             default: PANIC("invalid kind", kind);
         }
 
@@ -120,6 +122,8 @@ struct Type {
             case TypeKind::Float32: align = alignof(float); break;
             case TypeKind::Float64: align = alignof(double); break;
             case TypeKind::Ptr: align = alignof(uintptr_t); break;
+            case TypeKind::StrView: align = alignof(uintptr_t); break;
+            case TypeKind::Slice: align = alignof(uintptr_t); break;
             default: PANIC("invalid kind", kind);
         }
 

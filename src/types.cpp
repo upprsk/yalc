@@ -290,6 +290,7 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
             case TypeKind::Float64: result = "f64"; break;
             case TypeKind::StrView: result = "string_view"; break;
             case TypeKind::Nil: result = "nil"; break;
+            case TypeKind::RawPtr: result = "rawptr"; break;
             default: break;
         }
 
@@ -322,7 +323,8 @@ auto fmt::formatter<yal::types::Type>::format(yal::types::Type ty,
         case TypeKind::Float32:
         case TypeKind::Float64:
         case TypeKind::StrView:
-        case TypeKind::Nil: return format_no_inner(ty.kind);
+        case TypeKind::Nil:
+        case TypeKind::RawPtr: return format_no_inner(ty.kind);
 
         case TypeKind::Ptr:
             ASSERT(ty.inner.size() == 1);

@@ -147,6 +147,7 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
         case types::TypeKind::Ptr:
         case types::TypeKind::PtrConst:
+        case types::TypeKind::RawPtr:
         case types::TypeKind::MultiPtr:
         case types::TypeKind::MultiPtrConst: return mod.get_type_ptr();
 
@@ -160,7 +161,14 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
         case types::TypeKind::Struct: return mod.new_type_of(TypeKind::Struct);
 
-        default: PANIC("invalid type", ty.kind);
+        case types::TypeKind::StrView:
+            return mod.new_type_of(TypeKind::StrView);
+
+        case types::TypeKind::Slice:
+        case types::TypeKind::SliceConst:
+            return mod.new_type_of(TypeKind::Slice);
+
+        default: PANIC("invalid type", ty.kind, fmt::to_string(ty.kind));
     }
 }
 
@@ -193,7 +201,7 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
         // NOTE: just converting directly, which is not always correct...
         // (although, if we allowed the cast in sema, then it should be usize of
         // isize)
-        if (source->is_ptr() || source->is_mptr()) {
+        if (source->is_ptr() || source->is_mptr() || source->is_rawptr()) {
             state.sstack_push(arg);
             return;
         }
@@ -204,7 +212,7 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
     else if (target->is_ptr() || target->is_mptr()) {
         // if both sides are pointers, at the IR level there is not
         // difference, push the inst back in the stack
-        if (source->is_ptr() || source->is_mptr()) {
+        if (source->is_ptr() || source->is_mptr() || source->is_rawptr()) {
             state.sstack_push(arg);
             return;
         }
@@ -213,6 +221,15 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
         // (although, if we allowed the cast in sema, then it should be usize of
         // isize)
         if (source->is_integral()) {
+            state.sstack_push(arg);
+            return;
+        }
+    }
+
+    else if (target->is_strview()) {
+        // the binary representation is exacly the same, so we can use one in
+        // place of the other
+        if (source->is_slice() && source->inner[0]->is_u8()) {
             state.sstack_push(arg);
             return;
         }
@@ -832,10 +849,16 @@ void build_assign_direct(Node* node, State& state, Context& ctx) {
         auto [ptr, type] = build_index_ptr(assign_lhs, state, ctx);
 
         auto rhs = state.sstack_pop();
-        ASSERT(*rhs->type == *type);
 
-        auto inst = module.new_inst_store(ptr, rhs);
-        state.add_inst(inst);
+        if (*rhs->type == *type) {
+            auto inst = module.new_inst_store(ptr, rhs);
+            state.add_inst(inst);
+        } else if (rhs->type->is_slice() && type->is_strview()) {
+            // just assume sema did a good job and these are compatible
+            auto inst = module.new_inst_store(ptr, rhs);
+            state.add_inst(inst);
+        } else
+            PANIC("invalid assign", *rhs->type, *type);
     }
 
     else if (assign_lhs->is_oneof(ast::NodeKind::Field)) {

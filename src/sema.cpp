@@ -526,6 +526,11 @@ auto coerce_types(types::Type* target, types::Type* source, Node* target_node,
         }
     }
 
+    if (target->is_rawptr()) {
+        if (source->is_ptr() || source->is_mptr())
+            return {target, CoerceResult::Direct};
+    }
+
     er.report_error(source_node->get_loc(),
                     "can not use value of type {} where {} is expected",
                     *source, *target);
@@ -645,11 +650,6 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
 
         // when using explicit casts any int can go to any int
         if (source->is_integral()) return target;
-
-        er.report_error(source_node->get_loc(),
-                        "can not cast from type {} to type {}", *osource,
-                        *target);
-        return ts.get_error();
     }
 
     if (target->is_ptr()) {
@@ -672,11 +672,7 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
 
         if (source->is_ptr()) return target;
         if (source->is_mptr()) return target;
-
-        er.report_error(source_node->get_loc(),
-                        "can not cast from type {} to type {}", *osource,
-                        *target);
-        return target;
+        if (source->is_rawptr()) return target;
     }
 
     if (target->is_mptr()) {
@@ -699,11 +695,17 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
 
         if (source->is_ptr()) return target;
         if (source->is_mptr()) return target;
+        if (source->is_rawptr()) return target;
+    }
 
-        er.report_error(source_node->get_loc(),
-                        "can not cast from type {} to type {}", *osource,
-                        *target);
-        return target;
+    if (target->is_strview()) {
+        if (source->is_slice() && source->inner[0]->is_u8()) return target;
+    }
+
+    if (target->is_slice()) {
+        if (target->is_slice_const() && target->inner[0]->is_u8() &&
+            source->is_strview())
+            return target;
     }
 
     if (target->is_struct()) {
@@ -711,11 +713,6 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
             return coerce_cast_lit_to_struct(target, source, source_node,
                                              state);
         }
-
-        er.report_error(source_node->get_loc(),
-                        "can not cast from type {} to type {}", *osource,
-                        *target);
-        return target;
     }
 
     if (target->is_distinct()) {
@@ -735,7 +732,9 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
 
     // TODO: to struct
 
-    PANIC("not implemented (cast)", *target, *source);
+    er.report_error(source_node->get_loc(),
+                    "can not cast from type {} to type {}", *osource, *target);
+    return target;
 }
 
 auto cast_types_and_fixup_untyped(Ast& ast, types::Type* target,
@@ -995,6 +994,13 @@ auto eval_expr(Node* node, State& state, Context& ctx) -> Value {
                 .data = ts.new_mptr(inner, data.is_const)};
     }
 
+    if (node->is_oneof(ast::NodeKind::Slice, ast::NodeKind::SliceConst)) {
+        auto data = conv::slice(*node);
+        auto inner = eval_expr_to_type(data.inner, state, ctx);
+        return {.type = ts.get_type(),
+                .data = ts.new_slice(inner, data.is_const)};
+    }
+
     if (node->is_oneof(ast::NodeKind::StructType)) {
         auto data = conv::struct_type(*node);
 
@@ -1228,8 +1234,8 @@ void sema_index(Ast& ast, Node* node, State& state, Context& ctx) {
     sema_expr(ast, data.receiver, state, ctx);
     sema_expr(ast, data.index, state, ctx);
 
-    auto rty = data.receiver->get_type();
-    auto ity = data.index->get_type();
+    auto rty = data.receiver->get_type()->unpacked()->undistinct();
+    auto ity = data.index->get_type()->unpacked()->undistinct();
 
     if (!ity->is_integral()) {
         er.report_error(node->get_loc(),
@@ -1274,11 +1280,11 @@ void sema_slicing(Ast& ast, Node* node, State& state, Context& ctx) {
     sema_expr(ast, data.start, state, ctx);
     sema_expr(ast, data.end, state, ctx);
 
-    auto rty = data.receiver->get_type();
+    auto rty = data.receiver->get_type()->unpacked()->undistinct();
 
     if (data.start) {
         auto sity = data.start->get_type();
-        if (!sity->is_integral()) {
+        if (!sity->unpacked()->undistinct()->is_integral()) {
             er.report_error(
                 node->get_loc(),
                 "can not use non-integral type {} as index in slice operation",
@@ -1292,7 +1298,7 @@ void sema_slicing(Ast& ast, Node* node, State& state, Context& ctx) {
 
     if (data.end) {
         auto sity = data.end->get_type();
-        if (!sity->is_integral()) {
+        if (!sity->unpacked()->undistinct()->is_integral()) {
             er.report_error(
                 node->get_loc(),
                 "can not use non-integral type {} as index in slice operation",
@@ -1506,7 +1512,8 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Ptr, ast::NodeKind::PtrConst,
                        ast::NodeKind::MultiPtr, ast::NodeKind::MultiPtrConst,
-                       ast::NodeKind::StructType)) {
+                       ast::NodeKind::StructType, ast::NodeKind::Slice,
+                       ast::NodeKind::SliceConst)) {
         node->set_type(ts.get_type());
         sema_expr_children(ast, node, state, ctx);
         return;
@@ -2106,21 +2113,27 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
                 auto inner = conv::index(*lhs_item).receiver;
                 auto inner_type = inner->get_type();
 
-                // FIXME: when we have slices and such this will need to be
-                // expanded
-                ASSERT(inner_type->is_mptr());
-
                 if (inner_type->is_const_ref()) {
                     er.report_error(
                         lhs_item->get_loc(),
                         "can not assign to constant value of type {}",
                         *lhs_item->get_type());
 
-                    // FIXME: when we have other indexables we need to update
-                    // this message
-                    er.report_note(inner->get_loc(),
-                                   "multi-pointer inner element has type {}",
-                                   *inner_type);
+                    if (inner_type->is_mptr()) {
+                        er.report_note(
+                            inner->get_loc(),
+                            "multi-pointer inner element has type {}",
+                            *inner_type);
+                    }
+
+                    else if (inner_type->is_slice()) {
+                        er.report_note(inner->get_loc(),
+                                       "slice inner element has type {}",
+                                       *inner_type);
+                    }
+
+                    else
+                        PANIC("not implemented", *inner_type);
                 }
 
                 coerce_types_and_fixup_untyped(ast, lhs_item->get_type(),

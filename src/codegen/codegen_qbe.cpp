@@ -54,10 +54,12 @@ auto to_qbe_type(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
         case ir::TypeKind::Ptr:
+        case ir::TypeKind::Slice:
         case ir::TypeKind::StrView: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
-        default: PANIC("invalid type kind", type.kind);
+        default:
+            PANIC("invalid type kind", type.kind, fmt::to_string(type.kind));
     }
 }
 
@@ -99,6 +101,7 @@ auto to_qbe_fntype(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Ptr: return machine_ptr_type();
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
+        case ir::TypeKind::Slice: return ":slice";
         default: PANIC("invalid type kind", type.kind);
     }
 }
@@ -126,9 +129,10 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
 
             case ir::OpCode::Call:
                 print(out, "    %l{} ={} call ${}(", inst->uid,
-                      to_qbe_temp(*inst->type), inst->get_value_str());
+                      to_qbe_fntype(*inst->type), inst->get_value_str());
                 for (auto arg : inst->get_args()) {
-                    print(out, "{} %l{}, ", to_qbe_type(*arg->type), arg->uid);
+                    print(out, "{} %l{}, ", to_qbe_fntype(*arg->type),
+                          arg->uid);
                 }
                 println(out, ")");
                 break;
@@ -136,7 +140,8 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             case ir::OpCode::CallVoid:
                 print(out, "    call ${}(", inst->get_value_str());
                 for (auto arg : inst->get_args()) {
-                    print(out, "{} %l{}, ", to_qbe_temp(*arg->type), arg->uid);
+                    print(out, "{} %l{}, ", to_qbe_fntype(*arg->type),
+                          arg->uid);
                 }
                 println(out, ")");
                 break;
@@ -173,6 +178,26 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             } break;
 
             case ir::OpCode::Load: {
+                auto arg0 = inst->get_arg(0);
+
+                // in case the type is a fat one, need to copy it to the stack
+                // with blit before doing anything
+                if (inst->type->is_slice() || inst->type->is_strview()) {
+                    auto offset = inst->get_value_u64();
+                    ASSERT(offset == 0,
+                           "offset in load for slices/string_view not "
+                           "implemented");
+
+                    println(out, "    %l{} ={} alloc{} {}", inst->uid,
+                            to_qbe_temp(*inst->type), inst->type->alignment(),
+                            inst->type->size());
+
+                    // blit origin, dest, nbytes
+                    println(out, "    blit %l{}, %l{}, {}", arg0->uid,
+                            inst->uid, inst->type->size());
+                    break;  // glorious switch-case!
+                }
+
                 std::string_view op;
                 switch (inst->type->kind) {
                     case ir::TypeKind::Uint64:
@@ -196,14 +221,12 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 auto offset = inst->get_value_u64();
                 if (offset > 0) {
                     println(out, "    %at{} ={} add %l{}, {}", inst->uid,
-                            to_qbe_temp(*inst->get_arg(0)->type),
-                            inst->get_arg(0)->uid, offset);
+                            to_qbe_temp(*arg0->type), arg0->uid, offset);
                     println(out, "    %l{} ={} {} %at{}", inst->uid,
                             to_qbe_temp(*inst->type), op, inst->uid);
                 } else {
                     println(out, "    %l{} ={} {} %l{}", inst->uid,
-                            to_qbe_temp(*inst->type), op,
-                            inst->get_arg(0)->uid);
+                            to_qbe_temp(*inst->type), op, arg0->uid);
                 }
 
             } break;
@@ -211,8 +234,24 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             case ir::OpCode::Store: {
                 std::string_view op;
 
+                auto arg0 = inst->get_arg(0);
+                auto arg1 = inst->get_arg(1);
+
+                // in case the type is a fat one, need to use blit on it
+                if (arg1->type->is_slice() || arg1->type->is_strview()) {
+                    auto offset = inst->get_value_u64();
+                    ASSERT(offset == 0,
+                           "offset in store for slices/string_view not "
+                           "implemented");
+
+                    // blit origin, dest, nbytes
+                    println(out, "    blit %l{}, %l{}, {}", arg1->uid,
+                            arg0->uid, arg1->type->size());
+                    break;  // glorious switch-case!
+                }
+
                 // use rhs type as the type to store
-                switch (inst->get_arg(1)->type->kind) {
+                switch (arg1->type->kind) {
                     case ir::TypeKind::Uint64:
                     case ir::TypeKind::Int64: op = "storel"; break;
                     case ir::TypeKind::Uint32:
@@ -230,19 +269,17 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                     case ir::TypeKind::Ptr: op = machine_store_ptr_op(); break;
                     default:
                         PANIC("bad type kind in Store",
-                              fmt::to_string(inst->get_arg(1)->type->kind));
+                              fmt::to_string(arg1->type->kind));
                 }
 
                 auto offset = inst->get_value_u64();
                 if (offset > 0) {
                     println(out, "    %at{} ={} add %l{}, {}", inst->uid,
-                            to_qbe_temp(*inst->get_arg(0)->type),
-                            inst->get_arg(0)->uid, offset);
-                    println(out, "    {} %l{}, %at{}", op,
-                            inst->get_arg(1)->uid, inst->uid);
+                            to_qbe_temp(*arg0->type), arg0->uid, offset);
+                    println(out, "    {} %l{}, %at{}", op, arg1->uid,
+                            inst->uid);
                 } else {
-                    println(out, "    {} %l{}, %l{}", op, inst->get_arg(1)->uid,
-                            inst->get_arg(0)->uid);
+                    println(out, "    {} %l{}, %l{}", op, arg1->uid, arg0->uid);
                 }
             } break;
 
@@ -372,6 +409,9 @@ void codegen(FILE* out, ir::Module const& module, ErrorReporter& er,
              types::TypeStore& ts, Options const& opt) {
     auto state = State{.out = out, .ts = &ts, .er = &er, .opt = &opt};
     auto ctx = Context{};
+
+    println(out, "type :slice = {{ {} 2 }}", machine_ptr_type());
+    println(out, "");
 
     for (auto const& fn : module.get_funcs()) {
         codegen_func(fn, state, ctx);

@@ -56,6 +56,7 @@ enum class TypeKind : uint16_t {
     /// Pointers
     Ptr,
     PtrConst,
+    RawPtr,
 
     /// Multi pointers
     MultiPtr,
@@ -128,6 +129,10 @@ struct Type {
             case TypeKind::Isize: return true;
             default: return false;
         }
+    }
+
+    [[nodiscard]] constexpr auto is_u8() const -> bool {
+        return kind == TypeKind::Uint8;
     }
 
     [[nodiscard]] constexpr auto is_float() const -> bool {
@@ -227,6 +232,10 @@ struct Type {
         return kind == TypeKind::PtrConst;
     }
 
+    [[nodiscard]] constexpr auto is_rawptr() const -> bool {
+        return kind == TypeKind::RawPtr;
+    }
+
     [[nodiscard]] constexpr auto is_mptr() const -> bool {
         return kind == TypeKind::MultiPtr || kind == TypeKind::MultiPtrConst;
     }
@@ -240,7 +249,7 @@ struct Type {
     }
 
     [[nodiscard]] constexpr auto is_const_ref() const -> bool {
-        return is_ptr_const() || is_mptr_const();
+        return is_ptr_const() || is_mptr_const() || is_slice_const();
     }
 
     [[nodiscard]] constexpr auto is_distinct() const -> bool {
@@ -359,6 +368,7 @@ struct Type {
 
             case TypeKind::Ptr:
             case TypeKind::PtrConst:
+            case TypeKind::RawPtr:
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return alignof(uintptr_t); break;
 
@@ -416,6 +426,7 @@ struct Type {
 
             case TypeKind::Ptr:
             case TypeKind::PtrConst:
+            case TypeKind::RawPtr:
             case TypeKind::MultiPtr:
             case TypeKind::MultiPtrConst: return sizeof(uintptr_t); break;
 
@@ -517,6 +528,8 @@ struct TypeStore {
 
         Type* strview;
         Type* nil;
+
+        Type* rawptr;
     };
 
 public:
@@ -584,6 +597,7 @@ public:
 
     [[nodiscard]] auto get_strview() const -> Type* { return builtin.strview; }
     [[nodiscard]] auto get_nil() const -> Type* { return builtin.nil; }
+    [[nodiscard]] auto get_rawptr() const -> Type* { return builtin.rawptr; }
 
     [[nodiscard]] auto new_ptr(Type* inner, bool is_const) -> Type* {
         return new_type(is_const ? TypeKind::PtrConst : TypeKind::Ptr,
@@ -720,6 +734,8 @@ private:
 
         builtin.strview = new_type(TypeKind::StrView, {});
         builtin.nil = new_type(TypeKind::Nil, {});
+
+        builtin.rawptr = new_type(TypeKind::RawPtr, {});
     }
 
 private:
@@ -766,6 +782,7 @@ constexpr auto format_as(TypeKind kind) {
         case TypeKind::LitField: name = "LitField"; break;
         case TypeKind::Ptr: name = "Ptr"; break;
         case TypeKind::PtrConst: name = "PtrConst"; break;
+        case TypeKind::RawPtr: name = "RawPtr"; break;
         case TypeKind::MultiPtr: name = "MultiPtr"; break;
         case TypeKind::MultiPtrConst: name = "MultiPtrConst"; break;
         case TypeKind::Nil: name = "Nil"; break;
