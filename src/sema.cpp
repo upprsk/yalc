@@ -1310,6 +1310,11 @@ void sema_slicing(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (unw->is_slice()) {
+        node->set_type(ts.new_slice(unw->inner[0], unw->is_slice_const()));
+        return;
+    }
+
     if (unw->is_strview()) {
         node->set_type(ts.get_strview());
         return;
