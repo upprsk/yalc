@@ -9,6 +9,7 @@
 #include "ast-node-visitor.hpp"
 #include "ast-node.hpp"
 #include "file-store.hpp"
+#include "fmt/chrono.h"
 #include "fmt/ranges.h"
 #include "ir.hpp"
 #include "types.hpp"
@@ -26,6 +27,10 @@ struct State {
         auto inst = shadow_stack.at(shadow_stack.size() - 1);
         shadow_stack.pop_back();
         return inst;
+    }
+
+    [[nodiscard]] auto sstack_top() -> Inst* {
+        return shadow_stack.at(shadow_stack.size() - 1);
     }
 
     void add_local(Decl* decl, Inst* init) { locals[decl] = init; }
@@ -229,25 +234,32 @@ void build_expr_lvalue(Node* node, State& state, Context& /*unused*/) {
     }
 }
 
-auto build_index_ptr(Node* node, State& state, Context& ctx)
-    -> std::pair<Inst*, Type*> {
+auto auto_extend_to_usize(Inst* inst, State& state) -> Inst* {
     auto& module = state.module;
 
-    auto data = conv::index(*node);
-    build_expr(data.receiver, state, ctx);
-    build_expr(data.index, state, ctx);
+    if (inst->type->size() < module.get_type_isize()->size()) {
+        inst = module.new_inst_ext(module.get_type_isize(), inst);
+        state.add_inst(inst);
+    }
 
-    auto type = create_ir_type_from_general(module, *node->get_type());
+    return inst;
+}
+
+struct IndexOffsetPtr {
+    Inst* ptr;
+    Inst* ext_index;
+};
+
+auto build_index_offset_ptr(types::Type* receiver_type, State& state,
+                            Context& /*unused*/) -> IndexOffsetPtr {
+    auto& module = state.module;
 
     auto index = state.sstack_pop();
     auto receiver = state.sstack_pop();
 
     // in case the index type is smaller then the pointer size, we need to
     // extend it
-    if (index->type->size() < module.get_type_isize()->size()) {
-        index = module.new_inst_ext(module.get_type_isize(), index);
-        state.add_inst(index);
-    }
+    index = auto_extend_to_usize(index, state);
 
     uint64_t sizeof_receiver;
     if (receiver->type->is_strview()) {
@@ -256,9 +268,7 @@ auto build_index_ptr(Node* node, State& state, Context& ctx)
 
         state.add_inst(receiver);
     } else if (receiver->type->is_slice()) {
-        auto receiver_type = data.receiver->get_type();
         ASSERT(receiver_type->is_slice());
-
         sizeof_receiver =
             create_ir_type_from_general(module, *receiver_type->inner[0])
                 ->size();
@@ -266,9 +276,7 @@ auto build_index_ptr(Node* node, State& state, Context& ctx)
 
         state.add_inst(receiver);
     } else if (receiver->type->is_array()) {
-        auto receiver_type = data.receiver->get_type();
         ASSERT(receiver_type->is_array());
-
         sizeof_receiver = receiver_type->inner[0]->size();
     } else {
         sizeof_receiver = receiver->type->size();
@@ -286,8 +294,110 @@ auto build_index_ptr(Node* node, State& state, Context& ctx)
     state.add_inst(inst_index_mult);
     state.add_inst(ptr);
 
+    return {.ptr = ptr, .ext_index = index};
+}
+
+auto build_index_ptr(Node* node, State& state, Context& ctx)
+    -> std::pair<Inst*, Type*> {
+    auto& module = state.module;
+
+    auto data = conv::index(*node);
+    build_expr(data.receiver, state, ctx);
+    build_expr(data.index, state, ctx);
+
+    auto type = create_ir_type_from_general(module, *node->get_type());
+    auto [ptr, _] =
+        build_index_offset_ptr(data.receiver->get_type(), state, ctx);
     return {ptr, type};
 }
+
+// ----------------------------------------------------------------------------
+
+void build_slicing_of_array(Node* /*unused*/, State& state, Context& ctx,
+                            types::Type* inner, conv::Slicing const& data) {
+    auto& module = state.module;
+    auto  receiver = state.sstack_pop();
+
+    // struct slice_t { T* ptr; size_t len; };
+    // struct slice_t s;
+    // s.ptr = <arr>.ptr;
+    // s.len = <arr>.len;
+
+    auto ptr_type = module.get_type_ptr();
+    auto usize_type = module.get_type_usize();
+
+    // struct slice_t s;
+    auto ptr =
+        module.new_inst_alloca(module.new_type_of(TypeKind::Slice),
+                               ptr_type->alignment(), ptr_type->size() * 2);
+    state.add_inst(ptr);
+
+    auto original_size = module.new_inst_int_const(usize_type, inner->count);
+    auto final_size = original_size;
+    state.add_inst(final_size);
+
+    // FIXME: check bounds for start
+    if (data.start) {
+        state.sstack_push(receiver);
+        build_expr(data.start, state, ctx);
+
+        auto [ptr, start] =
+            build_index_offset_ptr(data.receiver->get_type(), state, ctx);
+        receiver = ptr;
+
+        final_size =
+            module.new_inst_arith(OpCode::Sub, usize_type, final_size, start);
+
+        state.add_inst(receiver);
+        state.add_inst(final_size);
+    }
+
+    // FIXME: check bounds for end
+    if (data.end) {
+        build_expr(data.end, state, ctx);
+        auto end = auto_extend_to_usize(state.sstack_pop(), state);
+
+        auto diff =
+            module.new_inst_arith(OpCode::Sub, usize_type, original_size, end);
+        final_size =
+            module.new_inst_arith(OpCode::Sub, usize_type, final_size, diff);
+
+        state.add_inst(diff);
+        state.add_inst(final_size);
+    }
+
+    // s.ptr = <arr>.ptr;
+    auto slice_data_ptr = module.new_inst_copy(ptr_type, receiver);
+    auto ptr_store = module.new_inst_store(ptr, slice_data_ptr);
+    state.add_inst(slice_data_ptr);
+    state.add_inst(ptr_store);
+
+    // s.len = <arr>.len;
+    auto size_store = module.new_inst_store(ptr, final_size, ptr_type->size());
+    state.add_inst(size_store);
+
+    state.sstack_push(ptr);
+}
+
+void build_slicing(Node* node, State& state, Context& ctx) {
+    auto data = conv::slicing(*node);
+    build_expr(data.receiver, state, ctx);
+
+    auto inner = data.receiver->get_type()->unpacked()->undistinct();
+    if (inner->is_array()) {
+        build_slicing_of_array(node, state, ctx, inner, data);
+    } else if (inner->is_mptr()) {
+        PANIC("slicing: not implemented (mptr)");
+    } else if (inner->is_strview()) {
+        PANIC("slicing: not implemented (string_view)");
+    } else if (inner->is_slice()) {
+        PANIC("slicing: not implemented (slice)");
+    } else {
+        PANIC("invalid receiver for slicing", *inner);
+    }
+}
+
+// ----------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void build_expr(Node* node, State& state, Context& ctx) {
@@ -504,6 +614,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Index)) {
+        // FIXME: check bounds
         auto [ptr, type] = build_index_ptr(node, state, ctx);
 
         auto inst = module.new_inst_load(type, ptr);
@@ -512,56 +623,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::Slicing)) {
-        auto data = conv::slicing(*node);
-
-        build_expr(data.receiver, state, ctx);
-
-        auto inner = data.receiver->get_type()->unpacked()->undistinct();
-        if (inner->is_array()) {
-            if (data.start || data.end) {
-                PANIC("slicing: not implemented start/end (array)");
-            }
-
-            auto receiver = state.sstack_pop();
-
-            // struct slice_t { T* ptr; size_t len; };
-            // struct slice_t s;
-            // s.ptr = <arr>.ptr;
-            // s.len = <arr>.len;
-
-            auto ptr_type = module.get_type_ptr();
-            auto usize_type = module.get_type_usize();
-
-            // struct slice_t s;
-            auto ptr = module.new_inst_alloca(
-                module.new_type_of(TypeKind::Slice), ptr_type->alignment(),
-                ptr_type->size() * 2);
-            state.add_inst(ptr);
-
-            // s.ptr = <arr>.ptr;
-            auto slice_data_ptr = module.new_inst_copy(ptr_type, receiver);
-            auto ptr_store = module.new_inst_store(ptr, slice_data_ptr);
-            state.add_inst(slice_data_ptr);
-            state.add_inst(ptr_store);
-
-            // s.len = <arr>.len;
-            auto size = module.new_inst_int_const(usize_type, inner->count);
-            auto size_store =
-                module.new_inst_store(ptr, size, ptr_type->size());
-            state.add_inst(size);
-            state.add_inst(size_store);
-
-            state.sstack_push(ptr);
-        } else if (inner->is_mptr()) {
-            PANIC("slicing: not implemented (mptr)");
-        } else if (inner->is_strview()) {
-            PANIC("slicing: not implemented (string_view)");
-        } else if (inner->is_slice()) {
-            PANIC("slicing: not implemented (slice)");
-        } else {
-            PANIC("invalid receiver for slicing", *inner);
-        }
-
+        build_slicing(node, state, ctx);
         return;
     }
 
