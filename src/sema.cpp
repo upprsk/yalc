@@ -1241,7 +1241,7 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
 
     else if (unw->is_array()) {
         if (data.name == "ptr") {
-            node->set_type(ts.new_mptr(ts.get_u8(), true));
+            node->set_type(ts.new_mptr(unw->inner[0], true));
             return;
         }
 
