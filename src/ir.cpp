@@ -1,5 +1,6 @@
 #include "ir.hpp"
 
+#include <algorithm>
 #include <list>
 #include <ranges>
 #include <string_view>
@@ -15,6 +16,13 @@
 namespace yal::ir {
 
 namespace rv = std::ranges::views;
+
+void Module::sort_funcs() {
+    std::ranges::sort(funcs, [](Func const& lhs, Func const& rhs) {
+        return lhs.is_extern() < rhs.is_extern() ||
+               lhs.link_name > rhs.link_name;
+    });
+}
 
 void disasm_inst(FILE* out, Inst const& inst) {
     if (inst.type) {

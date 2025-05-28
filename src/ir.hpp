@@ -515,6 +515,8 @@ public:
         return funcs;
     }
 
+    void sort_funcs();
+
     void reset_inst_uid_counter(uint32_t v = 0) { next_inst_uid = v; }
     void reset_block_uid_counter(uint32_t v = 0) { next_block_uid = v; }
 

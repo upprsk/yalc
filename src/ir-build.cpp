@@ -1281,6 +1281,8 @@ auto build(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
     build_flat_module(root, state, ctx);
 
     auto m = std::move(state.module);
+    m.sort_funcs();
+
     return m;
 }
 
