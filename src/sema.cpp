@@ -483,52 +483,112 @@ auto coerce_types(types::Type* target, types::Type* source, Node* target_node,
     }
 
     if (target->is_mptr()) {
-        if (target->is_mptr_mut() && source->is_mptr_mut())
-            return {target, CoerceResult::Direct};
-        if (target->is_mptr_const() && source->is_mptr_mut())
-            return {target, CoerceResult::Direct};
-        if (target->is_mptr_const() && source->is_mptr_const())
-            return {target, CoerceResult::Direct};
-        if (target->is_mptr_mut() && source->is_mptr_const()) {
-            er.report_error(
-                source_node->get_loc(),
-                "can not implicitly cast away constness of {} to {}", *source,
-                *target);
-            if (target_node != nullptr) {
-                er.report_note(target_node->get_loc(),
-                               "this requires mutable {}", *target);
+        if (source->is_rawptr()) return {target, CoerceResult::Direct};
+        if (source->is_mptr()) {
+            if (*target->inner[0] != *source->inner[0]) {
+                er.report_error(
+                    source_node->get_loc(),
+                    "can not coerce multi-pointer of {} to multi-pointer of {}",
+                    *target->inner[0], *source->inner[0]);
+
+                // NOTE: could return target type here to avoid further ghost
+                // errors
+                return {ts.get_error(), CoerceResult::Direct};
             }
 
-            // NOTE: could return target type here to avoid further ghost errors
-            return {ts.get_error(), CoerceResult::Direct};
+            if (target->is_mptr_mut() && source->is_mptr_mut())
+                return {target, CoerceResult::Direct};
+            if (target->is_mptr_const() && source->is_mptr_mut())
+                return {target, CoerceResult::Direct};
+            if (target->is_mptr_const() && source->is_mptr_const())
+                return {target, CoerceResult::Direct};
+            if (target->is_mptr_mut() && source->is_mptr_const()) {
+                er.report_error(
+                    source_node->get_loc(),
+                    "can not implicitly cast away constness of {} to {}",
+                    *source, *target);
+                if (target_node != nullptr) {
+                    er.report_note(target_node->get_loc(),
+                                   "this requires mutable {}", *target);
+                }
+
+                // NOTE: could return target type here to avoid further ghost
+                // errors
+                return {ts.get_error(), CoerceResult::Direct};
+            }
         }
     }
 
     if (target->is_ptr()) {
-        if (target->is_ptr_mut() && source->is_ptr_mut())
-            return {target, CoerceResult::Direct};
-        if (target->is_ptr_const() && source->is_ptr_mut())
-            return {target, CoerceResult::Direct};
-        if (target->is_ptr_const() && source->is_ptr_const())
-            return {target, CoerceResult::Direct};
-        if (target->is_ptr_mut() && source->is_ptr_mut()) {
-            er.report_error(
-                source_node->get_loc(),
-                "can not implicitly cast away constness of {} to {}", *source,
-                *target);
-            if (target_node != nullptr) {
-                er.report_note(target_node->get_loc(),
-                               "this requires mutable {}", *target);
+        if (source->is_rawptr()) return {target, CoerceResult::Direct};
+        if (source->is_ptr()) {
+            if (*target->inner[0] != *source->inner[0]) {
+                er.report_error(source_node->get_loc(),
+                                "can not coerce pointer of {} to pointer of {}",
+                                *target->inner[0], *source->inner[0]);
+
+                // NOTE: could return target type here to avoid further ghost
+                // errors
+                return {ts.get_error(), CoerceResult::Direct};
             }
 
-            // NOTE: could return target type here to avoid further ghost errors
-            return {ts.get_error(), CoerceResult::Direct};
+            if (target->is_ptr_mut() && source->is_ptr_mut())
+                return {target, CoerceResult::Direct};
+            if (target->is_ptr_const() && source->is_ptr_mut())
+                return {target, CoerceResult::Direct};
+            if (target->is_ptr_const() && source->is_ptr_const())
+                return {target, CoerceResult::Direct};
+            if (target->is_ptr_mut() && source->is_ptr_const()) {
+                er.report_error(
+                    source_node->get_loc(),
+                    "can not implicitly cast away constness of {} to {}",
+                    *source, *target);
+                if (target_node != nullptr) {
+                    er.report_note(target_node->get_loc(),
+                                   "this requires mutable {}", *target);
+                }
+
+                // NOTE: could return target type here to avoid further ghost
+                // errors
+                return {ts.get_error(), CoerceResult::Direct};
+            }
         }
     }
 
     if (target->is_rawptr()) {
         if (source->is_ptr() || source->is_mptr())
             return {target, CoerceResult::Direct};
+    }
+
+    if (target->is_slice() && source->is_slice()) {
+        if (*target->inner[0] != *source->inner[0]) {
+            er.report_error(source_node->get_loc(),
+                            "can not coerce slice of {} to slice of {}",
+                            *target->inner[0], *source->inner[0]);
+
+            // NOTE: could return target type here to avoid further ghost errors
+            return {ts.get_error(), CoerceResult::Direct};
+        }
+
+        if (target->is_slice_mut() && source->is_slice_mut())
+            return {target, CoerceResult::Direct};
+        if (target->is_slice_const() && source->is_slice_mut())
+            return {target, CoerceResult::Direct};
+        if (target->is_slice_const() && source->is_slice_const())
+            return {target, CoerceResult::Direct};
+        if (target->is_slice_mut() && source->is_slice_const()) {
+            er.report_error(
+                source_node->get_loc(),
+                "can not implicitly cast away constness of {} to {}", *source,
+                *target);
+            if (target_node != nullptr) {
+                er.report_note(target_node->get_loc(),
+                               "this requires mutable {}", *target);
+            }
+
+            // NOTE: could return target type here to avoid further ghost errors
+            return {ts.get_error(), CoerceResult::Direct};
+        }
     }
 
     er.report_error(source_node->get_loc(),

@@ -265,6 +265,10 @@ struct Type {
     }
 
     [[nodiscard]] constexpr auto is_slice() const -> bool {
+        return kind == TypeKind::Slice || kind == TypeKind::SliceConst;
+    }
+
+    [[nodiscard]] constexpr auto is_slice_mut() const -> bool {
         return kind == TypeKind::Slice;
     }
 
