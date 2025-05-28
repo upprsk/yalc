@@ -5,6 +5,7 @@
 #include <ranges>
 #include <string_view>
 
+#include "fmt/format.h"
 #include "fmt/ranges.h"
 #include "ir.hpp"
 
@@ -102,7 +103,8 @@ auto to_qbe_fntype(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
         case ir::TypeKind::Slice: return ":slice";
-        default: PANIC("invalid type kind", type.kind);
+        default:
+            PANIC("invalid type kind", type.kind, fmt::to_string(type.kind));
     }
 }
 
