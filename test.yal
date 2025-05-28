@@ -1,15 +1,31 @@
 module main;
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    var args = argv[1:argc];
+    var args = mkargs(argv[:argc]);
+    defer c_free(args.ptr);
+
+    // var args = argv[:argc];
+    var i: usize = 0;
+    while i < args.len {
+        defer i = i + 1;
+        c_printf("args[%d] = %s\n".ptr, i, args[i].ptr);
+    }
+
+    return 0;
+}
+
+func mkargs(raw_args: [][*]u8) []string_view {
+    var args_ptr = c_malloc(sizeof(string_view) * raw_args.len);
+    var args = (args_ptr as [*]string_view)[:raw_args.len];
 
     var i: usize = 0;
     while i < args.len {
         defer i = i + 1;
-        c_printf("args[%d] = %s\n".ptr, i, args[i]);
+
+        args[i] = raw_args[i][:c_strlen(raw_args[i])] as string_view;
     }
 
-    return 0;
+    return args;
 }
 
 // vim: ft=yal

@@ -405,6 +405,51 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 func c_printf(fmt: [*]const u8, ...);
 )");
 
+    run_test(ctx, p, "allocate cast and use slices of string_view",
+             R"(
+module main;
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var args = mkargs(argv[:argc]);
+    defer c_free(args.ptr);
+
+    // var args = argv[:argc];
+    var i: usize = 0;
+    while i < args.len {
+        defer i = i + 1;
+        c_printf("args[%d] = %s\n".ptr, i, args[i].ptr);
+    }
+
+    return 0;
+}
+
+func mkargs(raw_args: [][*]u8) []string_view {
+    var args_ptr = c_malloc(sizeof(string_view) * raw_args.len);
+    var args = (args_ptr as [*]string_view)[:raw_args.len];
+
+    var i: usize = 0;
+    while i < args.len {
+        defer i = i + 1;
+
+        args[i] = raw_args[i][:c_strlen(raw_args[i])] as string_view;
+    }
+
+    return args;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) rawptr;
+
+@extern(link_name="free")
+func c_free(ptr: rawptr);
+
+@extern(link_name="strlen")
+func c_strlen(a: [*]const u8) usize;
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("assign");
 
