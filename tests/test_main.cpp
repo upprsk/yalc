@@ -13,6 +13,7 @@
 #include "test_lower.hpp"
 #include "test_name_res.hpp"
 #include "test_parser.hpp"
+#include "test_qbe.hpp"
 #include "test_sema.hpp"
 #include "test_tokenizer.hpp"
 #include "tokenizer.hpp"
@@ -146,6 +147,13 @@ auto real_main(Args args) -> int {
 
     {
         auto [tok, tfailed, tskipped] = test_ir(p);
+        ok += tok;
+        failed += tfailed;
+        skipped += tskipped;
+    }
+
+    {
+        auto [tok, tfailed, tskipped] = test_qbe(p);
         ok += tok;
         failed += tfailed;
         skipped += tskipped;

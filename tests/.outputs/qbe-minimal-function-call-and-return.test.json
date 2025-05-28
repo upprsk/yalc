@@ -1,0 +1,1 @@
+{"stdout":"type :slice = { l 2 }\n\nfunction w $main_id(w %l0, ) {\n@start\n@b0\n    ret %l0\n}\nexport function w $main() {\n@start\n@b0\n    %l0 =w copy 68\n    %l1 =w copy %l0\n    %l2 =w call $main_id(w %l1, )\n    ret %l2\n}\n"}
