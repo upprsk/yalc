@@ -1228,10 +1228,10 @@ func c_getchar() i32;
 
 
 @extern(link_name="malloc")
-func c_malloc(size: usize) [*]u8;
+func c_malloc(size: usize) rawptr;
 
 @extern(link_name="free")
-func c_free(ptr: [*]u8);
+func c_free(ptr: rawptr);
 
 @extern(link_name="exit")
 func c_exit(code: i32);

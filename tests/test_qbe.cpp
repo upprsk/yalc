@@ -447,6 +447,74 @@ func c_free(ptr: rawptr);
 func c_strlen(a: [*]const u8) usize;
 )");
 
+    run_test(ctx, p, "slicing slices and printing with malloc",
+             R"(
+module main;
+
+func read_count() i32 {
+    var count = 0;
+
+    c_printf("count: ".ptr);
+    c_scanf("%d".ptr, &count);
+
+    return count;
+}
+
+func allocate_array(count: i32) []i32 {
+    var ptr: [*]i32 = c_malloc(count as usize * sizeof(i32));
+    return ptr[:count];
+}
+
+func fill_array(arr: []i32) {
+    var i  = 10;
+    var it = arr;
+    while it.len > 0 {
+        defer {
+            it = it[1:];
+            i  = i + 10;
+        }
+
+        it[0] = i;
+    }
+
+    return;
+}
+
+func print_array(arr: []const i32) {
+    var it = arr;
+    while it.len > 0 {
+        defer it = it[1:];
+
+        c_printf("- %d\n".ptr, it[0]);
+    }
+
+    return;
+}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    var count = read_count();
+    var arr   = allocate_array(count);
+    defer c_free(arr.ptr);
+
+    fill_array(arr);
+    print_array(arr);
+
+    return 0;
+}
+
+@extern(link_name="malloc")
+func c_malloc(size: usize) rawptr;
+
+@extern(link_name="free")
+func c_free(ptr: rawptr);
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+
+@extern(link_name="scanf")
+func c_scanf(fmt: [*]const u8, ...);
+)");
+
     ctx.tags.pop_back();
     ctx.tags.emplace_back("assign");
 

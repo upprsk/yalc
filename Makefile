@@ -2,11 +2,8 @@ CMAKE_J=1
 
 all: test
 
-test: test.yal.o test.c.o
-	gcc -o test test.yal.o test.c.o
-
-test.c.o: test.c
-	gcc -c -o test.c.o test.c
+test: test.yal.o
+	gcc -o test test.yal.o
 
 test.yal.o: test.yal.asm
 	gcc -c -o test.yal.o -xassembler test.yal.asm
