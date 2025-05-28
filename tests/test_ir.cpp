@@ -43,8 +43,6 @@ auto gen_ast_ir(std::string source) -> json {
     ms.flush();
 
     auto module = yal::ir::build(ast, prj_root, er, ts, {.single_file = true});
-    if (er.had_error()) return 1;
-
     if (er.had_error()) {
         return json{
             {"stderr", ms.str()}
@@ -95,8 +93,6 @@ auto gen_ast_ir_many(std::vector<std::string> sources) -> json {
     ms.flush();
 
     auto module = yal::ir::build(ast, prj_root, er, ts, {});
-    if (er.had_error()) return 1;
-
     if (er.had_error()) {
         return json{
             {"stderr", ms.str()}
