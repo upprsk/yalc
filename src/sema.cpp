@@ -1286,6 +1286,11 @@ void sema_field(Ast& ast, Node* node, State& state, Context& ctx) {
                     "type {} does not have a field (or namespaced "
                     "function) named {:?}",
                     *rty, data.name);
+    if (rty->decl && rty->decl->node) {
+        auto n = rty->decl->node;
+        er.report_note(n->get_loc(), "type defined here");
+    }
+
     node->set_type(ts.get_error());
 }
 
@@ -2703,7 +2708,9 @@ void eval_defined_values(Node* decl, std::span<Node*> ids,
 
         // wen we eval and define a type, create a distinct copy
         if (v.type->is_type()) {
-            v.data = ts.new_distinct_of(d->full_name, v.get_data_type());
+            auto ty = ts.new_distinct_of(d->full_name, v.get_data_type());
+            ty->decl = d;
+            v.data = ty;
         }
 
         d->value = v;

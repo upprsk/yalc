@@ -692,34 +692,87 @@ auto resolve_names(ast::Ast& ast, ast::Node* root, ErrorReporter& er,
     auto root_env = Env{};
 
     {
+        auto& ds = *ast.get_decl_store();
+
+        using TT = types::TypeKind;
+        auto type_ty = ts.new_type(TT::Type, {});
+        auto void_ty = ts.new_type(TT::Void, {});
+        auto i64_ty = ts.new_type(TT::Int64, {});
+        auto u64_ty = ts.new_type(TT::Uint64, {});
+        auto i32_ty = ts.new_type(TT::Int32, {});
+        auto u32_ty = ts.new_type(TT::Uint32, {});
+        auto i16_ty = ts.new_type(TT::Int16, {});
+        auto u16_ty = ts.new_type(TT::Uint16, {});
+        auto i8_ty = ts.new_type(TT::Int8, {});
+        auto u8_ty = ts.new_type(TT::Uint8, {});
+        auto isize_ty = ts.new_type(TT::Isize, {});
+        auto usize_ty = ts.new_type(TT::Usize, {});
+        auto bool_ty = ts.new_type(TT::Bool, {});
+        auto f64_ty = ts.new_type(TT::Float64, {});
+        auto f32_ty = ts.new_type(TT::Float32, {});
+        auto string_view_ty = ts.new_type(TT::StrView, {});
+        auto rawptr_ty = ts.new_type(TT::RawPtr, {});
+
         auto mkty = [&](types::Type* ty) -> Value {
-            return {.type = ts.get_type(), .data = ty};
+            return {.type = type_ty, .data = ty};
         };
 
-        auto& ds = *ast.get_decl_store();
-        root_env.define(ds, "type", nullptr, mkty(ts.get_type()), {});
-        root_env.define(ds, "void", nullptr, mkty(ts.get_void()), {});
+        type_ty->decl = root_env.define(ds, "type", nullptr, mkty(type_ty), {});
 
-        root_env.define(ds, "i64", nullptr, mkty(ts.get_i64()), {});
-        root_env.define(ds, "u64", nullptr, mkty(ts.get_u64()), {});
-        root_env.define(ds, "i32", nullptr, mkty(ts.get_i32()), {});
-        root_env.define(ds, "u32", nullptr, mkty(ts.get_u32()), {});
-        root_env.define(ds, "i16", nullptr, mkty(ts.get_i16()), {});
-        root_env.define(ds, "u16", nullptr, mkty(ts.get_u16()), {});
-        root_env.define(ds, "i8", nullptr, mkty(ts.get_i8()), {});
-        root_env.define(ds, "u8", nullptr, mkty(ts.get_u8()), {});
+        void_ty->decl = root_env.define(ds, "void", nullptr, mkty(void_ty), {});
 
-        root_env.define(ds, "isize", nullptr, mkty(ts.get_isize()), {});
-        root_env.define(ds, "usize", nullptr, mkty(ts.get_usize()), {});
+        i64_ty->decl = root_env.define(ds, "i64", nullptr, mkty(i64_ty), {});
+        u64_ty->decl = root_env.define(ds, "u64", nullptr, mkty(u64_ty), {});
+        i32_ty->decl = root_env.define(ds, "i32", nullptr, mkty(i32_ty), {});
+        u32_ty->decl = root_env.define(ds, "u32", nullptr, mkty(u32_ty), {});
+        i16_ty->decl = root_env.define(ds, "i16", nullptr, mkty(i16_ty), {});
+        u16_ty->decl = root_env.define(ds, "u16", nullptr, mkty(u16_ty), {});
+        i8_ty->decl = root_env.define(ds, "i8", nullptr, mkty(i8_ty), {});
+        u8_ty->decl = root_env.define(ds, "u8", nullptr, mkty(u8_ty), {});
 
-        root_env.define(ds, "bool", nullptr, mkty(ts.get_bool()), {});
+        isize_ty->decl =
+            root_env.define(ds, "isize", nullptr, mkty(isize_ty), {});
+        usize_ty->decl =
+            root_env.define(ds, "usize", nullptr, mkty(usize_ty), {});
 
-        root_env.define(ds, "f64", nullptr, mkty(ts.get_f64()), {});
-        root_env.define(ds, "f32", nullptr, mkty(ts.get_f32()), {});
+        bool_ty->decl = root_env.define(ds, "bool", nullptr, mkty(bool_ty), {});
 
-        root_env.define(ds, "string_view", nullptr, mkty(ts.get_strview()), {});
+        f64_ty->decl = root_env.define(ds, "f64", nullptr, mkty(f64_ty), {});
+        f32_ty->decl = root_env.define(ds, "f32", nullptr, mkty(f32_ty), {});
 
-        root_env.define(ds, "rawptr", nullptr, mkty(ts.get_rawptr()), {});
+        string_view_ty->decl = root_env.define(ds, "string_view", nullptr,
+                                               mkty(string_view_ty), {});
+
+        rawptr_ty->decl =
+            root_env.define(ds, "rawptr", nullptr, mkty(rawptr_ty), {});
+
+        // these don't have decls?
+        auto err_ty = ts.new_type(TT::Err, {});
+        auto untyped_int_ty = ts.new_type(TT::UntypedInt, {});
+        auto nil_ty = ts.new_type(TT::Nil, {});
+
+        ts.set_builtins({
+            .error = err_ty,
+            .type = type_ty,
+            ._void = void_ty,
+            .untyped_int = untyped_int_ty,
+            .uint64 = u64_ty,
+            .int64 = i64_ty,
+            .uint32 = u32_ty,
+            .int32 = i32_ty,
+            .uint16 = u16_ty,
+            .int16 = i16_ty,
+            .uint8 = u8_ty,
+            .int8 = i8_ty,
+            .usize = usize_ty,
+            .isize = isize_ty,
+            ._bool = bool_ty,
+            .f32 = f32_ty,
+            .f64 = f64_ty,
+            .strview = string_view_ty,
+            .nil = nil_ty,
+            .rawptr = rawptr_ty,
+        });
 
         root_env.define(ds, "true", nullptr,
                         {.type = ts.get_bool(), .data = true}, {});

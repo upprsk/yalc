@@ -480,6 +480,8 @@ struct Type {
     uint32_t         count{};
     std::string_view id;
     std::span<Type*> inner;
+
+    Decl* decl{};
 };
 
 }  // namespace yal::types
@@ -570,7 +572,7 @@ public:
         TypeItem* item{};
     };
 
-    TypeStore() { add_builtins(); }
+    TypeStore() = default;
 
     [[nodiscard]] auto get_error() const -> Type* { return builtin.error; }
     [[nodiscard]] auto get_type() const -> Type* { return builtin.type; }
@@ -711,36 +713,7 @@ public:
     [[nodiscard]] auto begin() const -> Iterator { return {head}; }
     [[nodiscard]] auto end() const -> Iterator { return {}; }
 
-private:
-    void add_builtins() {
-        builtin.error = new_type(TypeKind::Err, {});
-        builtin.type = new_type(TypeKind::Type, {});
-        builtin._void = new_type(TypeKind::Void, {});
-
-        builtin.untyped_int = new_type(TypeKind::UntypedInt, {});
-
-        builtin.uint64 = new_type(TypeKind::Uint64, {});
-        builtin.int64 = new_type(TypeKind::Int64, {});
-        builtin.uint32 = new_type(TypeKind::Uint32, {});
-        builtin.int32 = new_type(TypeKind::Int32, {});
-        builtin.uint16 = new_type(TypeKind::Uint16, {});
-        builtin.int16 = new_type(TypeKind::Int16, {});
-        builtin.uint8 = new_type(TypeKind::Uint8, {});
-        builtin.int8 = new_type(TypeKind::Int8, {});
-
-        builtin.usize = new_type(TypeKind::Usize, {});
-        builtin.isize = new_type(TypeKind::Isize, {});
-
-        builtin._bool = new_type(TypeKind::Bool, {});
-
-        builtin.f32 = new_type(TypeKind::Float32, {});
-        builtin.f64 = new_type(TypeKind::Float64, {});
-
-        builtin.strview = new_type(TypeKind::StrView, {});
-        builtin.nil = new_type(TypeKind::Nil, {});
-
-        builtin.rawptr = new_type(TypeKind::RawPtr, {});
-    }
+    void set_builtins(Builtin const& builtins) { builtin = builtins; }
 
 private:
     TypeItem* head{};
