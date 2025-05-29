@@ -166,11 +166,6 @@ struct Binary {
     Node* rhs{};
 };
 
-struct BinaryRef {
-    Node*& lhs;
-    Node*& rhs;
-};
-
 struct Unary {
     Node* child{};
 };
@@ -183,12 +178,6 @@ struct StructField {
     std::string_view name;
     Node*            type{};
     Node*            init{};
-};
-
-struct StructFieldRef {
-    std::string_view name;
-    Node*&           type;
-    Node*&           init;
 };
 
 struct Ptr {
@@ -254,10 +243,6 @@ struct Block {
 
 struct ExprStmt {
     Node* child{};
-};
-
-struct ReturnStmtRef {
-    Node*& child;
 };
 
 struct IfStmt {
@@ -487,26 +472,11 @@ struct CallIndirect {
     return {.lhs = n.get_child(0), .rhs = n.get_child(1)};
 }
 
-[[nodiscard]] constexpr auto binary_ref(Node const& n) -> BinaryRef {
-    ASSERT(n.is_oneof(NodeKind::Add, NodeKind::Sub, NodeKind::Mul,
-                      NodeKind::Div, NodeKind::Mod, NodeKind::LeftShift,
-                      NodeKind::RightShift, NodeKind::Equal, NodeKind::NotEqual,
-                      NodeKind::Less, NodeKind::LessEqual, NodeKind::Greater,
-                      NodeKind::GreaterEqual, NodeKind::Band, NodeKind::Bor,
-                      NodeKind::Bxor, NodeKind::Land, NodeKind::Lor,
-                      NodeKind::Cast));
-    return {.lhs = n.get_child_ptrref(0), .rhs = n.get_child_ptrref(1)};
-}
-
 [[nodiscard]] constexpr auto unary(Node const& n) -> Unary {
     ASSERT(n.is_oneof(NodeKind::AddrOf, NodeKind::Deref, NodeKind::Lnot,
                       NodeKind::Bnot, NodeKind::Neg, NodeKind::Optional,
                       NodeKind::ExprStmt, NodeKind::ReturnStmt));
     return {.child = n.get_child(0)};
-}
-
-[[nodiscard]] constexpr auto return_stmt_ref(Node const& n) -> ReturnStmtRef {
-    return {.child = n.get_child_ptrref(0)};
 }
 
 [[nodiscard]] constexpr auto struct_type(Node const& n) -> StructType {
@@ -520,15 +490,6 @@ struct CallIndirect {
         .name = n.get_data_str(),
         .type = n.get_child(0),
         .init = n.get_child(1),
-    };
-}
-
-[[nodiscard]] constexpr auto struct_field_ref(Node const& n) -> StructFieldRef {
-    ASSERT(n.get_kind() == NodeKind::StructField);
-    return {
-        .name = n.get_data_str(),
-        .type = n.get_child_ptrref(0),
-        .init = n.get_child_ptrref(1),
     };
 }
 

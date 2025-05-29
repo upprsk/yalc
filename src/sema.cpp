@@ -603,7 +603,7 @@ auto coerce_types(types::Type* target, types::Type* source, Node* target_node,
 }
 
 auto coerce_types_and_magic(Ast& ast, types::Type* target, types::Type* source,
-                            Node* target_node, Node*& source_node, State& state)
+                            Node* target_node, Node* source_node, State& state)
     -> types::Type* {
     auto [r, rr] =
         coerce_types(target, source, target_node, source_node, state);
@@ -615,7 +615,10 @@ auto coerce_types_and_magic(Ast& ast, types::Type* target, types::Type* source,
                                *source_node->get_type(), *r);
 #endif
 
-        source_node = ast.new_coerce(source_node->get_loc(), source_node, r);
+        auto source_node_copy = ast.shallow_dupe(*source_node);
+        source_node->make_equal_to(
+            ast.new_coerce(source_node->get_loc(), source_node_copy, r),
+            nullptr);
     }
 
     return r;
@@ -623,7 +626,7 @@ auto coerce_types_and_magic(Ast& ast, types::Type* target, types::Type* source,
 
 auto coerce_types_and_fixup_untyped(Ast& ast, types::Type* target,
                                     types::Type* source, Node* target_node,
-                                    Node*& source_node, State& state)
+                                    Node* source_node, State& state)
     -> types::Type* {
     auto r = coerce_types_and_magic(ast, target, source, target_node,
                                     source_node, state);
@@ -799,7 +802,7 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
 
 auto cast_types_and_fixup_untyped(Ast& ast, types::Type* target,
                                   types::Type* source, Node* target_node,
-                                  Node*& source_node, State& state)
+                                  Node* source_node, State& state)
     -> types::Type* {
     auto r = cast_types(target, source, target_node, source_node, state);
     fixup_untyped(ast, r, source_node, state);
@@ -812,7 +815,7 @@ auto cast_types_and_fixup_untyped(Ast& ast, types::Type* target,
 auto check_types_arith_and_coerce_integers_magic(Ast& ast, Node* comp,
                                                  types::Type* lhs_type,
                                                  types::Type* rhs_type,
-                                                 Node*& lhs, Node*& rhs,
+                                                 Node* lhs, Node* rhs,
                                                  State& state) -> types::Type* {
     auto& er = *state.er;
     auto& ts = *state.ts;
@@ -824,8 +827,8 @@ auto check_types_arith_and_coerce_integers_magic(Ast& ast, Node* comp,
         auto result_type = lhs_larger ? lhs_type : rhs_type;
         auto other_type = lhs_larger ? rhs_type : lhs_type;
 
-        auto& result_node = lhs_larger ? lhs : rhs;
-        auto& other_node = lhs_larger ? rhs : lhs;
+        auto result_node = lhs_larger ? lhs : rhs;
+        auto other_node = lhs_larger ? rhs : lhs;
 
         return coerce_types_and_fixup_untyped(ast, result_type, other_type,
                                               result_node, other_node, state);
@@ -847,8 +850,8 @@ auto check_types_arith_and_coerce_integers_magic(Ast& ast, Node* comp,
     return ts.get_error();
 }
 
-auto check_types_arith_and_coerce_magic(Ast& ast, Node* comp, Node*& lhs,
-                                        Node*& rhs, State& state)
+auto check_types_arith_and_coerce_magic(Ast& ast, Node* comp, Node* lhs,
+                                        Node* rhs, State& state)
     -> types::Type* {
     auto lhs_type = lhs->get_type()->unpacked();
     auto rhs_type = rhs->get_type()->unpacked();
@@ -1455,7 +1458,7 @@ void sema_call(Ast& ast, Node* node, State& state, Context& ctx) {
         // the correct place (which would be `data`) because we need to be
         // able to modify where the pointer points to
         coerce_types_and_fixup_untyped(ast, param, arg->get_type(), nullptr,
-                                       node->get_child_ptrref(i), state);
+                                       node->get_child(i), state);
     }
 
     // handle calls to `sizeof()`
@@ -1464,7 +1467,8 @@ void sema_call(Ast& ast, Node* node, State& state, Context& ctx) {
             d && d->link_name == "sizeof" && data.args.size() > 0) {
             auto arg = eval_expr_to_type(data.args[0], state, ctx);
             auto size = arg->size();
-            node->transmute_to_const_int(ts.get_usize(), size);
+            node->make_equal_to(ast.new_int(node->get_loc(), size),
+                                ts.get_usize());
         }
     }
 }
@@ -1580,7 +1584,7 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
     }
 
     if (node->is_oneof(ast::NodeKind::StructField)) {
-        auto data = conv::struct_field_ref(*node);
+        auto data = conv::struct_field(*node);
         sema_expr(ast, data.type, state, ctx);
         sema_expr(ast, data.init, state, ctx);
 
@@ -1685,7 +1689,7 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
                        ast::NodeKind::Mul, ast::NodeKind::Div,
                        ast::NodeKind::Mod)) {
-        auto data = conv::binary_ref(*node);
+        auto data = conv::binary(*node);
 
         sema_expr(ast, data.lhs, state, ctx);
         sema_expr(ast, data.rhs, state, ctx);
@@ -1884,9 +1888,10 @@ void sema_decl_with_types_and_inits(Ast& ast, Node* ids_node, Node* types_node,
             }
 
             if (requires_pack_coercion) {
-                auto c = ast.new_coerce(init->get_loc(), init,
-                                        ts.new_pack(coercions));
-                types_node->set_child(init_idx, c);
+                auto init_copy = ast.shallow_dupe(*init);
+                init->make_equal_to(ast.new_coerce(init->get_loc(), init_copy,
+                                                   ts.new_pack(coercions)),
+                                    nullptr);
             }
         }
 
@@ -2107,9 +2112,11 @@ void sema_assign(Ast& ast, Node* node, State& state, Context& ctx) {
             }
 
             if (requires_pack_coercion) {
-                auto c = ast.new_coerce(rhs_item->get_loc(), rhs_item,
-                                        ts.new_pack(coercions));
-                data.rhs->set_child(rhs_idx, c);
+                auto copy = ast.shallow_dupe(*rhs_item);
+                rhs_item->make_equal_to(
+                    ast.new_coerce(rhs_item->get_loc(), copy,
+                                   ts.new_pack(coercions)),
+                    nullptr);
             }
         }
 
@@ -2257,9 +2264,8 @@ void sema_return_stmt(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
-    auto rref = conv::return_stmt_ref(*node);
     coerce_types_and_fixup_untyped(ast, ret_type, data.child->get_type(), node,
-                                   rref.child, state);
+                                   data.child, state);
 }
 
 void sema_while_stmt(Ast& ast, Node* node, State& state, Context& ctx) {

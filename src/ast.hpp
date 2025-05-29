@@ -318,6 +318,12 @@ public:
                         new_node_array_with(children));
     }
 
+    auto new_unscoped_assign(Location loc, std::span<Node* const> children)
+        -> Node* {
+        return new_node(NodeKind::UnscopedAssign, loc,
+                        new_node_array_with(children));
+    }
+
     auto new_decl_local_var_direct(Location loc, Node* init) -> Node* {
         return new_node(NodeKind::DeclLocalVarDirect, loc,
                         new_node_array_with(init));

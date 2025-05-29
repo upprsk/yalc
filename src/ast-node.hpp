@@ -572,16 +572,20 @@ public:
 
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
+
     [[nodiscard]] constexpr auto get_children() const -> std::span<Node *> {
+        // handle forwarding
+        for (size_t i = 0; i < children.size(); i++) {
+            children[i] = get_child(i);
+        }
+
         return children;
     }
+
     [[nodiscard]] constexpr auto get_child(size_t at) const -> Node * {
         ASSERT(at < children.size());
-        return children[at];
-    }
-    [[nodiscard]] constexpr auto get_child_ptrref(size_t at) const -> Node *& {
-        ASSERT(at < children.size());
-        return children[at];
+
+        return children[at]->find();
     }
 
     // ------------------------------------------------------------------------
@@ -644,20 +648,43 @@ public:
 
     constexpr void update_with_decl_ref(std::string_view v) { data = v; }
 
-    constexpr void set_child(size_t i, Node *n) {
-        ASSERT(i < children.size());
-        children[i] = n;
+    // ------------------------------------------------------------------------
+
+    constexpr void make_equal_to(Node *o, types::Type *type) {
+        auto found = find();
+        if (found != o) {
+            if (type) o->set_type(type);
+
+            found->forward = o;
+        }
     }
+
+    constexpr auto find() -> Node * {
+        auto expr = this;
+        while (expr != nullptr) {
+            auto next = expr->forward;
+            if (next == nullptr) return expr;
+
+            expr = next;
+        }
+
+        return expr;
+    }
+
+    // constexpr void set_child(size_t i, Node *n) {
+    //     ASSERT(i < children.size());
+    //     children[i] = n;
+    // }
 
     // ------------------------------------------------------------------------
 
-    void transmute_to_unscoped_group(
-        std::span<Node *> allocated_unscoped_items);
-    void transmute_to_unscoped_assign(
-        std::span<Node *> allocated_unscoped_items);
-    void transmute_to_const_int(types::Type *new_type, uint64_t v);
-    void transmute_to_call_direct(Decl             *callee,
-                                  std::span<Node *> allocated_args);
+    // void transmute_to_unscoped_group(
+    //     std::span<Node *> allocated_unscoped_items);
+    // void transmute_to_unscoped_assign(
+    //     std::span<Node *> allocated_unscoped_items);
+    // void transmute_to_const_int(types::Type *new_type, uint64_t v);
+    // void transmute_to_call_direct(Decl             *callee,
+    //                               std::span<Node *> allocated_args);
 
 private:
     NodeKind          kind{};
@@ -666,6 +693,8 @@ private:
 
     Decl        *decl{};
     types::Type *type{};
+
+    Node *forward{};
 
     std::variant<std::monostate, float, double, uint64_t, std::string_view,
                  types::Type *>

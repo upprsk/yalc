@@ -101,7 +101,8 @@ void visit_var_decl(Ast& ast, Node* node, Context& ctx) {
         init_idx++;
     }
 
-    node->transmute_to_unscoped_group(ast.allocate_node_span(items));
+    node->make_equal_to(ast.new_unscoped_group(node->get_loc(), items),
+                        ts.get_void());
 }
 
 void visit_assign(Ast& ast, Node* node, Context& ctx) {
@@ -192,7 +193,8 @@ void visit_assign(Ast& ast, Node* node, Context& ctx) {
         }
     }
 
-    node->transmute_to_unscoped_assign(ast.allocate_node_span(items));
+    node->make_equal_to(ast.new_unscoped_assign(node->get_loc(), items),
+                        ts.get_void());
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -220,7 +222,9 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
         auto decl = data.callee->get_decl();
         ASSERT(decl != nullptr);
 
-        node->transmute_to_call_direct(decl, data.args);
+        node->make_equal_to(
+            ast.new_call_direct(node->get_loc(), decl, data.args),
+            node->get_type());
         visit_children(ctx, node);
     }
 
@@ -248,7 +252,9 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
             // both are the same, just transmute to a direct call
             std::vector args{receiver};
             std::ranges::copy(data.args, std::back_inserter(args));
-            node->transmute_to_call_direct(decl, ast.allocate_node_span(args));
+            node->make_equal_to(
+                ast.new_call_direct(node->get_loc(), decl, args),
+                node->get_type());
             visit_children(ctx, node);
         }
 
@@ -277,8 +283,9 @@ void visit_call(Ast& ast, Node* node, Context& ctx) {
 
                 std::vector args{new_receiver};
                 std::ranges::copy(data.args, std::back_inserter(args));
-                node->transmute_to_call_direct(decl,
-                                               ast.allocate_node_span(args));
+                node->make_equal_to(
+                    ast.new_call_direct(node->get_loc(), decl, args),
+                    node->get_type());
                 visit_children(ctx, node);
             }
 
