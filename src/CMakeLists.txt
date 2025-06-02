@@ -1,4 +1,10 @@
 add_library(yal
+    arena.cpp
+    arena.hpp
+    file_store.cpp
+    file_store.hpp
+    location.cpp
+    location.hpp
     macros.hpp
     utils.cpp
     utils.hpp
