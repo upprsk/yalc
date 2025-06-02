@@ -1,6 +1,8 @@
 add_library(yal
     arena.cpp
     arena.hpp
+    error_reporter.cpp
+    error_reporter.hpp
     file_store.cpp
     file_store.hpp
     location.cpp
