@@ -7,6 +7,7 @@
 
 namespace yal::tests {
 // NOLINTBEGIN(readability-function-cognitive-complexity)
+// NOLINTBEGIN(readability-function-size)
 
 auto file_store() -> ut::Test {
     auto tb = ut::new_test("file store");
@@ -288,5 +289,6 @@ module main;
     return tb;
 }
 
+// NOLINTEND(readability-function-size)
 // NOLINTEND(readability-function-cognitive-complexity)
 }  // namespace yal::tests
