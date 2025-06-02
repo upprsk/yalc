@@ -2,8 +2,10 @@
 
 #include <fmt/base.h>
 
+#include <algorithm>
 #include <libassert/assert.hpp>
 
+#include "tests.hpp"
 #include "utils.hpp"
 
 using fmt::println;
@@ -20,21 +22,8 @@ void print_help(std::string_view self) {
     println(stderr, "options:");
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
-    println(stderr, "    --verbose: show more output (on stderr).");
-    println(stderr, "    --file: single file compilation mode.");
-    println(stderr, "    --dump <step>: dump the result of an internal compilation step. This option");
-    println(stderr, "        accepts a list of options separated by a comma: step1,step2. The option");
-    println(stderr, "        can also be passed multiple times: --dump step1 --dump step2");
-    println(stderr, "        available steps:");
-    println(stderr, "            tokens: dump tokenization result.");
-    println(stderr, "            ast: dump parsed AST.");
-    println(stderr, "            top-name-res: dump top-level name-resolved AST.");
-    println(stderr, "            attributes: dump AST after attributes are applied.");
-    println(stderr, "            name-res: dump AST full name resolutiofull name resolution.");
-    println(stderr, "            sema: dump the AST of each function after semantic-analysis.");
-    println(stderr, "            ir: dump the intermediate representation.");
-    println(stderr, "            ir-lower: dump the intermediate representation after lowering.");
-    println(stderr, "    -o,--output: path to output file (QBE)");
+    println(stderr, "    -v,--verbose: show more output (on stderr). Each time");
+    println(stderr, "        this flag is passed, verbosity is increased (max {})", ut::VERBOSE_LEVEL_MAX);
     // clang-format on
 }
 
@@ -53,14 +42,29 @@ auto argparse(int argc, char** argv) -> Args {
             std::exit(0);
         }
 
+        if (arg == "--usage") {
+            print_usage(self);
+            std::exit(0);
+        }
+
         if (arg == "--verbose") {
-            args.verbose = true;
+            args.verbose += 1;
+        } else if (arg.starts_with("-v")) {
+            auto n = std::ranges::count_if(arg.substr(2),
+                                           [](char c) { return c != 'v'; });
+            if (n > 0) {
+                // had some character that was not a 'v'
+                println(stderr, "error: unknown option: {:?}", arg);
+                std::exit(1);
+            }
+
+            args.verbose += arg.size() - 1;
         } else if (arg == "--ask") {
             args.ask = true;
         } else if (arg == "--diff") {
             args.diff = true;
         } else {
-            println(stderr, "error: unknown option: '{:?}'", arg);
+            println(stderr, "error: unknown option: {:?}", arg);
             std::exit(1);
         }
     }

@@ -1,11 +1,19 @@
 #include <fmt/format.h>
 
 #include "argparse.hpp"
+#include "tests.hpp"
 
 auto main(int argc, char** argv) -> int {
     auto args = argparse(argc, argv);
 
-    fmt::println("[test] Hello, World!");
+    std::vector<ut::Test> tests;
+    tests.push_back(yal::tests::file_store());
+
+    auto opt = ut::Options{.verbose = args.verbose};
+    auto result = ut::run_tests(opt, ut::new_test("top", std::move(tests)));
+
+    fmt::println(stderr, "");
+    ut::print_result(result);
 
     if (args.verbose) fmt::println(stderr, "done!");
     return 0;
