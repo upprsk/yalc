@@ -109,6 +109,13 @@ public:
         std::string_view contents;
     };
 
+    struct Dir {
+        DirId             id;
+        std::string_view  original_path;
+        std::string_view  full_path;
+        std::span<FileId> files;
+    };
+
     constexpr FileStore() = default;
 
     // add a file to the store. Its contents are read from the filesystem. In
@@ -129,6 +136,30 @@ public:
                                                   std::string_view contents)
         -> FileId;
 
+    // ------------------------------------------------------------------------
+
+    // add a directory to the store. Its contents are scanned from the
+    // filesystem, adding each `.yal` file to it. In case it fails, an invalid
+    // `DirId` is returned. Note that failing to read files while scanning will
+    // not be reported here.  In case the directory has already been added to
+    // the store, it is returned instead.
+    [[nodiscard]] auto add_dir(std::string_view path) -> DirId;
+
+    // add a directory and its contents to the store. In case the directory has
+    // already been added to the store, it is returned instead.
+    [[nodiscard]] auto add_dir_and_contents(std::string_view        path,
+                                            std::span<FileId const> contents)
+        -> DirId;
+
+    // add a directory and its contents (files that interest us) to the store.
+    // In case the file has already been added to the store, it is returned
+    // directly instead.
+    [[nodiscard]] auto add_dir_and_contents_full(
+        std::string_view path, std::string_view full_path,
+        std::span<FileId const> contents) -> DirId;
+
+    // ------------------------------------------------------------------------
+
     // get a file by id
     [[nodiscard]] auto get_file_by_id(FileId id) const -> std::optional<File>;
 
@@ -136,20 +167,35 @@ public:
     [[nodiscard]] auto find_file_by_path(std::string_view full_path) const
         -> FileId;
 
+    // get a directory by id
+    [[nodiscard]] auto get_dir_by_id(DirId id) const -> std::optional<Dir>;
+
+    // find a directory in the store given the full path.
+    [[nodiscard]] auto find_dir_by_path(std::string_view full_path) const
+        -> DirId;
+
+private:
     // read the contents of a file into the `big_arena`.
     [[nodiscard]] auto read_entire_file(std::string const &full_path)
         -> std::optional<std::string_view>;
 
-private:
     // add a file to the store without checking that id is present
     [[nodiscard]] auto add_file_and_contents_nocheck(std::string_view path,
                                                      std::string_view full_path,
                                                      std::string_view contents)
         -> FileId;
 
+    // add a directory to the store without checking that id is present
+    [[nodiscard]] auto add_dir_and_contents_nocheck(
+        std::string_view path, std::string_view full_path,
+        std::span<FileId const> contents) -> DirId;
+
 private:
     // list of all files, indexable by `FileId`
     std::vector<File> files;
+
+    // list of all directories, indexable by `DirId`
+    std::vector<Dir> dirs;
 
     // This arena stores is meant to store small data, like the filepaths.
     mem::Arena small_arena;
