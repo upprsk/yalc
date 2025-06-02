@@ -1,1 +1,0 @@
-{"stderr":":memory::8:16: error: can not use value of type string_view where [*]const u8 is expected\n  0007 |     while i < count {\n> 0008 |         printf(\"i=%d\\n\", i);\n                        ^^^^^^^^\n  0009 | \n"}

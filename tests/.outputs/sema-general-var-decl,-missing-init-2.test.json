@@ -1,1 +1,0 @@
-{"stderr":":memory::4:16: error: wrong number of initializers for declaration, expected 2 but got 1\n  0003 | func main() {\n> 0004 |     var x, _ = 12;\n                        ^^\n  0005 | }\n:memory::4:9: note: 2 identifiers declared here\n  0003 | func main() {\n> 0004 |     var x, _ = 12;\n                 ^^^^\n  0005 | }\n"}

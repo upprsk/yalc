@@ -1,1 +1,0 @@
-{"stderr":":memory-0::3:14: error: redefinition of identifier: \"x\"\n  0002 |              // first\n> 0003 |              var x = 0;\n                      ^^^^^^^^^^\n:memory-1::3:14: note: previously value defined here\n  0002 |              // second\n> 0003 |              var x = 0;\n                      ^^^^^^^^^^\n"}

@@ -1,1 +1,0 @@
-{"stdout":"type :slice = { l 2 }\n\nexport function w $main() {\n@start\n@b0\n    %l0 =l alloc4 12\n    %l1 =w copy 1\n    storew %l1, %l0\n    %l3 =w copy 2\n    %at4 =l add %l0, 4\n    storew %l3, %at4\n    %l5 =w copy 3\n    %at6 =l add %l0, 8\n    storew %l5, %at6\n    %l7 =l copy %l0\n    %l8 =w copy 0\n    ret %l8\n}\n"}

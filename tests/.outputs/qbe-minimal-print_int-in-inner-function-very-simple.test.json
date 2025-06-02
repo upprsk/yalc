@@ -1,1 +1,0 @@
-{"stdout":"type :slice = { l 2 }\n\nfunction $main_print_answer() {\n@start\n@b0\n    %l0 =w copy 42\n    call $print_int(w %l0, )\n    ret\n}\nexport function w $main() {\n@start\n@b0\n    call $main_print_answer()\n    %l1 =w copy 0\n    ret %l1\n}\n"}

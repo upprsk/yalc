@@ -1,1 +1,0 @@
-{"stderr":":memory::4:5: error: missing types or initializer on variable declaration\n  0003 | func test() {\n> 0004 |     var a;\n             ^^^^^^\n  0005 | }\n"}

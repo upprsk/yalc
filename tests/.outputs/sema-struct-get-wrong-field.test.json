@@ -1,1 +1,0 @@
-{"stderr":":memory::6:9: error: type #test.S(struct {a: i32}) does not have a field (or namespaced function) named \"b\"\n  0005 |     var s: S = .{.a=0};\n> 0006 |     _ = s.b;\n                 ^^^\n  0007 | }\n:memory::3:1: note: type defined here\n  0002 | module test;\n> 0003 | def S = struct { a: i32 };\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  0004 | func test() {\n"}

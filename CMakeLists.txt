@@ -28,15 +28,23 @@ include(FetchContent)
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        11.1.3
+  GIT_TAG        11.2.0
   GIT_SHALLOW    Yes
 )
 FetchContent_MakeAvailable(fmt)
 
 FetchContent_Declare(
+  unordered_dense
+  GIT_REPOSITORY https://github.com/martinus/unordered_dense.git
+  GIT_TAG        v4.5.0
+  GIT_SHALLOW    Yes
+)
+FetchContent_MakeAvailable(unordered_dense)
+
+FetchContent_Declare(
   libassert
   GIT_REPOSITORY https://github.com/jeremy-rifkin/libassert.git
-  GIT_TAG        v2.1.5 # <HASH or TAG>
+  GIT_TAG        v2.1.5
   GIT_SHALLOW    Yes
 )
 FetchContent_MakeAvailable(libassert)

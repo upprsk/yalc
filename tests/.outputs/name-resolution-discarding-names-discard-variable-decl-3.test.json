@@ -1,1 +1,0 @@
-{"stderr":":memory::4:13: error: undefined identifier: \"_\"\n  0003 |     var _ = 1;\n> 0004 |     var x = _ + 1;\n                     ^\n  0005 | }\n"}

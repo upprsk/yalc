@@ -1,1 +1,0 @@
-{"stderr":":memory::5:24: error: no field named \"b\" found in type #test.S(struct {a: i32})\n  0004 | func test() {\n> 0005 |     var s: S = .{.a=0, .b=0};\n                                ^^^^\n  0006 | }\n"}

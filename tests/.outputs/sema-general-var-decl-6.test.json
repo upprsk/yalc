@@ -1,1 +1,0 @@
-{"stderr":":memory::3:12: error: wrong number of types for declaration, expected 1 but got 2\n  0002 | func main() {\n> 0003 |     var a: i32, u8;\n                    ^^^^^^^\n  0004 | }\n:memory::3:9: note: 1 identifiers declared here\n  0002 | func main() {\n> 0003 |     var a: i32, u8;\n                 ^\n  0004 | }\n"}

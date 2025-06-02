@@ -1,1 +1,0 @@
-[{"span":{"begin":0,"end":10},"type":"Int"},{"span":{"begin":11,"end":22},"type":"Int"},{"span":{"begin":23,"end":25},"type":"Int"},{"span":{"begin":26,"end":30},"type":"Hex"},{"span":{"begin":31,"end":37},"type":"Hex"},{"span":{"begin":38,"end":42},"type":"Int"},{"span":{"begin":42,"end":42},"type":"Eof"}]
