@@ -129,6 +129,11 @@ auto argparse(int argc, char** argv) -> Args {
         }
     }
 
+    if (args.program.empty()) {
+        println(stderr, "error: missing required argument: program");
+        std::exit(1);
+    }
+
     return args;
 }
 
