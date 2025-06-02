@@ -124,7 +124,7 @@ auto argparse(int argc, char** argv) -> Args {
         }
 
         else {
-            println(stderr, "error: unknown option: '{:?}'", arg);
+            println(stderr, "error: unknown option: {:?}", arg);
             std::exit(1);
         }
     }
