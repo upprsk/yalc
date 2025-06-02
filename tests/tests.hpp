@@ -36,7 +36,10 @@ struct Test {
 
     bool skip = false;
 
-    void add_test(std::string name, auto&& fn);
+    void add_test(std::string name, auto&& fn)
+    requires requires(TestParams p) {
+        { fn(p) } -> std::convertible_to<bool>;
+    };
 };
 
 struct TestResult {
@@ -73,7 +76,11 @@ auto run_tests(Options const& opt, Test const& test, int level = 1)
     -> TestResult;
 void print_result(TestResult const& result, std::string_view name = "");
 
-inline void Test::add_test(std::string name, auto&& fn) {
+inline void Test::add_test(std::string name, auto&& fn)
+requires requires(TestParams p) {
+    { fn(p) } -> std::convertible_to<bool>;
+}
+{
     children.push_back(new_test(std::move(name), std::move(fn)));
 }
 

@@ -137,7 +137,7 @@ auto run_tests(Options const& opt, Test const& test, int level) -> TestResult {
     if (opt.is_verbose_detail()) {
         if (level > 0) {
             println(stderr, "{:>{}}{} {:?}", "+", level,
-                    fmt::styled("starting:", header_style),
+                    fmt::styled("running:", header_style),
                     fmt::styled(test.name, string_style), level);
         } else {
             println(stderr, "{} {:?}", fmt::styled("starting:", header_style),
@@ -164,12 +164,6 @@ auto run_tests(Options const& opt, Test const& test, int level) -> TestResult {
 
     for (auto const& child : test.children) {
         result += run_tests(opt, child, level + 1);
-    }
-
-    if (opt.is_verbose_detail()) {
-        println(stderr, "{:>{}}{} {:?}:", "-", level,
-                fmt::styled("finished test:", header_style),
-                fmt::styled(test.name, string_style));
     }
 
     if (!test.children.empty() && opt.is_verbose_info()) {

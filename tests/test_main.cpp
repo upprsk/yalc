@@ -12,9 +12,8 @@ auto main(int argc, char** argv) -> int {
     auto opt = ut::Options{.verbose = args.verbose};
     auto result = ut::run_tests(opt, ut::new_test("top", std::move(tests)));
 
-    fmt::println(stderr, "");
+    if (args.verbose) fmt::println(stderr, "done!");
     ut::print_result(result);
 
-    if (args.verbose) fmt::println(stderr, "done!");
-    return 0;
+    return result.failed + result.crashed > 0;
 }
