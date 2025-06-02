@@ -101,6 +101,7 @@ private:
 };
 
 class FileStore {
+public:
     struct File {
         FileId           id;
         std::string_view original_path;
@@ -108,7 +109,6 @@ class FileStore {
         std::string_view contents;
     };
 
-public:
     constexpr FileStore() = default;
 
     // add a file to the store. Its contents are read from the filesystem. In
