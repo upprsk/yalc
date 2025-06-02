@@ -1,4 +1,7 @@
 add_library(yal
+    macros.hpp
+    utils.cpp
+    utils.hpp
     yal.cpp
     yal.hpp
 )

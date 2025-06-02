@@ -1,4 +1,6 @@
 add_executable(tests
+    argparse.cpp
+    argparse.hpp
     test_main.cpp
 )
 target_include_directories(tests PRIVATE .)
