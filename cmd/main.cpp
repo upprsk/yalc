@@ -3,6 +3,7 @@
 #include "argparser.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
+#include "tokenizer.hpp"
 
 auto main(int argc, char** argv) -> int {
     auto args = yalc::argparse(argc, argv);
@@ -34,8 +35,6 @@ auto main(int argc, char** argv) -> int {
             }
         }
     }
-
-    fmt::println("Hello, World!");
 
     if (args.verbose) fmt::println(stderr, "done!");
     return 0;
