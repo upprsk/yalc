@@ -28,39 +28,43 @@ public:
         : parent{parent}, fs{fs}, out{out}, fileid{fileid} {}
 
     template <typename... T>
-    void report_error(Span s, fmt::format_string<T...> fmt, T&&... args) {
+    void report_error(Span s, fmt::format_string<T...> fmt, T&&... args) const {
         vreport_error(s, fmt, fmt::make_format_args(args...));
     }
 
     template <typename... T>
-    void report_warn(Span s, fmt::format_string<T...> fmt, T&&... args) {
+    void report_warn(Span s, fmt::format_string<T...> fmt, T&&... args) const {
         vreport_warn(s, fmt, fmt::make_format_args(args...));
     }
 
     template <typename... T>
-    void report_note(Span s, fmt::format_string<T...> fmt, T&&... args) {
+    void report_note(Span s, fmt::format_string<T...> fmt, T&&... args) const {
         vreport_note(s, fmt, fmt::make_format_args(args...));
     }
 
     template <typename... T>
-    void report_debug(Span s, fmt::format_string<T...> fmt, T&&... args) {
+    void report_debug(Span s, fmt::format_string<T...> fmt, T&&... args) const {
         vreport_debug(s, fmt, fmt::make_format_args(args...));
     }
 
     template <typename... T>
-    void report_bug(Span s, fmt::format_string<T...> fmt, T&&... args) {
+    void report_bug(Span s, fmt::format_string<T...> fmt, T&&... args) const {
         vreport_bug(s, fmt, fmt::make_format_args(args...));
     }
 
-    void vreport_error(Span s, fmt::string_view fmt, fmt::format_args args);
-    void vreport_warn(Span s, fmt::string_view fmt, fmt::format_args args);
-    void vreport_note(Span s, fmt::string_view fmt, fmt::format_args args);
-    void vreport_debug(Span s, fmt::string_view fmt, fmt::format_args args);
-    void vreport_bug(Span s, fmt::string_view fmt, fmt::format_args args);
+    void vreport_error(Span s, fmt::string_view fmt,
+                       fmt::format_args args) const;
+    void vreport_warn(Span s, fmt::string_view fmt,
+                      fmt::format_args args) const;
+    void vreport_note(Span s, fmt::string_view fmt,
+                      fmt::format_args args) const;
+    void vreport_debug(Span s, fmt::string_view fmt,
+                       fmt::format_args args) const;
+    void vreport_bug(Span s, fmt::string_view fmt, fmt::format_args args) const;
 
     void report(Span s, std::string_view prefix, fmt::text_style color,
                 fmt::string_view fmt, fmt::format_args args,
-                uint32_t context = 1);
+                uint32_t context = 1) const;
 
     // -----------------------------------------------------------------------
 

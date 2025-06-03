@@ -55,35 +55,35 @@ namespace yal {
 }
 
 void LocalErrorReporter::vreport_error(Span s, fmt::string_view fmt,
-                                       fmt::format_args args) {
+                                       fmt::format_args args) const {
     parent->error_count++;
     report(s, "error", error_style, fmt, args);
 }
 
 void LocalErrorReporter::vreport_warn(Span s, fmt::string_view fmt,
-                                      fmt::format_args args) {
+                                      fmt::format_args args) const {
     report(s, "warn", warn_style, fmt, args);
 }
 
 void LocalErrorReporter::vreport_note(Span s, fmt::string_view fmt,
-                                      fmt::format_args args) {
+                                      fmt::format_args args) const {
     report(s, "note", note_style, fmt, args);
 }
 
 void LocalErrorReporter::vreport_debug(Span s, fmt::string_view fmt,
-                                       fmt::format_args args) {
+                                       fmt::format_args args) const {
     report(s, "debug", debug_style, fmt, args);
 }
 
 void LocalErrorReporter::vreport_bug(Span s, fmt::string_view fmt,
-                                     fmt::format_args args) {
+                                     fmt::format_args args) const {
     parent->error_count++;
     report(s, "bug", bug_style, fmt, args);
 }
 
 void LocalErrorReporter::report(Span s, std::string_view prefix,
                                 fmt::text_style color, fmt::string_view fmt,
-                                fmt::format_args args, uint32_t context) {
+                                fmt::format_args args, uint32_t context) const {
     ASSERT(s.begin <= s.end);
 
     auto             file = get_file();
