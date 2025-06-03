@@ -16,6 +16,11 @@ auto main(int argc, char** argv) -> int {
     // otherwise we want to add the given directory
     if (args.single_file) {
         auto id = fs.add_file(args.program);
+        if (id.is_invalid()) {
+            fmt::println(stderr, "invalid file: {}", args.program);
+            return 1;
+        }
+
         if (args.verbose) {
             auto f = fs.get_file_by_id(id);
             fmt::println(stderr, "program: {} ({}B)", f->full_path,
@@ -23,6 +28,11 @@ auto main(int argc, char** argv) -> int {
         }
     } else {
         auto id = fs.add_dir(args.program);
+        if (id.is_invalid()) {
+            fmt::println(stderr, "invalid directory: {}", args.program);
+            return 1;
+        }
+
         if (args.verbose) {
             auto d = fs.get_dir_by_id(id);
             fmt::println(stderr, "program directory: {} ({} files)",
