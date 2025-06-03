@@ -8,6 +8,8 @@ add_library(yal
     location.cpp
     location.hpp
     macros.hpp
+    tokenizer.cpp
+    tokenizer.hpp
     utils.cpp
     utils.hpp
     yal.cpp
