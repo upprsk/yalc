@@ -254,17 +254,16 @@ struct Tokenizer {
 
     // ------------------------------------------------------------------------
 
-    std::string_view    source;
-    LocalErrorReporter* er;
-    uint32_t            start{};
-    uint32_t            current{};
+    std::string_view          source;
+    LocalErrorReporter const* er;
+    uint32_t                  start{};
+    uint32_t                  current{};
 };
 
 // ------------------------------------------------------------------------
 
-auto tokenize(std::string_view source, LocalErrorReporter& er)
-    -> std::vector<Token> {
-    auto tokenizer = Tokenizer{.source = source, .er = &er};
+auto tokenize(LocalErrorReporter const& er) -> std::vector<Token> {
+    auto tokenizer = Tokenizer{.source = er.get_source(), .er = &er};
     return tokenizer.tokenize_all();
 }
 

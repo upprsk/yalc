@@ -103,8 +103,7 @@ struct Token {
     constexpr auto operator==(Token const& o) const -> bool = default;
 };
 
-auto tokenize(std::string_view source, LocalErrorReporter& er)
-    -> std::vector<Token>;
+auto tokenize(LocalErrorReporter const& er) -> std::vector<Token>;
 
 void to_json(nlohmann::json& j, TokenType const& n);
 void to_json(nlohmann::json& j, Token const& t);
