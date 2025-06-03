@@ -22,8 +22,9 @@ void print_help(std::string_view self) {
     println(stderr, "options:");
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
-    println(stderr, "    -v,--verbose: show more output (on stderr). Each time");
-    println(stderr, "        this flag is passed, verbosity is increased (max {})", ut::VERBOSE_LEVEL_MAX);
+    println(stderr, "    -v,--verbose: show more output (on stderr). Each time this flag is passed,");
+    println(stderr, "       verbosity is increased (to a maximum of max {}). It is possible to use", ut::VERBOSE_LEVEL_MAX);
+    println(stderr, "       -vmax or --verbose-max to get the maximum verbosity");
     // clang-format on
 }
 
@@ -49,6 +50,8 @@ auto argparse(int argc, char** argv) -> Args {
 
         if (arg == "--verbose") {
             args.verbose += 1;
+        } else if (arg == "-vmax" || arg == "--verbose-max") {
+            args.verbose = ut::VERBOSE_LEVEL_MAX;
         } else if (arg.starts_with("-v")) {
             auto n = std::ranges::count_if(arg.substr(2),
                                            [](char c) { return c != 'v'; });

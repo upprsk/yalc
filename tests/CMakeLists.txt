@@ -1,6 +1,7 @@
 add_executable(tests
     argparse.cpp
     argparse.hpp
+    subprocess.hpp
     test_file_store.cpp
     test_integration.cpp
     test_main.cpp

@@ -2,17 +2,20 @@
 
 #include <fmt/color.h>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <filesystem>
 #include <libassert/assert.hpp>
+#include <nlohmann/json.hpp>
 #include <ranges>
 #include <string_view>
 
-#include "nlohmann/json.hpp"
+#include "subprocess.hpp"
 #include "utils.hpp"
 
 using fmt::print;
 using fmt::println;
+using nlohmann::json;
 
 namespace ut {
 
@@ -29,235 +32,315 @@ struct assertion_error : std::exception {
 
 // ============================================================================
 
-constexpr auto header_style = fmt::emphasis::bold;
-constexpr auto success_style = fmt::fg(fmt::color::lime_green);
-constexpr auto skip_style = fmt::fg(fmt::color::orange);
-constexpr auto fail_style = fmt::fg(fmt::color::red);
-constexpr auto crash_style =
-    fmt::bg(fmt::color::red) | fmt::fg(fmt::color::white) | fmt::emphasis::bold;
-constexpr auto string_style = fmt::fg(fmt::color::dark_green);
-
-// ============================================================================
-
-auto new_test(std::string name) -> Test {
-    return {
-        .name = std::move(name),
-        .params_list = {},
-        .func = {},
-        .children = {},
-    };
-}
-
-auto new_test(std::string name, std::vector<Test> children) -> Test {
-    return {
-        .name = std::move(name),
-        .params_list = {},
-        .func = {},
-        .children = std::move(children),
-    };
-}
-
-// ----------------------------------------------------------------------------
-
-void run_one(Options const& opt, Test const& test, TestResult& result,
-             auto&& fn) {
-    if (test.skip) {
-        if (opt.is_verbose_detail()) {
-            println(stderr, "{:?} skipped", fmt::styled(test.name, skip_style));
-        }
-    }
-
-    try {
-        auto ok = fn();
-        if (ok)
-            result.successful += 1;
-        else
-            result.failed += 1;
-    } catch (assertion_error const& err) {
-        if (opt.is_verbose_info()) {
-            println(stderr, "{:?} crashed:\n{}",
-                    fmt::styled(test.name, string_style), err.info.to_string());
-        } else {
-            println(stderr, "{:?} {}", fmt::styled(test.name, string_style),
-                    fmt::styled("crashed", crash_style));
-        }
-
-        result.crashed += 1;
-    }
-}
-
-auto load_expectation(std::filesystem::path const& path) -> nlohmann::json {
-    auto data = yal::read_entire_file(path.string());
-    if (!data) return {};
-
-    return nlohmann::json::parse(*data);
-}
-
-auto snap_function(
-    TestContext const&                                           c,
-    std::function<nlohmann::json(FILE* out, TestContext const&)> fn) -> bool {
-    auto const& p = c.params;
-    ASSUME(p.size() == 2);
-
-    auto const& name = std::any_cast<std::string>(p[0]);
-    auto const& source = std::any_cast<std::string>(p[1]);
-
-    auto err = yal::MemStream{};
-    auto received = fn(err.f, c);
-
-    auto j = nlohmann::json{
-        {"tokens", std::move(received)},
-        {"stderr",     err.flush_str()},
-    };
-
-    namespace fs = std::filesystem;
-    auto path = fs::path{"tests"} / ".cases";
-    if (!fs::is_directory(path)) {
-        fs::create_directory(path);
-    }
-
-    path /= fmt::format("case-{}-{:03}.json", name, c.idx);
-
-    auto expectation = load_expectation(path);
-    if (expectation.is_null()) {
-        println(stderr, "{:?} has {}", fmt::styled(c.test.name, string_style),
-                fmt::styled("no expectation", fail_style));
-        if (c.opt.ask) {
-            println(stderr, "no expectation found for {:?}, generate? (Y/n",
-                    fmt::styled(c.test.name, string_style));
-            auto c = getchar();
-            while (c != '\n' && getchar() != '\n');
-
-            if (c == '\n' || c == 'y' || c == 'Y') {
-                yal::write_file(path, j.dump());
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    if (j != expectation) {
-        println(stderr, "{:?} received wrong value",
-                fmt::styled(c.test.name, string_style));
-        if (c.opt.is_verbose_info()) {
-            // TODO: show diff of output
-        }
-
-        if (c.opt.ask) {
-            println(stderr, "no expectation found for {:?}, generate? (Y/n",
-                    fmt::styled(c.test.name, string_style));
-            auto c = getchar();
-            while (c != '\n' && getchar() != '\n');
-
-            if (c == '\n' || c == 'y' || c == 'Y') {
-                yal::write_file(path, j.dump());
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    if (c.opt.is_verbose_detail()) {
-        println(stderr, "{:?}: success",
-                fmt::styled(c.test.name, string_style));
-    }
-
-    return true;
-}
-
-auto run_tests(Options const& opt, Test const& test, int level) -> TestResult {
+/// Configure libassert to thrown an exception instead of aborting
+void setup_failure_handler() {
     // void set_failure_handler(void (*handler)(assertion_info const&));
     libassert::set_failure_handler([](libassert::assertion_info const& info) {
         throw assertion_error{info};
     });
-
-    TestResult result;
-
-    if (opt.is_verbose_detail()) {
-        if (level > 0) {
-            println(stderr, "{:>{}}{} {:?}", "+", level,
-                    fmt::styled("running:", header_style),
-                    fmt::styled(test.name, string_style), level);
-        } else {
-            println(stderr, "{} {:?}", fmt::styled("starting:", header_style),
-                    test.name);
-        }
-    }
-
-    if (test.func) {
-        if (test.params_list.empty()) {
-            run_one(opt, test, result, [&] {
-                return test.func({.params = {}, .test = test, .opt = opt});
-            });
-        } else {
-            TestResult kids_result;
-
-            for (auto const& [idx, params] :
-                 std::ranges::views::enumerate(test.params_list)) {
-                run_one(opt, test, kids_result, [&] {
-                    return test.func({.params = params,
-                                      .test = test,
-                                      .opt = opt,
-                                      .idx = static_cast<size_t>(idx)});
-                });
-            }
-
-            result += kids_result;
-        }
-    }
-
-    for (auto const& child : test.children) {
-        result += run_tests(opt, child, level + 1);
-    }
-
-    if (!test.children.empty() && opt.is_verbose_info()) {
-        print_result(result, opt.is_verbose_detail() ? "" : test.name);
-    }
-
-    return result;
 }
 
-void print_result(TestResult const& result, std::string_view name) {
-    if (!name.empty()) {
-        print(stderr, "{:<30?}", fmt::styled(name, string_style));
+/// Put libassert back to default configuration.
+void clear_failure_handler() {
+    libassert::set_failure_handler(libassert::default_failure_handler);
+}
+
+auto get_test_fullname(Context const& ctx, Test const& t)
+    -> std::vector<std::string_view> {
+    std::vector<std::string_view> full_name{t.name};
+    full_name.append_range(ctx.parents);
+
+    return full_name;
+}
+
+/// Print final test results.
+void print_final_results(Context const& /*unused*/, Result const& results) {
+    println("{:=^50}", " results ");
+    println("success: {}, failed: {}, skipped: {}, crashed: {}",
+            results.success,
+            fmt::styled(results.failed, results.failed > 0
+                                            ? fmt::fg(fmt::color::red)
+                                            : fmt::text_style{}),
+            fmt::styled(results.skipped, results.skipped > 0
+                                             ? fmt::fg(fmt::color::orange)
+                                             : fmt::text_style{}),
+            fmt::styled(results.crashed, results.crashed > 0
+                                             ? fmt::fg(fmt::color::red)
+                                             : fmt::text_style{}));
+    println("total: {}", results.total());
+}
+
+/// Print intermediary test results.
+void print_results(Context const& /*unused*/, Test const& t,
+                   Result const& results) {
+    println("{:=^50}", t.name);
+    println("success: {}, failed: {}, skipped: {}, crashed: {}",
+            results.success, results.failed, results.skipped, results.crashed);
+    println("total: {}", results.total());
+}
+
+void print_crash(Context const& ctx, Test const& t,
+                 libassert::assertion_info const& dump) {
+    println("{}: {:?}",
+            fmt::styled("crashed",
+                        fmt::bg(fmt::color::red) | fmt::fg(fmt::color::white)),
+            t.name);
+
+    if (ctx.opt.show_crashes()) println("{}", dump.to_string());
+}
+
+void print_fail(Context const& /*unused*/, Test const& t) {
+    println("{}: {:?}",
+            fmt::styled("failed",
+                        fmt::bg(fmt::color::red) | fmt::fg(fmt::color::white)),
+            t.name);
+}
+
+void print_success(Context const& /*unused*/, Test const& t) {
+    println("{}: {:?}",
+            fmt::styled("OK",
+                        fmt::bg(fmt::color::lime) | fmt::fg(fmt::color::white)),
+            t.name);
+}
+
+void print_no_expectation(Context const& /*unused*/, Test const& t) {
+    println("{}: {:?} has no expectation",
+            fmt::styled("failed",
+                        fmt::bg(fmt::color::red) | fmt::fg(fmt::color::white)),
+            t.name);
+}
+
+// ----------------------------------------------------------------------------
+
+auto json_to_pretty_string(json const& j) -> std::string {
+    std::string output;
+
+    auto const& out = j["out"];
+    auto const& data = j["data"];
+
+    if (!out.is_null() && !out.empty()) output += out;
+    if (!data.is_null() && !data.empty()) output += data.dump(2);
+
+    return output;
+}
+
+auto path_of_file(int fd) -> std::filesystem::path {
+    return std::filesystem::read_symlink(
+        std::filesystem::path{"/proc/self/fd"} / fmt::to_string(fd));
+}
+
+auto path_of_file(FILE* f) -> std::filesystem::path {
+    return path_of_file(fileno(f));
+}
+
+auto get_tmp_file(std::string_view initial_contents)
+    -> std::unique_ptr<FILE, void (*)(FILE*)> {
+    // :(
+    std::string path = "/tmp/yal-tests-XXXXXX";
+    auto        fd = mkstemp(path.data());
+
+    std::unique_ptr<FILE, void (*)(FILE*)> f = {
+        fdopen(fd, "wb+"), [](FILE* f) {
+            unlink(path_of_file(f).c_str());
+            fclose(f);
+        }};
+
+    fwrite(initial_contents.data(), sizeof(*initial_contents.data()),
+           initial_contents.size(), f.get());
+    fflush(f.get());
+
+    return f;
+}
+
+void show_diff(json const& left, json const& right) {
+    auto left_file = get_tmp_file(json_to_pretty_string(left));
+    auto right_file = get_tmp_file(json_to_pretty_string(right));
+    subprocess::call({"git", "--no-pager", "diff", "--no-index",
+                      path_of_file(left_file.get()).string(),
+                      path_of_file(right_file.get()).string()});
+}
+
+// ----------------------------------------------------------------------------
+
+void sanitize_name(std::string& name) {
+    std::ranges::replace(name, ' ', '-');
+    std::ranges::replace(name, '/', '-');
+    std::ranges::replace(name, '*', '-');
+    std::ranges::replace(name, '?', '-');
+}
+
+auto gen_filepath(std::string name) -> std::string {
+    namespace fs = std::filesystem;
+
+    sanitize_name(name);
+
+    std::filesystem::path path = __FILE__;
+
+    auto outputs_dir = path.parent_path() / ".outputs";
+    if (!fs::is_directory(outputs_dir)) {
+        fs::create_directory(outputs_dir);
     }
 
-    print(stderr,
-          "{} tests: ", fmt::styled(result.count(), fmt::emphasis::bold));
+    return outputs_dir / fmt::format("{}.test.json", name);
+}
 
-    if (result.successful > 0) {
-        print(stderr, success_style, "{} successful", result.successful);
-    } else {
-        print(stderr, fail_style, "{} successful", result.successful);
+auto load_expectation(std::string const& filepath) -> json {
+    auto filedata = yal::read_entire_file(filepath);
+    if (!filedata) return json{};
+
+    return json::parse(*filedata);
+}
+
+void save_expectation(std::string const& filepath, json const& data) {
+    yal::write_file(filepath, data.dump());
+}
+
+auto ask_for_update(Context const& /*unused*/, Test const& t,
+                    std::string_view message) -> bool {
+    print("{:?} {}. generate? (Y/n): ", t.name, message);
+
+    auto c = getchar();
+    while (c != '\n' && getchar() != '\n');
+
+    return c == '\n' || c == 'y' || c == 'Y';
+}
+
+auto run_test_func(Context const& ctx, Test const& t) -> Result {
+    Result r;
+
+    json received;
+
+    try {
+        auto ms = yal::MemStream{};
+        auto data = t.func(ctx.with_output(ms.f));
+
+        received["out"] = ms.flush_str();
+        received["data"] = data;
+    } catch (assertion_error const& err) {
+        r.crashed += 1;
+
+        if (ctx.opt.show_fails()) print_crash(ctx, t, err.info);
+        return r;
     }
 
-    print(stderr, ", ");
+    auto full_name = fmt::to_string(fmt::join(get_test_fullname(ctx, t), "."));
+    auto filepath = gen_filepath(full_name);
 
-    if (result.skipped > 0) {
-        print(stderr, skip_style, "{} skipped", result.skipped);
-    } else {
-        print(stderr, "{} skipped", result.skipped);
+    auto expected = load_expectation(filepath);
+    if (expected.is_null()) {
+        if (ctx.opt.show_fails()) print_no_expectation(ctx, t);
+
+        if (ctx.opt.ask) {
+            if (ask_for_update(ctx, t, "has no expectation")) {
+                save_expectation(filepath, received);
+
+                r.success += 1;
+                return r;
+            }
+        }
+
+        r.failed += 1;
+        return r;
     }
 
-    print(stderr, ", ");
+    if (received != expected) {
+        if (ctx.opt.show_fails()) {
+            print_fail(ctx, t);
+        }
 
-    if (result.failed > 0) {
-        print(stderr, fail_style, "{} failed", result.failed);
-    } else {
-        print(stderr, "{} failed", result.failed);
+        if (ctx.opt.show_output()) {
+            if (ctx.opt.diff) {
+                show_diff(expected, received);
+            } else {
+                println("expected: {}", json_to_pretty_string(expected));
+                println("but received: {}", json_to_pretty_string(received));
+            }
+        }
+
+        if (ctx.opt.ask) {
+            if (ask_for_update(ctx, t, "has no expectation")) {
+                save_expectation(filepath, received);
+
+                r.success += 1;
+                return r;
+            }
+        }
+
+        r.failed += 1;
+        return r;
     }
 
-    print(stderr, ", ");
-
-    if (result.crashed > 0) {
-        print(stderr, crash_style, "{} crashed", result.crashed);
-    } else {
-        print(stderr, "{} crashed", result.crashed);
+    if (ctx.opt.show_success()) {
+        print_success(ctx, t);
     }
 
-    println(stderr, "");
+    r.success += 1;
+    return r;
+}
+
+auto run_test(Context const& ctx, Test const& t) -> Result {
+    Result r;
+
+    if (t.func) {
+        r += run_test_func(ctx, t);
+    }
+
+    if (!t.children.empty()) {
+        for (auto const& child : t.children) {
+            r += run_test(ctx.with_parent(t.name), child);
+        }
+    }
+
+    // in case the test has no children or no name, then there is no point in
+    // showing results
+    if (!t.name.empty() && !t.children.empty() && ctx.opt.show_results()) {
+        print_results(ctx, t, r);
+    }
+
+    return r;
+}
+
+// ============================================================================
+
+auto group(std::string name) -> Test {
+    return {.name = std::move(name), .children = {}, .func = {}};
+}
+
+void add(Test& t, Test child) { t.children.push_back(std::move(child)); }
+
+void add(Test& t, std::string name, Test::Func func) {
+    t.children.push_back({
+        .name = std::move(name),
+        .children = {},
+        .func = std::move(func),
+    });
+}
+
+void add(Test& t, std::string name, std::function<void()> func) {
+    t.children.push_back({
+        .name = std::move(name),
+        .children = {},
+        .func = [f = std::move(func)](auto) -> json {
+            f();
+            return {};
+        },
+    });
+}
+
+auto test(std::string name, Test::Func func) -> Test {
+    return {.name = std::move(name), .children = {}, .func = std::move(func)};
+}
+
+auto run(Options const& opt, Test const& t) -> Result {
+    setup_failure_handler();
+
+    auto ctx = Context{.out = nullptr, .opt = opt, .parents = {}};
+    auto result = run_test(ctx, t);
+
+    clear_failure_handler();
+
+    print_final_results(ctx, result);
+    return result;
 }
 
 }  // namespace ut

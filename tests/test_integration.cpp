@@ -16,41 +16,66 @@ namespace yal::tests {
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 // NOLINTBEGIN(readability-function-size)
 
-auto integration() -> ut::Test {
-    auto tb = ut::new_test("integration");
+auto tokenizer() -> ut::Test {
+    auto tb = ut::group("tokenizer");
 
-    std::vector<ut::TestParams> params;
+    std::vector<std::pair<std::string, std::string>> tests{
+        {         "empty file",                                                         ""},
+        {            "minimal",                                             "module main;"},
+        {             "equals",                                                  "= == =>"},
+        {               "less",                                              "< << <<= <="},
+        {            "greater",                                              "> >> >= >>="},
+        {               "plus",                                                  "+ ++ +="},
+        {              "minus",                                                  "- -- -="},
+        {               "star",                                                     "* *="},
+        {              "slash",                                                     "/ /="},
+        {               "bang",                                                     "! !="},
+        {            "percent",                                                     "% %="},
+        {          "ampersand",                                                     "& &="},
+        {               "pipe",                                                     "| |="},
+        {             "carrot",                                                     "^ ^="},
+        {              "tilde",                                                     "~ ~="},
+        {        "punctuation",                                "; : , . .. ... .* .= .{ ?"},
+        {             "parens",                                              "( ) { } [ ]"},
 
-    auto add_parametrized = [&](std::string name, std::string s) {
-        params.push_back({std::move(name), std::move(s)});
+        {        "identifiers",               "hello test _ _one\ntWo_tHREe YAY abc123 _1"},
+        {          "decorator",                     "@test @_124 @123 @testing_this_THING"},
+        {            "numbers", "1234567890 123_456_789 00 0xFF 0xbaba 2145 1.4 3.14 1.99"},
+
+        {             "string",    R"~~("this is a string!" "a string \"with quotes\"")~~"},
+        {               "char",                           R"~~('a' 'b' 'c' '\'' '\xF0')~~"},
+
+        {            "comment",                                     "// this is a comment"},
+
+        {"unterminated string",                              R"~~("unterminated string)~~"},
+        {            "int dot",                                              R"~~(123.)~~"},
+        {        "int methods",                                        R"~~(123.test())~~"},
+
+        {             "shbang",                                   R"(#!/usr/local/bin/yalc
+yay!)"},
     };
 
-    // empty file
-    add_parametrized("empty", "");
-    add_parametrized("module", "module main;");
-    add_parametrized(
-        "module 2",
-        "module main;\n\nfunc main() i32 {\n    return 0;\n    }\n");
+    for (auto&& [name, input] : tests) {
+        ut::add(tb, name,
+                [name = name, input = std::move(input)](
+                    ut::Context const& ctx) -> nlohmann::json {
+                    auto fs = yal::FileStore{};
+                    auto er = yal::ErrorReporter{&fs, ctx.out};
 
-    add_snap(tb, "empty file", params,
-             [](FILE* out, ut::TestContext const& c) -> nlohmann::json {
-                 auto const& p = c.params;
-                 ASSUME(p.size() == 2);
+                    auto fileid = fs.add_file_and_contents(
+                        fmt::format(":memory:{}", name), input);
 
-                 auto const& name = std::any_cast<std::string>(p[0]);
-                 auto const& source = std::any_cast<std::string>(p[1]);
+                    return tokenize(er.for_file(fileid));
+                });
+    }
 
-                 auto fs = yal::FileStore{};
-                 auto er = yal::ErrorReporter{&fs, out};
+    return tb;
+}
 
-                 auto fileid = fs.add_file_and_contents(
-                     fmt::format(":memory:{}", name), source);
+auto integration() -> ut::Test {
+    auto tb = ut::group("integration");
 
-                 auto erf = er.for_file(fileid);
-                 auto tokens = tokenize(source, erf);
-
-                 return tokens;
-             });
+    ut::add(tb, tokenizer());
 
     return tb;
 }

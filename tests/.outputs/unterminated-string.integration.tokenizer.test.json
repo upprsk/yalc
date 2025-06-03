@@ -1,0 +1,1 @@
+{"data":[{"span":"0-20","type":"Str"},{"span":"20-20","type":"Eof"}],"out":":memory:unterminated string:1:0: error: unterminated string\n> 0001 | \"unterminated string\n         ^^^^^^^^^^^^^^^^^^^^\n"}

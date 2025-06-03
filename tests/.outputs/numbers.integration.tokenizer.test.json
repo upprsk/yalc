@@ -1,0 +1,1 @@
+{"data":[{"span":"0-10","type":"Int"},{"span":"11-22","type":"Int"},{"span":"23-25","type":"Int"},{"span":"26-30","type":"Hex"},{"span":"31-37","type":"Hex"},{"span":"38-42","type":"Int"},{"span":"43-46","type":"Float"},{"span":"47-51","type":"Float"},{"span":"52-56","type":"Float"},{"span":"56-56","type":"Eof"}],"out":""}

@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <libassert/assert.hpp>
+#include <nlohmann/json.hpp>
 #include <string_view>
 
 #include "file_store.hpp"
@@ -10,9 +11,9 @@ namespace yal::tests {
 // NOLINTBEGIN(readability-function-size)
 
 auto file_store() -> ut::Test {
-    auto tb = ut::new_test("file store");
+    auto tb = ut::group("file_store");
 
-    add_test(tb, "create, get and check file with contents", [](auto) {
+    ut::add(tb, "create, get and check file with contents", []() {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -30,11 +31,29 @@ auto file_store() -> ut::Test {
 
         auto ex_full_path = std::filesystem::absolute(filepath);
         ASSERT(f->full_path == ex_full_path.string());
-
-        return true;
     });
 
-    add_test(tb, "add file and contents twice", [](auto) {
+    ut::add(tb, "create, get and check file with contents", []() {
+        auto fs = yal::FileStore{};
+
+        std::string_view filepath = ":memory:";
+        std::string_view content = "some content";
+
+        auto id = fs.add_file_and_contents(filepath, content);
+        ASSERT(id.is_valid(), "invalid file");
+
+        auto f = fs.get_file_by_id(id);
+        ASSERT(f.has_value());
+
+        ASSERT(f->id == id);
+        ASSERT(f->original_path == filepath);
+        ASSERT(f->contents == content);
+
+        auto ex_full_path = std::filesystem::absolute(filepath);
+        ASSERT(f->full_path == ex_full_path.string());
+    });
+
+    ut::add(tb, "add file and contents twice", []() {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -63,11 +82,9 @@ auto file_store() -> ut::Test {
         ASSERT(f->id == id);
         ASSERT(f->original_path == filepath);
         ASSERT(f->contents == content);
-
-        return true;
     });
 
-    add_test(tb, "add file twice", [](auto) {
+    ut::add(tb, "add file twice", []() {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -96,11 +113,9 @@ auto file_store() -> ut::Test {
         ASSERT(f->id == id);
         ASSERT(f->original_path == filepath);
         ASSERT(f->contents == content);
-
-        return true;
     });
 
-    add_test(tb, "add file from filesystem", [](auto) {
+    ut::add(tb, "add file from filesystem", []() {
         auto fs = yal::FileStore{};
         auto test_dir = std::filesystem::path{"tests"} / "test_data";
 
@@ -166,11 +181,9 @@ module main;
 
             ASSERT(f->full_path == c_full_path);
         }
-
-        return true;
     });
 
-    add_test(tb, "add directory with contents", [](auto) {
+    ut::add(tb, "add directory with contents", []() {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -200,11 +213,9 @@ module main;
 
         ex_full_path = std::filesystem::absolute(filepath);
         ASSERT(f->full_path == ex_full_path.string());
-
-        return true;
     });
 
-    add_test(tb, "add file from dir in filesystem", [](auto) {
+    ut::add(tb, "add file from dir in filesystem", []() {
         auto fs = yal::FileStore{};
         auto test_dir = std::filesystem::path{"tests"} / "test_data";
 
@@ -282,8 +293,6 @@ module main;
 
             ASSERT(f->full_path == c_full_path);
         }
-
-        return true;
     });
 
     return tb;

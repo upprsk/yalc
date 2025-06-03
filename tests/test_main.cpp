@@ -6,9 +6,9 @@
 auto main(int argc, char** argv) -> int {
     auto args = argparse(argc, argv);
 
-    std::vector<ut::Test> tests;
-    tests.push_back(yal::tests::file_store());
-    tests.push_back(yal::tests::integration());
+    auto top = ut::group("");
+    ut::add(top, yal::tests::file_store());
+    ut::add(top, yal::tests::integration());
 
     auto opt = ut::Options{
         .verbose = args.verbose,
@@ -16,10 +16,9 @@ auto main(int argc, char** argv) -> int {
         .diff = args.diff,
     };
 
-    auto result = ut::run_tests(opt, ut::new_test("top", std::move(tests)));
+    auto result = ut::run(opt, top);
 
     if (args.verbose) fmt::println(stderr, "done!");
-    ut::print_result(result);
 
-    return result.failed + result.crashed > 0;
+    return result.has_failures();
 }
