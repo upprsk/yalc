@@ -8,8 +8,14 @@ auto main(int argc, char** argv) -> int {
 
     std::vector<ut::Test> tests;
     tests.push_back(yal::tests::file_store());
+    tests.push_back(yal::tests::integration());
 
-    auto opt = ut::Options{.verbose = args.verbose};
+    auto opt = ut::Options{
+        .verbose = args.verbose,
+        .ask = args.ask,
+        .diff = args.diff,
+    };
+
     auto result = ut::run_tests(opt, ut::new_test("top", std::move(tests)));
 
     if (args.verbose) fmt::println(stderr, "done!");

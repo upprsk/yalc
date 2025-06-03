@@ -12,7 +12,7 @@ namespace yal::tests {
 auto file_store() -> ut::Test {
     auto tb = ut::new_test("file store");
 
-    tb.add_test("create, get and check file with contents", [](auto) {
+    add_test(tb, "create, get and check file with contents", [](auto) {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -34,7 +34,7 @@ auto file_store() -> ut::Test {
         return true;
     });
 
-    tb.add_test("add file and contents twice", [](auto) {
+    add_test(tb, "add file and contents twice", [](auto) {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -67,7 +67,7 @@ auto file_store() -> ut::Test {
         return true;
     });
 
-    tb.add_test("add file twice", [](auto) {
+    add_test(tb, "add file twice", [](auto) {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -100,7 +100,7 @@ auto file_store() -> ut::Test {
         return true;
     });
 
-    tb.add_test("add file from filesystem", [](auto) {
+    add_test(tb, "add file from filesystem", [](auto) {
         auto fs = yal::FileStore{};
         auto test_dir = std::filesystem::path{"tests"} / "test_data";
 
@@ -170,7 +170,7 @@ module main;
         return true;
     });
 
-    tb.add_test("add directory with contents", [](auto) {
+    add_test(tb, "add directory with contents", [](auto) {
         auto fs = yal::FileStore{};
 
         std::string_view filepath = ":memory:";
@@ -204,7 +204,7 @@ module main;
         return true;
     });
 
-    tb.add_test("add file from dir in filesystem", [](auto) {
+    add_test(tb, "add file from dir in filesystem", [](auto) {
         auto fs = yal::FileStore{};
         auto test_dir = std::filesystem::path{"tests"} / "test_data";
 

@@ -39,6 +39,11 @@ struct MemStream {
 
     void flush() const { fflush(f); }
 
+    [[nodiscard]] auto flush_str() const -> std::string_view {
+        flush();
+        return str();
+    }
+
     [[nodiscard]] constexpr auto str() const -> std::string_view {
         return {buf, bufsize};
     }

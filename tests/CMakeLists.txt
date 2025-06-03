@@ -2,6 +2,7 @@ add_executable(tests
     argparse.cpp
     argparse.hpp
     test_file_store.cpp
+    test_integration.cpp
     test_main.cpp
     tests.cpp
     tests.hpp
