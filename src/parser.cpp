@@ -52,11 +52,14 @@ auto escape_string(ErrorReporterForFile& er, Span span, std::string_view s)
                 case '0': result.push_back('\0'); break;
                 case 'a': result.push_back('\a'); break;
                 case 'b': result.push_back('\b'); break;
-                case 't': result.push_back('\t'); break;
-                case 'n': result.push_back('\n'); break;
-                case 'v': result.push_back('\v'); break;
+                case 'e': result.push_back('\e'); break;
                 case 'f': result.push_back('\f'); break;
+                case 'n': result.push_back('\n'); break;
                 case 'r': result.push_back('\r'); break;
+                case 't': result.push_back('\t'); break;
+                case 'v': result.push_back('\v'); break;
+                case '\\': result.push_back('\\'); break;
+                case '\'': result.push_back('\''); break;
                 case '"': result.push_back('"'); break;
 
                 case 'x': {
@@ -94,12 +97,15 @@ auto escape_char(ErrorReporterForFile& er, Span span, std::string_view s)
             case '0': value = '\0'; break;
             case 'a': value = '\a'; break;
             case 'b': value = '\b'; break;
-            case 't': value = '\t'; break;
-            case 'n': value = '\n'; break;
-            case 'v': value = '\v'; break;
+            case 'e': value = '\e'; break;
             case 'f': value = '\f'; break;
+            case 'n': value = '\n'; break;
             case 'r': value = '\r'; break;
+            case 't': value = '\t'; break;
+            case 'v': value = '\v'; break;
+            case '\\': value = '\\'; break;
             case '\'': value = '\''; break;
+            case '"': value = '"'; break;
 
             case 'x': {
                 auto xs = s.substr(2);
