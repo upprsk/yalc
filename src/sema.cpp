@@ -1739,6 +1739,11 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Char)) {
+        node->set_type(ts.get_u8());
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Int)) {
         node->set_type(ts.get_untyped_int());
         return;
