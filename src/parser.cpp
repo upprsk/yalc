@@ -85,6 +85,7 @@ auto escape_string(ErrorReporterForFile& er, Span span, std::string_view s)
 auto escape_char(ErrorReporterForFile& er, Span span, std::string_view s)
     -> uint32_t {
     uint32_t value = 0;
+
     if (s[0] == '\\') {
         ASSUME(s.size() >= 2);
 
@@ -112,6 +113,8 @@ auto escape_char(ErrorReporterForFile& er, Span span, std::string_view s)
             default:
                 er.report_warn(span, "unknown escape sequence: '\\{:c}'", s[1]);
         }
+    } else {
+        value = s[0];
     }
 
     return value;
