@@ -82,6 +82,41 @@ auto escape_string(ErrorReporterForFile& er, Span span, std::string_view s)
     return result;
 }
 
+auto escape_char(ErrorReporterForFile& er, Span span, std::string_view s)
+    -> uint32_t {
+    uint32_t value = 0;
+    if (s[0] == '\\') {
+        ASSUME(s.size() >= 2);
+
+        switch (s[1]) {
+            case '0': value = '\0'; break;
+            case 'a': value = '\a'; break;
+            case 'b': value = '\b'; break;
+            case 't': value = '\t'; break;
+            case 'n': value = '\n'; break;
+            case 'v': value = '\v'; break;
+            case 'f': value = '\f'; break;
+            case 'r': value = '\r'; break;
+
+            case 'x': {
+                auto xs = s.substr(2);
+                if (xs.size() == 2 && is_hex_char(xs[0]) &&
+                    is_hex_char(xs[1])) {
+                    value = parse_hex_escape(xs[0], xs[1]);
+                } else {
+                    er.report_error(
+                        span, "invalid hexadecimal character literal: {:?}", s);
+                }
+            } break;
+
+            default:
+                er.report_warn(span, "unknown escape sequence: '\\{:c}'", s[1]);
+        }
+    }
+
+    return value;
+}
+
 #define try(...) \
     if (!(__VA_ARGS__)) return ast->new_err(prev_loc())
 
@@ -601,7 +636,7 @@ struct Parser {
             case TokenType::DotLbrace: return parse_lit();
             case TokenType::Lbracket: return parse_arr();
             case TokenType::Str: return parse_str(t);
-            case TokenType::Char: return parse_char();
+            case TokenType::Char: return parse_char(t);
 
             case TokenType::Ampersand:
             case TokenType::Bang:
@@ -855,7 +890,13 @@ struct Parser {
         return ast->new_str(to_loc(t.span), result);
     }
 
-    auto parse_char() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
+    [[nodiscard]] auto parse_char(Token t) const -> ast::Node* {
+        auto s = t.span.str(source);
+        s = s.substr(1, s.size() - 2);
+
+        auto value = escape_char(*er, t.span, s);
+        return ast->new_char(to_loc(t.span), value);
+    }
 
     auto parse_struct() -> ast::Node* {
         auto start = prev_loc();

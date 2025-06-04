@@ -34,7 +34,7 @@ func print_array(arr: []const i32) {
     while it.len > 0 {
         defer it = it[1:];
 
-        c_printf("- %d\n".ptr, it[0]);
+        c_printf("%c- %d\n".ptr, '\t', it[0]);
     }
 
     return;
