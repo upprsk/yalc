@@ -57,6 +57,7 @@ auto escape_string(ErrorReporterForFile& er, Span span, std::string_view s)
                 case 'v': result.push_back('\v'); break;
                 case 'f': result.push_back('\f'); break;
                 case 'r': result.push_back('\r'); break;
+                case '"': result.push_back('"'); break;
 
                 case 'x': {
                     if (i + 2 < s.size() && is_hex_char(s[i + 1]) &&
@@ -98,6 +99,7 @@ auto escape_char(ErrorReporterForFile& er, Span span, std::string_view s)
             case 'v': value = '\v'; break;
             case 'f': value = '\f'; break;
             case 'r': value = '\r'; break;
+            case '\'': value = '\''; break;
 
             case 'x': {
                 auto xs = s.substr(2);
