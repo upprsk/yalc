@@ -550,6 +550,13 @@ void build_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Char)) {
+        auto type = create_ir_type_from_general(module, *node->get_type());
+        auto inst = module.new_inst_int_const(type, node->get_data_u64());
+        state.add_and_push_inst(inst);
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Int)) {
         auto type = create_ir_type_from_general(module, *node->get_type());
         auto inst = module.new_inst_int_const(type, node->get_data_u64());
