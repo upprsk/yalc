@@ -106,8 +106,15 @@ func main() i32 {
     run_test(ctx, p, "normal float", R"(module _; func _() { 3.14; })");
     run_test(ctx, p, "float with separators",
              R"(module _; func _() { 3.14_159; })");
-    ctx.tags.pop_back();
 
+    run_test(ctx, p, "character literal",
+             R"(module _; func _() { 'a'; 'b'; })");
+    run_test(ctx, p, "character literal escape",
+             R"(module _; func _() { '\n'; })");
+    run_test(ctx, p, "character literal escape hex",
+             R"(module _; func _() { '\x0A'; })");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("strings");
 
     run_test(ctx, p, "simple",
