@@ -882,7 +882,7 @@ struct Parser {
         return items;
     }
 
-    [[nodiscard]] [[nodiscard]] auto parse_str(Token t) const -> ast::Node* {
+    [[nodiscard]] auto parse_str(Token t) const -> ast::Node* {
         auto s = t.span.str(source);
         s = s.substr(1, s.size() - 2);
 
