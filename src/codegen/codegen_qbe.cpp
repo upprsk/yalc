@@ -313,17 +313,21 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             case ir::OpCode::Lt:
             case ir::OpCode::Le: {
                 std::string_view op;
+
+                auto arg0 = inst->get_arg(0);
+                auto arg1 = inst->get_arg(1);
+
                 switch (inst->op) {
                     case ir::OpCode::Eq: op = "eq"; break;
                     case ir::OpCode::Neq: op = "ne"; break;
                     case ir::OpCode::Lt:
-                        if (inst->type->is_signed())
+                        if (arg0->type->is_signed())
                             op = "slt";
                         else
                             op = "ult";
                         break;
                     case ir::OpCode::Le:
-                        if (inst->type->is_signed())
+                        if (arg0->type->is_signed())
                             op = "sle";
                         else
                             op = "ule";
@@ -333,9 +337,8 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                 }
 
                 println(out, "    %l{} ={} c{}{} %l{}, %l{}", inst->uid,
-                        to_qbe_temp(*inst->type), op,
-                        to_qbe_temp(*inst->get_arg(0)->type),
-                        inst->get_arg(0)->uid, inst->get_arg(1)->uid);
+                        to_qbe_temp(*inst->type), op, to_qbe_temp(*arg0->type),
+                        arg0->uid, arg1->uid);
 
             } break;
 

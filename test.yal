@@ -1,52 +1,51 @@
 module main;
 
-func read_count() i32 {
-    var count = 0;
+func partition(a: []i32, low: i32, high: i32) i32 {
+    var pivot, i = a[high], low - 1;
 
-    c_printf("count: ".ptr);
-    c_scanf("%d".ptr, &count);
-
-    return count;
-}
-
-func allocate_array(count: i32) []i32 {
-    var ptr: [*]i32 = c_malloc(count as usize * sizeof(i32));
-    return ptr[:count];
-}
-
-func fill_array(arr: []i32) {
-    var i  = 10;
-    var it = arr;
-    while it.len > 0 {
-        defer {
-            it = it[1:];
-            i  = i + 10;
+    var j = low;
+    while j < high {
+        defer j = j + 1;
+        if a[j] <= pivot {
+            i = i + 1;
+            a[i], a[j] = a[j], a[i];
         }
+    }
 
-        it[0] = i;
+    a[i+1], a[high] = a[high], a[i+1];
+    return i + 1;
+}
+
+func quicksort(a: []i32, low: i32, high: i32) {
+    c_printf("quicksort(low=%d, high=%d, %d)\n".ptr, low, high);
+    if low < high {
+        var pivot = partition(a, low, high);
+        c_printf("  pivot=%d\n".ptr, pivot);
+        quicksort(a, low, pivot-1);
+        quicksort(a, pivot+1, high);
     }
 
     return;
 }
 
-func print_array(arr: []const i32) {
-    var it = arr;
-    while it.len > 0 {
-        defer it = it[1:];
+func print_items(items: []i32) {
+    var i: usize = 0;
+    while i < items.len {
+        defer i = i + 1;
 
-        c_printf("%c- %d\n".ptr, ' ', it[0]);
+        c_printf("%d, ".ptr, items[i]);
     }
 
+    c_printf("\n".ptr);
     return;
 }
 
 func main(argc: i32, argv: [*][*]u8) i32 {
-    var count = read_count();
-    var arr   = allocate_array(count);
-    defer c_free(arr.ptr);
+    var items = [_]i32{ 8, 7, 2, 1, 0, 9, 6 };
+    print_items(items[:]);
 
-    fill_array(arr);
-    print_array(arr);
+    quicksort(items[:], 0, items.len as i32 - 1);
+    print_items(items[:]);
 
     return 0;
 }
