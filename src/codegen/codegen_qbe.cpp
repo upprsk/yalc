@@ -168,6 +168,11 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
                         inst->get_arg(0)->uid);
             } break;
 
+            case ir::OpCode::Trunc: {
+                println(out, "    %l{} ={} copy %l{}", inst->uid,
+                        to_qbe_temp(*inst->type), inst->get_arg(0)->uid);
+            } break;
+
             case ir::OpCode::Copy:
                 println(out, "    %l{} ={} copy %l{}", inst->uid,
                         to_qbe_temp(*inst->type), inst->get_arg(0)->uid);

@@ -195,7 +195,10 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
                 return;
             }
 
-            // TODO: when target is smaller
+            auto type = create_ir_type_from_general(module, *target);
+            auto inst = module.new_inst_trunc(type, arg);
+            state.add_and_push_inst(inst);
+            return;
         }
 
         // NOTE: just converting directly, which is not always correct...

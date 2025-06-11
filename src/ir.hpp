@@ -151,6 +151,7 @@ enum class OpCode : uint16_t {
     Store,
 
     Ext,
+    Trunc,
 
     Add,
     Sub,
@@ -370,6 +371,10 @@ public:
 
     [[nodiscard]] auto new_inst_ext(Type* type, Inst* src) -> Inst* {
         return new_inst(OpCode::Ext, type, {}, src);
+    }
+
+    [[nodiscard]] auto new_inst_trunc(Type* type, Inst* src) -> Inst* {
+        return new_inst(OpCode::Trunc, type, {}, src);
     }
 
     [[nodiscard]] auto new_inst_arith(OpCode op, Type* type, Inst* lhs,
@@ -592,6 +597,7 @@ constexpr auto format_as(OpCode op) {
         case OpCode::Load: name = "Load"; break;
         case OpCode::Store: name = "Store"; break;
         case OpCode::Ext: name = "Ext"; break;
+        case OpCode::Trunc: name = "Trunc"; break;
         case OpCode::Add: name = "Add"; break;
         case OpCode::Sub: name = "Sub"; break;
         case OpCode::Div: name = "Div"; break;
