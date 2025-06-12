@@ -344,6 +344,20 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Id)) {
+        if (auto decl = node->get_decl()) {
+            if (auto type = decl->get_type();
+                type && type->is_bool() && decl->value.has_data()) {
+                auto v = decl->value.get_data_bool();
+                auto new_node = ast.new_int(node->get_loc(), v);
+
+                node->make_equal_to(new_node, ctx.ts->get_bool());
+            }
+        }
+
+        return;
+    }
+
     if (ctx.opt->verbose_lowering)
         er.report_warn(node->get_loc(), "node not lowered ({})",
                        node->get_kind());
