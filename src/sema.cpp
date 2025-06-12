@@ -1691,6 +1691,30 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Lor, ast::NodeKind::Land)) {
+        auto data = conv::binary(*node);
+        node->set_type(ts.get_bool());
+
+        sema_expr(ast, data.lhs, state, ctx);
+        sema_expr(ast, data.rhs, state, ctx);
+
+        auto lhs = data.lhs->get_type()->unpacked()->undistinct();
+        auto rhs = data.rhs->get_type()->unpacked()->undistinct();
+
+        if (!lhs->is_bool() || !rhs->is_bool()) {
+            er.report_error(
+                node->get_loc(),
+                "logical operation requires that both arguments are of type {}",
+                *ts.get_bool());
+            er.report_note(data.lhs->get_loc(), "this has type {}",
+                           *data.lhs->get_type());
+            er.report_note(data.rhs->get_loc(), "this has type {}",
+                           *data.rhs->get_type());
+        }
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
                        ast::NodeKind::Mul, ast::NodeKind::Div,
                        ast::NodeKind::Mod)) {
