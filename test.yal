@@ -17,10 +17,8 @@ func partition(a: []i32, low: i32, high: i32) i32 {
 }
 
 func quicksort(a: []i32, low: i32, high: i32) {
-    c_printf("quicksort(low=%d, high=%d, %d)\n".ptr, low, high);
     if low < high {
         var pivot = partition(a, low, high);
-        c_printf("  pivot=%d\n".ptr, pivot);
         quicksort(a, low, pivot-1);
         quicksort(a, pivot+1, high);
     }
