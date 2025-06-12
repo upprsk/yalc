@@ -865,6 +865,54 @@ void build_expr(Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Lor)) {
+        auto data = conv::binary(*node);
+
+        // Or short-circuits, so that `b` is only executed if a is false.
+        //
+        //     if a { a }
+        //     else { b }
+        //
+        // So we need to create the following:
+        //
+        //         %result = < lhs >
+        //         branch %result, @after, @rhs
+        //     @rhs
+        //         %result = < rhs >
+        //         jmp @after
+        //     @after
+
+        // When we codegen lhs, we don't pop the argument. On the rhs block we
+        // assign to it again, so that the result will always be in it after the
+        // end.
+
+        build_expr(data.lhs, state, ctx);
+        auto lhs = state.sstack_top();
+
+        auto rhs_blk = state.new_empty_block(BlockOp::Branch);
+        auto after = state.new_empty_block(BlockOp::Jmp);
+
+        // finish current block using brach op
+        state.close_into_pending_block(BlockOp::Branch, lhs,
+                                       std::array{after, rhs_blk});
+
+        // set rhs branch as the current pending block
+        state.pending_block = rhs_blk;
+
+        // fill rhs, update the result and finish with a simple jump to after
+        build_expr(data.rhs, state, ctx);
+        auto rhs = state.sstack_pop();
+
+        auto inst = module.new_inst_settmp(lhs, rhs);
+        state.add_inst(inst);
+        state.close_into_pending_block(BlockOp::Jmp, nullptr,
+                                       std::array{after});
+
+        // set after as the current pending block
+        state.pending_block = after;
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Coerce)) {
         auto data = conv::coerce(*node);
         build_expr(data.child, state, ctx);
