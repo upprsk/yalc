@@ -920,6 +920,44 @@ func c_printf(fmt: [*]const u8, ...);
 )");
 
     ctx.tags.pop_back();
+    ctx.tags.emplace_back("logical short-circuit");
+
+    run_test(ctx, p, "all boolean cases", R"(module main;
+
+func print_bool(b: bool) bool {
+    c_printf("  bool: %d\n".ptr, b);
+    return b;
+}
+
+func main(argc: i32, argv: [*][*]u8) i32 {
+    c_printf("true or false\n".ptr);
+    if print_bool(true) or print_bool(false) {
+        c_printf("> true or false: OK\n".ptr);
+    }
+
+    c_printf("true or true\n".ptr);
+    if print_bool(true) or print_bool(true) {
+        c_printf("> true or true: OK\n".ptr);
+    }
+
+    c_printf("false or false\n".ptr);
+    if print_bool(false) or print_bool(false) {
+        c_printf("> false or false: OK\n".ptr);
+    }
+
+    c_printf("false or true\n".ptr);
+    if print_bool(false) or print_bool(true) {
+        c_printf("> false or true: OK\n".ptr);
+    }
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: [*]const u8, ...);
+)");
+
+    ctx.tags.pop_back();
     ctx.tags.emplace_back("slices");
 
     run_test(ctx, p, "slice an array with start",
