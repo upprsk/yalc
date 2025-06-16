@@ -180,8 +180,8 @@ void build_expr(Node* node, State& state, Context& ctx);
 void build_cast(types::Type* target, types::Type* source, State& state) {
     auto& module = state.module;
 
-    target = target->unpacked();
-    source = source->unpacked();
+    target = target->unpacked()->undistinct();
+    source = source->unpacked()->undistinct();
 
     if (*target == *source) return;
     auto arg = state.sstack_pop();
