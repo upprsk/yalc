@@ -823,9 +823,10 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
     if (node->is_oneof(ast::NodeKind::Add, ast::NodeKind::Sub,
                        ast::NodeKind::Div, ast::NodeKind::Mul,
-                       ast::NodeKind::Equal, ast::NodeKind::NotEqual,
-                       ast::NodeKind::Less, ast::NodeKind::LessEqual,
-                       ast::NodeKind::Greater, ast::NodeKind::GreaterEqual)) {
+                       ast::NodeKind::Mod, ast::NodeKind::Equal,
+                       ast::NodeKind::NotEqual, ast::NodeKind::Less,
+                       ast::NodeKind::LessEqual, ast::NodeKind::Greater,
+                       ast::NodeKind::GreaterEqual)) {
         auto data = conv::binary(*node);
         build_expr(data.lhs, state, ctx);
         build_expr(data.rhs, state, ctx);
@@ -838,6 +839,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
             case ast::NodeKind::Sub: op = OpCode::Sub; break;
             case ast::NodeKind::Div: op = OpCode::Div; break;
             case ast::NodeKind::Mul: op = OpCode::Mul; break;
+            case ast::NodeKind::Mod: op = OpCode::Mod; break;
             case ast::NodeKind::Equal: op = OpCode::Eq; break;
             case ast::NodeKind::NotEqual: op = OpCode::Neq; break;
             case ast::NodeKind::Less: op = OpCode::Lt; break;

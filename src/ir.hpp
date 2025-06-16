@@ -157,6 +157,7 @@ enum class OpCode : uint16_t {
     Sub,
     Div,
     Mul,
+	Mod,
 
     Eq,
     Neq,
@@ -602,6 +603,7 @@ constexpr auto format_as(OpCode op) {
         case OpCode::Sub: name = "Sub"; break;
         case OpCode::Div: name = "Div"; break;
         case OpCode::Mul: name = "Mul"; break;
+        case OpCode::Mod: name = "Mod"; break;
         case OpCode::Eq: name = "Eq"; break;
         case OpCode::Neq: name = "Neq"; break;
         case OpCode::Lt: name = "Lt"; break;

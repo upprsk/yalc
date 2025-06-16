@@ -293,13 +293,15 @@ void codegen_block(ir::Block const& block, State& state, Context& ctx) {
             case ir::OpCode::Add:
             case ir::OpCode::Sub:
             case ir::OpCode::Div:
-            case ir::OpCode::Mul: {
+            case ir::OpCode::Mul:
+            case ir::OpCode::Mod: {
                 std::string_view op;
                 switch (inst->op) {
                     case ir::OpCode::Add: op = "add"; break;
                     case ir::OpCode::Sub: op = "sub"; break;
                     case ir::OpCode::Div: op = "div"; break;
                     case ir::OpCode::Mul: op = "mul"; break;
+                    case ir::OpCode::Mod: op = "rem"; break;
                     default: UNREACHABLE("invalid op for arith", inst->op);
                 }
 
