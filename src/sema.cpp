@@ -695,7 +695,7 @@ auto cast_types(types::Type* target, types::Type* source, Node* target_node,
             return target;
         }
 
-        if (source->is_ptr()) {
+        if (source->is_ptr() || source->is_rawptr()) {
             if (!target->is_size()) {
                 er.report_error(source_node->get_loc(),
                                 "can not cast pointer {} to integers other "
