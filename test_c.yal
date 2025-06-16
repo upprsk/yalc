@@ -24,4 +24,24 @@ func c_printf(fmt: [*]const u8, ...);
 @extern(link_name="scanf")
 func c_scanf(fmt: [*]const u8, ...);
 
+def FILE = rawptr;
+
+@extern(link_name="fopen")
+func c_fopen(path: [*]const u8, mode: [*]const u8) FILE;
+
+@extern(link_name="fclose")
+func c_fclose(f: FILE);
+
+@extern(link_name="fread")
+func c_fread(ptr: rawptr, size: usize, nmemb: usize, stream: FILE) usize;
+
+@extern(link_name="fwrite")
+func c_fwrite(ptr: rawptr, size: usize, nmemb: usize, stream: FILE) usize;
+
+@extern(link_name="rand")
+func c_rand() i32;
+
+@extern(link_name="atoi")
+func c_atoi(s: [*]const u8) i32;
+
 // vim: ft=yal
