@@ -212,7 +212,7 @@ void build_cast(types::Type* target, types::Type* source, State& state) {
         // TODO: when source is not an integer
     }
 
-    else if (target->is_ptr() || target->is_mptr()) {
+    else if (target->is_ptr() || target->is_mptr() || target->is_rawptr()) {
         // if both sides are pointers, at the IR level there is not
         // difference, push the inst back in the stack
         if (source->is_ptr() || source->is_mptr() || source->is_rawptr()) {
@@ -719,8 +719,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
             // stack variable
             if (d->is_stack_var()) {
-                ASSERT(local->type->is_ptr());
-
+                ASSERT(local->type->is_ptr(), *local->type);
                 state.sstack_push(local);
             }
 
