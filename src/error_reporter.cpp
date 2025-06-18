@@ -107,6 +107,9 @@ void LocalErrorReporter::report(Span s, std::string_view prefix,
 
     auto [ls, le] = find_linestart(source, s);
 
+    // FIXME: currently, context walks the lins backward, so this only works for
+    // when context=1
+
     // print `context` lines from before the line with the error
     auto ils = ls;
     for (size_t i = 0; i < context && ils > 1; i++) {
