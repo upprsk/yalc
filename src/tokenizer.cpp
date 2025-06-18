@@ -1,5 +1,7 @@
 #include "tokenizer.hpp"
 
+#include <cstdint>
+
 #include "error_reporter.hpp"
 #include "nlohmann/json.hpp"
 
@@ -58,6 +60,27 @@ struct Tokenizer {
 
         while (true) {
             auto t = tokenize_one();
+            if (t.is_lparen()) {
+                balancing_stack.push_back({TokenType::Rparen, t.span});
+            } else if (t.is_lbrace()) {
+                balancing_stack.push_back({TokenType::Rbrace, t.span});
+            } else if (t.is_lbracket()) {
+                balancing_stack.push_back({TokenType::Rbracket, t.span});
+            } else if (t.is_rparen() || t.is_rbrace() || t.is_rbracket()) {
+                while (!balancing_stack.empty()) {
+                    auto top = *(balancing_stack.end() - 1);
+                    balancing_stack.pop_back();
+                    if (top.type == t.type) break;
+
+                    er->report_error(t.span, "unbalanced '{}'",
+                                     top.span.str(source));
+                    er->report_note(top.span, "'{}' opened here and not closed",
+                                    top.span.str(source));
+
+                    tokens.push_back({top.type, t.span});
+                }
+            }
+
             tokens.push_back(t);
 
             if (t.is_eof()) break;
@@ -258,6 +281,8 @@ struct Tokenizer {
     LocalErrorReporter const* er;
     uint32_t                  start{};
     uint32_t                  current{};
+
+    std::vector<Token> balancing_stack;
 };
 
 // ------------------------------------------------------------------------

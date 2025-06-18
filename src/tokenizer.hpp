@@ -100,6 +100,30 @@ struct Token {
         return is_id() && span.str(src) == kw;
     }
 
+    [[nodiscard]] constexpr auto is_lparen() const -> bool {
+        return type == TokenType::Lparen;
+    }
+
+    [[nodiscard]] constexpr auto is_rparen() const -> bool {
+        return type == TokenType::Rparen;
+    }
+
+    [[nodiscard]] constexpr auto is_lbrace() const -> bool {
+        return type == TokenType::Lbrace;
+    }
+
+    [[nodiscard]] constexpr auto is_rbrace() const -> bool {
+        return type == TokenType::Rbrace;
+    }
+
+    [[nodiscard]] constexpr auto is_lbracket() const -> bool {
+        return type == TokenType::Lbracket;
+    }
+
+    [[nodiscard]] constexpr auto is_rbracket() const -> bool {
+        return type == TokenType::Rbracket;
+    }
+
     [[nodiscard]] constexpr auto has_chars() const -> bool { return !is_eof(); }
 
     constexpr auto operator==(Token const& o) const -> bool = default;
