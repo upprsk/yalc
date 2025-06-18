@@ -1,0 +1,1 @@
+{"data":{"children":[],"kind":"File","loc":"0-14@FileId(0)","module_name":""},"out":":memory:invalid module decl 6:1:7: error: expected Id, but got ''main''\n> 0001 | module 'main';\n                ^^^^^^\n"}

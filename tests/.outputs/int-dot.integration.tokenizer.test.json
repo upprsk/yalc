@@ -1,1 +1,1 @@
-{"data":[{"span":"0-3","type":"Int"},{"span":"3-4","type":"Dot"},{"span":"4-4","type":"Eof"}],"out":""}
+{"data":[{"span":"0-3","type":"Int"},{"span":"3-4","type":"Dot"},{"span":"4-4","type":"EOF"}],"out":""}

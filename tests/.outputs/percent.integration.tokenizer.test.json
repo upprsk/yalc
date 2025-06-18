@@ -1,1 +1,1 @@
-{"data":[{"span":"0-1","type":"Percent"},{"span":"2-4","type":"PercentEqual"},{"span":"4-4","type":"Eof"}],"out":""}
+{"data":[{"span":"0-1","type":"Percent"},{"span":"2-4","type":"PercentEqual"},{"span":"4-4","type":"EOF"}],"out":""}

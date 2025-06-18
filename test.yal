@@ -1,15 +1,6 @@
 module main;
 
-func main(argc: i32, argv: [*][*]u8) i32 {
-    var count = read_count();
-    var arr   = allocate_array(count);
-    defer c_free(arr.ptr);
-
-    fill_array(arr);
-    print_array(arr);
-
-    return 0;
-}
+var global = 10;
+var good: i32;
 
 // vim: ft=yal
-
