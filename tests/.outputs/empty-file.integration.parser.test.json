@@ -1,1 +1,1 @@
-{"data":{"children":[],"kind":"File","loc":"0-0@FileId(0)","module_name":""},"out":":memory:empty file:1:0: error: expected 'module', but got EOF\n> 0001 | \n         \n"}
+{"data":{"kind":"File","loc":"0-0@FileId(0)","module_name":""},"out":":memory:empty file:1:0: error: expected 'module', but got EOF\n> 0001 | \n         \n"}

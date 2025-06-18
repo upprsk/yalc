@@ -1,1 +1,1 @@
-{"data":{"children":[],"kind":"File","loc":"0-11@FileId(0)","module_name":""},"out":":memory:invalid module decl 5:1:0: error: expected 'module', but got 'modul'\n> 0001 | modul main;\n         ^^^^^\n"}
+{"data":{"kind":"File","loc":"0-11@FileId(0)","module_name":""},"out":":memory:invalid module decl 5:1:0: error: expected 'module', but got 'modul'\n> 0001 | modul main;\n         ^^^^^\n"}

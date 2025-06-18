@@ -1,0 +1,1 @@
+{"data":{"kind":"File","loc":"0-14@FileId(0)","module_name":"main"},"out":":memory:invalid global with attributes 2:2:1: error: invalid attribute, missing identifier\n  0001 | module main;\n> 0002 | @\n         ^\n  0003 | \n"}

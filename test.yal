@@ -1,5 +1,7 @@
 module main;
 
-func
+@test_1(=12,))
+@test_2
+var global;
 
 // vim: ft=yal
