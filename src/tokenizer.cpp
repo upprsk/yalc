@@ -208,6 +208,13 @@ struct Tokenizer {
     }
 
     constexpr auto tokenize_decorator() -> Token {
+        if (!is_alpha(peek()) && !is_digit(peek()) && peek() != '_') {
+            // a lonely '@'
+            er->report_error(span(), "invalid attribute, missing identifier");
+
+            return mkt(TokenType::Err);
+        }
+
         while (is_alpha(peek()) || is_digit(peek()) || peek() == '_') advance();
 
         return mkt(TokenType::Attribute);

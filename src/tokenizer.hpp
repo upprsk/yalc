@@ -75,6 +75,10 @@ struct Token {
     TokenType type;
     Span      span;
 
+    [[nodiscard]] constexpr auto is_err() const -> bool {
+        return type == TokenType::Err;
+    }
+
     [[nodiscard]] constexpr auto is_eof() const -> bool {
         return type == TokenType::Eof;
     }
@@ -124,7 +128,9 @@ struct Token {
         return type == TokenType::Rbracket;
     }
 
-    [[nodiscard]] constexpr auto has_chars() const -> bool { return !is_eof(); }
+    [[nodiscard]] constexpr auto has_chars() const -> bool {
+        return !is_eof() && !is_err();
+    }
 
     constexpr auto operator==(Token const& o) const -> bool = default;
 };
