@@ -1,10 +1,14 @@
+#include <fmt/base.h>
 #include <fmt/format.h>
 
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 #include "argparser.hpp"
+#include "ast.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
+#include "parser.hpp"
 #include "tokenizer.hpp"
 
 auto main(int argc, char** argv) -> int {
@@ -35,6 +39,12 @@ auto main(int argc, char** argv) -> int {
             fmt::println(stderr, "program: {} ({}B)", f->full_path,
                          f->contents.size());
         }
+
+        auto           tokens = yal::tokenize(er.for_file(id));
+        auto           ast = yal::ast::Ast{};
+        auto           root = yal::parse_into_ast(tokens, ast, er.for_file(id));
+        nlohmann::json root_json = *root;
+        fmt::println("{}", root_json.dump(2));
     } else {
         auto id = fs.add_dir(args.program);
         if (id.is_invalid()) {
