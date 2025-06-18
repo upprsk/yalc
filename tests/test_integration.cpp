@@ -160,6 +160,27 @@ var good: i32;
 var global = 10;
 var good: i32;
 )~~"},
+
+        {               "defs 1", R"~~(module main;
+def TEN = 10;
+var global = TEN;
+)~~"},
+        {       "invalid defs 1", R"~~(module main;
+def
+var global = 10;
+)~~"},
+        {       "invalid defs 2", R"~~(module main;
+def TEN
+var global = 10;
+)~~"},
+        {       "invalid defs 3", R"~~(module main;
+def TEN =
+var global = 10;
+)~~"},
+        {       "invalid defs 4", R"~~(module main;
+def TEN = 10
+var global = TEN;
+)~~"},
     };
 
     for (auto&& [name, input] : tests) {

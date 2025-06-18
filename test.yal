@@ -1,6 +1,5 @@
 module main;
 
-var global = 10;
-var good: i32;
+func
 
 // vim: ft=yal
