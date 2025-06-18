@@ -176,24 +176,106 @@ public:
     auto parse_top_decl() -> ast::Node* {
         // er.report_debug(span(), "parse_top_decl() got '{}'",
         // span().str(source));
+        auto attributes =
+            check(TokenType::Attribute) ? parse_attributes() : nullptr;
 
-        if (check("var")) return parse_top_var();
-        if (check("def")) return parse_top_def();
+        if (check("var")) return parse_top_var(attributes);
+        if (check("def")) return parse_top_def(attributes);
         if (check("func")) return parse_top_func();
 
         er.report_error(span(), "expected top-level declaration but got '{}'",
                         span().str(source));
 
-        return ast.new_node_err(to_loc(span()));
+        auto err = ast.new_node_err(to_loc(span()));
+
+        skip_while_not(TokenType::Eof, TokenType::Attribute, "var", "def",
+                       "func");
+
+        return err;
     }
 
-    auto parse_top_var() -> ast::Node* {
+    // ------------------------------------------------------------------------
+
+    auto parse_attributes() -> ast::Node* {
+        auto start_span = span();
+
+        std::vector<ast::Node*> attrs;
+        while (check(TokenType::Attribute)) {
+            auto attr = parse_attribute();
+            attrs.push_back(attr);
+        }
+
+        return ast.new_node_pack(to_loc(start_span.extend(prev_span())), attrs);
+    }
+
+    auto parse_attribute() -> ast::Node* {
+        auto start_span = span();
+
+        // name of the attribute without the leading '@'
+        auto attribute_name = start_span.str(source).substr(1);
+        // NOTE: we have an unconsumed '@something' here every time
+        advance();
+
+        std::vector<ast::Node*> args;
+
+        // we have arguments for the attribute
+        if (match(TokenType::Lparen)) {
+            do {
+                if (check(TokenType::Rparen)) break;
+
+                if (check(TokenType::Id) && check_next(TokenType::Equal)) {
+                    // this is a key-value pair
+                    auto key = span();
+
+                    // advance the key and the =
+                    advance();
+                    advance();
+
+                    auto value = parse_expr_without_recover();
+                    if (!value) {
+                        value = ast.new_node_err(to_loc(prev_span()));
+                        skip_while_not(TokenType::Eof, TokenType::Semi,
+                                       TokenType::Rparen, TokenType::Comma,
+                                       TokenType::Attribute, "func", "var",
+                                       "def");
+                    }
+
+                    args.push_back(
+                        ast.new_attributekv(to_loc(key.extend(prev_span())),
+                                            key.str(source), value));
+                }
+
+                else {
+                    // this is a lonely value
+                    auto value = parse_expr_without_recover();
+                    if (!value) {
+                        skip_while_not(TokenType::Eof, TokenType::Semi,
+                                       TokenType::Rparen, TokenType::Comma,
+                                       TokenType::Attribute, "func", "var",
+                                       "def");
+                    } else {
+                        args.push_back(value);
+                    }
+                }
+            } while (match(TokenType::Comma));
+
+            if (!consume(TokenType::Rparen)) {
+                // FIXME: recover missing parenthesis
+            }
+        }
+
+        return ast.new_attribute(to_loc(start_span), attribute_name, args);
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_top_var(ast::Node* attributes) -> ast::Node* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'var' here every time
         advance();
 
-        auto ids = parse_decl_ids();
+        auto names = parse_decl_ids();
 
     types_label:
         auto types =
@@ -203,10 +285,7 @@ public:
             match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
 
         if (!consume(TokenType::Semi)) {
-            while (!check_oneof(TokenType::Eof, TokenType::Colon,
-                                TokenType::Equal, TokenType::Semi,
-                                TokenType::Attribute, "var", "def", "func"))
-                advance();
+            recover_parse_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -218,17 +297,17 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_top_var(to_loc(start_span.extend(prev_span())), ids,
-                                    types, inits);
+        return ast.new_node_top_var(to_loc(start_span.extend(prev_span())),
+                                    attributes, names, types, inits);
     }
 
-    auto parse_top_def() -> ast::Node* {
+    auto parse_top_def(ast::Node* attributes) -> ast::Node* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'def' here every time
         advance();
 
-        auto ids = parse_decl_ids();
+        auto names = parse_decl_ids();
 
     types_label:
         auto types =
@@ -238,10 +317,7 @@ public:
             match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
 
         if (!consume(TokenType::Semi)) {
-            while (!check_oneof(TokenType::Eof, TokenType::Colon,
-                                TokenType::Equal, TokenType::Semi,
-                                TokenType::Attribute, "var", "def", "func"))
-                advance();
+            recover_parse_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -253,11 +329,9 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_top_def(to_loc(start_span.extend(prev_span())), ids,
-                                    types, inits);
+        return ast.new_node_top_def(to_loc(start_span.extend(prev_span())),
+                                    attributes, names, types, inits);
     }
-
-    auto parse_top_func() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
 
     auto parse_decl_ids() -> ast::Node* {
         auto                    start_span = span();
@@ -298,6 +372,11 @@ public:
         if (types.empty()) return nullptr;
         return ast.new_node_pack(to_loc(start_span.extend(prev_span())), types);
     }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_top_func() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
+
     // ========================================================================
 
     auto parse_expr_without_recover() -> ast::Node* {
@@ -342,8 +421,7 @@ public:
         auto expr = parse_expr_without_recover();
         if (expr) return expr;
 
-        while (!check_oneof(TokenType::Eof, TokenType::Semi)) advance();
-
+        skip_while_not(TokenType::Eof, TokenType::Semi);
         if (check(TokenType::Semi)) advance();
 
         return ast.new_node_err(to_loc(start_span));
@@ -360,28 +438,26 @@ public:
     // - 'def'
     // - attribute
     void recover_parse_module_decl() {
-        while (!check_oneof(TokenType::Eof, TokenType::Semi,
-                            TokenType::Attribute, "func", "var", "def")) {
-            advance();
-        }
+        skip_while_not(TokenType::Eof, TokenType::Semi, TokenType::Attribute,
+                       "func", "var", "def");
 
         if (check(TokenType::Semi)) advance();
     }
 
-    void recover_parse_decl_ids() {
-        while (!check_oneof(TokenType::Eof, TokenType::Semi, TokenType::Colon,
-                            TokenType::Equal, TokenType::Attribute, "func",
-                            "var", "def")) {
-            advance();
-        }
-
-        if (check(TokenType::Semi)) advance();
+    void recover_parse_def_or_var() {
+        skip_while_not(TokenType::Eof, TokenType::Colon, TokenType::Equal,
+                       TokenType::Semi, TokenType::Attribute, "var", "def",
+                       "func");
     }
 
     // ========================================================================
 
     void skip_comments() {
         while (peek().is_comment()) advance();
+    }
+
+    void skip_while_not(auto&&... args) {
+        while (!check_oneof(std::forward<decltype(args)>(args)...)) advance();
     }
 
     // ========================================================================
@@ -407,6 +483,12 @@ public:
 
     [[nodiscard]] constexpr auto check_oneof(auto... tt) -> bool {
         return (check(tt) || ...);
+    }
+
+    [[nodiscard]] constexpr auto check_next(TokenType tt) const -> bool {
+        if (is_at_end()) return false;
+
+        return tokens[current_token + 1].type == tt;
     }
 
     [[nodiscard]] constexpr auto match(TokenType tt) -> bool {
@@ -495,7 +577,7 @@ public:
     constexpr void advance() {
         do {
             if (!is_at_end()) current_token++;
-        } while (peek().is_comment());
+        } while (peek().is_comment() || peek().is_err());
     }
 };
 

@@ -24,14 +24,24 @@ public:
                                   dupe_string(module_name));
     }
 
-    auto new_node_top_def(Location loc, Node* names, Node* types, Node* inits)
-        -> NodeTopDef* {
-        return new_node<NodeTopDef>(loc, names, types, inits);
+    auto new_attribute(Location loc, std::string_view name,
+                       std::span<Node* const> args) -> NodeAttribute* {
+        return new_node<NodeAttribute>(loc, dupe_string(name), dupe_span(args));
     }
 
-    auto new_node_top_var(Location loc, Node* names, Node* types, Node* inits)
-        -> NodeTopVar* {
-        return new_node<NodeTopVar>(loc, names, types, inits);
+    auto new_attributekv(Location loc, std::string_view key, Node* value)
+        -> NodeAttributeKV* {
+        return new_node<NodeAttributeKV>(loc, dupe_string(key), value);
+    }
+
+    auto new_node_top_def(Location loc, Node* attributes, Node* names,
+                          Node* types, Node* inits) -> NodeTopDef* {
+        return new_node<NodeTopDef>(loc, attributes, names, types, inits);
+    }
+
+    auto new_node_top_var(Location loc, Node* attributes, Node* names,
+                          Node* types, Node* inits) -> NodeTopVar* {
+        return new_node<NodeTopVar>(loc, attributes, names, types, inits);
     }
 
     auto new_node_id(Location loc, std::string_view value) -> NodeId* {

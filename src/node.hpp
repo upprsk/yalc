@@ -14,6 +14,8 @@ enum class NodeKind {
     Err,
 
     File,
+    Attribute,
+    AttributeKV,
     TopVar,
     TopDef,
 
@@ -36,6 +38,10 @@ public:
 
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
+
+    [[nodiscard]] constexpr auto is_node_pack() const -> bool {
+        return kind == NodeKind::NodePack;
+    }
 
     // In case this node has a forwarding pointer, i.e was set to another using
     // union-find, process the chain and return the latest. In case the node is
@@ -73,6 +79,13 @@ public:
 
     // Convert the node to json.
     virtual void to_json(nlohmann::json& j) const;
+
+    // Convert just common values to json (this overwrites the JSON object).
+    void to_json_common_values(nlohmann::json& j) const;
+
+    // Convert just children to json (this does not overwrite the JSON object,
+    // just adds the 'children' key.
+    void to_json_children(nlohmann::json& j) const;
 };
 
 // Error node.
@@ -121,17 +134,78 @@ public:
 
 // ============================================================================
 
+// An attribute that is attached to some declaration.
+class NodeAttribute : public Node {
+    std::string_view name;
+
+    // A list of all arguments given in the attribute. Key-Value pairs are
+    // represented by `AttributeKV`.
+    std::span<Node*> args;
+
+public:
+    constexpr NodeAttribute(Location loc, std::string_view name,
+                            std::span<Node*> args)
+        : Node{NodeKind::Attribute, loc}, name{name}, args{args} {}
+
+    [[nodiscard]] constexpr auto get_name() const -> std::string_view {
+        return name;
+    }
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return args;
+    }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+};
+
+class NodeAttributeKV : public Node {
+    std::string_view key;
+    Node*            value{};
+
+public:
+    constexpr NodeAttributeKV(Location loc, std::string_view key, Node* value)
+        : Node{NodeKind::AttributeKV, loc}, key{key}, value{value} {}
+
+    [[nodiscard]] constexpr auto get_value() const -> Node* { return value; }
+    [[nodiscard]] constexpr auto get_key() const -> std::string_view {
+        return key;
+    }
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return {&value, 1};
+    }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+};
+
+// ============================================================================
+
 // Top-level (global) variable declaration
 class NodeTopVar : public Node {
-    std::array<Node*, 3> children;
+    std::array<Node*, 4> children;
 
     [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
         return children[idx];
     }
 
 public:
-    constexpr NodeTopVar(Location loc, Node* names, Node* types, Node* inits)
-        : Node{NodeKind::TopVar, loc}, children{names, types, inits} {}
+    constexpr NodeTopVar(Location loc, Node* attributes, Node* names,
+                         Node* types, Node* inits)
+        : Node{NodeKind::TopVar, loc},
+          children{names, types, inits, attributes} {}
+
+    // Get attributes attached to the variable. May be null (in case of no
+    // attributes).
+    //
+    //     @attribute var a, b, c: ta, tb, tc = va, vb, vc;
+    //     ^^^^^^^^^^
+    [[nodiscard]] auto get_attributes() const -> NodePack*;
 
     // Get the names that are declared. This is a pack of ids, one for each
     // value declared. May be null (in case of parse errors).
@@ -161,34 +235,43 @@ public:
 
 // Top-level (global) constant declaration
 class NodeTopDef : public Node {
-    std::array<Node*, 3> children;
+    std::array<Node*, 4> children;
 
     [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
         return children[idx];
     }
 
 public:
-    constexpr NodeTopDef(Location loc, Node* names, Node* types, Node* inits)
-        : Node{NodeKind::TopDef, loc}, children{names, types, inits} {}
+    constexpr NodeTopDef(Location loc, Node* attributes, Node* names,
+                         Node* types, Node* inits)
+        : Node{NodeKind::TopDef, loc},
+          children{names, types, inits, attributes} {}
+
+    // Get attributes attached to the definition. May be null (in case of no
+    // attributes).
+    //
+    //     @attribute def a, b, c: ta, tb, tc = va, vb, vc;
+    //     ^^^^^^^^^^
+    [[nodiscard]] auto get_attributes() const -> NodePack*;
 
     // Get the names that are declared. This is a pack of ids, one for each
     // value declared. May be null (in case of parse errors).
     //
-    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //     def a, b, c: ta, tb, tc = va, vb, vc;
     //         ^^^^^^^
     [[nodiscard]] auto get_names() const -> NodePack*;
 
     // Get the types of the values declared. This is a pack of exprs, one for
     // each explicit type. May be null.
     //
-    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //     def a, b, c: ta, tb, tc = va, vb, vc;
     //                  ^^^^^^^^^^
     [[nodiscard]] auto get_types() const -> NodePack*;
 
     // Get the initializers of the values declared. This is a pack of exprs, one
     // for each initializer. May be null.
     //
-    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //     def a, b, c: ta, tb, tc = va, vb, vc;
     //                               ^^^^^^^^^^
     [[nodiscard]] auto get_inits() const -> NodePack*;
 

@@ -25,6 +25,18 @@ auto Node::format_to(fmt::format_context& ctx) const
 }
 
 void Node::to_json(nlohmann::json& j) const {
+    to_json_common_values(j);
+    to_json_children(j);
+}
+
+void Node::to_json_common_values(nlohmann::json& j) const {
+    j = json{
+        {"kind", fmt::to_string(get_kind())},
+        { "loc",  fmt::to_string(get_loc())},
+    };
+}
+
+void Node::to_json_children(nlohmann::json& j) const {
     auto children = json::array();
     for (auto child : get_children()) {
         json cj;
@@ -33,11 +45,7 @@ void Node::to_json(nlohmann::json& j) const {
         children.push_back(cj);
     }
 
-    j = json{
-        {    "kind", fmt::to_string(get_kind())},
-        {     "loc",  fmt::to_string(get_loc())},
-        {"children",                   children},
-    };
+    if (!children.empty()) j["children"] = std::move(children);
 }
 
 // ============================================================================
@@ -59,14 +67,50 @@ void NodeFile::to_json(nlohmann::json& j) const {
 
 // ============================================================================
 
+auto NodeAttribute::format_to(fmt::format_context& ctx) const
+    -> fmt::format_context::iterator {
+    return fmt::format_to(
+        ctx.out(), "NodeAttribute({}, {:?}, {})", get_loc(), get_name(),
+        fmt::join(get_children() | rv::filter([](Node* n) {
+                      return n != nullptr;
+                  }) | rv::transform([](Node* n) -> Node const& { return *n; }),
+                  ", "));
+}
+
+void NodeAttribute::to_json(nlohmann::json& j) const {
+    Node::to_json(j);
+    j["name"] = get_name();
+}
+
+auto NodeAttributeKV::format_to(fmt::format_context& ctx) const
+    -> fmt::format_context::iterator {
+    return fmt::format_to(ctx.out(), "NodeAttributeKV({}, {}={})", get_loc(),
+                          get_key(),
+                          get_value() ? *get_value() : NodeErr{get_loc()});
+}
+
+void NodeAttributeKV::to_json(nlohmann::json& j) const {
+    Node::to_json_common_values(j);
+
+    j["key"] = get_key();
+    if (auto v = get_value()) {
+        j["value"] = *v;
+    }
+}
+
+// ============================================================================
+
 auto as_node_pack(Node* n) -> NodePack* {
-    auto p = dynamic_cast<NodePack*>(n);
-    ASSERT(p != nullptr, "expected NodePack", n->get_kind());
-    return p;
+    ASSERT(n->is_node_pack(), "expected NodePack", n->get_kind());
+    return static_cast<NodePack*>(n);
+}
+
+auto NodeTopVar::get_attributes() const -> NodePack* {
+    return child_at(3) ? as_node_pack(child_at(3)) : nullptr;
 }
 
 auto NodeTopVar::get_names() const -> NodePack* {
-    return as_node_pack(child_at(0));
+    return child_at(0) ? as_node_pack(child_at(0)) : nullptr;
 }
 
 auto NodeTopVar::get_types() const -> NodePack* {
@@ -77,8 +121,12 @@ auto NodeTopVar::get_inits() const -> NodePack* {
     return child_at(2) ? as_node_pack(child_at(2)) : nullptr;
 }
 
+auto NodeTopDef::get_attributes() const -> NodePack* {
+    return child_at(3) ? as_node_pack(child_at(3)) : nullptr;
+}
+
 auto NodeTopDef::get_names() const -> NodePack* {
-    return as_node_pack(child_at(0));
+    return child_at(0) ? as_node_pack(child_at(0)) : nullptr;
 }
 
 auto NodeTopDef::get_types() const -> NodePack* {
@@ -118,6 +166,7 @@ auto NodeInt::format_to(fmt::format_context& ctx) const
 void to_json(nlohmann::json& j, NodeKind const& n) { j = fmt::to_string(n); }
 
 void to_json(nlohmann::json& j, Node const& t) { t.to_json(j); }
+
 }  // namespace yal::ast
 
 auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
@@ -127,6 +176,8 @@ auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
     switch (p) {
         case yal::ast::NodeKind::Err: name = "Err"; break;
         case yal::ast::NodeKind::File: name = "File"; break;
+        case yal::ast::NodeKind::Attribute: name = "Attribute"; break;
+        case yal::ast::NodeKind::AttributeKV: name = "AttributeKV"; break;
         case yal::ast::NodeKind::TopVar: name = "TopVar"; break;
         case yal::ast::NodeKind::TopDef: name = "TopDef"; break;
         case yal::ast::NodeKind::Id: name = "Id"; break;
