@@ -1,5 +1,7 @@
 #include <fmt/format.h>
 
+#include <filesystem>
+
 #include "argparser.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
@@ -18,6 +20,13 @@ auto main(int argc, char** argv) -> int {
         auto id = fs.add_file(args.program);
         if (id.is_invalid()) {
             fmt::println(stderr, "invalid file: {}", args.program);
+
+            if (std::filesystem::is_directory(args.program)) {
+                fmt::println(
+                    stderr, "note: {} is a directory, maybe try without --file",
+                    args.program);
+            }
+
             return 1;
         }
 
@@ -30,6 +39,13 @@ auto main(int argc, char** argv) -> int {
         auto id = fs.add_dir(args.program);
         if (id.is_invalid()) {
             fmt::println(stderr, "invalid directory: {}", args.program);
+
+            if (std::filesystem::is_regular_file(args.program)) {
+                fmt::println(
+                    stderr, "note: {} is a regular file, maybe try with --file",
+                    args.program);
+            }
+
             return 1;
         }
 
