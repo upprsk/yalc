@@ -1,5 +1,6 @@
 #include "error_reporter.hpp"
 
+#include <cstdio>
 #include <libassert/assert.hpp>
 #include <string_view>
 
@@ -27,7 +28,8 @@ namespace yal {
     uint32_t line_start{};
     uint32_t line_end = source.length();
 
-    for (ssize_t i = begin; i >= 0; i--) {
+    for (ssize_t i = begin; i < static_cast<ssize_t>(source.length()) && i >= 0;
+         i--) {
         if (source[i] == '\n') {
             line_start = i + 1;
             break;
