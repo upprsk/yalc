@@ -28,9 +28,8 @@ namespace yal {
     uint32_t line_start{};
     uint32_t line_end = source.length();
 
-    for (ssize_t i = begin; i < static_cast<ssize_t>(source.length()) && i >= 0;
-         i--) {
-        if (source[i] == '\n') {
+    for (ssize_t i = begin; i >= 0; i--) {
+        if (i < static_cast<ssize_t>(source.length()) && source[i] == '\n') {
             line_start = i + 1;
             break;
         }
