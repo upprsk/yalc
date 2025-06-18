@@ -100,6 +100,8 @@ struct Token {
         return is_id() && span.str(src) == kw;
     }
 
+    [[nodiscard]] constexpr auto has_chars() const -> bool { return !is_eof(); }
+
     constexpr auto operator==(Token const& o) const -> bool = default;
 };
 

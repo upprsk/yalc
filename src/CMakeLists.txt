@@ -1,6 +1,7 @@
 add_library(yal
     arena.cpp
     arena.hpp
+    ast.hpp
     error_reporter.cpp
     error_reporter.hpp
     file_store.cpp
@@ -8,6 +9,10 @@ add_library(yal
     location.cpp
     location.hpp
     macros.hpp
+    node.cpp
+    node.hpp
+    parser.cpp
+    parser.hpp
     tokenizer.cpp
     tokenizer.hpp
     utils.cpp

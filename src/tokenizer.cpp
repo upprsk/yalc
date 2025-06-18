@@ -343,7 +343,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType const& p,
         case yal::TokenType::Str: name = "Str"; break;
         case yal::TokenType::Char: name = "Char"; break;
         case yal::TokenType::Comment: name = "Comment"; break;
-        case yal::TokenType::Eof: name = "Eof"; break;
+        case yal::TokenType::Eof: name = "EOF"; break;
     }
     return formatter<string_view>::format(name, ctx);
 }
