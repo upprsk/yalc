@@ -61,7 +61,7 @@ enum class TokenType : uint8_t {
     Lbracket,
     Rbracket,
     Id,
-    Decorator,
+    Attribute,
     Int,
     Hex,
     Float,

@@ -187,7 +187,7 @@ struct Tokenizer {
     constexpr auto tokenize_decorator() -> Token {
         while (is_alpha(peek()) || is_digit(peek()) || peek() == '_') advance();
 
-        return mkt(TokenType::Decorator);
+        return mkt(TokenType::Attribute);
     }
 
     constexpr auto tokenize_string() -> Token {
@@ -336,7 +336,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType const& p,
         case yal::TokenType::Lbracket: name = "Lbracket"; break;
         case yal::TokenType::Rbracket: name = "Rbracket"; break;
         case yal::TokenType::Id: name = "Id"; break;
-        case yal::TokenType::Decorator: name = "Decorator"; break;
+        case yal::TokenType::Attribute: name = "Attribute"; break;
         case yal::TokenType::Int: name = "Int"; break;
         case yal::TokenType::Float: name = "Float"; break;
         case yal::TokenType::Hex: name = "Hex"; break;
