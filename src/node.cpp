@@ -77,6 +77,18 @@ auto NodeTopVar::get_inits() const -> NodePack* {
     return child_at(2) ? as_node_pack(child_at(2)) : nullptr;
 }
 
+auto NodeTopDef::get_names() const -> NodePack* {
+    return as_node_pack(child_at(0));
+}
+
+auto NodeTopDef::get_types() const -> NodePack* {
+    return child_at(1) ? as_node_pack(child_at(1)) : nullptr;
+}
+
+auto NodeTopDef::get_inits() const -> NodePack* {
+    return child_at(2) ? as_node_pack(child_at(2)) : nullptr;
+}
+
 // ============================================================================
 
 void NodeId::to_json(nlohmann::json& j) const {

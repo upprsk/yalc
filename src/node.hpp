@@ -159,6 +159,44 @@ public:
     }
 };
 
+// Top-level (global) constant declaration
+class NodeTopDef : public Node {
+    std::array<Node*, 3> children;
+
+    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
+        return children[idx];
+    }
+
+public:
+    constexpr NodeTopDef(Location loc, Node* names, Node* types, Node* inits)
+        : Node{NodeKind::TopDef, loc}, children{names, types, inits} {}
+
+    // Get the names that are declared. This is a pack of ids, one for each
+    // value declared. May be null (in case of parse errors).
+    //
+    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //         ^^^^^^^
+    [[nodiscard]] auto get_names() const -> NodePack*;
+
+    // Get the types of the values declared. This is a pack of exprs, one for
+    // each explicit type. May be null.
+    //
+    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //                  ^^^^^^^^^^
+    [[nodiscard]] auto get_types() const -> NodePack*;
+
+    // Get the initializers of the values declared. This is a pack of exprs, one
+    // for each initializer. May be null.
+    //
+    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //                               ^^^^^^^^^^
+    [[nodiscard]] auto get_inits() const -> NodePack*;
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
+    }
+};
+
 // ============================================================================
 
 // A node for an identifier.

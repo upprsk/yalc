@@ -222,7 +222,41 @@ public:
                                     types, inits);
     }
 
-    auto parse_top_def() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
+    auto parse_top_def() -> ast::Node* {
+        auto start_span = span();
+
+        // NOTE: we have an unconsumed 'def' here every time
+        advance();
+
+        auto ids = parse_decl_ids();
+
+    types_label:
+        auto types =
+            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+    inits_label:
+        auto inits =
+            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+
+        if (!consume(TokenType::Semi)) {
+            while (!check_oneof(TokenType::Eof, TokenType::Colon,
+                                TokenType::Equal, TokenType::Semi,
+                                TokenType::Attribute, "var", "def", "func"))
+                advance();
+
+            // in case we recovered with a colon, then try types again
+            if (check(TokenType::Colon)) goto types_label;
+
+            // in case we recovered with an equals, then try to use it as the
+            // inits
+            if (match(TokenType::Equal)) goto inits_label;
+
+            if (check(TokenType::Semi)) advance();
+        }
+
+        return ast.new_node_top_def(to_loc(start_span.extend(prev_span())), ids,
+                                    types, inits);
+    }
+
     auto parse_top_func() -> ast::Node* { PANIC("NOT IMPLEMENTED"); }
 
     auto parse_decl_ids() -> ast::Node* {

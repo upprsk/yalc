@@ -24,6 +24,11 @@ public:
                                   dupe_string(module_name));
     }
 
+    auto new_node_top_def(Location loc, Node* names, Node* types, Node* inits)
+        -> NodeTopDef* {
+        return new_node<NodeTopDef>(loc, names, types, inits);
+    }
+
     auto new_node_top_var(Location loc, Node* names, Node* types, Node* inits)
         -> NodeTopVar* {
         return new_node<NodeTopVar>(loc, names, types, inits);
