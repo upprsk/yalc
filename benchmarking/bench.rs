@@ -24,15 +24,27 @@ fn quicksort(a: &mut [i32], low: i32, high: i32) {
     }
 }
 
+/// Reinterpret a slice of T as a slice of bytes without copying.
+/// Only use with simple copy types like integers, floats, bools, etc. Don't use with structs or enums.
+pub fn get_bytes<T: Copy>(array: &mut [T]) -> &mut [u8] {
+    // Safety: &[u64] can be safely converted to &[u8]
+    // (so why doesn't rust have a safe method for this?)
+    unsafe { std::slice::from_raw_parts_mut(array.as_ptr() as *mut u8, array.len() * std::mem::size_of::<T>()) }
+}
+
 fn read_values(path: &str, n: usize) -> Vec<i32> {
     let mut file = std::fs::File::open(path).expect("failed to open file");
     let mut data: Vec<i32> = Vec::new();
-    for _ in 0..n {
-        let mut buf = [0; 4];
-        file.read(&mut buf).expect("failed to read");
 
-        data.push(i32::from_ne_bytes(buf));
-    }
+    data.resize(n, 0);
+    file.read(get_bytes(&mut data[..])).expect("failed to read");
+
+    // for _ in 0..n {
+    //     let mut buf = [0; 4];
+    //     file.read(&mut buf).expect("failed to read");
+    //
+    //     data.push(i32::from_ne_bytes(buf));
+    // }
 
     data
 }

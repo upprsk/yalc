@@ -30,7 +30,7 @@ void quicksort(std::span<int> a, int low, int high) {
 
 void print_items(std::span<int> items) {
     for (auto item : items) {
-        std::cout << item << ", \n";
+        std::cout << item << ", ";
     }
 
     std::cout << "\n";
@@ -112,11 +112,11 @@ auto main(int argc, char** argv_) -> int {
     }
 
     if (args.mode == 1) {
-        gen_file("./numbers.bin", count);
+        gen_file(args.input_file_path, count);
         return 0;
     }
 
-    auto items = read_values("./numbers.bin", count);
+    auto items = read_values(args.input_file_path, count);
     print_items(items);
 
     quicksort(items, 0, count - 1);
