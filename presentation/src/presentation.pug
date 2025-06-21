@@ -1,0 +1,765 @@
+img(src="Inatel.png" class="h-10 absolute left-3 top-3")
+
+div.reveal
+  div.slides
+    section
+      h2 Yet Another Language
+      h3 (YAL)
+
+      .grid.grid-cols-2.mt-40
+        small Lucas da Silveira Ross
+        small Marcelo V. C. Aragão
+
+    section
+      section(data-auto-animate="")
+        h2 Linguagens de Programação de Sistemas
+
+        p Possuem requistos diferentes de linguagens de alto nível.
+
+        ul
+          li.fragment #[i Runtime] mínimo, ou seja, pouco #[i overhead] obrigatório
+          li.fragment Uso determinístico de memória
+          li.fragment Acesso direto ao #[i hardware] quando necessário
+
+      section(data-auto-animate="")
+        h2 Linguagens de Programação de Sistemas
+
+        p #[i Features] comums que são desencorajadas:
+
+        ul
+          li.fragment Tipagem dinâmica
+          li.fragment Virtualização (i.e #[i bytecode])
+          li.fragment #[i Garbage Collector]
+          li.fragment Alocação Dinâmica por padrão
+
+    section
+      h2 YAL
+
+      p.
+        Uma linguagem simples, feita para ser fácil de ler e entender,
+        modernizando, e não revolucionando, a linguagem C.
+
+    section
+      table
+        tr
+          th Feature
+          th C
+          th C++
+          th Rust
+          th YAL
+        tr
+          td Ponteiros
+          td Sim
+          td Sim
+          td Sim #[small #[sub 1]]
+          td Sim
+        tr
+          td Referencias
+          td Não
+          td Sim
+          td Sim
+          td Não
+        tr
+          td Slices
+          td Não
+          td Parcial #[small #[sub 2]]
+          td Sim
+          td Sim
+        tr
+          td Herança
+          td Não
+          td Sim
+          td Não
+          td Não
+        tr
+          td Módulos
+          td Não
+          td Parcial #[small #[sub 3]]
+          td Sim
+          td Sim
+        tr
+          td GC
+          td Não
+          td Opcional #[small #[sub 4]]
+          td Opcional #[small #[sub 5]]
+          td Não
+
+      p: small Comparação com outras linguagens #[br] Tabela I
+
+    section
+      section
+        h2 Hello, World!
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            module main;
+
+            // from libc
+            @extern
+            func printf(fmt: [*]const u8, ...);
+
+            func main() {
+                printf("Hello, %s!\n".ptr, "World".ptr);
+            }
+
+      section
+        h2 Literais Básicas
+
+        aside.notes
+          ul
+            li \a: bell (BEL);
+            li \b: backspace (BS);
+            li \e: escape (ESC);
+            li \f: form feed (FF);
+            li \n: newline;
+            li \r: carriage return;
+            li \t: tab;
+            li \t: vertical tab (VT);
+            li \\: adicionar o caractere \.
+            li \": adicionar o caractere ".
+            li \': adicionar o caractere '.
+            li \0: adicionar o caractere nulo.
+            li \xNN: adicionar um número hexadecimal com valor definido pelos 2 dı́gitos hexadecimais NN.
+
+        .grid.grid-cols-2
+          div
+            h4 Numéricas
+
+            ul
+              li #[b 16]
+              li #[b 0x10]
+              li #[b 0o20]
+              li #[b 0b10000]
+              li #[b 3.14]
+              li.fragment #[b 1_000_000]
+
+          div
+            h4 Strings
+
+            ul
+              li #[b "um string!"]
+              li #[b "um\n\tstring!"]
+              li #[b "\xf0\x9f\x98\x80"]
+              li.fragment 😀
+
+    section
+      section
+        h2 Declarações
+
+        pre: code(data-line-numbers="|2|5,10|8,13" class="language-go")
+          script(type="text/template").
+            // declarar uma variavel do tipo i32
+            var x: i32;
+            // declarar uma variavel do tipo i32 com valor
+            // inicial 12
+            var y: i32 = 12;
+            // declarar uma variavel com tipo inferido i32 e
+            // valor inicial 12
+            var z = 12;
+            // declarar uma constante do tipo u64 e valor 12
+            def a: u64 = 12;
+            // declarar uma constante com tipo inferido e
+            // valor 12
+            def b = 12;
+
+      section
+        h2 Declarações
+
+        p.
+          Variáveis não são deixadas sem valor inicializado, sempre recebendo
+          um valor padrão definido.
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            var x: i32;    // = 0
+            var y: [2]i32; // = [12]i32{0, 0}
+
+        .fragment
+          p Constantes requerem um valor inicial.
+
+          pre: code(data-line-numbers="" class="language-go")
+            script(type="text/template").
+              def ZERO = 0;
+
+      section
+        h2 Declarações
+
+        p.
+          Declarações múltiplas permitem declarar vários valores ao mesmo
+          tempo. Essa #[i feature] existem principalmente por conta de
+          retornos múltiplos.
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            var x, y = 69, 420;
+
+        p Constantes também suportam declarações múltiplas.
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            def ZERO, ONE = 0, 1;
+
+      section
+        h2 Declarações
+
+        p.
+          YAL permite redefinir o mesmo nome várias vezes no mesmo escopo.
+          Isso permite efetivamente modificar o tipo de uma variável.
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            func main(argc: i32, argv: [*][*]u8) i32 {
+                var argv = argv[:argc];
+
+                return 0;
+            }
+
+      section
+        h2 Atribuições
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            a, b = b, a;
+
+        .fragment
+          p.
+            Atribuições não são expressões, de forma que o seguinte não é
+            possível:
+
+          pre: code(data-line-numbers="" class="language-go")
+            script(type="text/template").
+              a = b = 2;
+
+    section
+      section
+        h2 Módulos
+
+        p.
+          YAL organiza o código em módulos, compostos por 1 ou mais arquivos
+          em um diretório, identificados pela primeira linha de cada arquivo.
+
+      section
+        h2 Módulos
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            // main.yal
+            module main;
+
+            func main() {
+                printf("Hello, %s!\n".ptr, "World".ptr);
+            }
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            // c.yal
+            module main;
+
+            // from libc
+            @extern
+            func printf(fmt: [*]const u8, ...);
+
+    section
+      section
+        h2 Controle de Fluxo
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            if condition {
+                // ...
+            }
+
+            while condition {
+                // ...
+            }
+
+      section
+        h2 Controle de Fluxo
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            if var x = foo(); x < 0 {
+                printf("x é negativo: %d\n", x);
+            } else if x > 0 {
+                printf("x é positivo: %d\n", x);
+            } else {
+                printf("x é zero: %d\n", x);
+            }
+
+      section
+        h2 defer
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            func main() {
+                var mem = malloc(100 * sizeof(i32));
+                defer free(mem);
+
+                do_stuff(mem);
+
+                // free(mem) chamado aqui
+            }
+
+      section
+        pre.r-stretch: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            func main() {
+                defer printf("end 1\n");
+                defer printf("end 2\n");
+
+                {
+                    var mem = malloc(100 * sizeof(i32));
+                    defer free(mem);
+
+                    {
+                        defer printf("ok\n");
+
+                        do_stuff(mem);
+
+                        // printf("ok\n") chamado aqui
+                    }
+
+                    // free(mem) chamado aqui
+                }
+
+                // printf("end 2\n") chamado aqui
+                // printf("end 1\n") chamado aqui
+            }
+
+      section
+        pre.r-stretch: code(data-line-numbers="|1|2-5|6|8|9-20" class="language-go")
+          script(type="text/template").
+            func read_file_data(path: [*]const u8) (i32, i32, bool) {
+                var f = fopen(path, "rb".ptr);
+                if f == nil {
+                    return 0, 0, false;
+                }
+                defer fclose(f);
+
+                var a, b: i32, i32;
+                if var n = fread(&a, sizeof(a), 1, f); n!=1 {
+                    // fclose(f) chamado
+                    return 0, 0, false;
+                }
+
+                if var n = fread(&b, sizeof(b), 1, f); n!=1 {
+                    // fclose(f) chamado
+                    return 0, 0, false;
+                }
+
+                // fclose(f) chamado
+                return a, b, true;
+            }
+
+    section
+      section
+        h2 Funções
+
+        p.
+          Funções podem retornar mais de um valor, algo especialmente útil
+          para tratamento de erros.
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            func read_file_data(path: [*]const u8) (i32, i32, bool) {
+                // ...
+            }
+
+      section(data-auto-animate="")
+        h2 Funções
+
+        pre: code(data-line-numbers="" class="language-c")
+          script(type="text/template").
+            int c_init_wifi(int mode, wifi_spec_t* specs);
+
+            int main() {
+                wifi_spec_t spec;
+                int err = c_init_wifi(MODE_STATION, &spec);
+                if (err != ERR_NONE) { /* ... */ }
+            }
+
+      section(data-auto-animate="")
+        h2 Funções
+
+        pre: code(data-line-numbers="|1-2|4|5-7|11" class="language-go")
+          script(type="text/template").
+            @extern
+            func c_init_wifi(mode: i32, specs: *wifi_spec_t) i32;
+
+            func init_wifi(mode: i32) (wifi_spec_t, i32) {
+                var spec: wifi_spec_t;
+                var err = c_init_wifi(mode, &spec);
+                return spec, err;
+            }
+
+            func main() {
+                var spec, err = init_wifi(MODE_STATION);
+                if err != ERR_NONE {}
+            }
+
+    section
+      section
+        h2 Tipos Básicos
+
+        ul
+          li Números Inteiros
+          li Números de Ponto Flutuante
+          li Ponteiros
+          li Strings
+
+      section
+        h2 Inteiros
+
+        table
+          tr
+            th Tamanho
+            th Com Sinal
+            th Sem Sinal
+            th Em C/C++
+          tr
+            td 1B
+            td i8
+            td u8
+            td char
+          tr
+            td 2B
+            td i16
+            td u16
+            td short
+          tr
+            td 4B
+            td i32
+            td u32
+            td int
+          tr
+            td 8B
+            td i64
+            td u64
+            td long long
+
+        p: small Tipos Inteiros #[br] Tabela II
+
+      section
+        h2 Ponto Flutuante
+
+        ul
+          li #[b f32]: float
+          li #[b f64]: double
+
+      section
+        h2 Ponteiros
+
+        table.text-3xl
+          tr
+            th Tipo YAL
+            th Descrição
+            th Em C/C++
+          tr
+            td *T
+            td Ponteiro para um valor mutável
+            td T*
+          tr
+            td *const T
+            td Ponteiro para um valor imutável
+            td T const*
+          tr
+            td [*]T
+            td Ponteiro para um array de valores mutável
+            td T*
+          tr
+            td [*]const T
+            td Ponteiro para um array de valores imutável
+            td T const*
+
+        p: small Tipos de Ponteiros #[br] Tabela III
+
+        p.text-4xl.
+          Também existe o tipo #[b rawptr], equivalente ao tipo #[b void*] em C
+          que pode ser convertido de qualquer ponteiro para qualquer ponteiro.
+
+      section
+        h2 Strings
+
+        -a="[]const u8"
+        p.
+          O tipo #[b string_view] é um tipo exclusivo para strings, sendo uma
+          extensão do tipo #[b #{a}]. Um tipo exclusivo para strings evita a
+          confusão comum quanto ao uso de #[b const char*] presente em C.
+
+    section
+      section
+        h2 Tipos Compostos
+
+        ul
+          li Arrays
+          li Estruturas
+          li Slices
+
+      section
+        h2 Arrays
+
+        pre: code(data-line-numbers="1|2|3-6" class="language-go")
+          script(type="text/template").
+            var arr = [3]i32{1, 2, 3};
+            var arr = [_]i32{1, 2, 3};
+            var arr = [_]i32{1, 2, 3}; // [3]i32
+            var ptr = arr.ptr; // [*]i32
+            var len = arr.len; // usize
+
+      section
+        h2 Estruturas
+
+        pre: code(data-line-numbers="1-4|6|8-9" class="language-go")
+          script(type="text/template").
+            struct {
+                a: i32,
+                b: i32,
+            };
+
+            var a: struct { item: i32 } = .{.item = 10};
+
+            def S = struct { item: i32 };
+            var b: S = .{.item = 10};
+
+      section
+        h2 Slices
+
+        table.text-3xl
+          tr
+            th Linguagem
+            th Slice Mutável
+            th Slice Imutável
+          tr
+            td C
+            td Sem suporte
+            td Sem suporte
+          tr
+            td C++
+            td std::span<T>
+            td std::span<const T>
+          tr
+            td Rust
+            td &mut [T]
+            td &[T]
+          tr
+            td Go
+            td []T
+            td Sem suporte
+          tr
+            td Odin
+            td []T
+            td Sem suporte
+          tr
+            td Zig
+            td []T
+            td []const T
+          tr
+            td YAL
+            td []T
+            td []const T
+
+        p: small Comparação de Tipos Slice #[br] Tabela IV
+
+      section
+        h2 Slices
+
+        table.text-3xl
+          tr
+            th Linguagem
+            th Operação
+          tr
+            td C
+            td Sem suporte
+          tr
+            td C++
+            td s.subspan(start, length)
+          tr
+            td Rust
+            td &s[start..end]
+          tr
+            td Go
+            td s[start:end]
+          tr
+            td Odin
+            td s[start:end]
+          tr
+            td Zig
+            td s[start..end]
+          tr
+            td YAL
+            td s[start:end]
+
+        p: small Comparação da Sintaxe de Slicing #[br] Tabela V
+
+    section
+      section
+        h2 Compilador
+
+        p.
+          Feito em C++23 usando a estrutura clássica de um compilador
+          de várias passadas.
+
+        .flex.justify-center
+          img(src="/pipeline.svg" class="w-3/5")
+
+      section
+        h2 Testes
+
+        p #[i Snapshot Testing] com uma biblioteca própria
+
+        pre: code(data-line-numbers="" class="language-cpp")
+          script(type="text/template").
+            run_test(ctx, p, "function call and return",
+                     R"(module main;
+
+            func id(x: i32) i32 { return x; }
+
+            @export
+            func main() i32 {
+                var x = 68;
+                return id(x);
+            }
+            )");
+
+      section
+        h2 Testes
+
+        .flex.justify-center
+          img(src="/testbench.png" class="w-3/5")
+
+    section
+      section(data-auto-animate="")
+        h2 Validação
+
+        pre: code(data-line-numbers="|1|3|4-5|7-8" class="language-go")
+          script(type="text/template").
+            module main;
+
+            func main(argc: i32, argv: [*][*]u8) i32 {
+                var items = [_]i32{ 8, 7, 2, 1, 0, 9, 6 };
+                print_items(items[:]);
+
+                quicksort(items[:], 0, items.len as i32 - 1);
+                print_items(items[:]);
+
+                return 0;
+            }
+
+      section(data-auto-animate="")
+        h2 Validação
+
+        pre: code(data-line-numbers="|2-4,7" class="language-go")
+          script(type="text/template").
+            func print_items(items: []i32) {
+                var i: usize = 0;
+                while i < items.len {
+                    defer i = i + 1;
+
+                    c_printf("%d, ".ptr, items[i]);
+                }
+
+                c_printf("\n".ptr);
+                return;
+            }
+
+      section(data-auto-animate="")
+        h2 Validação
+
+        pre.r-stretch: code(data-line-numbers="|2|4-6,11|9,13" class="language-go")
+          script(type="text/template").
+            func partition(a: []i32, low: i32, high: i32) i32 {
+                var pivot, i = a[high], low - 1;
+
+                var j = low;
+                while j < high {
+                    defer j = j + 1;
+                    if a[j] <= pivot {
+                        i = i + 1;
+                        a[i], a[j] = a[j], a[i];
+                    }
+                }
+
+                a[i+1], a[high] = a[high], a[i+1];
+
+                return i + 1;
+            }
+
+      section(data-auto-animate="")
+        h2 Validação
+
+        pre: code(data-line-numbers="" class="language-go")
+          script(type="text/template").
+            func quicksort(a: []i32, low: i32, high: i32) {
+                if low < high {
+                    var pivot = partition(a, low, high);
+                    quicksort(a, low, pivot-1);
+                    quicksort(a, pivot+1, high);
+                }
+
+                return;
+            }
+
+      section(data-auto-animate="")
+        h2 Validação
+
+        table.text-3xl
+          tr
+            th Linguagem
+            th Linhas de Código
+            th Binário (KiB)
+            th RAM (KiB)
+            th Compilação (ms)
+            th Execução (ms)
+          tr
+            td C
+            td 102
+            td 13,05
+            td 3,82
+            td 57,7 ± 0,6
+            td 161,1 ± 2,6
+          tr
+            td C++
+            td 102
+            td 14,02
+            td 3,89
+            td 769,5 ± 4,7
+            td 156,6 ± 1,2
+          tr
+            td Rust
+            td 97
+            td 3.894,36
+            td 8,00
+            td 179,8 ± 0,9
+            td 349,2 ± 2,3
+          tr
+            td YAL
+            td 114
+            td 13,77
+            td 3,82
+            td 16,2 ± 0,2
+            td 158,0 ± 1,1
+
+        p: small Comparação quantitativa entre implementações da mesma função em diferentes linguagens compiladas #[br] Tabela IX
+
+      section
+        h2 Validação
+
+        .flex.justify-center
+          img(src="/benchmark-compile.png" class="w-2/3")
+
+      section
+        h2 Validação
+
+        .flex.justify-center
+          img(src="/benchmark-sort.png" class="w-2/3")
+
+    section
+      h2 Yet Another Language
+      h3 (YAL)
+
+      .grid.grid-cols-2.mt-40
+        small Lucas da Silveira Ross
+        small Marcelo V. C. Aragão
+
+
+// vim: ts=2 sts=2 sw=2 et
