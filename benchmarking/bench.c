@@ -129,4 +129,6 @@ int main(int argc, char** argv) {
 
     quicksort(items, 0, count-1);
     print_items(items, count);
+
+    free(items);
 }

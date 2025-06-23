@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <vector>
 
 using namespace std::string_view_literals;
 
@@ -36,19 +37,20 @@ void print_items(std::span<int> items) {
     std::cout << "\n";
 }
 
-auto read_values(char const* path, int count) -> std::span<int> {
+auto read_values(char const* path, int count) -> std::vector<int> {
     auto f = std::unique_ptr<FILE, void (*)(FILE*)>{fopen(path, "rb"),
                                                     [](FILE* f) { fclose(f); }};
     if (f == nullptr) return {};
 
-    auto buffer = new int[count];
-    int  r = fread(buffer, sizeof(int), count, f.get());
+    std::vector<int> buffer;
+    buffer.resize(count);
+
+    int r = fread(buffer.data(), sizeof(int), count, f.get());
     if (r != count) {
-        delete[] buffer;
         return {};
     }
 
-    return {buffer, static_cast<std::size_t>(count)};
+    return buffer;
 }
 
 void gen_file(char const* path, int n) {
