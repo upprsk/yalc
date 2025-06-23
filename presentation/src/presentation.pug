@@ -3,8 +3,8 @@ img(src="Inatel.png" class="h-10 fixed left-3 top-3")
 div.reveal
   div.slides
     section
-      h2 Yet Another Language
-      h3 (YAL)
+      h1 Yet Another Language
+      h2 (YAL)
 
       .grid.grid-cols-2.mt-40
         small Lucas da Silveira Ross
@@ -14,7 +14,18 @@ div.reveal
         Hi!
 
     section
+      h2 Outline
+
+      ol
+        li Introdução
+        li Proposta
+        li Descrição Sintática e Semântica
+        li Ferramentas
+        li Avaliação
+
+    section
       section(data-auto-animate="")
+        h6: i Introdução
         h2 Linguagens de Programação de Sistemas
 
         p Possuem requistos diferentes de linguagens de alto nível.
@@ -29,6 +40,7 @@ div.reveal
           Tambem eh legal falar sobre FFIs.
 
       section(data-auto-animate="")
+        h6: i Introdução
         h2 Linguagens de Programação de Sistemas
 
         p #[i Features] comums que são desencorajadas:
@@ -46,6 +58,7 @@ div.reveal
           a alocacao dinamica automatica (como para arrays e strings por exemplo).
 
     section
+      h6: i Proposta
       h2 YAL
 
       p.
@@ -53,6 +66,8 @@ div.reveal
         modernizando, e não revolucionando, a linguagem C.
 
     section
+      h6: i Proposta
+
       table
         tr
           th Feature
@@ -106,6 +121,7 @@ div.reveal
 
     section
       section
+        h6: i Descrição Sintática e Semântica
         h2 Hello, World!
 
         pre: code(data-line-numbers="" class="language-go")
@@ -125,6 +141,7 @@ div.reveal
           O uso de ptr nos strings.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Literais Básicas
 
         aside.notes
@@ -168,7 +185,8 @@ div.reveal
           Notar que strings arbitrarios em UTF-8 sao suportados.
 
     section
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Declarações
 
         pre: code(data-line-numbers="|2|5,10|8,13" class="language-go")
@@ -187,7 +205,8 @@ div.reveal
             // valor 12
             def b = 12;
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Declarações
 
         p.
@@ -206,7 +225,8 @@ div.reveal
             script(type="text/template").
               def ZERO = 0;
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Declarações
 
         p.
@@ -228,7 +248,8 @@ div.reveal
           Explicar que o motivo para se ter declaracoes multiplas eh para
           retornos multiplos.
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Declarações
 
         p.
@@ -249,6 +270,7 @@ div.reveal
           do escopo local.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Atribuições
 
         pre: code(data-line-numbers="" class="language-go")
@@ -265,14 +287,16 @@ div.reveal
               a = b = 2;
 
     section
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Módulos
 
         p.
           YAL organiza o código em módulos, compostos por 1 ou mais arquivos
           em um diretório, identificados pela primeira linha de cada arquivo.
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Módulos
 
         pre: code(data-line-numbers="" class="language-go")
@@ -301,6 +325,7 @@ div.reveal
 
     section
       section
+        h6: i Descrição Sintática e Semântica
         h2 Controle de Fluxo
 
         pre: code(data-line-numbers="" class="language-go")
@@ -318,7 +343,12 @@ div.reveal
           do/while, switch.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Controle de Fluxo
+
+        p.
+          Uma declaração pode ser adicionada antes da condicao para evitar
+          poluir o escopo local.
 
         pre: code(data-line-numbers="" class="language-go")
           script(type="text/template").
@@ -331,10 +361,10 @@ div.reveal
             }
 
         aside.notes.
-          Go, Odin e C++ possuem essa funcionalidade tambem. Ajuda a previnir
-          a poluicao do escopo local.
+          Go, Odin e C++ possuem essa funcionalidade tambem.
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 defer
 
         pre: code(data-line-numbers="" class="language-go")
@@ -348,7 +378,9 @@ div.reveal
                 // free(mem) chamado aqui
             }
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
+
         pre.r-stretch: code(data-line-numbers="" class="language-go")
           script(type="text/template").
             func main() {
@@ -363,13 +395,10 @@ div.reveal
                         defer printf("ok\n");
 
                         do_stuff(mem);
-
                         // printf("ok\n") chamado aqui
                     }
-
                     // free(mem) chamado aqui
                 }
-
                 // printf("end 2\n") chamado aqui
                 // printf("end 1\n") chamado aqui
             }
@@ -378,7 +407,9 @@ div.reveal
           Explicar como difere do defer do Go, que funciona a escopo da
           funcao.
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
+
         pre.r-stretch: code(data-line-numbers="|1|2-5|6|8|9-20" class="language-go")
           script(type="text/template").
             func read_file_data(path: [*]const u8) (i32, i32, bool) {
@@ -405,6 +436,7 @@ div.reveal
 
     section
       section
+        h6: i Descrição Sintática e Semântica
         h2 Funções
 
         p.
@@ -418,6 +450,7 @@ div.reveal
             }
 
       section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Funções
 
         pre: code(data-line-numbers="" class="language-c")
@@ -434,6 +467,7 @@ div.reveal
           Esse tipo de API eh muito comum em plataformas embarcadas como ESP-32.
 
       section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Funções
 
         pre: code(data-line-numbers="|1-2|4|5-7|11" class="language-go")
@@ -462,6 +496,7 @@ div.reveal
 
     section
       section
+        h6: i Descrição Sintática e Semântica
         h2 Tipos Básicos
 
         ul
@@ -471,6 +506,7 @@ div.reveal
           li Strings
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Inteiros
 
         table
@@ -507,6 +543,7 @@ div.reveal
           de plataformas de 8 bits como ATMega, onde tem 16bits.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Ponto Flutuante
 
         ul
@@ -519,6 +556,7 @@ div.reveal
           implementados como bibliotecas.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Ponteiros
 
         table.text-3xl
@@ -554,6 +592,7 @@ div.reveal
           Nao eh possivel usar memoria de forma generica sem um tipo como rawptr.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Strings
 
         -a="[]const u8"
@@ -568,6 +607,7 @@ div.reveal
 
     section
       section
+        h6: i Descrição Sintática e Semântica
         h2 Tipos Compostos
 
         ul
@@ -581,6 +621,7 @@ div.reveal
           ponteiros.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Arrays
 
         pre: code(data-line-numbers="1|2|3-6" class="language-go")
@@ -596,6 +637,7 @@ div.reveal
           quando atribuido e passado para funcoes.
 
       section
+        h6: i Descrição Sintática e Semântica
         h2 Estruturas
 
         pre: code(data-line-numbers="1-4|6|8-9" class="language-go")
@@ -616,7 +658,8 @@ div.reveal
           poderiam ser manipulados como valores durante a compilacao, abrindo
           portas para meta-programas.
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Slices
 
         table.text-3xl
@@ -660,7 +703,8 @@ div.reveal
           logica invertida quanto a mutabilidade. Explicar a escolha quanto a
           mutabilidade, e porque Go e Odin nao a possuem.
 
-      section
+      section(data-auto-animate="")
+        h6: i Descrição Sintática e Semântica
         h2 Slices
 
         table.text-3xl
@@ -693,14 +737,14 @@ div.reveal
 
     section
       section
+        h6: i Ferramentas
         h2 Compilador
-
-        p.
-          Feito em C++23 usando a estrutura clássica de um compilador
-          de várias passadas.
 
         .flex.justify-center
           img(src="/pipeline.svg" class="w-3/5")
+
+        p.text-3xl.
+          Feito em C++23 como um compilador de várias passadas.
 
         aside.notes.
           Explicar as transformacoes feitas por cada etapa, especialmente quanto
@@ -708,7 +752,8 @@ div.reveal
           importante de explicar. Explicar o uso de QBE e nao LLVM ou compilacao
           direta.
 
-      section
+      section(data-auto-animate="")
+        h6: i Ferramentas
         h2 Testes
 
         p #[i Snapshot Testing] com uma biblioteca própria
@@ -733,6 +778,7 @@ div.reveal
           serializacao.
 
       section
+        h6: i Ferramentas
         h2 Testes
 
         .flex.justify-center
