@@ -10,6 +10,9 @@ div.reveal
         small Lucas da Silveira Ross
         small Marcelo V. C. Aragão
 
+      aside.notes.
+        Hi!
+
     section
       section(data-auto-animate="")
         h2 Linguagens de Programação de Sistemas
@@ -21,6 +24,10 @@ div.reveal
           li.fragment Uso determinístico de memória
           li.fragment Acesso direto ao #[i hardware] quando necessário
 
+        aside.notes.
+          Explicar quanto ao que seria um runtime, e o que significa ele ser minimo.
+          Tambem eh legal falar sobre FFIs.
+
       section(data-auto-animate="")
         h2 Linguagens de Programação de Sistemas
 
@@ -31,6 +38,12 @@ div.reveal
           li.fragment Virtualização (i.e #[i bytecode])
           li.fragment #[i Garbage Collector]
           li.fragment Alocação Dinâmica por padrão
+
+        aside.notes.
+          Explicar a questao do overhead da virtualizacao (instrucoes de hardware
+          por instrucao da VM). Notar tambem quanto ao fato de o problema ser o
+          uso de #[i Tracing] e nao de garbage collectors em geral. Explicar quanto
+          a alocacao dinamica automatica (como para arrays e strings por exemplo).
 
     section
       h2 YAL
@@ -86,6 +99,11 @@ div.reveal
 
       p: small Comparação com outras linguagens #[br] Tabela I
 
+      aside.notes.
+        1: Ponteiros nao sao felizes em Rust.
+        2: Explicar quanto aos problemas das versoes do C++.
+        3: Explicar quanto ao uso de Rc e std::shared_ptr.
+
     section
       section
         h2 Hello, World!
@@ -101,6 +119,10 @@ div.reveal
             func main() {
                 printf("Hello, %s!\n".ptr, "World".ptr);
             }
+
+        aside.notes.
+          Coisas para notar: o uso de modulos, o uso de printf da libc.
+          O uso de ptr nos strings.
 
       section
         h2 Literais Básicas
@@ -140,7 +162,10 @@ div.reveal
               li #[b "um string!"]
               li #[b "um\n\tstring!"]
               li #[b "\xf0\x9f\x98\x80"]
-              li.fragment 😀
+              li.fragment "😀"
+
+        aside.notes.
+          Notar que strings arbitrarios em UTF-8 sao suportados.
 
     section
       section
@@ -199,6 +224,10 @@ div.reveal
           script(type="text/template").
             def ZERO, ONE = 0, 1;
 
+        aside.notes.
+          Explicar que o motivo para se ter declaracoes multiplas eh para
+          retornos multiplos.
+
       section
         h2 Declarações
 
@@ -213,6 +242,11 @@ div.reveal
 
                 return 0;
             }
+
+        aside.notes.
+          Explicar a utilidade de redefinicoes para tratamento de erros e
+          transformacoes sequenciais de dados. Previne quanto a poluicao
+          do escopo local.
 
       section
         h2 Atribuições
@@ -259,6 +293,12 @@ div.reveal
             @extern
             func printf(fmt: [*]const u8, ...);
 
+        aside.notes.
+          Explicar a questao de problemas quanto dependencias circulares, e
+          como o namespace compartilhado remove a maioria desses casos.
+          Declaracoes sao publicas por padrao, caso necessario, explicar quanto
+          a @private e @private(.file).
+
     section
       section
         h2 Controle de Fluxo
@@ -273,6 +313,10 @@ div.reveal
                 // ...
             }
 
+        aside.notes.
+          Tornar claro porque algumas construcoes estao faltantes: for,
+          do/while, switch.
+
       section
         h2 Controle de Fluxo
 
@@ -285,6 +329,10 @@ div.reveal
             } else {
                 printf("x é zero: %d\n", x);
             }
+
+        aside.notes.
+          Go, Odin e C++ possuem essa funcionalidade tambem. Ajuda a previnir
+          a poluicao do escopo local.
 
       section
         h2 defer
@@ -325,6 +373,10 @@ div.reveal
                 // printf("end 2\n") chamado aqui
                 // printf("end 1\n") chamado aqui
             }
+
+        aside.notes.
+          Explicar como difere do defer do Go, que funciona a escopo da
+          funcao.
 
       section
         pre.r-stretch: code(data-line-numbers="|1|2-5|6|8|9-20" class="language-go")
@@ -378,6 +430,9 @@ div.reveal
                 if (err != ERR_NONE) { /* ... */ }
             }
 
+        aside.notes.
+          Esse tipo de API eh muito comum em plataformas embarcadas como ESP-32.
+
       section(data-auto-animate="")
         h2 Funções
 
@@ -396,6 +451,14 @@ div.reveal
                 var spec, err = init_wifi(MODE_STATION);
                 if err != ERR_NONE {}
             }
+
+        aside.notes.
+          Explicar como essa arquitetura de retornos multiplos nao apresenta
+          overhead quando o numero de retornos eh menor ou igual a dois, ja
+          que a maioria das arquiteturas possui dois registradores reservados
+          para valores de retorno. De qualquer forma, uma convencao de chamada
+          customizada poderia ser usada com mais registradores reservados para
+          casos especificos.
 
     section
       section
@@ -439,12 +502,21 @@ div.reveal
 
         p: small Tipos Inteiros #[br] Tabela II
 
+        aside.notes.
+          Lembrar que int nao eh garantido de ter sempre tem 32bits, como no caso
+          de plataformas de 8 bits como ATMega, onde tem 16bits.
+
       section
         h2 Ponto Flutuante
 
         ul
           li #[b f32]: float
           li #[b f64]: double
+
+        aside.notes.
+          Poderia se adicionar suporte futuro a tipos de alta precisao da
+          plataforma x87 como long double 80bits. Tipos como Decimal seriam
+          implementados como bibliotecas.
 
       section
         h2 Ponteiros
@@ -477,6 +549,10 @@ div.reveal
           Também existe o tipo #[b rawptr], equivalente ao tipo #[b void*] em C
           que pode ser convertido de qualquer ponteiro para qualquer ponteiro.
 
+        aside.notes.
+          Notar a importancia de um tipo rawptr em uma linguagem de baixo nivel.
+          Nao eh possivel usar memoria de forma generica sem um tipo como rawptr.
+
       section
         h2 Strings
 
@@ -486,6 +562,10 @@ div.reveal
           extensão do tipo #[b #{a}]. Um tipo exclusivo para strings evita a
           confusão comum quanto ao uso de #[b const char*] presente em C.
 
+        aside.notes.
+          Porque strings possuem somente um tipo imutavel. Notar a importancia
+          de um tipo StringBuilder na biblioteca padrao.
+
     section
       section
         h2 Tipos Compostos
@@ -494,6 +574,11 @@ div.reveal
           li Arrays
           li Estruturas
           li Slices
+
+        aside.notes.
+          Explicar quanto a falta de um tipo de uniao. Nao foi implementado por
+          falta de tempo, sendo que sua funcao pode ser emulada por arrays e
+          ponteiros.
 
       section
         h2 Arrays
@@ -505,6 +590,10 @@ div.reveal
             var arr = [_]i32{1, 2, 3}; // [3]i32
             var ptr = arr.ptr; // [*]i32
             var len = arr.len; // usize
+
+        aside.notes.
+          Explicar a falta de rebaixamento para ponteiro como em C/C++, e copia
+          quando atribuido e passado para funcoes.
 
       section
         h2 Estruturas
@@ -520,6 +609,12 @@ div.reveal
 
             def S = struct { item: i32 };
             var b: S = .{.item = 10};
+
+        aside.notes.
+          Explicar a escolha de nao possuir uma declaracao como em C, C++ ou Rust
+          mas tratar como uma declaracao. Uma extensao desse modelo eh que tipos
+          poderiam ser manipulados como valores durante a compilacao, abrindo
+          portas para meta-programas.
 
       section
         h2 Slices
@@ -559,6 +654,11 @@ div.reveal
             td []const T
 
         p: small Comparação de Tipos Slice #[br] Tabela IV
+
+        aside.notes.
+          Explicar quanto a emulacao de slices em C. Notar quanto a Rust utilizar
+          logica invertida quanto a mutabilidade. Explicar a escolha quanto a
+          mutabilidade, e porque Go e Odin nao a possuem.
 
       section
         h2 Slices
@@ -602,6 +702,12 @@ div.reveal
         .flex.justify-center
           img(src="/pipeline.svg" class="w-3/5")
 
+        aside.notes.
+          Explicar as transformacoes feitas por cada etapa, especialmente quanto
+          a resolucao de nomes e analise semantica. A IR tambem eh um ponto
+          importante de explicar. Explicar o uso de QBE e nao LLVM ou compilacao
+          direta.
+
       section
         h2 Testes
 
@@ -620,6 +726,11 @@ div.reveal
                 return id(x);
             }
             )");
+
+        aside.notes.
+          Explicar porque uma biblioteca propria. Explicar porque nao usar testes
+          unitarios padroes. Explicar o uso de JSON e os desafios/vantagens de
+          serializacao.
 
       section
         h2 Testes
@@ -702,6 +813,61 @@ div.reveal
       section(data-auto-animate="")
         h2 Validação
 
+        pre.r-stretch: code(data-line-numbers="|2-3" class="language-go")
+          script(type="text/template").
+            func gen_file(path: [*]const u8, n: usize) {
+                var f = c_fopen(path, "wb".ptr);
+                defer c_fclose(f);
+
+                var i: usize = 0;
+                while i < n {
+                    defer i = i + 1;
+
+                    var v = c_rand() % n as i32;
+                    var v = v;
+                    var n = c_fwrite(&v, sizeof(i32), 1, f);
+                }
+
+                return;
+            }
+
+        aside.notes.
+          Notar quanto a falta de completude da implementacao Rust devido a
+          necessidade de dependencias. Falar sobre gerenciadores de pacote e
+          seus riscos?
+
+      section(data-auto-animate="")
+        h2 Validação
+
+        pre.r-stretch: code(data-line-numbers="|2,5|3,14|7-9,13" class="language-go")
+          script(type="text/template").
+            func read_values(path: [*]const u8, count: usize) []i32 {
+                var f = c_fopen(path, "rb".ptr);
+                if f as usize == 0 { return [_]i32{}[:]; }
+
+                defer c_fclose(f);
+
+                var ok = true;
+                var buffer = c_malloc(sizeof(i32) * count) as [*]i32;
+                defer if ok == false { c_free(buffer); }
+
+                var read = c_fread(buffer, sizeof(i32), count, f);
+                if read != count {
+                    ok = false;
+                    return [_]i32{}[:];
+                }
+
+                return buffer[:count];
+            }
+
+        aside.notes.
+          Notar quanto a falta de retornos multiplos devido a forma como
+          valores sao tratados na representacao intermediaria. Notar a
+          falta de valores nulos, algo que seria desejado.
+
+      section(data-auto-animate="")
+        h2 Validação
+
         table.text-3xl
           tr
             th Linguagem
@@ -741,11 +907,22 @@ div.reveal
 
         p: small Comparação quantitativa entre implementações da mesma função em diferentes linguagens compiladas #[br] Tabela IX
 
+        aside.notes.
+          Explicar quanto a explosao de trabalho para o compilador C++ quanto ao
+          uso de includes (iostream). Notar quanto ao uso excessivo de memoria e
+          tempo do Rust (se necessario, como isso poderia ser minimizado). Notar
+          quanto ao tamanho do executave& Rust dada a presenca de dados de todos
+          os arquivos e debug.
+
       section
         h2 Validação
 
         .flex.justify-center
           img(src="/benchmark-compile.png" class="w-2/3")
+
+        aside.notes.
+          Notar como o tempo de compilacao em YAL conta com 4 programas separados:
+          bash, YAL, QBE e assembler.
 
       section
         h2 Validação
