@@ -136,7 +136,7 @@ func main(argc: i32, argv: [*][*]u8) i32 {
 
     var items, ok = read_values(args.input_file_path, count as usize);
     if !ok {
-        c_printf("error: failed to read values".ptr);
+        c_printf("error: failed to read values\n".ptr);
         return 1;
     }
 
