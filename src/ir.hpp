@@ -295,6 +295,9 @@ struct Module {
         Type* float64;
 
         Type* ptr;
+
+        Type* strview;
+        Type* slice;
     };
 
 public:
@@ -316,6 +319,8 @@ public:
             .float64 = new_type_of(TypeKind::Float64),
 
             .ptr = new_type_of(TypeKind::Ptr),
+            .strview = new_type_of(TypeKind::StrView),
+            .slice = new_type_of(TypeKind::Slice),
         };
     }
 
@@ -496,6 +501,14 @@ public:
         return cache.ptr;
     }
 
+    [[nodiscard]] constexpr auto get_type_strview() const -> Type* {
+        return cache.strview;
+    }
+
+    [[nodiscard]] constexpr auto get_type_slice() const -> Type* {
+        return cache.slice;
+    }
+
     // ------------------------------------------------------------------------
 
     auto add_string(std::string_view str) -> size_t {
@@ -534,6 +547,8 @@ private:
 
     std::vector<Func>             funcs;
     std::vector<std::string_view> strings;
+
+    std::vector<std::span<Type>> struct_members;
 
     uint32_t next_inst_uid{};
     uint32_t next_block_uid{};

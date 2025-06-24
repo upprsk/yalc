@@ -170,12 +170,10 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
 
         case types::TypeKind::Struct: return mod.new_type_of(TypeKind::Struct);
 
-        case types::TypeKind::StrView:
-            return mod.new_type_of(TypeKind::StrView);
+        case types::TypeKind::StrView: return mod.get_type_strview();
 
         case types::TypeKind::Slice:
-        case types::TypeKind::SliceConst:
-            return mod.new_type_of(TypeKind::Slice);
+        case types::TypeKind::SliceConst: return mod.get_type_slice();
 
         default: PANIC("invalid type", ty.kind, fmt::to_string(ty.kind));
     }
@@ -356,9 +354,8 @@ void build_slicing_of_array(Node* /*unused*/, State& state, Context& ctx,
     auto usize_type = module.get_type_usize();
 
     // struct slice_t s;
-    auto ptr =
-        module.new_inst_alloca(module.new_type_of(TypeKind::Slice),
-                               ptr_type->alignment(), ptr_type->size() * 2);
+    auto ptr = module.new_inst_alloca(
+        module.get_type_slice(), ptr_type->alignment(), ptr_type->size() * 2);
     state.add_inst(ptr);
 
     auto original_size = module.new_inst_int_const(usize_type, inner->count);
@@ -421,9 +418,8 @@ void build_slicing_of_mptr(Node* /*unused*/, State& state, Context& ctx,
     auto usize_type = module.get_type_usize();
 
     // struct slice_t s;
-    auto ptr =
-        module.new_inst_alloca(module.new_type_of(TypeKind::Slice),
-                               ptr_type->alignment(), ptr_type->size() * 2);
+    auto ptr = module.new_inst_alloca(
+        module.get_type_slice(), ptr_type->alignment(), ptr_type->size() * 2);
     state.add_inst(ptr);
 
     Inst* start_index = nullptr;
@@ -474,9 +470,8 @@ void build_slicing_of_slice(Node* /*unused*/, State& state, Context& ctx,
     auto usize_type = module.get_type_usize();
 
     // struct slice_t s;
-    auto ptr =
-        module.new_inst_alloca(module.new_type_of(TypeKind::Slice),
-                               ptr_type->alignment(), ptr_type->size() * 2);
+    auto ptr = module.new_inst_alloca(
+        module.get_type_slice(), ptr_type->alignment(), ptr_type->size() * 2);
     state.add_inst(ptr);
 
     auto original_size =
@@ -612,7 +607,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
         // struct str_t s;
         auto ptr =
-            module.new_inst_alloca(module.new_type_of(TypeKind::StrView),
+            module.new_inst_alloca(module.get_type_strview(),
                                    ptr_type->alignment(), ptr_type->size() * 2);
         state.add_inst(ptr);
 
