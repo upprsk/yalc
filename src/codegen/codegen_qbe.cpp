@@ -42,7 +42,7 @@ auto machine_store_ptr_op() -> std::string_view {
     return sizeof(uintptr_t) == 4 ? "storew" : "storel";
 }
 
-auto to_qbe_type(ir::Type const& type) -> std::string_view {
+auto to_qbe_type(ir::Type const& type) -> std::string {
     switch (type.kind) {
         case ir::TypeKind::Uint64:
         case ir::TypeKind::Int64: return "l";
@@ -54,11 +54,12 @@ auto to_qbe_type(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Int8: return "b";
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
-        case ir::TypeKind::Ptr:
-        case ir::TypeKind::Slice:
-        case ir::TypeKind::StrView: return machine_ptr_type();
+        case ir::TypeKind::Ptr: return std::string{machine_ptr_type()};
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
+        case ir::TypeKind::StrView:
+        case ir::TypeKind::Slice: return ":slice";
+        case ir::TypeKind::Struct: return fmt::format(":struct_{}", type.id);
         default:
             PANIC("invalid type kind", type.kind, fmt::to_string(type.kind));
     }
@@ -87,7 +88,7 @@ auto to_qbe_temp(ir::Type const& type) -> std::string_view {
     }
 }
 
-auto to_qbe_fntype(ir::Type const& type) -> std::string_view {
+auto to_qbe_fntype(ir::Type const& type) -> std::string {
     switch (type.kind) {
         case ir::TypeKind::Uint64:
         case ir::TypeKind::Int64: return "l";
@@ -99,10 +100,11 @@ auto to_qbe_fntype(ir::Type const& type) -> std::string_view {
         case ir::TypeKind::Int8: return "sb";
         case ir::TypeKind::Usize:
         case ir::TypeKind::Isize:
-        case ir::TypeKind::Ptr: return machine_ptr_type();
+        case ir::TypeKind::Ptr: return std::string{machine_ptr_type()};
         case ir::TypeKind::Float32: return "f";
         case ir::TypeKind::Float64: return "d";
         case ir::TypeKind::Slice: return ":slice";
+        case ir::TypeKind::Struct: return fmt::format(":struct_{}", type.id);
         default:
             PANIC("invalid type kind", type.kind, fmt::to_string(type.kind));
     }
@@ -423,6 +425,16 @@ void codegen(FILE* out, ir::Module const& module, ErrorReporter& er,
     auto ctx = Context{};
 
     println(out, "type :slice = {{ {} 2 }}", machine_ptr_type());
+    println(out, "");
+
+    for (auto const& [idx, s] : rv::enumerate(module.get_all_structs())) {
+        print(out, "type :struct_{} = {{ ", idx);
+        for (auto const& field : s) {
+            print(out, "{}, ", to_qbe_type(*field));
+        }
+        println(out, "}}");
+    }
+
     println(out, "");
 
     for (auto const& fn : module.get_funcs()) {

@@ -163,12 +163,22 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
         case types::TypeKind::Pack:
             if (ty.inner.size() == 1)
                 return create_ir_type_from_general(mod, *ty.inner[0]);
-            return mod.new_type_of(TypeKind::Struct);
+            return mod.new_type_struct(
+                ty.inner | rv::transform([&](types::Type* t) {
+                    return create_ir_type_from_general(mod, *t);
+                }) |
+                std::ranges::to<std::vector>());
 
         case types::TypeKind::Distinct:
             return create_ir_type_from_general(mod, *ty.inner[0]);
 
-        case types::TypeKind::Struct: return mod.new_type_of(TypeKind::Struct);
+        case types::TypeKind::Struct:
+            return mod.new_type_struct(
+                ty.inner | rv::transform([&](types::Type* t) {
+                    ASSERT(t->is_struct_field());
+                    return create_ir_type_from_general(mod, *t->inner[0]);
+                }) |
+                std::ranges::to<std::vector>());
 
         case types::TypeKind::StrView: return mod.get_type_strview();
 
@@ -565,7 +575,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
                 module.new_inst_alloca(rty_ir, rty->alignment(), rty->size());
             state.add_inst(inst);
 
-            for (size_t i = fields.size() - 1; i > 0; --i) {
+            for (size_t i = fields.size(); i > 0; --i) {
                 auto f = fields.at(fmt::to_string(i - 1));
                 auto v = state.sstack_pop();
 
@@ -573,6 +583,7 @@ void build_expr(Node* node, State& state, Context& ctx) {
                 state.add_inst(store);
             }
 
+            state.sstack_push(inst);
             return;
         }
 
@@ -714,9 +725,9 @@ void build_expr(Node* node, State& state, Context& ctx) {
 
         if (node_type->is_struct()) {
             auto fields = node_type->as_struct_get_fields();
-            auto ptr = module.new_inst_alloca(
-                module.new_type_of(TypeKind::Struct), node_type->alignment(),
-                node_type->size());
+            auto ty = create_ir_type_from_general(module, *node_type);
+            auto ptr = module.new_inst_alloca(ty, node_type->alignment(),
+                                              node_type->size());
             state.add_and_push_inst(ptr);
 
             for (auto node : data.items) {

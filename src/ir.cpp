@@ -1,6 +1,8 @@
 #include "ir.hpp"
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <list>
 #include <ranges>
 #include <string_view>
@@ -16,6 +18,16 @@
 namespace yal::ir {
 
 namespace rv = std::ranges::views;
+
+auto Module::new_type_struct(std::span<Type * const> members) -> Type* {
+    auto id = struct_members.size();
+    ASSERT(id <= std::numeric_limits<uint8_t>::max());
+
+    auto ty = new_type_of(TypeKind::Struct, id);
+    struct_members.push_back(new_type_span(members));
+
+    return ty;
+}
 
 void Module::sort_funcs() {
     std::ranges::sort(funcs, [](Func const& lhs, Func const& rhs) {
@@ -147,6 +159,8 @@ void disasm_module(FILE* out, Module const& mod) {
 auto fmt::formatter<yal::ir::Type>::format(yal::ir::Type const& n,
                                            format_context&      ctx) const
     -> format_context::iterator {
+    if (n.is_struct()) return fmt::format_to(ctx.out(), "struct_{}", n.id);
+
     std::string_view name;
     switch (n.kind) {
         case yal::ir::TypeKind::Err: name = "Err"; break;

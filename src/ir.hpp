@@ -39,6 +39,7 @@ enum class TypeKind : uint8_t {
 
 struct Type {
     TypeKind kind;
+    uint8_t  id{};
 
     [[nodiscard]] constexpr auto is_ptr() const -> bool {
         return kind == TypeKind::Ptr;
@@ -157,7 +158,7 @@ enum class OpCode : uint16_t {
     Sub,
     Div,
     Mul,
-	Mod,
+    Mod,
 
     Eq,
     Neq,
@@ -436,9 +437,11 @@ public:
         return blocks.alloc<Block*>(next);
     }
 
-    [[nodiscard]] auto new_type_of(TypeKind kind) -> Type* {
-        return types.create<Type>(kind);
+    [[nodiscard]] auto new_type_of(TypeKind kind, uint8_t id = 0) -> Type* {
+        return types.create<Type>(kind, id);
     }
+
+    [[nodiscard]] auto new_type_struct(std::span<Type* const> members) -> Type*;
 
     [[nodiscard]] auto new_type_span(std::span<Type* const> args)
         -> std::span<Type*> {
@@ -534,6 +537,11 @@ public:
         return funcs;
     }
 
+    [[nodiscard]] auto get_all_structs() const
+        -> std::span<std::span<Type*> const> {
+        return struct_members;
+    }
+
     void sort_funcs();
 
     void reset_inst_uid_counter(uint32_t v = 0) { next_inst_uid = v; }
@@ -548,7 +556,7 @@ private:
     std::vector<Func>             funcs;
     std::vector<std::string_view> strings;
 
-    std::vector<std::span<Type>> struct_members;
+    std::vector<std::span<Type*>> struct_members;
 
     uint32_t next_inst_uid{};
     uint32_t next_block_uid{};
