@@ -52,6 +52,27 @@ auto Type::as_struct_get_fields() const
     return fields;
 }
 
+auto Type::as_struct_get_fields_vec() const
+    -> std::vector<std::pair<std::string_view, StructField>> {
+    ASSERT(is_struct());
+
+    std::vector<std::pair<std::string_view, StructField>> fields;
+
+    size_t offset{};
+
+    for (auto it : inner) {
+        auto align = it->alignment();
+        offset = (offset + (align - 1)) & -align;
+
+        fields.emplace_back(
+            it->id, StructField{.offset = offset, .type = it->inner[0]});
+
+        offset += it->size();
+    }
+
+    return fields;
+}
+
 auto TypeStore::new_pack(std::span<Type *const> inner) -> Type * {
     std::vector<Type *> expanded;
     for (auto it : inner) {

@@ -344,6 +344,20 @@ void visit_node(Ast& ast, Node* node, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Lnot)) {
+        auto data = conv::unary(*node);
+        visit_node(ast, data.child, ctx);
+
+        auto zero = ast.new_int(node->get_loc(), 0);
+        zero->set_type(data.child->get_type());
+
+        auto new_node = ast.new_binary_expr(
+            node->get_loc(), ast::NodeKind::Equal, data.child, zero);
+        node->make_equal_to(new_node, ctx.ts->get_bool());
+
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::Id)) {
         if (auto decl = node->get_decl()) {
             if (auto type = decl->get_type();

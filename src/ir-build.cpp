@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <ranges>
+#include <string_view>
 #include <vector>
 
 #include "ast-node-conv.hpp"
@@ -10,6 +11,7 @@
 #include "ast-node.hpp"
 #include "file-store.hpp"
 #include "fmt/chrono.h"
+#include "fmt/format.h"
 #include "fmt/ranges.h"
 #include "ir.hpp"
 #include "types.hpp"
@@ -85,12 +87,19 @@ struct State {
 
     std::unordered_map<Decl*, Inst*> locals{};
 
+    std::unordered_map<std::string_view, types::Type*>
+        multi_return_func_resolved_return_types{};
+
     std::vector<Inst*>  shadow_stack{};
     std::vector<Inst*>  pending_insts{};
     std::vector<Block*> blocks{};
 
     Block* pending_block{};
     // NOLINTEND(readability-redundant-member-init)
+
+    // Store the return type of the current function.
+    Type*        current_function_return_ir{};
+    types::Type* current_function_return{};
 
     types::TypeStore* ts;
     ErrorReporter*    er;
@@ -154,7 +163,7 @@ auto create_ir_type_from_general(Module& mod, types::Type const& ty) -> Type* {
         case types::TypeKind::Pack:
             if (ty.inner.size() == 1)
                 return create_ir_type_from_general(mod, *ty.inner[0]);
-            PANIC("packs not implemented");
+            return mod.new_type_of(TypeKind::Struct);
 
         case types::TypeKind::Distinct:
             return create_ir_type_from_general(mod, *ty.inner[0]);
@@ -544,9 +553,32 @@ void build_expr(Node* node, State& state, Context& ctx) {
     if (node->is_oneof(ast::NodeKind::ExprPack)) {
         auto data = conv::expr_pack(*node);
         if (data.items.size() > 1) {
-            state.er->report_bug(node->get_loc(),
-                                 "return of multiple values not implemented");
-            PANIC("not implemented");
+            auto rty = state.current_function_return;
+            auto rty_ir = state.current_function_return_ir;
+
+            ASSERT(rty != nullptr);
+            ASSERT(rty_ir != nullptr);
+            ASSERT(rty->is_struct());
+            ASSERT(rty_ir->is_struct());
+
+            auto fields = rty->as_struct_get_fields();
+            ASSERT(fields.size() == data.items.size());
+
+            for (auto rvalue : data.items) build_expr(rvalue, state, ctx);
+
+            auto inst =
+                module.new_inst_alloca(rty_ir, rty->alignment(), rty->size());
+            state.add_inst(inst);
+
+            for (size_t i = fields.size() - 1; i > 0; --i) {
+                auto f = fields.at(fmt::to_string(i - 1));
+                auto v = state.sstack_pop();
+
+                auto store = module.new_inst_store(inst, v, f.offset);
+                state.add_inst(store);
+            }
+
+            return;
         }
 
         build_expr(data.items[0], state, ctx);
@@ -1171,13 +1203,34 @@ void build_stmt(Node* node, State& state, Context& ctx) {
 
         build_expr(data.init, state, ctx);
 
+        auto init = state.sstack_pop();
         if (data.names.size() == 1) {
-            auto init = state.sstack_pop();
             state.add_local(data.names[0]->get_decl(), init);
             return;
         }
 
-        PANIC("var decl with multiple returns not implemented");
+        ASSERT(init->type->is_struct(), *init->type);
+        ASSERT(data.init->get_kind() == ast::NodeKind::CallDirect);
+
+        auto ret = state.multi_return_func_resolved_return_types.at(
+            data.init->get_decl()->link_name);
+        ASSERT(ret->is_struct());
+
+        auto fields = ret->as_struct_get_fields_vec();
+        ASSERT(fields.size() == data.names.size());
+
+        for (auto const& [i, p] : rv::enumerate(fields)) {
+            auto&& field = p.second;
+
+            auto ty = create_ir_type_from_general(module, *field.type);
+
+            auto ld = module.new_inst_load(ty, init, field.offset);
+
+            state.add_inst(ld);
+            state.add_local(data.names[i]->get_decl(), ld);
+        }
+
+        // PANIC("var decl with multiple returns not implemented", *ret);
         return;
     }
 
@@ -1338,17 +1391,30 @@ auto create_func_params(std::span<types::Type*> types, State& state)
 }
 
 auto create_func_ret(Node* node, std::span<types::Type*> types, State& state)
-    -> Type* {
+    -> std::pair<Type*, types::Type*> {
+    auto& ts = *state.ts;
+    auto& er = *state.er;
+
     if (types.size() > 1) {
-        state.er->report_bug(node->get_loc(),
-                             "multiple return types have not been implemented");
-        PANIC("not implemented");
+        std::vector<types::Type*> fields;
+        for (auto [idx, ty] : rv::enumerate(types)) {
+            auto field = ts.new_struct_field(fmt::to_string(idx), ty);
+            if (field->is_void()) {
+                er.report_error(node->get_loc(),
+                                "can not use type '{}' in return pack", *field);
+            }
+
+            fields.push_back(field);
+        }
+
+        auto ty = ts.new_struct(fields);
+        return {create_ir_type_from_general(state.module, *ty), ty};
     }
 
-    auto& ty = *types[0];
-    if (ty.is_void()) return nullptr;
+    auto ty = types[0];
+    if (ty->is_void()) return {nullptr, ty};
 
-    return create_ir_type_from_general(state.module, ty);
+    return {create_ir_type_from_general(state.module, *ty), ty};
 }
 
 void build_func_decl(Node* node, State& state, Context& ctx) {
@@ -1361,7 +1427,13 @@ void build_func_decl(Node* node, State& state, Context& ctx) {
 
     auto data = conv::func_decl(*node);
     auto params = create_func_params(ty.get_params(), state);
-    auto ret = create_func_ret(data.ret, ty.get_ret(), state);
+    auto [ret, backing_ret] = create_func_ret(data.ret, ty.get_ret(), state);
+
+    state.current_function_return_ir = ret;
+    state.current_function_return = backing_ret;
+
+    state.multi_return_func_resolved_return_types[decl->link_name] =
+        backing_ret;
 
     std::vector<Inst*> params_insts;
     for (auto param : data.get_args().params) {

@@ -328,6 +328,9 @@ struct Type {
     [[nodiscard]] auto as_struct_get_fields() const
         -> std::unordered_map<std::string_view, StructField>;
 
+    [[nodiscard]] auto as_struct_get_fields_vec() const
+        -> std::vector<std::pair<std::string_view, StructField>>;
+
     [[nodiscard]] auto undistinct() -> Type* {
         auto t = this;
         while (t->is_distinct()) t = t->inner[0];

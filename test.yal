@@ -38,9 +38,9 @@ func print_items(items: []i32) {
     return;
 }
 
-func read_values(path: [*]const u8, count: usize) []i32 {
+func read_values(path: [*]const u8, count: usize) ([]i32, bool) {
     var f = c_fopen(path, "rb".ptr);
-    if f as usize == 0 { return [_]i32{}[:]; }
+    if f as usize == 0 { return [_]i32{}[:], false; }
 
     defer c_fclose(f);
 
@@ -51,10 +51,10 @@ func read_values(path: [*]const u8, count: usize) []i32 {
     var read = c_fread(buffer, sizeof(i32), count, f);
     if read != count {
         ok = false;
-        return [_]i32{}[:];
+        return [_]i32{}[:], ok;
     }
 
-    return buffer[:count];
+    return buffer[:count], ok;
 }
 
 func gen_file(path: [*]const u8, n: usize) {
@@ -134,7 +134,12 @@ func main(argc: i32, argv: [*][*]u8) i32 {
     }
 
 
-    var items = read_values("./numbers.bin".ptr, count as usize);
+    var items, ok = read_values(args.input_file_path, count as usize);
+    if !ok {
+        c_printf("error: failed to read values".ptr);
+        return 1;
+    }
+
     print_items(items);
 
     quicksort(items, 0, items.len as i32 - 1);

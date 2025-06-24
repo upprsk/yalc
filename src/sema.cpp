@@ -1729,6 +1729,22 @@ void sema_expr(Ast& ast, Node* node, State& state, Context& ctx) {
         return;
     }
 
+    if (node->is_oneof(ast::NodeKind::Lnot)) {
+        auto data = conv::unary(*node);
+
+        sema_expr(ast, data.child, state, ctx);
+
+        if (auto ty = data.child->get_type()->unpacked()->undistinct();
+            !ty->is_bool()) {
+            er.report_error(node->get_loc(),
+                            "can not negate non-boolean type {}", *ty);
+            er.report_note(data.child->get_loc(), "this has type {}", *ty);
+        }
+
+        node->set_type(ts.get_bool());
+        return;
+    }
+
     if (node->is_oneof(ast::NodeKind::ExprPack)) {
         auto data = conv::expr_pack(*node);
 
