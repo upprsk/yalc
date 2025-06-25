@@ -334,6 +334,8 @@ auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
         case yal::ast::NodeKind::TopDef: name = "TopDef"; break;
         case yal::ast::NodeKind::Func: name = "Func"; break;
         case yal::ast::NodeKind::Block: name = "Block"; break;
+        case yal::ast::NodeKind::Return: name = "Return"; break;
+        case yal::ast::NodeKind::ExprStmt: name = "ExprStmt"; break;
         case yal::ast::NodeKind::Id: name = "Id"; break;
         case yal::ast::NodeKind::Int: name = "Int"; break;
         case yal::ast::NodeKind::String: name = "String"; break;

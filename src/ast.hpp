@@ -56,6 +56,15 @@ public:
         return new_node<NodeBlock>(loc, dupe_span(children));
     }
 
+    auto new_node_return(Location loc, std::span<Node* const> values)
+        -> NodeReturn* {
+        return new_node<NodeReturn>(loc, dupe_span(values));
+    }
+
+    auto new_node_expr_stmt(Location loc, Node* child) -> NodeExprStmt* {
+        return new_node<NodeExprStmt>(loc, child);
+    }
+
     auto new_node_id(Location loc, std::string_view value) -> NodeId* {
         return new_node<NodeId>(loc, dupe_string(value));
     }

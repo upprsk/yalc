@@ -563,9 +563,17 @@ public:
         auto start_span = span();
 
         if (!consume(TokenType::Lbrace)) PANIC("handle missing '{' in block");
+
+        std::vector<ast::Node*> children;
+        while (!is_at_end() && !check(TokenType::Rbrace)) {
+            auto stmt = parse_stmt();
+            children.push_back(stmt);
+        }
+
         if (!consume(TokenType::Rbrace)) PANIC("handle missing '}' in block");
 
-        return ast.new_node_block(to_loc(start_span.extend(prev_span())), {});
+        return ast.new_node_block(to_loc(start_span.extend(prev_span())),
+                                  children);
     }
 
     // ========================================================================
@@ -621,6 +629,49 @@ public:
 
     // ========================================================================
 
+    auto parse_stmt() -> ast::Node* {
+        if (opt.verbose) {
+            er.report_debug(span(), "parse_stmt() got '{}'",
+                            span().str(source));
+        }
+
+        auto start_span = span();
+        if (check("return")) return parse_return_stmt();
+
+        auto expr = parse_expr();
+        (void)!consume(TokenType::Semi);
+
+        auto s = start_span.extend(prev_span());
+        return ast.new_node_expr_stmt(to_loc(s), expr);
+    }
+
+    auto parse_return_stmt() -> ast::Node* {
+        auto start_span = span();
+
+        // skip over the 'return'
+        advance();
+
+        std::vector<ast::Node*> rets;
+        while (!check(TokenType::Semi)) {
+            auto ret = parse_expr_without_recover();
+            if (ret) rets.push_back(ret);
+
+            if (check(TokenType::Semi)) break;
+            if (!consume(TokenType::Comma,
+                         "expected ',' to separate return values"))
+                break;
+        }
+
+        // NOTE: we want to do something when this fails?
+        (void)consume(TokenType::Semi,
+                      "expected ';' after function return values");
+
+        return ast.new_node_return(to_loc(start_span.extend(prev_span())),
+                                   rets);
+    }
+
+    // ========================================================================
+
     void recover_parse_module_decl() {
         skip_while_not(TokenType::Eof, TokenType::Semi, TokenType::Attribute,
                        "func", "var", "def");
@@ -664,7 +715,8 @@ public:
     }
 
     void recover_parse_expr() {
-        skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func");
+        skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
+                       "return");
         if (check(TokenType::Semi)) advance();
     }
 
@@ -734,7 +786,7 @@ public:
     }
 
     [[nodiscard]] constexpr auto is_kw(std::string_view s) const -> bool {
-        return s == "var" || s == "def" || s == "func";
+        return s == "var" || s == "def" || s == "func" || s == "return";
     }
 
     // ========================================================================

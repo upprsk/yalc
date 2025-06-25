@@ -21,6 +21,8 @@ enum class NodeKind {
     Func,
 
     Block,
+    Return,
+    ExprStmt,
 
     Id,
     Int,
@@ -447,16 +449,38 @@ public:
 class NodeBlock : public Node {
     std::span<Node*> children;
 
-    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
-        return children[idx];
-    }
-
 public:
     constexpr NodeBlock(Location loc, std::span<Node*> children)
         : Node{NodeKind::Block, loc}, children{children} {}
 
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;
+    }
+};
+
+// A node for a return statement.
+class NodeExprStmt : public Node {
+    Node* child;
+
+public:
+    constexpr NodeExprStmt(Location loc, Node* child)
+        : Node{NodeKind::ExprStmt, loc}, child{child} {}
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return {&child, 1};
+    }
+};
+
+// A node for a return statement.
+class NodeReturn : public Node {
+    std::span<Node*> values;
+
+public:
+    constexpr NodeReturn(Location loc, std::span<Node*> values)
+        : Node{NodeKind::Return, loc}, values{values} {}
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return values;
     }
 };
 
