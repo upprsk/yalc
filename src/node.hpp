@@ -23,6 +23,8 @@ enum class NodeKind {
     Block,
     Return,
     ExprStmt,
+    Var,
+    Def,
 
     Id,
     Int,
@@ -483,6 +485,86 @@ public:
 
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return values;
+    }
+};
+
+// Local variable declaration
+class NodeVar : public Node {
+    std::array<Node*, 3> children;
+
+    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
+        return children[idx];
+    }
+
+public:
+    constexpr NodeVar(Location loc, Node* names, Node* types, Node* inits)
+        : Node{NodeKind::Var, loc}, children{names, types, inits} {}
+
+    // Get the names that are declared. This is a pack of ids, one for each
+    // value declared. May be null (in case of parse errors).
+    //
+    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //         ^^^^^^^
+    [[nodiscard]] auto get_names() const -> NodePack*;
+
+    // Get the types of the values declared. This is a pack of exprs, one for
+    // each explicit type. May be null.
+    //
+    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //                  ^^^^^^^^^^
+    [[nodiscard]] auto get_types() const -> NodePack*;
+
+    // Get the initializers of the values declared. This is a pack of exprs, one
+    // for each initializer. May be null.
+    //
+    //     var a, b, c: ta, tb, tc = va, vb, vc;
+    //                               ^^^^^^^^^^
+    [[nodiscard]] auto get_inits() const -> NodePack*;
+
+    void to_json(nlohmann::json& j) const override;
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
+    }
+};
+
+// Local constant declaration
+class NodeDef : public Node {
+    std::array<Node*, 3> children;
+
+    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
+        return children[idx];
+    }
+
+public:
+    constexpr NodeDef(Location loc, Node* names, Node* types, Node* inits)
+        : Node{NodeKind::Def, loc}, children{names, types, inits} {}
+
+    // Get the names that are declared. This is a pack of ids, one for each
+    // value declared. May be null (in case of parse errors).
+    //
+    //     def a, b, c: ta, tb, tc = va, vb, vc;
+    //         ^^^^^^^
+    [[nodiscard]] auto get_names() const -> NodePack*;
+
+    // Get the types of the values declared. This is a pack of exprs, one for
+    // each explicit type. May be null.
+    //
+    //     def a, b, c: ta, tb, tc = va, vb, vc;
+    //                  ^^^^^^^^^^
+    [[nodiscard]] auto get_types() const -> NodePack*;
+
+    // Get the initializers of the values declared. This is a pack of exprs, one
+    // for each initializer. May be null.
+    //
+    //     def a, b, c: ta, tb, tc = va, vb, vc;
+    //                               ^^^^^^^^^^
+    [[nodiscard]] auto get_inits() const -> NodePack*;
+
+    void to_json(nlohmann::json& j) const override;
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
     }
 };
 

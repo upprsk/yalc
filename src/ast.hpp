@@ -65,6 +65,16 @@ public:
         return new_node<NodeExprStmt>(loc, child);
     }
 
+    auto new_node_def(Location loc, Node* names, Node* types, Node* inits)
+        -> NodeDef* {
+        return new_node<NodeDef>(loc, names, types, inits);
+    }
+
+    auto new_node_var(Location loc, Node* names, Node* types, Node* inits)
+        -> NodeVar* {
+        return new_node<NodeVar>(loc, names, types, inits);
+    }
+
     auto new_node_id(Location loc, std::string_view value) -> NodeId* {
         return new_node<NodeId>(loc, dupe_string(value));
     }

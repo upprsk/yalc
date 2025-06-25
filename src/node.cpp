@@ -307,6 +307,76 @@ void NodeFunc::to_json(nlohmann::json& j) const {
 
 // ============================================================================
 
+auto NodeVar::get_names() const -> NodePack* {
+    return as_node_pack(child_at(0));
+}
+
+auto NodeVar::get_types() const -> NodePack* {
+    return as_node_pack(child_at(1));
+}
+
+auto NodeVar::get_inits() const -> NodePack* {
+    return as_node_pack(child_at(2));
+}
+
+void NodeVar::to_json(nlohmann::json& j) const {
+    Node::to_json_common_values(j);
+
+    if (auto names = get_names()) {
+        names->to_json(j["names"]);
+    } else {
+        j["names"] = json();
+    }
+
+    if (auto types = get_types()) {
+        types->to_json(j["types"]);
+    } else {
+        j["types"] = json();
+    }
+
+    if (auto inits = get_inits()) {
+        inits->to_json(j["inits"]);
+    } else {
+        j["inits"] = json();
+    }
+}
+
+auto NodeDef::get_names() const -> NodePack* {
+    return as_node_pack(child_at(0));
+}
+
+auto NodeDef::get_types() const -> NodePack* {
+    return as_node_pack(child_at(1));
+}
+
+auto NodeDef::get_inits() const -> NodePack* {
+    return as_node_pack(child_at(2));
+}
+
+void NodeDef::to_json(nlohmann::json& j) const {
+    Node::to_json_common_values(j);
+
+    if (auto names = get_names()) {
+        names->to_json(j["names"]);
+    } else {
+        j["names"] = json();
+    }
+
+    if (auto types = get_types()) {
+        types->to_json(j["types"]);
+    } else {
+        j["types"] = json();
+    }
+
+    if (auto inits = get_inits()) {
+        inits->to_json(j["inits"]);
+    } else {
+        j["inits"] = json();
+    }
+}
+
+// ============================================================================
+
 void NodeId::to_json(nlohmann::json& j) const {
     Node::to_json(j);
     j["name"] = get_value();
@@ -364,6 +434,8 @@ auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
         case yal::ast::NodeKind::Block: name = "Block"; break;
         case yal::ast::NodeKind::Return: name = "Return"; break;
         case yal::ast::NodeKind::ExprStmt: name = "ExprStmt"; break;
+        case yal::ast::NodeKind::Var: name = "Var"; break;
+        case yal::ast::NodeKind::Def: name = "Def"; break;
         case yal::ast::NodeKind::Id: name = "Id"; break;
         case yal::ast::NodeKind::Int: name = "Int"; break;
         case yal::ast::NodeKind::String: name = "String"; break;

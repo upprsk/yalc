@@ -282,14 +282,14 @@ public:
             match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
 
         if (!consume(TokenType::Semi)) {
-            recover_parse_def_or_var();
+            recover_parse_top_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
 
             // in case we recovered with an equals, then try to use it as the
             // inits
-            if (match(TokenType::Equal)) goto inits_label;
+            if (check(TokenType::Equal)) goto inits_label;
 
             if (check(TokenType::Semi)) advance();
         }
@@ -314,14 +314,14 @@ public:
             match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
 
         if (!consume(TokenType::Semi)) {
-            recover_parse_def_or_var();
+            recover_parse_top_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
 
             // in case we recovered with an equals, then try to use it as the
             // inits
-            if (match(TokenType::Equal)) goto inits_label;
+            if (check(TokenType::Equal)) goto inits_label;
 
             if (check(TokenType::Semi)) advance();
         }
@@ -570,7 +570,7 @@ public:
             children.push_back(stmt);
         }
 
-        if (!consume(TokenType::Rbrace)) PANIC("handle missing '}' in block");
+        (void)consume(TokenType::Rbrace);
 
         return ast.new_node_block(to_loc(start_span.extend(prev_span())),
                                   children);
@@ -636,6 +636,8 @@ public:
         }
 
         auto start_span = span();
+        if (check("var")) return parse_var();
+        if (check("def")) return parse_def();
         if (check("return")) return parse_return_stmt();
 
         auto expr = parse_expr();
@@ -643,6 +645,70 @@ public:
 
         auto s = start_span.extend(prev_span());
         return ast.new_node_expr_stmt(to_loc(s), expr);
+    }
+
+    auto parse_var() -> ast::Node* {
+        auto start_span = span();
+
+        // NOTE: we have an unconsumed 'var' here every time
+        advance();
+
+        auto names = parse_decl_ids();
+
+    types_label:
+        auto types =
+            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+    inits_label:
+        auto inits =
+            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+
+        if (!consume(TokenType::Semi)) {
+            recover_parse_def_or_var();
+
+            // in case we recovered with a colon, then try types again
+            if (check(TokenType::Colon)) goto types_label;
+
+            // in case we recovered with an equals, then try to use it as the
+            // inits
+            if (check(TokenType::Equal)) goto inits_label;
+
+            if (check(TokenType::Semi)) advance();
+        }
+
+        return ast.new_node_var(to_loc(start_span.extend(prev_span())), names,
+                                types, inits);
+    }
+
+    auto parse_def() -> ast::Node* {
+        auto start_span = span();
+
+        // NOTE: we have an unconsumed 'def' here every time
+        advance();
+
+        auto names = parse_decl_ids();
+
+    types_label:
+        auto types =
+            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+    inits_label:
+        auto inits =
+            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+
+        if (!consume(TokenType::Semi)) {
+            recover_parse_def_or_var();
+
+            // in case we recovered with a colon, then try types again
+            if (check(TokenType::Colon)) goto types_label;
+
+            // in case we recovered with an equals, then try to use it as the
+            // inits
+            if (check(TokenType::Equal)) goto inits_label;
+
+            if (check(TokenType::Semi)) advance();
+        }
+
+        return ast.new_node_def(to_loc(start_span.extend(prev_span())), names,
+                                types, inits);
     }
 
     auto parse_return_stmt() -> ast::Node* {
@@ -690,10 +756,16 @@ public:
                        "def");
     }
 
-    void recover_parse_def_or_var() {
+    void recover_parse_top_def_or_var() {
         skip_while_not(TokenType::Eof, TokenType::Colon, TokenType::Equal,
                        TokenType::Semi, TokenType::Attribute, "var", "def",
                        "func");
+    }
+
+    void recover_parse_def_or_var() {
+        skip_while_not(TokenType::Eof, TokenType::Colon, TokenType::Equal,
+                       TokenType::Semi, TokenType::Attribute, "var", "def",
+                       "func", "return");
     }
 
     void recover_parse_func_garg() {
