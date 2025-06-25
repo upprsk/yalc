@@ -1,1 +1,1 @@
-{"data":[{"span":"22-25","type":"Id"},{"span":"25-26","type":"Bang"},{"span":"26-26","type":"EOF"}],"out":""}
+{"data":[{"span":"22-25","type":"identifier"},{"span":"25-26","type":"!"},{"span":"26-26","type":"EOF"}],"out":""}

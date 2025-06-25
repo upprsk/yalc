@@ -89,6 +89,11 @@ void print_crash(Context const& ctx, Test const& t,
     if (ctx.opt.show_crashes()) println("{}", dump.to_string());
 }
 
+void print_skip(Context const& /*unused*/, Test const& t) {
+    println("{}: {:?}", fmt::styled("skipped", fmt::fg(fmt::color::orange)),
+            t.name);
+}
+
 void print_fail(Context const& /*unused*/, Test const& t) {
     println("{}: {:?}",
             fmt::styled("failed",
@@ -216,6 +221,11 @@ auto run_test_func(Context const& ctx, Test const& t) -> Result {
 
         received["out"] = ms.flush_str();
         received["data"] = data;
+    } catch (skip_exception) {
+        r.skipped += 1;
+
+        if (ctx.opt.show_results()) print_skip(ctx, t);
+        return r;
     } catch (assertion_error const& err) {
         r.crashed += 1;
 
@@ -248,7 +258,7 @@ auto run_test_func(Context const& ctx, Test const& t) -> Result {
             print_fail(ctx, t);
         }
 
-        if (ctx.opt.show_output()) {
+        if (ctx.opt.show_output() || (ctx.opt.diff && ctx.opt.ask)) {
             if (ctx.opt.diff) {
                 show_diff(expected, received);
             } else {
@@ -258,7 +268,7 @@ auto run_test_func(Context const& ctx, Test const& t) -> Result {
         }
 
         if (ctx.opt.ask) {
-            if (ask_for_update(ctx, t, "has no expectation")) {
+            if (ask_for_update(ctx, t, "has wrong expectation")) {
                 save_expectation(filepath, received);
 
                 r.success += 1;

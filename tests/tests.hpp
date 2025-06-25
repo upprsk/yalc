@@ -119,6 +119,12 @@ constexpr void operator+=(Result& lhs, Result const& rhs) {
 
 // ============================================================================
 
+struct skip_exception {};
+
+constexpr void skip() { throw skip_exception{}; }
+
+// ============================================================================
+
 // create an empty test group with the given name. The name is more of a
 // semantic choice, as it is functionally identical to a test beeing created
 // empty with a name.

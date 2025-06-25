@@ -1,1 +1,1 @@
-{"data":[{"span":"0-1","type":"Equal"},{"span":"2-4","type":"EqualEqual"},{"span":"5-7","type":"EqualGreater"},{"span":"7-7","type":"EOF"}],"out":""}
+{"data":[{"span":"0-1","type":"="},{"span":"2-4","type":"=="},{"span":"5-7","type":"=>"},{"span":"7-7","type":"EOF"}],"out":""}

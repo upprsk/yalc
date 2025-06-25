@@ -1,1 +1,1 @@
-{"data":{"kind":"File","loc":"0-10@FileId(0)","module_name":""},"out":":memory:invalid module decl 3:1:7: error: expected Id, but got '134'\n> 0001 | module 134\n                ^^^\n"}
+{"data":{"kind":"File","loc":"0-10@FileId(0)","module_name":""},"out":":memory:invalid module decl 3:1:7: error: expected 'identifier', but got '134'\n> 0001 | module 134\n                ^^^\n"}

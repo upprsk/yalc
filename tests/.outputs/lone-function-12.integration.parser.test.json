@@ -1,0 +1,1 @@
+{"data":{"children":[{"args":{"kind":"NodePack","loc":"19-21@FileId(0)"},"attached_type":"","attributes":null,"gargs":null,"is_c_varargs":false,"kind":"Func","loc":"13-26@FileId(0)","name":"f","ret":{"children":[{"kind":"Id","loc":"22-25@FileId(0)","name":"i32"}],"kind":"NodePack","loc":"22-25@FileId(0)"}}],"kind":"File","loc":"0-26@FileId(0)","module_name":"main"},"out":""}

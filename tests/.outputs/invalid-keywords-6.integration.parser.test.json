@@ -1,0 +1,1 @@
+{"data":{"children":[{"kind":"Err","loc":"13-15@FileId(0)"}],"kind":"File","loc":"0-19@FileId(0)","module_name":"main"},"out":":memory:invalid keywords 6:2:1: error: expected top-level declaration but got 'va'\n  0001 | module main;\n> 0002 | va fun\n         ^^\n  0003 | \n"}

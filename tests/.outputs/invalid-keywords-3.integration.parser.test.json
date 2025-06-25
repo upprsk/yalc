@@ -1,0 +1,1 @@
+{"data":{"children":[{"kind":"Err","loc":"13-16@FileId(0)"}],"kind":"File","loc":"0-16@FileId(0)","module_name":"main"},"out":":memory:invalid keywords 3:2:1: error: expected top-level declaration but got 'fun'\n  0001 | module main;\n> 0002 | fun\n         ^^^\n  0003 | \n"}

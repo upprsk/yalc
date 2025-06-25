@@ -1,1 +1,1 @@
-{"data":{"children":[{"children":[null,null,null,null],"kind":"TopVar","loc":"14-17@FileId(0)"}],"kind":"File","loc":"0-17@FileId(0)","module_name":"main"},"out":":memory:invalid globals 2:4:1: error: expected Semi, but got EOF\n  0003 | var \n> 0004 | \n         \n"}
+{"data":{"children":[{"attributes":null,"inits":null,"kind":"TopVar","loc":"14-17@FileId(0)","names":null,"types":null}],"kind":"File","loc":"0-17@FileId(0)","module_name":"main"},"out":":memory:invalid globals 2:4:1: error: expected ';', but got 'EOF'\n  0003 | var \n> 0004 | \n         \n"}

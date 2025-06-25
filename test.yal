@@ -1,7 +1,12 @@
 module main;
 
-@test_1(=12,))
-@test_2
-var global;
+func main() i32 {
+    // c_printf("Hello, %s!\n".ptr, "World".ptr);
+
+    return 0;
+}
+
+@extern(link_name="printf")
+func c_printf(fmt: c_string, ...);
 
 // vim: ft=yal

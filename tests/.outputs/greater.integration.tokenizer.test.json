@@ -1,1 +1,1 @@
-{"data":[{"span":"0-1","type":"Greater"},{"span":"2-4","type":"GreaterGreater"},{"span":"5-7","type":"GreaterEqual"},{"span":"8-11","type":"GreaterGreaterEqual"},{"span":"11-11","type":"EOF"}],"out":""}
+{"data":[{"span":"0-1","type":">"},{"span":"2-4","type":">>"},{"span":"5-7","type":">="},{"span":"8-11","type":">>="},{"span":"11-11","type":"EOF"}],"out":""}

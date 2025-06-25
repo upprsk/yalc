@@ -1,1 +1,1 @@
-{"data":[{"span":"0-3","type":"Int"},{"span":"3-4","type":"Dot"},{"span":"4-8","type":"Id"},{"span":"8-9","type":"Lparen"},{"span":"9-10","type":"Rparen"},{"span":"10-10","type":"EOF"}],"out":""}
+{"data":[{"span":"0-3","type":"integer"},{"span":"3-4","type":"."},{"span":"4-8","type":"identifier"},{"span":"8-9","type":"("},{"span":"9-10","type":")"},{"span":"10-10","type":"EOF"}],"out":""}
