@@ -649,6 +649,51 @@ var x = 10;
 func f();
 )~~"},
 
+        {                      "some statements", R"~~(module main;
+func test() {
+    "yo!";
+    abc;
+    12;
+}
+)~~"},
+
+        {         "some statements missing semi", R"~~(module main;
+func test() {
+    "yo!";
+    abc
+    12;
+}
+)~~"},
+
+        {                     "return statement", R"~~(module main;
+func test() { return x; }
+)~~"},
+        {                   "return statement 2", R"~~(module main;
+func test() { return x, y; }
+)~~"},
+
+        {             "invalid return statement", R"~~(module main;
+func test() {
+    retur
+}
+
+var x;
+)~~"},
+        {           "invalid return statement 2", R"~~(module main;
+func test() {
+    return
+}
+
+var x;
+)~~"},
+        {           "invalid return statement 3", R"~~(module main;
+func test() {
+    return x
+}
+
+var x;
+)~~"},
+
         {                         "#hello world", R"~~(module main;
 
 func main() i32 {
