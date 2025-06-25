@@ -580,6 +580,14 @@ public:
 
     auto parse_expr_without_recover() -> ast::Node* {
         auto start_span = span();
+        if (match(TokenType::Lparen)) {
+            auto expr = parse_expr_without_recover();
+            // TODO: this should have some smart recovery
+
+            (void)consume(TokenType::Rparen);
+            return expr;
+        }
+
         if (check(TokenType::Id)) {
             // make sure that we are not trying to do something stupid
             if (is_kw_and_report(start_span)) return nullptr;
