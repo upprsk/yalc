@@ -224,6 +224,8 @@ struct Tokenizer {
         while (!is_at_end() && peek() != '"') {
             if (peek() == '\\') advance();
             advance();
+
+            if (peek() == '\n') break;
         }
 
         if (!match('"')) {
