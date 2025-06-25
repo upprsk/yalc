@@ -318,6 +318,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType const& p,
                                             format_context&       ctx) const
     -> format_context::iterator {
     string_view name = "unknown";
+#if FULL_TOKEN_NAMES
     switch (p) {
         case yal::TokenType::Err: name = "Err"; break;
         case yal::TokenType::Equal: name = "Equal"; break;
@@ -381,6 +382,69 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType const& p,
         case yal::TokenType::Comment: name = "Comment"; break;
         case yal::TokenType::Eof: name = "EOF"; break;
     }
+#endif
+    switch (p) {
+        case yal::TokenType::Err: name = "ERR"; break;
+        case yal::TokenType::Equal: name = "="; break;
+        case yal::TokenType::EqualEqual: name = "=="; break;
+        case yal::TokenType::EqualGreater: name = "=>"; break;
+        case yal::TokenType::Less: name = "<"; break;
+        case yal::TokenType::LessLess: name = "<<"; break;
+        case yal::TokenType::LessLessEqual: name = "<<="; break;
+        case yal::TokenType::LessEqual: name = "<="; break;
+        case yal::TokenType::Greater: name = ">"; break;
+        case yal::TokenType::GreaterGreater: name = ">>"; break;
+        case yal::TokenType::GreaterEqual: name = ">="; break;
+        case yal::TokenType::GreaterGreaterEqual: name = ">>="; break;
+        case yal::TokenType::Plus: name = "+"; break;
+        case yal::TokenType::PlusPlus: name = "++"; break;
+        case yal::TokenType::PlusEqual: name = "+="; break;
+        case yal::TokenType::Minus: name = "-"; break;
+        case yal::TokenType::MinusMinus: name = "--"; break;
+        case yal::TokenType::MinusEqual: name = "-="; break;
+        case yal::TokenType::Star: name = "*"; break;
+        case yal::TokenType::StarEqual: name = "*="; break;
+        case yal::TokenType::Slash: name = "/"; break;
+        case yal::TokenType::SlashEqual: name = "/="; break;
+        case yal::TokenType::Bang: name = "!"; break;
+        case yal::TokenType::BangEqual: name = "!="; break;
+        case yal::TokenType::Percent: name = "%"; break;
+        case yal::TokenType::PercentEqual: name = "%="; break;
+        case yal::TokenType::Ampersand: name = "&"; break;
+        case yal::TokenType::AmpersandEqual: name = "&="; break;
+        case yal::TokenType::Pipe: name = "|"; break;
+        case yal::TokenType::PipeEqual: name = "|="; break;
+        case yal::TokenType::Carrot: name = "^"; break;
+        case yal::TokenType::CarrotEqual: name = "^="; break;
+        case yal::TokenType::Tilde: name = "~"; break;
+        case yal::TokenType::TildeEqual: name = "~="; break;
+        case yal::TokenType::Semi: name = ";"; break;
+        case yal::TokenType::Colon: name = ":"; break;
+        case yal::TokenType::Comma: name = ","; break;
+        case yal::TokenType::Dot: name = "."; break;
+        case yal::TokenType::DotDot: name = ".."; break;
+        case yal::TokenType::DotDotDot: name = "..."; break;
+        case yal::TokenType::DotStar: name = ".*"; break;
+        case yal::TokenType::DotEqual: name = ".="; break;
+        case yal::TokenType::DotLbrace: name = ".{"; break;
+        case yal::TokenType::Question: name = "?"; break;
+        case yal::TokenType::Lparen: name = "("; break;
+        case yal::TokenType::Rparen: name = ")"; break;
+        case yal::TokenType::Lbrace: name = "{"; break;
+        case yal::TokenType::Rbrace: name = "}"; break;
+        case yal::TokenType::Lbracket: name = "["; break;
+        case yal::TokenType::Rbracket: name = "]"; break;
+        case yal::TokenType::Id: name = "identifier"; break;
+        case yal::TokenType::Attribute: name = "attribute"; break;
+        case yal::TokenType::Int: name = "integer"; break;
+        case yal::TokenType::Hex: name = "hex"; break;
+        case yal::TokenType::Float: name = "float"; break;
+        case yal::TokenType::Str: name = "string"; break;
+        case yal::TokenType::Char: name = "character"; break;
+        case yal::TokenType::Comment: name = "comment"; break;
+        case yal::TokenType::Eof: name = "EOF"; break;
+    }
+
     return formatter<string_view>::format(name, ctx);
 }
 
