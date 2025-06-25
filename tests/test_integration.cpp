@@ -357,10 +357,10 @@ func f() (
         {            "lone function - invalid 6", R"~~(module main;
 func f() ()
 )~~"},
-        {           "#lone function - invalid 7", R"~~(module main;
+        {            "lone function - invalid 7", R"~~(module main;
 func f() {
 )~~"},
-        {           "#lone function - invalid 8", R"~~(module main;
+        {            "lone function - invalid 8", R"~~(module main;
 func f() ({
 )~~"},
         {            "lone function - invalid 9", R"~~(module main;
@@ -504,11 +504,11 @@ var x = 10;
 func f() ()
 var x = 10;
 )~~"},
-        {        "#function and var - invalid 7", R"~~(module main;
+        {         "function and var - invalid 7", R"~~(module main;
 func f() {
 var x = 10;
 )~~"},
-        {        "#function and var - invalid 8", R"~~(module main;
+        {         "function and var - invalid 8", R"~~(module main;
 func f() ({
 var x = 10;
 )~~"},
@@ -671,6 +671,31 @@ func test() { return x; }
         {                   "return statement 2", R"~~(module main;
 func test() { return x, y; }
 )~~"},
+        {                   "return statement 3", R"~~(module main;
+func f() {
+    var x, y = 69, 420;
+    return x, false;
+}
+)~~"},
+        {                   "return statement 4", R"~~(module main;
+func f() {
+    var x = _, 12;
+    return;
+}
+)~~"},
+
+        {                            "local var", R"~~(module main;
+func f() { var x = 10; }
+)~~"},
+        {                          "local var 1", R"~~(module main;
+func f() { var x: i32 = 10; }
+)~~"},
+        {                            "local def", R"~~(module main;
+func f() { def X = 10; }
+)~~"},
+        {                          "local def 2", R"~~(module main;
+func f() { def X: u64 = 10; }
+)~~"},
 
         {             "invalid return statement", R"~~(module main;
 func test() {
@@ -692,6 +717,69 @@ func test() {
 }
 
 var x;
+)~~"},
+        {           "invalid return statement 4", R"~~(module main;
+func test() { return
+var x;
+)~~"},
+        {           "invalid return statement 5", R"~~(module main;
+func f() {
+    var x, y = 69, 420
+    return x, false;
+}
+)~~"},
+        {           "invalid return statement 6", R"~~(module main;
+func f() {
+    var x, y  69, 420
+    return x, false;
+}
+)~~"},
+        {           "invalid return statement 7", R"~~(module main;
+func f() {
+    var x, y  69, 420;
+    return x, false;
+}
+)~~"},
+        {           "invalid return statement 8", R"~~(module main;
+func f() {
+    var x 32
+    return x false;
+}
+)~~"},
+        {                "local var - invalid 1", R"~~(module main;
+func f() {
+    var x 32;
+    return x, false;
+}
+)~~"},
+        {                "local var - invalid 2", R"~~(module main;
+func f() {
+    var x =
+    return;
+}
+)~~"},
+        {                "local var - invalid 3", R"~~(module main;
+func f() {
+    var x = ,
+    return;
+}
+)~~"},
+        {                "local var - invalid 4", R"~~(module main;
+func f() {
+    var x = , 12;
+    return;
+}
+)~~"},
+        {                "local var - invalid 5", R"~~(module main;
+func f() {
+    var x y = 10;
+}
+)~~"},
+        {                "local var - invalid 6", R"~~(module main;
+func f() {
+    var = 10
+    var v = ;
+}
 )~~"},
 
         {                         "#hello world", R"~~(module main;
