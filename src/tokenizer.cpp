@@ -74,8 +74,10 @@ struct Tokenizer {
 
                     er->report_error(t.span, "unbalanced '{}'",
                                      top.span.str(source));
-                    er->report_note(top.span, "'{}' opened here and not closed",
-                                    top.span.str(source));
+                    er->report_note(
+                        top.span,
+                        "'{}' opened here and not closed (missing {})",
+                        top.span.str(source), top.type);
 
                     tokens.push_back({top.type, t.span});
                 }
