@@ -204,6 +204,34 @@ auto NodeTopDef::get_inits() const -> NodePack* {
     return as_node_pack(child_at(2));
 }
 
+void NodeTopDef::to_json(nlohmann::json& j) const {
+    Node::to_json_common_values(j);
+
+    if (auto attributes = get_attributes()) {
+        attributes->to_json(j["attributes"]);
+    } else {
+        j["attributes"] = json();
+    }
+
+    if (auto names = get_names()) {
+        names->to_json(j["names"]);
+    } else {
+        j["names"] = json();
+    }
+
+    if (auto types = get_types()) {
+        types->to_json(j["types"]);
+    } else {
+        j["types"] = json();
+    }
+
+    if (auto inits = get_inits()) {
+        inits->to_json(j["inits"]);
+    } else {
+        j["inits"] = json();
+    }
+}
+
 // ============================================================================
 
 auto NodeFunc::get_attributes() const -> NodePack* {

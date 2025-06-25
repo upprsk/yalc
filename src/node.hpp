@@ -333,6 +333,8 @@ public:
     //                               ^^^^^^^^^^
     [[nodiscard]] auto get_inits() const -> NodePack*;
 
+    void to_json(nlohmann::json& j) const override;
+
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;
     }
