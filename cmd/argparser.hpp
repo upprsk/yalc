@@ -61,6 +61,7 @@ struct Args {
 
     bool single_file = false;
     bool verbose = false;
+    bool verbose_parser = false;
 
     DumpStep dump{};
 };

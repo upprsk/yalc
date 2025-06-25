@@ -28,6 +28,7 @@ void print_help(std::string_view self) {
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
     println(stderr, "    --verbose: show more output (on stderr).");
+    println(stderr, "    --verbose-parser: show details of parsing (on stderr).");
     println(stderr, "    --file: single file compilation mode.");
     println(stderr, "    --dump <step>: dump the result of an internal compilation step. This option");
     println(stderr, "        accepts a list of options separated by a comma: step1,step2. The option");
@@ -68,6 +69,10 @@ auto argparse(int argc, char** argv) -> Args {
 
         if (arg == "--verbose") {
             args.verbose = true;
+        }
+
+        else if (arg == "--verbose-parser") {
+            args.verbose_parser = true;
         }
 
         else if (arg == "--file") {

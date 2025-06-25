@@ -18,12 +18,36 @@ enum class NodeKind {
     AttributeKV,
     TopVar,
     TopDef,
+    Func,
+
+    Block,
 
     Id,
     Int,
+    String,
 
     NodePack,
+    FuncArg,
 };
+
+// ----------------------------------------------------------------------------
+
+// fwd
+
+class NodeErr;
+class NodeFile;
+class NodeAttribute;
+class NodeAttributeKV;
+class NodeTopVar;
+class NodeTopDef;
+class NodeFunc;
+class NodeBlock;
+class NodeId;
+class NodeInt;
+class NodePack;
+class NodeFuncArg;
+
+// ----------------------------------------------------------------------------
 
 // Base interface for all AST nodes.
 class Node {
@@ -38,6 +62,10 @@ public:
 
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
+
+    [[nodiscard]] constexpr auto is_err() const -> bool {
+        return kind == NodeKind::Err;
+    }
 
     [[nodiscard]] constexpr auto is_node_pack() const -> bool {
         return kind == NodeKind::NodePack;
@@ -105,6 +133,32 @@ public:
 
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;
+    }
+};
+
+// ----------------------------------------------------------------------------
+
+class NodeFuncArg : public Node {
+    std::string_view name;
+    Node*            type;
+
+public:
+    constexpr NodeFuncArg(Location loc, std::string_view name, Node* type)
+        : Node{NodeKind::FuncArg, loc}, name{name}, type{type} {}
+
+    [[nodiscard]] constexpr auto get_name() const -> std::string_view {
+        return name;
+    }
+
+    [[nodiscard]] constexpr auto get_type() const -> Node* { return type; }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return {&type, 1};
     }
 };
 
@@ -228,6 +282,8 @@ public:
     //                               ^^^^^^^^^^
     [[nodiscard]] auto get_inits() const -> NodePack*;
 
+    void to_json(nlohmann::json& j) const override;
+
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;
     }
@@ -282,6 +338,130 @@ public:
 
 // ============================================================================
 
+// A direct function definition (witout namespacing or generics).
+//
+//     @attribute
+//     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+//          ^~~~^~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~ ^~~~~~~~~~~~ ^~
+//             |          |                          |            |  |
+//             |          |                          |            |  \_ body
+//             |          |                          |            |
+//             |          |                          |            \_ ret
+//             |          |                          |
+//             |          |                          \_ args
+//             |          |
+//             |          \_ gargs
+//             \_ name
+class NodeFunc : public Node {
+    std::string_view     name;
+    std::string_view     attached_type;
+    std::array<Node*, 5> children;
+
+    bool is_c_varargs;
+
+    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
+        return children[idx];
+    }
+
+public:
+    constexpr NodeFunc(Location loc, Node* attributes, std::string_view name,
+                       std::string_view attached_type, Node* gargs, Node* args,
+                       Node* ret, Node* body, bool is_c_varargs)
+        : Node{NodeKind::Func, loc},
+          name{name},
+          attached_type{attached_type},
+          children{attributes, gargs, args, ret, body},
+          is_c_varargs{is_c_varargs} {}
+
+    // Get the name of the function.
+    //
+    //     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    //          ^^^^
+    [[nodiscard]] constexpr auto get_name() const -> std::string_view {
+        return name;
+    }
+
+    // Get the namespace name of the function, for when it is attached to a
+    // type.
+    //
+    //     func test.test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    //          ^^^^
+    [[nodiscard]] constexpr auto get_attached_type() const -> std::string_view {
+        return attached_type;
+    }
+
+    // Get attributes attached to the definition. May be null (in case of no
+    // attributes).
+    //
+    //     @attribute
+    //     ^^^^^^^^^^
+    //     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    [[nodiscard]] auto get_attributes() const -> NodePack*;
+
+    // Get generic arguments. May be null (in case of no generic arguments).
+    //
+    //     @attribute
+    //     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    //              ^^^^^^^^^^^
+    [[nodiscard]] auto get_gargs() const -> NodePack*;
+
+    // Get arguments. May be null (in case of no arguments).
+    //
+    //     @attribute
+    //     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    //                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    [[nodiscard]] auto get_args() const -> NodePack*;
+
+    // Get the return values. May be null (in case of no return values).
+    //
+    //     @attribute
+    //     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    //                                                     ^^^^^^^^^^^^
+    [[nodiscard]] auto get_ret() const -> NodePack*;
+
+    // Get the function body. May be null (in case of no return values).
+    //
+    //     @attribute
+    //     func test[T: any, V](argc: i32, argv: [*][*]u8) (i32, usize) {}
+    //                                                     ^^^^^^^^^^^^
+    [[nodiscard]] auto get_body() const -> NodeBlock*;
+
+    // If the function has the '...' for c-style variable length arguments.
+    [[nodiscard]] constexpr auto get_is_c_varargs() const -> bool {
+        return is_c_varargs;
+    }
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
+    }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+};
+
+// ============================================================================
+
+// A node for a code block.
+class NodeBlock : public Node {
+    std::span<Node*> children;
+
+    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
+        return children[idx];
+    }
+
+public:
+    constexpr NodeBlock(Location loc, std::span<Node*> children)
+        : Node{NodeKind::Block, loc}, children{children} {}
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
+    }
+};
+
+// ============================================================================
+
 // A node for an identifier.
 class NodeId : public Node {
     std::string_view id;
@@ -316,6 +496,24 @@ public:
     void to_json(nlohmann::json& j) const override;
 };
 
+// A node for a string literal.
+class NodeString : public Node {
+    std::string_view value;
+
+public:
+    constexpr NodeString(Location loc, std::string_view value)
+        : Node{NodeKind::String, loc}, value{value} {}
+
+    [[nodiscard]] constexpr auto get_value() const -> std::string_view {
+        return value;
+    }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+};
+
 void to_json(nlohmann::json& j, NodeKind const& n);
 void to_json(nlohmann::json& j, Node const& t);
 
@@ -334,6 +532,18 @@ define_formatter_from_string_view(yal::ast::NodeKind);
     }
 
 define_formatter_from_string_view_for_virtual(yal::ast::Node);
+
+define_formatter_from_string_view_for_virtual(yal::ast::NodeErr);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeFile);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeAttribute);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeAttributeKV);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeTopVar);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeTopDef);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeFunc);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeBlock);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeId);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeInt);
+define_formatter_from_string_view_for_virtual(yal::ast::NodePack);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeFuncArg);
 
 #undef define_formatter_from_string_view_for_virtual

@@ -44,12 +44,33 @@ public:
         return new_node<NodeTopVar>(loc, attributes, names, types, inits);
     }
 
+    auto new_node_func(Location loc, Node* attributes, std::string_view name,
+                       std::string_view attached_type, Node* gargs, Node* args,
+                       Node* ret, Node* body, bool is_c_varargs) -> NodeFunc* {
+        return new_node<NodeFunc>(loc, attributes, name, attached_type, gargs,
+                                  args, ret, body, is_c_varargs);
+    }
+
+    auto new_node_block(Location loc, std::span<Node* const> children)
+        -> NodeBlock* {
+        return new_node<NodeBlock>(loc, dupe_span(children));
+    }
+
     auto new_node_id(Location loc, std::string_view value) -> NodeId* {
         return new_node<NodeId>(loc, dupe_string(value));
     }
 
     auto new_node_int(Location loc, uint64_t value) -> NodeInt* {
         return new_node<NodeInt>(loc, value);
+    }
+
+    auto new_node_string(Location loc, std::string_view value) -> NodeString* {
+        return new_node<NodeString>(loc, dupe_string(value));
+    }
+
+    auto new_node_func_arg(Location loc, std::string_view name, Node* type)
+        -> NodeFuncArg* {
+        return new_node<NodeFuncArg>(loc, dupe_string(name), type);
     }
 
     auto new_node_pack(Location loc, std::span<Node* const> children)

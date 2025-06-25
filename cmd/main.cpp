@@ -42,7 +42,8 @@ auto main(int argc, char** argv) -> int {
 
         auto           tokens = yal::tokenize(er.for_file(id));
         auto           ast = yal::ast::Ast{};
-        auto           root = yal::parse_into_ast(tokens, ast, er.for_file(id));
+        auto           root = yal::parse_into_ast(tokens, ast, er.for_file(id),
+                                                  {.verbose = args.verbose_parser});
         nlohmann::json root_json = *root;
         fmt::println("{}", root_json.dump(2));
     } else {
