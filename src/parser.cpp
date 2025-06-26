@@ -1,8 +1,11 @@
 #include "parser.hpp"
 
+#include <fmt/ranges.h>
+
 #include <charconv>
 #include <cstddef>
 #include <libassert/assert.hpp>
+#include <ranges>
 #include <span>
 #include <string_view>
 
@@ -13,6 +16,8 @@
 #include "tokenizer.hpp"
 
 namespace yal {
+
+namespace rv = std::ranges::views;
 
 constexpr auto is_hex_char(char c) -> bool {
     return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') ||
@@ -410,8 +415,7 @@ public:
         if (check(TokenType::Lbrace))
             body = parse_block();
         else
-            (void)consume(TokenType::Semi,
-                          "expected either a function body or a ';'");
+            (void)consume_with_options(TokenType::Semi, TokenType::Lbrace);
 
         return ast.new_node_func(to_loc(start_span.extend(prev_span())),
                                  attributes, name, attached_type, gargs, args,
@@ -431,7 +435,7 @@ public:
             if (arg) args.push_back(arg);
 
             if (check(TokenType::Rbracket)) break;
-            if (!consume(
+            if (!consume_with_note(
                     TokenType::Comma,
                     "expected ',' to separate generic function arguments")) {
                 had_error = true;
@@ -442,8 +446,9 @@ public:
         }
 
         // NOTE: we want to do something when this fails?
-        (void)consume(TokenType::Rbracket,
-                      "expected ']' after generic function arguments");
+        (void)consume_with_note(
+            TokenType::Rbracket,
+            "expected ']' after generic function arguments");
 
         auto s = start_span.extend(prev_span());
         if (!had_error && args.empty()) {
@@ -456,10 +461,15 @@ public:
     auto parse_func_args() -> std::pair<ast::Node*, bool> {
         auto start_span = span();
 
-        if (!consume(TokenType::Lparen))
+        if (!consume(TokenType::Lparen)) {
+            // NOTE: this helps with error recovery when something failed when
+            // parsing generic arguments
+            (void)match(TokenType::Rparen);
+
             return std::make_pair(
                 ast.new_node_err(to_loc(start_span.extend(prev_span()))),
                 false);
+        }
 
         std::vector<ast::Node*> args;
         while (!check(TokenType::Rparen)) {
@@ -469,8 +479,9 @@ public:
             if (arg) args.push_back(arg);
 
             if (check(TokenType::Rparen)) break;
-            if (!consume(TokenType::Comma,
-                         "expected ',' to separate function arguments")) {
+            if (!consume_with_note(
+                    TokenType::Comma,
+                    "expected ',' to separate function arguments")) {
                 recover_parse_func_arg();
                 if (!match(TokenType::Comma)) break;
             }
@@ -485,8 +496,8 @@ public:
         }
 
         // NOTE: we want to do something when this fails?
-        (void)consume(TokenType::Rparen,
-                      "expected ')' after function arguments");
+        (void)consume_with_note(TokenType::Rparen,
+                                "expected ')' after function arguments");
 
         return std::make_pair(
             ast.new_node_pack(to_loc(start_span.extend(prev_span())), args),
@@ -496,7 +507,7 @@ public:
     auto parse_func_arg() -> ast::Node* {
         auto start_span = span();
         if (is_kw_and_report(start_span) ||
-            !consume(TokenType::Id, "expected argument name"))
+            !consume_with_note(TokenType::Id, "expected argument name"))
             return nullptr;
 
         auto       name = start_span.str(source);
@@ -520,8 +531,9 @@ public:
                 if (ret) rets.push_back(ret);
 
                 if (check(TokenType::Rparen)) break;
-                if (!consume(TokenType::Comma,
-                             "expected ',' to separate return value types")) {
+                if (!consume_with_note(
+                        TokenType::Comma,
+                        "expected ',' to separate return value types")) {
                     had_error = true;
                     recover_parse_func_ret();
                     if (!match(TokenType::Comma)) break;
@@ -529,8 +541,9 @@ public:
             }
 
             // NOTE: we want to do something when this fails?
-            (void)consume(TokenType::Rparen,
-                          "expected ')' after function return value types");
+            (void)consume_with_note(
+                TokenType::Rparen,
+                "expected ')' after function return value types");
 
             auto s = start_span.extend(prev_span());
             if (!had_error && rets.empty()) {
@@ -545,6 +558,9 @@ public:
         if (ret)
             ret = ast.new_node_pack(ret ? ret->get_loc() : to_loc(prev_span()),
                                     std::array{ret});
+        else
+            recover_parse_func_ret_single();
+
         return ret;
     }
 
@@ -578,8 +594,58 @@ public:
 
     // ========================================================================
 
+    // constexpr static auto const PREC_CALL = 10;
+    constexpr static auto const PREC_UNARY = 9;
+    // constexpr static auto const PREC_CAST = 8;
+    // constexpr static auto const PREC_MUL = 7;
+    constexpr static auto const PREC_ADD = 6;
+    // constexpr static auto const PREC_SHIFT = 5;
+    // constexpr static auto const PREC_COMP = 4;
+    // constexpr static auto const PREC_BIT = 3;
+    // constexpr static auto const PREC_LOGIC = 2;
+    // constexpr static auto const PREC_ASSIGN = 1;
+    constexpr static auto const PREC_NONE = 0;
+
     auto parse_expr_without_recover() -> ast::Node* {
+        return parse_expr_with_precedence(PREC_NONE);
+    }
+
+    auto parse_expr() -> ast::Node* {
         auto start_span = span();
+        auto expr = parse_expr_without_recover();
+        if (expr) return expr;
+
+        recover_parse_expr();
+        return ast.new_node_err(to_loc(start_span.extend(prev_span())));
+    }
+
+    // ========================================================================
+
+    auto parse_expr_with_precedence(int precedence) -> ast::Node* {
+        auto left = parse_expr_prefix();
+        if (left == nullptr) return nullptr;
+
+        while (get_precedence(peek()) > precedence) {
+            left = parse_expr_infix(left);
+        }
+
+        return left;
+    }
+
+    auto parse_expr_prefix() -> ast::Node* {
+        auto start_span = span();
+
+        // literally a nop
+        if (match(TokenType::Plus))
+            return parse_expr_with_precedence(PREC_UNARY);
+
+        if (match(TokenType::Minus)) {
+            auto child = parse_expr_with_precedence(PREC_UNARY);
+            return ast.new_node_unary(ast::NodeKind::Neg,
+                                      to_loc(start_span.extend(prev_span())),
+                                      child);
+        }
+
         if (match(TokenType::Lparen)) {
             auto expr = parse_expr_without_recover();
             // TODO: this should have some smart recovery
@@ -597,42 +663,66 @@ public:
             return ast.new_node_id(to_loc(start_span), start_span.str(source));
         }
 
-        if (match(TokenType::Int)) {
-            // TODO: do not use replace and a dynamic string here
-            auto s = std::string{start_span.str(source)};
-            s.erase(begin(std::ranges::remove(s, '_')), s.end());
-
-            uint64_t v;
-            auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
-            if (ec != std::errc{} || ptr != s.data() + s.size()) {
-                er.report_bug(start_span,
-                              "invalid integer found in parser: '{}'", s);
-                return ast.new_node_err(to_loc(start_span));
-            }
-
-            return ast.new_node_int(to_loc(start_span), v);
-        }
-
-        if (match(TokenType::Str)) {
-            auto s = start_span.str(source);
-            s = s.substr(1, s.size() - 2);
-
-            auto result = escape_string(er, start_span, s);
-            return ast.new_node_string(to_loc(start_span), result);
-        }
+        if (match(TokenType::Int)) return parse_int(start_span);
+        if (match(TokenType::Str)) return parse_string(start_span);
 
         er.report_error(start_span, "expected expression, but got '{}'",
                         start_span.str(source));
         return nullptr;
     }
 
-    auto parse_expr() -> ast::Node* {
-        auto start_span = span();
-        auto expr = parse_expr_without_recover();
-        if (expr) return expr;
+    auto parse_expr_infix(ast::Node* left) -> ast::Node* {
+        auto tok = peek();
+        advance();
 
-        recover_parse_expr();
-        return ast.new_node_err(to_loc(start_span.extend(prev_span())));
+        auto right = parse_expr_with_precedence(get_precedence(tok));
+
+        ast::NodeKind kind;
+        switch (tok.type) {
+            case TokenType::Plus: kind = ast::NodeKind::Add; break;
+            case TokenType::Minus: kind = ast::NodeKind::Sub; break;
+            default:
+                UNREACHABLE("unexpected token kind in parse infix", tok, *left);
+        }
+
+        return ast.new_node_binary(kind, left->get_loc().extend(prev_span()),
+                                   left, right);
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto get_precedence(Token const& t) -> int {
+        switch (t.type) {
+            case TokenType::Plus:
+            case TokenType::Minus: return PREC_ADD;
+
+            default: return PREC_NONE;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_int(Span const& span) -> ast::Node* {
+        // TODO: do not use replace and a dynamic string here
+        auto s = std::string{span.str(source)};
+        s.erase(begin(std::ranges::remove(s, '_')), s.end());
+
+        uint64_t v;
+        auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+        if (ec != std::errc{} || ptr != s.data() + s.size()) {
+            er.report_bug(span, "invalid integer found in parser: '{}'", s);
+            return ast.new_node_err(to_loc(span));
+        }
+
+        return ast.new_node_int(to_loc(span), v);
+    }
+
+    auto parse_string(Span const& span) -> ast::Node* {
+        auto s = span.str(source);
+        s = s.substr(1, s.size() - 2);
+
+        auto result = escape_string(er, span, s);
+        return ast.new_node_string(to_loc(span), result);
     }
 
     // ========================================================================
@@ -648,8 +738,14 @@ public:
         if (check("def")) return parse_def();
         if (check("return")) return parse_return_stmt();
 
-        auto expr = parse_expr();
-        (void)!consume(TokenType::Semi);
+        auto expr = parse_expr_without_recover();
+        if (!expr) {
+            recover_parse_expr_stmt();
+            expr = ast.new_node_err(to_loc(start_span.extend(prev_span())));
+        }
+
+        (void)consume_with_note(TokenType::Semi,
+                                "expected end of expression statement");
 
         auto s = start_span.extend(prev_span());
         return ast.new_node_expr_stmt(to_loc(s), expr);
@@ -721,6 +817,7 @@ public:
 
     auto parse_return_stmt() -> ast::Node* {
         auto start_span = span();
+        auto had_error = false;
 
         // skip over the 'return'
         advance();
@@ -731,14 +828,17 @@ public:
             if (ret) rets.push_back(ret);
 
             if (check(TokenType::Semi)) break;
-            if (!consume(TokenType::Comma,
-                         "expected ',' to separate return values"))
+            if (!consume_with_options(TokenType::Comma, TokenType::Semi)) {
+                had_error = true;
                 break;
+            }
         }
 
         // NOTE: we want to do something when this fails?
-        (void)consume(TokenType::Semi,
-                      "expected ';' after function return values");
+        if (!had_error) {
+            (void)consume_with_note(
+                TokenType::Semi, "expected ';' after function return values");
+        }
 
         return ast.new_node_return(to_loc(start_span.extend(prev_span())),
                                    rets);
@@ -794,10 +894,21 @@ public:
                        "var", "def", "func");
     }
 
+    void recover_parse_func_ret_single() {
+        skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Semi,
+                       TokenType::Lbrace, TokenType::Attribute, "var", "def",
+                       "func");
+    }
+
     void recover_parse_expr() {
         skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
                        "return");
         if (check(TokenType::Semi)) advance();
+    }
+
+    void recover_parse_expr_stmt() {
+        skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
+                       "return");
     }
 
     // ------------------------------------------------------------------------
@@ -922,51 +1033,78 @@ public:
         return true;
     }
 
-    template <typename... T>
-    [[nodiscard]] constexpr auto consume(TokenType                tt,
-                                         fmt::format_string<T...> fmt,
-                                         T&&... args) -> bool {
-        return consume_impl(tt, fmt, fmt::make_format_args(args...));
-    }
-
-    [[nodiscard]] constexpr auto consume(TokenType tt) -> bool {
-        if (match(tt)) return true;
-
+    // NOTE: depends on peek
+    constexpr void report_consume(auto&& tt) {
         if (peek().has_chars())
             er.report_error(span(), "expected '{}', but got '{}'", tt,
                             span().str(source));
         else
             er.report_error(span(), "expected '{}', but got '{}'", tt,
                             peek().type);
+    }
 
+    constexpr void build_options_string(auto&& /*unused*/) {}
+    constexpr void build_options_string(auto&& out, auto&& tt, auto&&... rest) {
+        fmt::format_to(out, " or '{}'", tt);
+        return build_options_string(out, rest...);
+    }
+
+    // NOTE: depends on peek
+    constexpr void report_consume_with_options(auto&& ftt, auto&&... tts) {
+        std::string out;
+        build_options_string(std::back_inserter(out), tts...);
+
+        if (peek().has_chars())
+            er.report_error(span(), "expected '{}'{}, but got '{}'", ftt, out,
+                            span().str(source));
+        else
+            er.report_error(span(), "expected '{}'{}, but got '{}'", ftt, out,
+                            peek().type);
+    }
+
+    template <typename... T>
+    [[nodiscard]] constexpr auto consume_with_note(TokenType                tt,
+                                                   fmt::format_string<T...> fmt,
+                                                   T&&... args) -> bool {
+        return consume_with_note_impl(tt, fmt, fmt::make_format_args(args...));
+    }
+
+    [[nodiscard]] constexpr auto consume_with_options(TokenType tt,
+                                                      auto&&... other_opts)
+        -> bool {
+        if (match(tt)) return true;
+
+        constexpr auto other_opts_size = sizeof...(other_opts);
+        if (other_opts_size == 0) {
+            report_consume(tt);
+            return false;
+        }
+
+        report_consume_with_options(tt, other_opts...);
+        return false;
+    }
+
+    [[nodiscard]] constexpr auto consume(TokenType tt) -> bool {
+        if (match(tt)) return true;
+
+        report_consume(tt);
         return false;
     }
 
     [[nodiscard]] constexpr auto consume(std::string_view tt) -> bool {
         if (match(tt)) return true;
 
-        if (peek().has_chars())
-            er.report_error(span(), "expected '{}', but got '{}'", tt,
-                            span().str(source));
-        else
-            er.report_error(span(), "expected '{}', but got '{}'", tt,
-                            peek().type);
-
+        report_consume(tt);
         return false;
     }
 
-    [[nodiscard]] constexpr auto consume_impl(TokenType        tt,
-                                              fmt::string_view fmt,
-                                              fmt::format_args args) -> bool {
+    [[nodiscard]] constexpr auto consume_with_note_impl(TokenType        tt,
+                                                        fmt::string_view fmt,
+                                                        fmt::format_args args)
+        -> bool {
         if (match(tt)) return true;
 
-        if (peek().has_chars())
-            er.report_error(span(), "expected '{}', but got '{}'", tt,
-                            span().str(source));
-        else
-            er.report_error(span(), "expected '{}', but got '{}'", tt,
-                            peek().type);
-
+        report_consume(tt);
         er.vreport_note(span(), fmt, args);
 
         return false;

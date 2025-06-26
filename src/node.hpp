@@ -26,6 +26,11 @@ enum class NodeKind {
     Var,
     Def,
 
+    Neg,
+
+    Add,
+    Sub,
+
     Id,
     Int,
     String,
@@ -46,6 +51,11 @@ class NodeTopVar;
 class NodeTopDef;
 class NodeFunc;
 class NodeBlock;
+class NodeExprStmt;
+class NodeVar;
+class NodeDef;
+class NodeUnaryExpr;
+class NodeBinaryExpr;
 class NodeId;
 class NodeInt;
 class NodePack;
@@ -562,6 +572,36 @@ public:
     [[nodiscard]] auto get_inits() const -> NodePack*;
 
     void to_json(nlohmann::json& j) const override;
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
+    }
+};
+
+// ============================================================================
+
+class NodeUnaryExpr : public Node {
+    Node* child;
+
+public:
+    constexpr NodeUnaryExpr(NodeKind kind, Location loc, Node* child)
+        : Node{kind, loc}, child{child} {}
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return {&child, 1};
+    }
+};
+
+class NodeBinaryExpr : public Node {
+    std::array<Node*, 2> children;
+
+    [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
+        return children[idx];
+    }
+
+public:
+    constexpr NodeBinaryExpr(NodeKind kind, Location loc, Node* lhs, Node* rhs)
+        : Node{kind, loc}, children{lhs, rhs} {}
 
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;

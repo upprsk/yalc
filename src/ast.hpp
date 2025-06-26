@@ -75,6 +75,16 @@ public:
         return new_node<NodeVar>(loc, names, types, inits);
     }
 
+    auto new_node_unary(NodeKind kind, Location loc, Node* child)
+        -> NodeUnaryExpr* {
+        return new_node<NodeUnaryExpr>(kind, loc, child);
+    }
+
+    auto new_node_binary(NodeKind kind, Location loc, Node* lhs, Node* rhs)
+        -> NodeBinaryExpr* {
+        return new_node<NodeBinaryExpr>(kind, loc, lhs, rhs);
+    }
+
     auto new_node_id(Location loc, std::string_view value) -> NodeId* {
         return new_node<NodeId>(loc, dupe_string(value));
     }
