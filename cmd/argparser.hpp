@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "error_reporter.hpp"
 #include "fmt/format.h"
 #include "macros.hpp"
 
@@ -64,6 +65,8 @@ struct Args {
     bool verbose_parser = false;
 
     DumpStep dump{};
+
+    yal::ErrorReporterFormat error_format = yal::ErrorReporterFormat::Pretty;
 };
 
 [[nodiscard]] auto argparse(int argc, char** argv) -> Args;

@@ -8,6 +8,7 @@
 #include <ranges>
 #include <string_view>
 
+#include "error_reporter.hpp"
 #include "utils.hpp"
 #include "yal.hpp"
 
@@ -46,6 +47,10 @@ void print_help(std::string_view self) {
     println(stderr, "            ir: dump the intermediate representation.");
     println(stderr, "            ir-lower: dump the intermediate representation after lowering.");
     println(stderr, "    -o,--output: path to output file (QBE)");
+    println(stderr, "    --error-format <format>: Change how errors are formatted.");
+    println(stderr, "        available formats:");
+    println(stderr, "            pretty: show the error message and context information in a readable way (default).");
+    println(stderr, "            json: all data in the report is given in a json format.");
     // clang-format on
 }
 
@@ -130,6 +135,23 @@ auto argparse(int argc, char** argv) -> Args {
             }
 
             args.output = arg;
+        }
+
+        else if (arg == "--error-format") {
+            if (!it.next(arg)) {
+                println(stderr, "error: missing argument for --error-format.");
+                std::exit(1);
+            }
+
+            if (arg == "pretty") {
+                args.error_format = yal::ErrorReporterFormat::Pretty;
+            } else if (arg == "json") {
+                args.error_format = yal::ErrorReporterFormat::Json;
+            } else {
+                println(stderr,
+                        "error: invalid argument for --error-format: {}", arg);
+                std::exit(1);
+            }
         }
 
         else if (args.program.empty()) {

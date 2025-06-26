@@ -16,7 +16,7 @@ auto main(int argc, char** argv) -> int {
     if (args.verbose) fmt::println(stderr, "args: {}", args);
 
     auto fs = yal::FileStore{};
-    auto er = yal::ErrorReporter{&fs, stderr};
+    auto er = yal::ErrorReporter{&fs, stderr, args.error_format};
 
     // in case we are in single file mode, we want to add just the given file,
     // otherwise we want to add the given directory
