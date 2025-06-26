@@ -597,7 +597,7 @@ public:
     // constexpr static auto const PREC_CALL = 10;
     constexpr static auto const PREC_UNARY = 9;
     // constexpr static auto const PREC_CAST = 8;
-    // constexpr static auto const PREC_MUL = 7;
+    constexpr static auto const PREC_MUL = 7;
     constexpr static auto const PREC_ADD = 6;
     // constexpr static auto const PREC_SHIFT = 5;
     // constexpr static auto const PREC_COMP = 4;
@@ -682,6 +682,9 @@ public:
         switch (tok.type) {
             case TokenType::Plus: kind = ast::NodeKind::Add; break;
             case TokenType::Minus: kind = ast::NodeKind::Sub; break;
+            case TokenType::Star: kind = ast::NodeKind::Mul; break;
+            case TokenType::Slash: kind = ast::NodeKind::Div; break;
+            case TokenType::Percent: kind = ast::NodeKind::Mod; break;
             default:
                 UNREACHABLE("unexpected token kind in parse infix", tok, *left);
         }
@@ -696,6 +699,10 @@ public:
         switch (t.type) {
             case TokenType::Plus:
             case TokenType::Minus: return PREC_ADD;
+
+            case TokenType::Star:
+            case TokenType::Slash:
+            case TokenType::Percent: return PREC_MUL;
 
             default: return PREC_NONE;
         }

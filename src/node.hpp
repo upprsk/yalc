@@ -30,6 +30,9 @@ enum class NodeKind {
 
     Add,
     Sub,
+    Mul,
+    Div,
+    Mod,
 
     Id,
     Int,

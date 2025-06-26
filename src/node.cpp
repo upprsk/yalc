@@ -439,6 +439,9 @@ auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
         case yal::ast::NodeKind::Neg: name = "Neg"; break;
         case yal::ast::NodeKind::Add: name = "Add"; break;
         case yal::ast::NodeKind::Sub: name = "Sub"; break;
+        case yal::ast::NodeKind::Mul: name = "Mul"; break;
+        case yal::ast::NodeKind::Div: name = "Div"; break;
+        case yal::ast::NodeKind::Mod: name = "Mod"; break;
         case yal::ast::NodeKind::Id: name = "Id"; break;
         case yal::ast::NodeKind::Int: name = "Int"; break;
         case yal::ast::NodeKind::String: name = "String"; break;
