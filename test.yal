@@ -1,5 +1,5 @@
 module main;
 
-func f() { 10 + 1 * 2 + 1; }
+def S[T] = 10;
 
 // vim: ft=yal
