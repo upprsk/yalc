@@ -664,6 +664,7 @@ public:
         }
 
         if (match(TokenType::Int)) return parse_int(start_span);
+        if (match(TokenType::Hex)) return parse_int_with_base(start_span, 16);
         if (match(TokenType::Str)) return parse_string(start_span);
 
         er.report_error(start_span, "expected expression, but got '{}'",
@@ -709,6 +710,22 @@ public:
 
         uint64_t v;
         auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+        if (ec != std::errc{} || ptr != s.data() + s.size()) {
+            er.report_bug(span, "invalid integer found in parser: '{}'", s);
+            return ast.new_node_err(to_loc(span));
+        }
+
+        return ast.new_node_int(to_loc(span), v);
+    }
+
+    auto parse_int_with_base(Span const& span, int base) -> ast::Node* {
+        // TODO: do not use replace and a dynamic string here
+        auto s = std::string{span.str(source).substr(2)};
+        s.erase(begin(std::ranges::remove(s, '_')), s.end());
+
+        uint64_t v;
+        auto [ptr, ec] =
+            std::from_chars(s.data(), s.data() + s.size(), v, base);
         if (ec != std::errc{} || ptr != s.data() + s.size()) {
             er.report_bug(span, "invalid integer found in parser: '{}'", s);
             return ast.new_node_err(to_loc(span));
