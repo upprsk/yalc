@@ -12,6 +12,8 @@ namespace yal {
 
 class ErrorReporter;
 
+enum class ErrorReporterFormat { Pretty, Json };
+
 class LocalErrorReporter {
     static constexpr auto const error_style = fmt::fg(fmt::color::red);
     static constexpr auto const warn_style = fmt::fg(fmt::color::yellow);
@@ -66,6 +68,12 @@ public:
                 fmt::string_view fmt, fmt::format_args args,
                 uint32_t context = 1) const;
 
+    void report_text(Span s, std::string_view prefix, fmt::text_style color,
+                     fmt::string_view fmt, fmt::format_args args,
+                     uint32_t context = 1) const;
+    void report_json(Span s, std::string_view prefix, fmt::string_view fmt,
+                     fmt::format_args args) const;
+
     // -----------------------------------------------------------------------
 
     // Get the file metadata this error reporter belongs to. In case the file is
@@ -107,7 +115,10 @@ class ErrorReporter {
     friend LocalErrorReporter;
 
 public:
-    constexpr ErrorReporter(FileStore* fs, FILE* out) : fs{fs}, out{out} {}
+    constexpr ErrorReporter(
+        FileStore* fs, FILE* out,
+        ErrorReporterFormat format = ErrorReporterFormat::Pretty)
+        : fs{fs}, out{out}, format{format} {}
 
     template <typename... T>
     void report_error(Location const& s, fmt::format_string<T...> fmt,
@@ -162,6 +173,14 @@ public:
 
     // -----------------------------------------------------------------------
 
+    constexpr void set_format(ErrorReporterFormat fmt) { format = fmt; }
+
+    [[nodiscard]] constexpr auto get_format() const -> ErrorReporterFormat {
+        return format;
+    }
+
+    // -----------------------------------------------------------------------
+
     [[nodiscard]] constexpr auto had_error() const -> bool {
         return error_count > 0;
     }
@@ -178,6 +197,8 @@ private:
 
     FILE*    out;
     uint32_t error_count{};
+
+    ErrorReporterFormat format = ErrorReporterFormat::Pretty;
 };
 
 }  // namespace yal

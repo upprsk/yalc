@@ -2,7 +2,10 @@
 
 #include <cstdio>
 #include <libassert/assert.hpp>
+#include <nlohmann/json.hpp>
 #include <string_view>
+
+#include "fmt/base.h"
 
 namespace yal {
 
@@ -85,6 +88,27 @@ void LocalErrorReporter::vreport_bug(Span s, fmt::string_view fmt,
 void LocalErrorReporter::report(Span s, std::string_view prefix,
                                 fmt::text_style color, fmt::string_view fmt,
                                 fmt::format_args args, uint32_t context) const {
+    ASSERT(parent != nullptr);
+
+    auto pf = parent->get_format();
+    if (pf == ErrorReporterFormat::Pretty) {
+        report_text(s, prefix, color, fmt, args, context);
+    }
+
+    else if (pf == ErrorReporterFormat::Json) {
+        report_json(s, prefix, fmt, args);
+    }
+
+    else {
+        UNREACHABLE("invalid report format");
+    }
+}
+
+void LocalErrorReporter::report_text(Span s, std::string_view prefix,
+                                     fmt::text_style  color,
+                                     fmt::string_view fmt,
+                                     fmt::format_args args,
+                                     uint32_t         context) const {
     ASSERT(s.begin <= s.end);
 
     auto             file = get_file();
@@ -145,6 +169,25 @@ void LocalErrorReporter::report(Span s, std::string_view prefix,
         fmt::println(out, "  {:04} | {}", row + i + 1,
                      source.substr(pls, ple - pls));
     }
+}
+
+void LocalErrorReporter::report_json(Span s, std::string_view prefix,
+                                     fmt::string_view fmt,
+                                     fmt::format_args args) const {
+    ASSERT(s.begin <= s.end);
+
+    auto file = get_file();
+
+    auto j = nlohmann::json{
+        {"file_id", file.id},
+        {"original_path", file.original_path},
+        {"fullpath", file.full_path},
+        {"prefix", prefix},
+        {"message", fmt::vformat(fmt, args)},
+        {"span", {s.begin, s.end}},
+    };
+
+    fmt::println(out, "{}", j.dump());
 }
 
 void ErrorReporter::vreport_error(Location const& s, fmt::string_view fmt,
