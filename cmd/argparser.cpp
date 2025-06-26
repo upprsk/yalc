@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "utils.hpp"
+#include "yal.hpp"
 
 namespace rv = std::ranges::views;
 
@@ -18,6 +19,8 @@ using fmt::println;
 void print_usage(std::string_view self) {
     println(stderr, "usage: {} [options] <program>", self);
 }
+
+void print_version() { println(stderr, "yalc: {}", yal::get_version()); }
 
 void print_help(std::string_view self) {
     print_usage(self);
@@ -64,6 +67,11 @@ auto argparse(int argc, char** argv) -> Args {
 
         if (arg == "--usage") {
             print_usage(self);
+            std::exit(0);
+        }
+
+        if (arg == "--version") {
+            print_version();
             std::exit(0);
         }
 
