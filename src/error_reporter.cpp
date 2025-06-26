@@ -91,7 +91,7 @@ void LocalErrorReporter::report(Span s, std::string_view prefix,
     std::string_view source = file.contents;
     auto [row, col] = find_rowcol(source, s);
 
-    fmt::print(out, "{}:{}:{}: ", file.original_path, row, col, prefix);
+    fmt::print(out, "{}:{}:{}: ", file.original_path, row, col);
 
     auto fd = fileno(out);
 
