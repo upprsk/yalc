@@ -782,6 +782,37 @@ func f() {
 }
 )~~"},
 
+        {                         "expression 1", R"~~(module main;
+func f() { 1 + 1; }
+)~~"},
+        {                         "expression 2", R"~~(module main;
+func f() { 1 + -1; }
+)~~"},
+        {                         "expression 3", R"~~(module main;
+func f() { 1 - -1; }
+)~~"},
+        {                        "#expression 4", R"~~(module main;
+func f() { 1 - 0x10; }
+)~~"},
+        {                         "expression 5", R"~~(module main;
+func f() { (2 + 2) -1; }
+)~~"},
+        {                         "expression 6", R"~~(module main;
+func f() { (2 + 2) --1; }
+)~~"},
+        {                         "expression 7", R"~~(module main;
+func f() { (2 + 2) - -1; }
+)~~"},
+        {                         "expression 8", R"~~(module main;
+func f() { (); x + 1; }
+)~~"},
+        {                         "expression 9", R"~~(module main;
+func f() { -(x - -y); }
+)~~"},
+        {                        "expression 10", R"~~(module main;
+func f() { -(x - +y); }
+)~~"},
+
         {                         "#hello world", R"~~(module main;
 
 func main() i32 {
