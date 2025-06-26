@@ -1,5 +1,5 @@
 module main;
 
-func f() { -(x - +y); }
+func f() { 1 - 0x10; }
 
 // vim: ft=yal

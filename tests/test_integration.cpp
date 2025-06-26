@@ -791,7 +791,7 @@ func f() { 1 + -1; }
         {                         "expression 3", R"~~(module main;
 func f() { 1 - -1; }
 )~~"},
-        {                        "#expression 4", R"~~(module main;
+        {                         "expression 4", R"~~(module main;
 func f() { 1 - 0x10; }
 )~~"},
         {                         "expression 5", R"~~(module main;
