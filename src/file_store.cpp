@@ -165,8 +165,8 @@ auto FileStore::add_dir_and_contents_nocheck(std::string_view        path,
 
 // ============================================================================
 
-void to_json(nlohmann::json &j, FileId const &id) { j = id; }
-void to_json(nlohmann::json &j, DirId const &id) { j = id; }
+void to_json(nlohmann::json &j, FileId const &id) { j = id.value(); }
+void to_json(nlohmann::json &j, DirId const &id) { j = id.value(); }
 
 }  // namespace yal
 
