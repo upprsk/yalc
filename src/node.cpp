@@ -192,6 +192,10 @@ auto NodeTopDef::get_attributes() const -> NodePack* {
     return as_node_pack(child_at(3));
 }
 
+auto NodeTopDef::get_gargs() const -> NodePack* {
+    return as_node_pack(child_at(4));
+}
+
 auto NodeTopDef::get_names() const -> NodePack* {
     return as_node_pack(child_at(0));
 }
@@ -211,6 +215,12 @@ void NodeTopDef::to_json(nlohmann::json& j) const {
         attributes->to_json(j["attributes"]);
     } else {
         j["attributes"] = json();
+    }
+
+    if (auto gargs = get_gargs()) {
+        gargs->to_json(j["gargs"]);
+    } else {
+        j["gargs"] = json();
     }
 
     if (auto names = get_names()) {
@@ -302,76 +312,6 @@ void NodeFunc::to_json(nlohmann::json& j) const {
 
     if (auto body = get_body()) {
         body->to_json(j["body"]);
-    }
-}
-
-// ============================================================================
-
-auto NodeVar::get_names() const -> NodePack* {
-    return as_node_pack(child_at(0));
-}
-
-auto NodeVar::get_types() const -> NodePack* {
-    return as_node_pack(child_at(1));
-}
-
-auto NodeVar::get_inits() const -> NodePack* {
-    return as_node_pack(child_at(2));
-}
-
-void NodeVar::to_json(nlohmann::json& j) const {
-    Node::to_json_common_values(j);
-
-    if (auto names = get_names()) {
-        names->to_json(j["names"]);
-    } else {
-        j["names"] = json();
-    }
-
-    if (auto types = get_types()) {
-        types->to_json(j["types"]);
-    } else {
-        j["types"] = json();
-    }
-
-    if (auto inits = get_inits()) {
-        inits->to_json(j["inits"]);
-    } else {
-        j["inits"] = json();
-    }
-}
-
-auto NodeDef::get_names() const -> NodePack* {
-    return as_node_pack(child_at(0));
-}
-
-auto NodeDef::get_types() const -> NodePack* {
-    return as_node_pack(child_at(1));
-}
-
-auto NodeDef::get_inits() const -> NodePack* {
-    return as_node_pack(child_at(2));
-}
-
-void NodeDef::to_json(nlohmann::json& j) const {
-    Node::to_json_common_values(j);
-
-    if (auto names = get_names()) {
-        names->to_json(j["names"]);
-    } else {
-        j["names"] = json();
-    }
-
-    if (auto types = get_types()) {
-        types->to_json(j["types"]);
-    } else {
-        j["types"] = json();
-    }
-
-    if (auto inits = get_inits()) {
-        inits->to_json(j["inits"]);
-    } else {
-        j["inits"] = json();
     }
 }
 

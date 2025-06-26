@@ -34,9 +34,11 @@ public:
         return new_node<NodeAttributeKV>(loc, dupe_string(key), value);
     }
 
-    auto new_node_top_def(Location loc, Node* attributes, Node* names,
-                          Node* types, Node* inits) -> NodeTopDef* {
-        return new_node<NodeTopDef>(loc, attributes, names, types, inits);
+    auto new_node_top_def(Location loc, Node* attributes, Node* gargs,
+                          Node* names, Node* types, Node* inits)
+        -> NodeTopDef* {
+        return new_node<NodeTopDef>(loc, attributes, gargs, names, types,
+                                    inits);
     }
 
     auto new_node_top_var(Location loc, Node* attributes, Node* names,
@@ -63,16 +65,6 @@ public:
 
     auto new_node_expr_stmt(Location loc, Node* child) -> NodeExprStmt* {
         return new_node<NodeExprStmt>(loc, child);
-    }
-
-    auto new_node_def(Location loc, Node* names, Node* types, Node* inits)
-        -> NodeDef* {
-        return new_node<NodeDef>(loc, names, types, inits);
-    }
-
-    auto new_node_var(Location loc, Node* names, Node* types, Node* inits)
-        -> NodeVar* {
-        return new_node<NodeVar>(loc, names, types, inits);
     }
 
     auto new_node_unary(NodeKind kind, Location loc, Node* child)

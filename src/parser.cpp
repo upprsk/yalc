@@ -311,6 +311,11 @@ public:
 
         auto names = parse_decl_ids();
 
+    generics_label:
+        // NOTE: using function gargs here, which is not perfect because the
+        // error recovery in there assumes the format of a function declaration
+        auto gargs = check(TokenType::Lbracket) ? parse_func_gargs() : nullptr;
+
     types_label:
         auto types =
             match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
@@ -320,6 +325,9 @@ public:
 
         if (!consume(TokenType::Semi)) {
             recover_parse_top_def_or_var();
+
+            // in case we recovered with a [, then try types again
+            if (check(TokenType::Lbracket)) goto generics_label;
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -332,7 +340,7 @@ public:
         }
 
         return ast.new_node_top_def(to_loc(start_span.extend(prev_span())),
-                                    attributes, names, types, inits);
+                                    attributes, gargs, names, types, inits);
     }
 
     auto parse_decl_ids() -> ast::Node* {
@@ -775,6 +783,7 @@ public:
         return ast.new_node_expr_stmt(to_loc(s), expr);
     }
 
+    // FIXME: Allow using attributes on local var
     auto parse_var() -> ast::Node* {
         auto start_span = span();
 
@@ -803,10 +812,11 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_var(to_loc(start_span.extend(prev_span())), names,
-                                types, inits);
+        return ast.new_node_top_var(to_loc(start_span.extend(prev_span())),
+                                    nullptr, names, types, inits);
     }
 
+    // FIXME: Allow using attributes on local def
     auto parse_def() -> ast::Node* {
         auto start_span = span();
 
@@ -814,6 +824,11 @@ public:
         advance();
 
         auto names = parse_decl_ids();
+
+    generics_label:
+        // NOTE: using function gargs here, which is not perfect because the
+        // error recovery in there assumes the format of a function declaration
+        auto gargs = check(TokenType::Lbracket) ? parse_func_gargs() : nullptr;
 
     types_label:
         auto types =
@@ -825,6 +840,9 @@ public:
         if (!consume(TokenType::Semi)) {
             recover_parse_def_or_var();
 
+            // in case we recovered with a [, then try types again
+            if (check(TokenType::Lbracket)) goto generics_label;
+
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
 
@@ -835,8 +853,8 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_def(to_loc(start_span.extend(prev_span())), names,
-                                types, inits);
+        return ast.new_node_top_def(to_loc(start_span.extend(prev_span())),
+                                    nullptr, gargs, names, types, inits);
     }
 
     auto parse_return_stmt() -> ast::Node* {
