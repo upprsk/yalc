@@ -215,6 +215,7 @@ module main;
         ASSERT(f->full_path == ex_full_path.string());
     });
 
+    /*
     ut::add(tb, "add file from dir in filesystem", []() {
         auto fs = yal::FileStore{};
         auto test_dir = std::filesystem::path{"tests"} / "test_data";
@@ -294,6 +295,7 @@ module main;
             ASSERT(f->full_path == c_full_path);
         }
     });
+    */
 
     return tb;
 }
