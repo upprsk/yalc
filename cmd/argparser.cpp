@@ -31,6 +31,7 @@ void print_help(std::string_view self) {
     println(stderr, "options:");
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
+    println(stderr, "    --version: print compiler version.");
     println(stderr, "    --verbose: show more output (on stderr).");
     println(stderr, "    --verbose-parser: show details of parsing (on stderr).");
     println(stderr, "    --file: single file compilation mode.");
