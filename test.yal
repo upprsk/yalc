@@ -1,5 +1,9 @@
 module main;
 
-func f() { 1 - 0x10; }
+func main() {
+    var x = test;
+}
+
+var test = 0;
 
 // vim: ft=yal

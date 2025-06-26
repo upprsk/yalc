@@ -40,12 +40,25 @@ auto main(int argc, char** argv) -> int {
                          f->contents.size());
         }
 
-        auto           tokens = yal::tokenize(er.for_file(id));
-        auto           ast = yal::ast::Ast{};
-        auto           root = yal::parse_into_ast(tokens, ast, er.for_file(id),
-                                                  {.verbose = args.verbose_parser});
-        nlohmann::json root_json = *root;
-        fmt::println("{}", root_json.dump(2));
+        auto tokens = yal::tokenize(er.for_file(id));
+        if (args.dump_tokens) {
+            nlohmann::json j = tokens;
+            fmt::println("{}", j.dump(2));
+        }
+
+        auto ast = yal::ast::Ast{};
+        auto root = yal::parse_into_ast(tokens, ast, er.for_file(id),
+                                        {.verbose = args.verbose_parser});
+
+        if (args.dump_parsed_ast) {
+            nlohmann::json j = *root;
+            fmt::println("{}", j.dump(2));
+        }
+
+        // do not compile, just analyse and report
+        if (args.just_analyse) {
+        }
+
     } else {
         auto id = fs.add_dir(args.program);
         if (id.is_invalid()) {

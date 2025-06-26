@@ -48,6 +48,9 @@ void print_help(std::string_view self) {
     println(stderr, "            ir: dump the intermediate representation.");
     println(stderr, "            ir-lower: dump the intermediate representation after lowering.");
     println(stderr, "    -o,--output: path to output file (QBE)");
+    println(stderr, "    --dump-tokens: dump the output of tokenization as json");
+    println(stderr, "    --dump-parsed-ast: dump the output of parsing as json");
+    println(stderr, "    --just-analyse: do not compile, just check the source");
     println(stderr, "    --error-format <format>: Change how errors are formatted.");
     println(stderr, "        available formats:");
     println(stderr, "            pretty: show the error message and context information in a readable way (default).");
@@ -153,6 +156,18 @@ auto argparse(int argc, char** argv) -> Args {
                         "error: invalid argument for --error-format: {}", arg);
                 std::exit(1);
             }
+        }
+
+        else if (arg == "--dump-tokens") {
+            args.dump_tokens = true;
+        }
+
+        else if (arg == "--dump-parsed-ast") {
+            args.dump_parsed_ast = true;
+        }
+
+        else if (arg == "--just-analyse") {
+            args.just_analyse = true;
         }
 
         else if (args.program.empty()) {
