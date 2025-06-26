@@ -812,6 +812,18 @@ func f() { -(x - -y); }
         {                        "expression 10", R"~~(module main;
 func f() { -(x - +y); }
 )~~"},
+        {                        "expression 11", R"~~(module main;
+func f() { -(x + +y); }
+)~~"},
+        {                        "expression 12", R"~~(module main;
+func f() { 10 % (x / -y); }
+)~~"},
+        {                        "expression 13", R"~~(module main;
+func f() { 10 % (x - -y); }
+)~~"},
+        {                        "expression 14", R"~~(module main;
+func f() { 10 + 1 * 2 + 1; }
+)~~"},
 
         {                         "#hello world", R"~~(module main;
 

@@ -1,9 +1,5 @@
 module main;
 
-func main() {
-    var x = test;
-}
-
-var test = 0;
+func f() { 10 + 1 * 2 + 1; }
 
 // vim: ft=yal
