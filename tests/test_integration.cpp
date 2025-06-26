@@ -824,6 +824,12 @@ func f() { 10 % (x - -y); }
         {                        "expression 14", R"~~(module main;
 func f() { 10 + 1 * 2 + 1; }
 )~~"},
+        {                        "expression 15", R"~~(module main;
+func f() { 1 + * 1; }
+)~~"},
+        {                        "expression 16", R"~~(module main;
+func f() { 1 + * 2
+)~~"},
 
         {                         "#hello world", R"~~(module main;
 
