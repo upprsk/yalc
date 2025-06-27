@@ -6,6 +6,7 @@
 
 #include "argparser.hpp"
 #include "ast.hpp"
+#include "decl.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
 #include "name_res.hpp"
@@ -14,7 +15,7 @@
 
 auto main(int argc, char** argv) -> int {
     auto args = yalc::argparse(argc, argv);
-    if (args.verbose) fmt::println(stderr, "args: {}", args);
+    if (args.verbose.has_exe()) fmt::println(stderr, "args: {}", args);
 
     auto fs = yal::FileStore{};
     auto er = yal::ErrorReporter{&fs, stderr, args.error_format};
@@ -35,30 +36,35 @@ auto main(int argc, char** argv) -> int {
             return 1;
         }
 
-        if (args.verbose) {
+        if (args.verbose.has_exe()) {
             auto f = fs.get_file_by_id(id);
             fmt::println(stderr, "program: {} ({}B)", f->full_path,
                          f->contents.size());
         }
 
         auto tokens = yal::tokenize(er.for_file(id));
-        if (args.dump_tokens) {
+        if (args.dump.has_tokens()) {
             nlohmann::json j = tokens;
             fmt::println("{}", j.dump(2));
         }
 
         auto ast = yal::ast::Ast{};
         auto root = yal::parse_into_ast(tokens, ast, er.for_file(id),
-                                        {.verbose = args.verbose_parser});
+                                        {.verbose = args.verbose.has_parser()});
 
-        if (args.dump_parsed_ast) {
+        if (args.dump.has_ast()) {
             nlohmann::json j = *root;
             fmt::println("{}", j.dump(2));
         }
 
-        auto mod = yal::perform_name_resolution(
-            ast, std::array{root}, er, {.verbose = args.dump_named_ast});
-        if (args.dump_named_ast) {
+        auto decl_store = yal::DeclStore{};
+
+        auto mod = yal::sort_declarations_and_resolve_top_level(
+            ast, decl_store, std::array{root}, er,
+            {.verbose = args.verbose.has_sort(),
+             .log_decl_dependencies = args.dump.has_deps_debug(),
+             .dump_dependencies_as_mermaid = args.dump.has_deps_mermaid()});
+        if (args.dump.has_sorted()) {
             nlohmann::json j = *mod;
             fmt::println("{}", j.dump(2));
         }
@@ -81,7 +87,7 @@ auto main(int argc, char** argv) -> int {
             return 1;
         }
 
-        if (args.verbose) {
+        if (args.verbose.has_exe()) {
             auto d = fs.get_dir_by_id(id);
             fmt::println(stderr, "program directory: {} ({} files)",
                          d->full_path, d->files.size());
@@ -94,6 +100,6 @@ auto main(int argc, char** argv) -> int {
         }
     }
 
-    if (args.verbose) fmt::println(stderr, "done!");
+    if (args.verbose.has_exe()) fmt::println(stderr, "done!");
     return 0;
 }

@@ -41,21 +41,21 @@ public:
     }
 
     auto new_node_top_def(Location loc, Node* attributes, Node* gargs,
-                          Node* names, Node* types, Node* inits)
-        -> NodeTopDef* {
-        return new_node<NodeTopDef>(loc, attributes, gargs, names, types,
-                                    inits);
+                          Node* names, Node* types, Node* inits) -> NodeDef* {
+        return new_node<NodeDef>(loc, attributes, gargs, names, types, inits);
     }
 
     auto new_node_top_var(Location loc, Node* attributes, Node* names,
-                          Node* types, Node* inits) -> NodeTopVar* {
-        return new_node<NodeTopVar>(loc, attributes, names, types, inits);
+                          Node* types, Node* inits) -> NodeVar* {
+        return new_node<NodeVar>(loc, attributes, names, types, inits);
     }
 
     auto new_node_func(Location loc, Node* attributes, std::string_view name,
-                       std::string_view attached_type, Node* gargs, Node* args,
+                       Span name_span, std::string_view attached_type,
+                       Span attached_type_span, Node* gargs, Node* args,
                        Node* ret, Node* body, bool is_c_varargs) -> NodeFunc* {
-        return new_node<NodeFunc>(loc, attributes, name, attached_type, gargs,
+        return new_node<NodeFunc>(loc, attributes, name, name_span,
+                                  attached_type, attached_type_span, gargs,
                                   args, ret, body, is_c_varargs);
     }
 
@@ -98,6 +98,11 @@ public:
     auto new_node_func_arg(Location loc, std::string_view name, Node* type)
         -> NodeFuncArg* {
         return new_node<NodeFuncArg>(loc, dupe_string(name), type);
+    }
+
+    auto new_node_func_named_ret(Location loc, std::string_view name,
+                                 Node* type) -> NodeFuncNamedRet* {
+        return new_node<NodeFuncNamedRet>(loc, dupe_string(name), type);
     }
 
     auto new_node_pack(Location loc, std::span<Node* const> children)

@@ -9,6 +9,8 @@
 
 namespace yal {
 
+struct Location;
+
 struct Span {
     uint32_t begin;
     uint32_t end;
@@ -34,6 +36,8 @@ struct Span {
         return {.begin = begin, .end = begin + sz};
     }
 
+    [[nodiscard]] constexpr auto localize(FileId id) const -> Location;
+
     constexpr auto operator==(Span const &o) const -> bool = default;
 };
 
@@ -58,6 +62,12 @@ struct Location {
 
     constexpr auto operator==(Location const &o) const -> bool = default;
 };
+
+// ============================================================================
+
+constexpr auto Span::localize(FileId id) const -> Location {
+    return {.fileid = id, .span = *this};
+}
 
 // ============================================================================
 

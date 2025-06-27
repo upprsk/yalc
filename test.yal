@@ -1,7 +1,27 @@
 module main;
 
-func main() i32 {
-    return 0;
+def A, B = 0, 1;
+def NAME = "name";
+
+var g_start = A;
+
+@export(link_name=NAME)
+var g_named = g_start;
+
+@yo(yo=thingy+1)
+func f[T, U](a, b: T) (a: U, 42) {
+    var x = A + B;
+    var y, z = x * 2, a - b;
+
+    return x + y;
 }
+
+var x = thingy;
+
+def thingy = 12;
+
+func export(link_name: string_view);
+
+def string_view = magic;
 
 // vim: ft=yal

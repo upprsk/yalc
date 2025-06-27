@@ -32,23 +32,31 @@ void print_help(std::string_view self) {
     println(stderr, "    -h,--help: show this message and exit.");
     println(stderr, "    --usage: show usage and exit.");
     println(stderr, "    --version: print compiler version.");
-    println(stderr, "    --verbose: show more output (on stderr).");
+    println(stderr, "    --verbose <steps>: show more output (on stderr) for each step. This option");
+    println(stderr, "        accepts a list of steps separetd by commas: step1,step2. Thi option can");
+    println(stderr, "        also be passed multiple times: --verbose step1 --verbose step2");
+    println(stderr, "        available steps:");
+    println(stderr, "            exe: make the compiler plumming itself more verbose.");
+    println(stderr, "            parser: make the parser verbose.");
+    println(stderr, "            sort: make top-level AST sorting and name resolution verbose.");
     println(stderr, "    --verbose-parser: show details of parsing (on stderr).");
+    println(stderr, "    --verbose-name-res: show details of name resolution (on stderr).");
     println(stderr, "    --file: single file compilation mode.");
     println(stderr, "    --dump <step>: dump the result of an internal compilation step. This option");
-    println(stderr, "        accepts a list of options separated by a comma: step1,step2. The option");
+    println(stderr, "        accepts a list of steps separated by a comma: step1,step2. The option");
     println(stderr, "        can also be passed multiple times: --dump step1 --dump step2");
     println(stderr, "        available steps:");
     println(stderr, "            tokens: dump tokenization result.");
     println(stderr, "            ast: dump parsed AST.");
-    println(stderr, "            top-name-res: dump top-level name-resolved AST.");
+    println(stderr, "            sorted: dump top-level name-resolved and sorted AST.");
     println(stderr, "            attributes: dump AST after attributes are applied.");
-    println(stderr, "            name-res: dump AST full name resolutiofull name resolution.");
+    println(stderr, "            named: dump AST full name resolutio.");
     println(stderr, "            sema: dump the AST of each function after semantic-analysis.");
     println(stderr, "            ir: dump the intermediate representation.");
     println(stderr, "            ir-lower: dump the intermediate representation after lowering.");
+    println(stderr, "            deps-mermaid: dump the results of top-level name-resolution as a");
+    println(stderr, "                mermaid diagram.");
     println(stderr, "    -o,--output: path to output file (QBE)");
-    println(stderr, "    --dump-tokens: dump the output of tokenization as json");
     println(stderr, "    --dump-parsed-ast: dump the output of parsing as json");
     println(stderr, "    --dump-named-ast: dump the output of name resolution as json");
     println(stderr, "    --just-analyse: do not compile, just check the source");
@@ -86,11 +94,24 @@ auto argparse(int argc, char** argv) -> Args {
         }
 
         if (arg == "--verbose") {
-            args.verbose = true;
-        }
+            if (!it.next(arg)) {
+                println(stderr, "error: missing argument for --dump.");
+                std::exit(1);
+            }
 
-        else if (arg == "--verbose-parser") {
-            args.verbose_parser = true;
+            for (auto it : rv::split(arg, ',')) {
+                std::string_view part{it};
+
+                if (part == "exe") {
+                    args.verbose = args.verbose.with_exe();
+                } else if (part == "parser") {
+                    args.verbose = args.verbose.with_parser();
+                } else if (part == "sort") {
+                    args.verbose = args.verbose.with_sort();
+                } else {
+                    println(stderr, "error: unknown verbose step: {:?}", part);
+                }
+            }
         }
 
         else if (arg == "--file") {
@@ -110,18 +131,22 @@ auto argparse(int argc, char** argv) -> Args {
                     args.dump = args.dump.with_tokens();
                 } else if (part == "ast") {
                     args.dump = args.dump.with_ast();
-                } else if (part == "top-name-res") {
-                    args.dump = args.dump.with_top_name_res();
+                } else if (part == "sorted") {
+                    args.dump = args.dump.with_sorted();
                 } else if (part == "attributes") {
                     args.dump = args.dump.with_attributes();
-                } else if (part == "name-res") {
-                    args.dump = args.dump.with_name_res();
+                } else if (part == "named") {
+                    args.dump = args.dump.with_named();
                 } else if (part == "sema") {
                     args.dump = args.dump.with_sema();
                 } else if (part == "ir") {
                     args.dump = args.dump.with_ir();
                 } else if (part == "ir-lower") {
                     args.dump = args.dump.with_ir_lower();
+                } else if (part == "deps-debug") {
+                    args.dump = args.dump.with_deps_debug();
+                } else if (part == "deps-mermaid") {
+                    args.dump = args.dump.with_deps_mermaid();
                 } else {
                     println(stderr, "error: unknown dump step: {:?}", part);
                 }
@@ -159,22 +184,6 @@ auto argparse(int argc, char** argv) -> Args {
             }
         }
 
-        else if (arg == "--dump-tokens") {
-            args.dump_tokens = true;
-        }
-
-        else if (arg == "--dump-parsed-ast") {
-            args.dump_parsed_ast = true;
-        }
-
-        else if (arg == "--dump-named-ast") {
-            args.dump_named_ast = true;
-        }
-
-        else if (arg == "--just-analyse") {
-            args.just_analyse = true;
-        }
-
         else if (args.program.empty()) {
             args.program = arg;
         }
@@ -200,15 +209,30 @@ auto format_as(DumpStep::Step step) -> std::string_view {
         case DumpStep::None: s = "none"; break;
         case DumpStep::Tokens: s = "tokens"; break;
         case DumpStep::Ast: s = "ast"; break;
-        case DumpStep::TopNameRes: s = "top-name-res"; break;
+        case DumpStep::Sorted: s = "sorted"; break;
         case DumpStep::Attributes: s = "attributes"; break;
-        case DumpStep::NameRes: s = "name-res"; break;
+        case DumpStep::Named: s = "named"; break;
         case DumpStep::Sema: s = "sema"; break;
         case DumpStep::Ir: s = "ir"; break;
         case DumpStep::IrLower: s = "ir-lower"; break;
+        case DumpStep::DepsMermaid: s = "deps-mermaid"; break;
+        case DumpStep::DepsDebug: s = "deps-debug"; break;
     }
 
     return s;
+}
+
+auto format_as(VerboseStep::Step step) -> std::string_view {
+    std::string_view name;
+
+    switch (step) {
+        case VerboseStep::None: name = "none"; break;
+        case VerboseStep::Exe: name = "exe"; break;
+        case VerboseStep::Parser: name = "parser"; break;
+        case VerboseStep::Sort: name = "sort"; break;
+    }
+
+    return name;
 }
 
 }  // namespace yalc
@@ -219,10 +243,11 @@ auto fmt::formatter<yalc::DumpStep>::format(yalc::DumpStep const& step,
                                             format_context&       ctx) const
     -> format_context::iterator {
     std::array steps{
-        yalc::DumpStep::Tokens,     yalc::DumpStep::Ast,
-        yalc::DumpStep::TopNameRes, yalc::DumpStep::Attributes,
-        yalc::DumpStep::NameRes,    yalc::DumpStep::Sema,
-        yalc::DumpStep::Ir,         yalc::DumpStep::IrLower,
+        yalc::DumpStep::Tokens,      yalc::DumpStep::Ast,
+        yalc::DumpStep::Sorted,      yalc::DumpStep::Attributes,
+        yalc::DumpStep::Named,       yalc::DumpStep::Sema,
+        yalc::DumpStep::Ir,          yalc::DumpStep::IrLower,
+        yalc::DumpStep::DepsMermaid, yalc::DumpStep::DepsDebug,
     };
 
     auto it =
@@ -230,10 +255,27 @@ auto fmt::formatter<yalc::DumpStep>::format(yalc::DumpStep const& step,
     return fmt::format_to(ctx.out(), "{}", fmt::join(it, ","));
 }
 
+auto fmt::formatter<yalc::VerboseStep>::format(yalc::VerboseStep const& step,
+                                               format_context& ctx) const
+    -> format_context::iterator {
+    std::array steps{
+        yalc::VerboseStep::None,
+        yalc::VerboseStep::Exe,
+        yalc::VerboseStep::Parser,
+        yalc::VerboseStep::Sort,
+    };
+
+    auto it = rv::filter(
+        steps, [&](yalc::VerboseStep::Step s) { return step.has(s); });
+    return fmt::format_to(ctx.out(), "{}", fmt::join(it, ","));
+}
+
 auto fmt::formatter<yalc::Args>::format(yalc ::Args const& p,
                                         format_context&    ctx) const
     -> format_context ::iterator {
-    return fmt::format_to(
-        ctx.out(), "Args{{program={:?}, output={:?}, single_file={}, dump={}}}",
-        p.program, p.output, p.single_file, p.dump);
+    return fmt::format_to(ctx.out(),
+                          "Args{{program={:?}, output={:?}, single_file={}, "
+                          "just_analyze={}, dump={}, verbose={}}}",
+                          p.program, p.output, p.single_file, p.just_analyse,
+                          p.dump, p.verbose);
 }

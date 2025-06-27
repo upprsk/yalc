@@ -1,6 +1,11 @@
 #include "decl.hpp"
 
+#include <nlohmann/json.hpp>
+
+#include "fmt/format.h"
+
 namespace yal {
+using nlohmann::json;
 
 auto DeclStore::new_decl(Location loc, std::string_view link_name,
                          std::string_view local_name) -> Decl* {
@@ -18,6 +23,14 @@ auto DeclStore::dupe_string(std::string_view s) -> std::string_view {
 auto DeclStore::get_by_link_name(std::string_view link_name) const -> Decl* {
     auto it = decls.find(link_name);
     return it != decls.end() ? it->second : nullptr;
+}
+
+void to_json(nlohmann::json& j, Decl const& d) {
+    j = json{
+        {       "loc", fmt::to_string(d.get_loc())},
+        { "link_name",           d.get_link_name()},
+        {"local_name",          d.get_local_name()},
+    };
 }
 
 }  // namespace yal

@@ -5,6 +5,7 @@
 #include <span>
 #include <string_view>
 
+#include "decl.hpp"
 #include "location.hpp"
 #include "macros.hpp"
 
@@ -18,15 +19,13 @@ enum class NodeKind {
     File,
     Attribute,
     AttributeKV,
-    TopVar,
-    TopDef,
+    Var,
+    Def,
     Func,
 
     Block,
     Return,
     ExprStmt,
-    Var,
-    Def,
 
     Neg,
 
@@ -42,6 +41,7 @@ enum class NodeKind {
 
     NodePack,
     FuncArg,
+    FuncNamedRet,
 };
 
 // ----------------------------------------------------------------------------
@@ -53,8 +53,8 @@ class NodeFlatModule;
 class NodeFile;
 class NodeAttribute;
 class NodeAttributeKV;
-class NodeTopVar;
-class NodeTopDef;
+class NodeVar;
+class NodeDef;
 class NodeFunc;
 class NodeBlock;
 class NodeExprStmt;
@@ -64,6 +64,7 @@ class NodeId;
 class NodeInt;
 class NodePack;
 class NodeFuncArg;
+class NodeFuncNamedRet;
 
 // ----------------------------------------------------------------------------
 
@@ -71,6 +72,11 @@ class NodeFuncArg;
 class Node {
     NodeKind kind{};
     Location loc{};
+
+    // In case this is a defining node (like Func or Var), then this points to
+    // the Decl that it defines. In case this is a refering node (Id), then this
+    // points to the Decl that originated it.
+    Decl* decl{};
 
     // Used for union-find
     Node* forward{};
@@ -80,13 +86,12 @@ public:
 
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
+    [[nodiscard]] constexpr auto get_decl() const -> Decl* { return decl; }
+
+    constexpr void set_decl(Decl* new_decl) { decl = new_decl; }
 
     [[nodiscard]] constexpr auto is_err() const -> bool {
         return kind == NodeKind::Err;
-    }
-
-    [[nodiscard]] constexpr auto is_node_pack() const -> bool {
-        return kind == NodeKind::NodePack;
     }
 
     // In case this node has a forwarding pointer, i.e was set to another using
@@ -163,6 +168,30 @@ class NodeFuncArg : public Node {
 public:
     constexpr NodeFuncArg(Location loc, std::string_view name, Node* type)
         : Node{NodeKind::FuncArg, loc}, name{name}, type{type} {}
+
+    [[nodiscard]] constexpr auto get_name() const -> std::string_view {
+        return name;
+    }
+
+    [[nodiscard]] constexpr auto get_type() const -> Node* { return type; }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return {&type, 1};
+    }
+};
+
+class NodeFuncNamedRet : public Node {
+    std::string_view name;
+    Node*            type;
+
+public:
+    constexpr NodeFuncNamedRet(Location loc, std::string_view name, Node* type)
+        : Node{NodeKind::FuncNamedRet, loc}, name{name}, type{type} {}
 
     [[nodiscard]] constexpr auto get_name() const -> std::string_view {
         return name;
@@ -286,7 +315,7 @@ public:
 
 // Top-level (global) variable declaration or local variable declaration. Both
 // use the exact same node.
-class NodeTopVar : public Node {
+class NodeVar : public Node {
     std::array<Node*, 4> children;
 
     [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
@@ -294,10 +323,9 @@ class NodeTopVar : public Node {
     }
 
 public:
-    constexpr NodeTopVar(Location loc, Node* attributes, Node* names,
-                         Node* types, Node* inits)
-        : Node{NodeKind::TopVar, loc},
-          children{names, types, inits, attributes} {}
+    constexpr NodeVar(Location loc, Node* attributes, Node* names, Node* types,
+                      Node* inits)
+        : Node{NodeKind::Var, loc}, children{names, types, inits, attributes} {}
 
     // Get attributes attached to the variable. May be null (in case of no
     // attributes).
@@ -336,7 +364,7 @@ public:
 
 // Top-level (global) constant declaration or local constant declaration. Both
 // use the exact same node.
-class NodeTopDef : public Node {
+class NodeDef : public Node {
     std::array<Node*, 5> children;
 
     [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
@@ -344,9 +372,9 @@ class NodeTopDef : public Node {
     }
 
 public:
-    constexpr NodeTopDef(Location loc, Node* attributes, Node* gargs,
-                         Node* names, Node* types, Node* inits)
-        : Node{NodeKind::TopDef, loc},
+    constexpr NodeDef(Location loc, Node* attributes, Node* gargs, Node* names,
+                      Node* types, Node* inits)
+        : Node{NodeKind::Def, loc},
           children{names, types, inits, attributes, gargs} {}
 
     // Get attributes attached to the definition. May be null (in case of no
@@ -412,6 +440,9 @@ class NodeFunc : public Node {
     std::string_view     attached_type;
     std::array<Node*, 5> children;
 
+    Span name_span;
+    Span attached_type_span;
+
     bool is_c_varargs;
 
     [[nodiscard]] constexpr auto child_at(size_t idx) const -> Node* {
@@ -420,12 +451,15 @@ class NodeFunc : public Node {
 
 public:
     constexpr NodeFunc(Location loc, Node* attributes, std::string_view name,
-                       std::string_view attached_type, Node* gargs, Node* args,
+                       Span name_span, std::string_view attached_type,
+                       Span attached_type_span, Node* gargs, Node* args,
                        Node* ret, Node* body, bool is_c_varargs)
         : Node{NodeKind::Func, loc},
           name{name},
           attached_type{attached_type},
           children{attributes, gargs, args, ret, body},
+          name_span{name_span},
+          attached_type_span{attached_type_span},
           is_c_varargs{is_c_varargs} {}
 
     // Get the name of the function.
@@ -436,6 +470,10 @@ public:
         return name;
     }
 
+    [[nodiscard]] constexpr auto get_name_span() const -> Span {
+        return name_span;
+    }
+
     // Get the namespace name of the function, for when it is attached to a
     // type.
     //
@@ -443,6 +481,10 @@ public:
     //          ^^^^
     [[nodiscard]] constexpr auto get_attached_type() const -> std::string_view {
         return attached_type;
+    }
+
+    [[nodiscard]] constexpr auto get_attached_type_span() const -> Span {
+        return attached_type_span;
     }
 
     // Get attributes attached to the definition. May be null (in case of no
@@ -485,6 +527,12 @@ public:
     [[nodiscard]] constexpr auto get_is_c_varargs() const -> bool {
         return is_c_varargs;
     }
+
+    // ------------------------------------------------------------------------
+
+    constexpr void set_name(std::string_view new_name) { name = new_name; }
+
+    // ------------------------------------------------------------------------
 
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;
@@ -644,8 +692,8 @@ define_formatter_from_string_view_for_virtual(yal::ast::NodeErr);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeFile);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeAttribute);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeAttributeKV);
-define_formatter_from_string_view_for_virtual(yal::ast::NodeTopVar);
-define_formatter_from_string_view_for_virtual(yal::ast::NodeTopDef);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeVar);
+define_formatter_from_string_view_for_virtual(yal::ast::NodeDef);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeFunc);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeBlock);
 define_formatter_from_string_view_for_virtual(yal::ast::NodeId);

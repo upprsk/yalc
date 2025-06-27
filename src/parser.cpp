@@ -396,13 +396,17 @@ public:
         }
 
         std::string_view attached_type;
+        Span             attached_type_span;
         if (match(TokenType::Dot)) {
             attached_type = name;
+            attached_type_span = name_span;
 
             name_span = span();
+            name = "";
             if (!consume_id_non_kw()) {
                 if (auto r = recover_parse_func_name_with_attached_type(
-                        start_span, attributes, name, attached_type))
+                        start_span, attributes, name, name_span, attached_type,
+                        attached_type_span))
                     return r;
             } else {
                 name = name_span.str(source);
@@ -426,8 +430,9 @@ public:
             (void)consume_with_options(TokenType::Semi, TokenType::Lbrace);
 
         return ast.new_node_func(to_loc(start_span.extend(prev_span())),
-                                 attributes, name, attached_type, gargs, args,
-                                 ret, body, is_c_varargs);
+                                 attributes, name, name_span, attached_type,
+                                 attached_type_span, gargs, args, ret, body,
+                                 is_c_varargs);
     }
 
     auto parse_func_gargs() -> ast::Node* {
@@ -575,7 +580,14 @@ public:
     auto parse_func_multi_ret_item() -> ast::Node* {
         // this is a named return, we don't have that yet
         if (check(TokenType::Id) && check_next(TokenType::Colon)) {
-            PANIC("NOT IMPLEMENTED");
+            auto name = span();
+            advance();  // the name
+            advance();  // the :
+
+            // NOTE: may want custom error handling here?
+            auto type = parse_expr_without_recover();
+            return ast.new_node_func_named_ret(to_loc(name.extend(prev_span())),
+                                               name.str(source), type);
         }
 
         return parse_expr_without_recover();
@@ -976,7 +988,8 @@ public:
 
     [[nodiscard]] auto recover_parse_func_name_with_attached_type(
         Span const& start_span, ast::Node* attributes, std::string_view name,
-        std::string_view attached_type) -> ast::Node* {
+        Span name_span, std::string_view attached_type, Span attached_type_span)
+        -> ast::Node* {
         skip_while_not(TokenType::Eof, TokenType::Lbracket, TokenType::Lparen,
                        TokenType::Semi, TokenType::Attribute, "var", "def",
                        "func");
@@ -985,14 +998,16 @@ public:
 
         // in case we are at the end, just abort
         if (is_at_end())
-            return ast.new_node_func(to_loc(s), attributes, name, attached_type,
-                                     nullptr, nullptr, nullptr, nullptr, false);
+            return ast.new_node_func(to_loc(s), attributes, name, name_span,
+                                     attached_type, attached_type_span, nullptr,
+                                     nullptr, nullptr, nullptr, false);
 
         // too far, we can not recover this
         if (check(TokenType::Semi) || is_kw(span())) {
             (void)match(TokenType::Semi);
-            return ast.new_node_func(to_loc(s), attributes, name, attached_type,
-                                     nullptr, nullptr, nullptr, nullptr, false);
+            return ast.new_node_func(to_loc(s), attributes, name, name_span,
+                                     attached_type, attached_type_span, nullptr,
+                                     nullptr, nullptr, nullptr, false);
         }
 
         return nullptr;
