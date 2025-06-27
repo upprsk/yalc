@@ -1032,6 +1032,12 @@ public:
         // in case we are at the first token, return EOF. This is safe because
         // we will always have at least one token in `tokens`, the EOF token.
         if (current_token == 0) return tokens[tokens.size() - 1];
+
+        for (size_t idx = current_token - 1; idx > 0; --idx) {
+            if (!tokens[idx].is_comment()) return tokens[idx];
+        }
+
+        // all tokens were comments, return the latest one?
         return tokens[current_token - 1];
     }
 
