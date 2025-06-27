@@ -13,6 +13,8 @@ namespace yal::ast {
 enum class NodeKind {
     Err,
 
+    FlatModule,
+
     File,
     Attribute,
     AttributeKV,
@@ -47,6 +49,7 @@ enum class NodeKind {
 // fwd
 
 class NodeErr;
+class NodeFlatModule;
 class NodeFile;
 class NodeAttribute;
 class NodeAttributeKV;
@@ -180,6 +183,28 @@ public:
 // ============================================================================
 
 // The top-level of a parsed file, with all declarations and the module name.
+class NodeFlatModule : public Node {
+    std::span<Node*> children;
+    std::string_view module_name;
+
+public:
+    constexpr NodeFlatModule(Location loc, std::span<Node*> children,
+                             std::string_view module_name)
+        : Node{NodeKind::FlatModule, loc},
+          children{children},
+          module_name{module_name} {}
+
+    [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
+        return children;
+    }
+
+    auto format_to(fmt::format_context& ctx) const
+        -> fmt::format_context::iterator override;
+
+    void to_json(nlohmann::json& j) const override;
+};
+
+// The top-level of a parsed file, with all declarations and the module name.
 class NodeFile : public Node {
     std::span<Node*> children;
     std::string_view module_name;
@@ -193,6 +218,10 @@ public:
 
     [[nodiscard]] auto get_children() const -> std::span<Node* const> override {
         return children;
+    }
+
+    [[nodiscard]] auto get_module_name() const -> std::string_view {
+        return module_name;
     }
 
     auto format_to(fmt::format_context& ctx) const

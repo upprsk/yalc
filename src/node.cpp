@@ -94,6 +94,21 @@ void NodeFuncArg::to_json(nlohmann::json& j) const {
 
 // ============================================================================
 
+auto NodeFlatModule::format_to(fmt::format_context& ctx) const
+    -> fmt::format_context::iterator {
+    return fmt::format_to(
+        ctx.out(), "NodeFlatModule({}, {:?}, {})", get_loc(), module_name,
+        fmt::join(get_children() | rv::filter([](Node* n) {
+                      return n != nullptr;
+                  }) | rv::transform([](Node* n) -> Node const& { return *n; }),
+                  ", "));
+}
+
+void NodeFlatModule::to_json(nlohmann::json& j) const {
+    Node::to_json(j);
+    j["module_name"] = module_name;
+}
+
 auto NodeFile::format_to(fmt::format_context& ctx) const
     -> fmt::format_context::iterator {
     return fmt::format_to(
@@ -365,6 +380,7 @@ auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
     std::string_view name = "???";
     switch (p) {
         case yal::ast::NodeKind::Err: name = "Err"; break;
+        case yal::ast::NodeKind::FlatModule: name = "FlatModule"; break;
         case yal::ast::NodeKind::File: name = "File"; break;
         case yal::ast::NodeKind::Attribute: name = "Attribute"; break;
         case yal::ast::NodeKind::AttributeKV: name = "AttributeKV"; break;

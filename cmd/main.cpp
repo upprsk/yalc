@@ -8,6 +8,7 @@
 #include "ast.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
+#include "name_res.hpp"
 #include "parser.hpp"
 #include "tokenizer.hpp"
 
@@ -52,6 +53,13 @@ auto main(int argc, char** argv) -> int {
 
         if (args.dump_parsed_ast) {
             nlohmann::json j = *root;
+            fmt::println("{}", j.dump(2));
+        }
+
+        auto mod = yal::perform_name_resolution(
+            ast, std::array{root}, er, {.verbose = args.dump_named_ast});
+        if (args.dump_named_ast) {
+            nlohmann::json j = *mod;
             fmt::println("{}", j.dump(2));
         }
 

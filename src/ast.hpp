@@ -18,6 +18,12 @@ public:
         return new_node<NodeErr>(loc);
     }
 
+    auto new_node_flat_module(Location loc, std::span<Node* const> children,
+                              std::string_view module_name) -> NodeFlatModule* {
+        return new_node<NodeFlatModule>(loc, dupe_span(children),
+                                        dupe_string(module_name));
+    }
+
     auto new_node_file(Location loc, std::span<Node* const> children,
                        std::string_view module_name) -> NodeFile* {
         return new_node<NodeFile>(loc, dupe_span(children),

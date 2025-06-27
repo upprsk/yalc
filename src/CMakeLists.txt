@@ -11,6 +11,8 @@ add_library(yal
     location.cpp
     location.hpp
     macros.hpp
+    name_res.cpp
+    name_res.hpp
     node.cpp
     node.hpp
     parser.cpp

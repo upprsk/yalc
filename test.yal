@@ -1,5 +1,7 @@
 module main;
 
-def S[T] = 10;
+func main() i32 {
+    return 0;
+}
 
 // vim: ft=yal

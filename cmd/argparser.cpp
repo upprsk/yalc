@@ -50,6 +50,7 @@ void print_help(std::string_view self) {
     println(stderr, "    -o,--output: path to output file (QBE)");
     println(stderr, "    --dump-tokens: dump the output of tokenization as json");
     println(stderr, "    --dump-parsed-ast: dump the output of parsing as json");
+    println(stderr, "    --dump-named-ast: dump the output of name resolution as json");
     println(stderr, "    --just-analyse: do not compile, just check the source");
     println(stderr, "    --error-format <format>: Change how errors are formatted.");
     println(stderr, "        available formats:");
@@ -164,6 +165,10 @@ auto argparse(int argc, char** argv) -> Args {
 
         else if (arg == "--dump-parsed-ast") {
             args.dump_parsed_ast = true;
+        }
+
+        else if (arg == "--dump-named-ast") {
+            args.dump_named_ast = true;
         }
 
         else if (arg == "--just-analyse") {

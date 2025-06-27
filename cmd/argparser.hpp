@@ -66,6 +66,7 @@ struct Args {
     bool just_analyse = false;
     bool dump_tokens = false;
     bool dump_parsed_ast = false;
+    bool dump_named_ast = false;
 
     DumpStep dump{};
 
