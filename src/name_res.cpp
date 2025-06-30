@@ -13,6 +13,12 @@
 
 namespace yal {
 
+/*
+ * TODO: remove all decl stuff from here! We NEED a 2 stage name resolution
+ * system. Also, want to experiment with macros, and that requires 2 stages (one
+ * for discovery and another for expansion).
+ */
+
 namespace rv = std::ranges::views;
 namespace udense = ankerl::unordered_dense;
 
