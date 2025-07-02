@@ -5,23 +5,22 @@ def NAME = "name";
 
 var g_start = A;
 
+@f.hi
+var hi_there;
+
 @export(link_name=NAME)
 var g_named = g_start;
 
-@yo(yo=thingy+1)
-func f[T, U](a, b: T) (a: U, 42) {
-    var x = A + B;
+@test.yo(yo=thingy+1)
+func f[T, U](a, b: T) (w: U, 42) {
+    var x = A + B + C;
     var y, z = x * 2, a - b;
+
+    w + hi_there;
 
     return x + y;
 }
 
 var x = thingy;
-
-def thingy = 12;
-
-func export(link_name: string_view);
-
-def string_view = magic;
 
 // vim: ft=yal

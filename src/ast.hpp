@@ -30,9 +30,11 @@ public:
                                   dupe_string(module_name));
     }
 
-    auto new_attribute(Location loc, std::string_view name,
-                       std::span<Node* const> args) -> NodeAttribute* {
-        return new_node<NodeAttribute>(loc, dupe_string(name), dupe_span(args));
+    auto new_attribute(Location loc, std::string_view qualified_name,
+                       std::string_view name, std::span<Node* const> args)
+        -> NodeAttribute* {
+        return new_node<NodeAttribute>(loc, dupe_string(qualified_name),
+                                       dupe_string(name), dupe_span(args));
     }
 
     auto new_attributekv(Location loc, std::string_view key, Node* value)

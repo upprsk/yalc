@@ -210,19 +210,32 @@ public:
         std::vector<ast::Node*> attrs;
         while (check(TokenType::Attribute)) {
             auto attr = parse_attribute();
-            attrs.push_back(attr);
+            if (attr) attrs.push_back(attr);
         }
 
         return ast.new_node_pack(to_loc(start_span.extend(prev_span())), attrs);
     }
 
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     auto parse_attribute() -> ast::Node* {
         auto start_span = span();
 
         // name of the attribute without the leading '@'
-        auto attribute_name = start_span.str(source).substr(1);
+        std::string_view qualified_name;
+        auto             attribute_name = start_span.str(source).substr(1);
         // NOTE: we have an unconsumed '@something' here every time
         advance();
+
+        if (match(TokenType::Dot)) {
+            qualified_name = attribute_name;
+            attribute_name = span().str(source);
+
+            if (!consume_id_non_kw()) {
+                if (!check(TokenType::Lparen) && !check(TokenType::Attribute) &&
+                    !check("var") && !check("def") && !check("func"))
+                    return nullptr;
+            }
+        }
 
         std::vector<ast::Node*> args;
 
@@ -266,7 +279,8 @@ public:
             }
         }
 
-        return ast.new_attribute(to_loc(start_span), attribute_name, args);
+        return ast.new_attribute(to_loc(start_span), qualified_name,
+                                 attribute_name, args);
     }
 
     // ------------------------------------------------------------------------

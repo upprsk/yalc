@@ -142,7 +142,8 @@ void NodeFile::to_json(nlohmann::json& j) const {
 auto NodeAttribute::format_to(fmt::format_context& ctx) const
     -> fmt::format_context::iterator {
     return fmt::format_to(
-        ctx.out(), "NodeAttribute({}, {:?}, {})", get_loc(), get_name(),
+        ctx.out(), "NodeAttribute({}, {:?}, {:?}, {})", get_loc(),
+        get_qualified_name(), get_name(),
         fmt::join(get_children() | rv::filter([](Node* n) {
                       return n != nullptr;
                   }) | rv::transform([](Node* n) -> Node const& { return *n; }),
@@ -152,6 +153,7 @@ auto NodeAttribute::format_to(fmt::format_context& ctx) const
 void NodeAttribute::to_json(nlohmann::json& j) const {
     Node::to_json(j);
     j["name"] = get_name();
+    if (auto n = get_qualified_name(); !n.empty()) j["qualified_name"] = n;
 }
 
 auto NodeAttributeKV::format_to(fmt::format_context& ctx) const

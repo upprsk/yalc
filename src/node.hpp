@@ -261,8 +261,16 @@ public:
 
 // ============================================================================
 
-// An attribute that is attached to some declaration.
+// An attribute that is attached to some declaration. It supports both styles:
+//
+//     @test
+//     ^^^^\_ name
+//
+//     @test_module.test
+//     ^^^^^^^^^^^\ ^^^\_ name
+//                 \_ qualified_name
 class NodeAttribute : public Node {
+    std::string_view qualified_name;
     std::string_view name;
 
     // A list of all arguments given in the attribute. Key-Value pairs are
@@ -270,9 +278,17 @@ class NodeAttribute : public Node {
     std::span<Node*> args;
 
 public:
-    constexpr NodeAttribute(Location loc, std::string_view name,
-                            std::span<Node*> args)
-        : Node{NodeKind::Attribute, loc}, name{name}, args{args} {}
+    constexpr NodeAttribute(Location loc, std::string_view qualified_name,
+                            std::string_view name, std::span<Node*> args)
+        : Node{NodeKind::Attribute, loc},
+          qualified_name{qualified_name},
+          name{name},
+          args{args} {}
+
+    [[nodiscard]] constexpr auto get_qualified_name() const
+        -> std::string_view {
+        return qualified_name;
+    }
 
     [[nodiscard]] constexpr auto get_name() const -> std::string_view {
         return name;
