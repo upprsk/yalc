@@ -38,9 +38,8 @@ void print_help(std::string_view self) {
     println(stderr, "        available steps:");
     println(stderr, "            exe: make the compiler plumming itself more verbose.");
     println(stderr, "            parser: make the parser verbose.");
+    println(stderr, "            deps: make the dependency resolution vrebose.");
     println(stderr, "            sort: make top-level AST sorting and name resolution verbose.");
-    println(stderr, "    --verbose-parser: show details of parsing (on stderr).");
-    println(stderr, "    --verbose-name-res: show details of name resolution (on stderr).");
     println(stderr, "    --file: single file compilation mode.");
     println(stderr, "    --dump <step>: dump the result of an internal compilation step. This option");
     println(stderr, "        accepts a list of steps separated by a comma: step1,step2. The option");
@@ -106,6 +105,8 @@ auto argparse(int argc, char** argv) -> Args {
                     args.verbose = args.verbose.with_exe();
                 } else if (part == "parser") {
                     args.verbose = args.verbose.with_parser();
+                } else if (part == "deps") {
+                    args.verbose = args.verbose.with_deps();
                 } else if (part == "sort") {
                     args.verbose = args.verbose.with_sort();
                 } else {
@@ -143,8 +144,6 @@ auto argparse(int argc, char** argv) -> Args {
                     args.dump = args.dump.with_ir();
                 } else if (part == "ir-lower") {
                     args.dump = args.dump.with_ir_lower();
-                } else if (part == "deps-debug") {
-                    args.dump = args.dump.with_deps_debug();
                 } else if (part == "deps-mermaid") {
                     args.dump = args.dump.with_deps_mermaid();
                 } else {

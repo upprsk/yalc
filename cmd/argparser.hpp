@@ -49,7 +49,6 @@ struct DumpStep {
     define_parts(ir_lower, IrLower);
 
     define_parts(deps_mermaid, DepsMermaid);
-    define_parts(deps_debug, DepsDebug);
 
 #undef define_with
 #undef define_has
@@ -67,7 +66,8 @@ struct VerboseStep {
         None = 0,
         Exe = 1 << 1,
         Parser = 1 << 2,
-        Sort = 1 << 3,
+        Deps = 1 << 3,
+        Sort = 1 << 4,
     };
 
 #define define_with(_name, _enum_case)                               \
@@ -85,6 +85,7 @@ struct VerboseStep {
 
     define_parts(exe, Exe);
     define_parts(parser, Parser);
+    define_parts(deps, Deps);
     define_parts(sort, Sort);
 
 #undef define_with

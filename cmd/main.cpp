@@ -62,7 +62,7 @@ auto main(int argc, char** argv) -> int {
         auto mod = yal::sort_declarations_and_resolve_top_level(
             ast, decl_store, std::array{root}, er,
             {.verbose = args.verbose.has_sort(),
-             .log_decl_dependencies = args.dump.has_deps_debug(),
+             .log_decl_dependencies = args.verbose.has_deps(),
              .dump_dependencies_as_mermaid = args.dump.has_deps_mermaid()});
         if (args.dump.has_sorted()) {
             nlohmann::json j = *mod;
