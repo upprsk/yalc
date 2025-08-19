@@ -1,1 +1,0 @@
-{"stderr":":memory::5:16: error: missing initializer for field \"a\" of type i32 in struct initialization\n  0004 | func test() {\n> 0005 |     var s: S = .{};\n                        ^^^\n  0006 | }\n"}

@@ -1,9 +1,2 @@
-build/
 .cache/
-compile_commands.json
-test
-test.yal.qbe
-test.c.o
-test.yal.asm
-test.yal.o
-test.yal.ir
+build/

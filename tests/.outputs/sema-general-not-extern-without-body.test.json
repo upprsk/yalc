@@ -1,1 +1,0 @@
-{"stderr":":memory::2:1: error: missing body for function\n  0001 | module main;\n> 0002 | func extern_func();\n         ^^^^^^^^^^^^^^^^^^^\n  0003 | \n"}

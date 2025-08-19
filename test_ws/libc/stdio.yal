@@ -1,4 +1,0 @@
-module libc;
-
-@extern func printf(fmt: [*]const u8, ...) i32;
-@extern func snprintf(str: [*]u8, size: usize, fmt: [*]const u8, ...) i32;

@@ -1,0 +1,479 @@
+#include "arena.h"
+#include "da.h"
+#include "defer.h"
+#include "options.h"
+#include "string_view.h"
+#include "typeinfo.h"
+#include <clang-c/Index.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Symbol Symbol;
+
+struct Symbol {
+    string_view name;
+    string_view canon_name;
+
+    Type_Info *info;
+
+    // forward to another type, used for typedefs
+    Symbol *forward;
+};
+
+typedef struct {
+    Symbol  *items;
+    uint32_t len;
+    uint32_t cap;
+} Sym_Table;
+
+typedef struct {
+    Type_Info_Record_Field *items;
+    uint32_t                len;
+    uint32_t                cap;
+} Record_Fields_Array;
+
+typedef struct {
+    Options const *opt;
+
+    Type_Info          *current_info;
+    Record_Fields_Array current_fields;
+
+    Arena     arena;
+    Sym_Table symtable;
+} Parse_State;
+
+Symbol *find_sym_by_name(Parse_State *s, string_view name) {
+    for (size_t i = 0; i < s->symtable.len; ++i) {
+        if (string_view_eq(s->symtable.items[i].name, name))
+            return &s->symtable.items[i];
+    }
+
+    return nullptr;
+}
+
+Symbol *resolve_symbol(Symbol *s) {
+    while (s->forward)
+        s = s->forward;
+
+    return s;
+}
+
+Type_Info *type_info_new(Parse_State *s) {
+    return arena_alloc(&s->arena, sizeof(Type_Info));
+}
+
+void add_builtin_types(Parse_State *s) {
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 1, .is_signed = true},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("char"),
+                           .canon_name = string_view_from_cstr("char"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 1, .is_signed = false},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("unsigned char"),
+                           .canon_name = string_view_from_cstr("unsigned char"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 2, .is_signed = true},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("short"),
+                           .canon_name = string_view_from_cstr("short"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 2, .is_signed = false},
+        };
+
+        da_append(
+            &s->symtable,
+            (Symbol){.name       = string_view_from_cstr("unsigned short"),
+                     .canon_name = string_view_from_cstr("unsigned short"),
+                     .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 4, .is_signed = true},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("int"),
+                           .canon_name = string_view_from_cstr("int"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 4, .is_signed = false},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("unsigned int"),
+                           .canon_name = string_view_from_cstr("unsigned int"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 8, .is_signed = true},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("long"),
+                           .canon_name = string_view_from_cstr("long"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind    = Type_Integer,
+                      .integer = {.byte_width = 8, .is_signed = false},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("unsigned long"),
+                           .canon_name = string_view_from_cstr("unsigned long"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind = Type_Real,
+                      .real = {.byte_width = 4},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("float"),
+                           .canon_name = string_view_from_cstr("float"),
+                           .info       = info});
+    }
+
+    {
+        Type_Info *info = type_info_new(s);
+        *info           = (Type_Info){
+                      .kind = Type_Real,
+                      .real = {.byte_width = 8},
+        };
+
+        da_append(&s->symtable,
+                  (Symbol){.name       = string_view_from_cstr("double"),
+                           .canon_name = string_view_from_cstr("double"),
+                           .info       = info});
+    }
+}
+
+Type_Info *create_type(Parse_State *s, CXType type) {
+    if (type.kind == CXType_Pointer) {
+        auto pointee = create_type(s, clang_getPointeeType(type));
+
+        auto name = clang_getTypeSpelling(type);
+        defer { clang_disposeString(name); }
+
+        auto attrs = TYPE_POINTER_ATTR_NONE;
+        if (clang_isConstQualifiedType(type)) attrs |= TYPE_POINTER_ATTR_CONST;
+
+        Type_Info *info = arena_alloc(&s->arena, sizeof(*info));
+        *info           = (Type_Info){
+                      .name    = arena_strdup(&s->arena, clang_getCString(name)),
+                      .kind    = Type_Pointer,
+                      .pointer = {.inner = pointee, .attrs = attrs},
+        };
+
+        return info;
+    }
+
+    auto name = clang_getTypeSpelling(type);
+    defer { clang_disposeString(name); }
+    auto sym =
+        find_sym_by_name(s, string_view_from_cstr(clang_getCString(name)));
+    if (sym && sym->info) return sym->info;
+
+    // don't known what is this
+    return nullptr;
+}
+
+enum CXChildVisitResult parse_record(CXCursor cursor, CXCursor parent,
+                                     void *user_data) {
+    Parse_State *s = user_data;
+
+    enum CXChildVisitResult result = CXChildVisit_Continue;
+
+    auto kind       = clang_getCursorKind(cursor);
+    auto type       = clang_getCursorType(cursor);
+    auto canon_type = clang_getCanonicalType(type);
+
+    if (s->opt->flags & OPTION_VERBOSE_PARSE) {
+        auto kind_str = clang_getCursorKindSpelling(kind);
+        defer { clang_disposeString(kind_str); }
+
+        printf(" L parse record :: %s\n", clang_getCString(kind_str));
+    }
+
+    if (kind == CXCursor_FieldDecl) {
+        auto field_name = clang_getCursorSpelling(cursor);
+        defer { clang_disposeString(field_name); }
+
+        auto type_str = clang_getTypeSpelling(type);
+        defer { clang_disposeString(type_str); }
+
+        auto canon_type_str = clang_getTypeSpelling(canon_type);
+        defer { clang_disposeString(canon_type_str); }
+
+        if (s->opt->flags & (OPTION_VERBOSE_PARSE | OPTION_VERBOSE_SEARCH)) {
+            printf(" L [+] field '%s': '%s' (aka. '%s')\n",
+                   clang_getCString(field_name), clang_getCString(type_str),
+                   clang_getCString(canon_type_str));
+        }
+
+        if (type.kind == CXType_Pointer) {
+            auto pointee_info = create_type(s, type);
+            if (pointee_info == nullptr) {
+                printf("fatal: failed to create type for '%s'\n",
+                       clang_getCString(type_str));
+                exit(1);
+            }
+        }
+
+        auto sym_type = find_sym_by_name(
+            s, string_view_from_cstr(clang_getCString(type_str)));
+        if (sym_type) {
+            if (s->opt->flags &
+                (OPTION_VERBOSE_PARSE | OPTION_VERBOSE_SEARCH)) {
+                printf("    L found type in symtable: '%.*s'\n",
+                       (int)sym_type->name.len, sym_type->name.ptr);
+            }
+        }
+    }
+
+    else {
+        // just ignore everything else
+    }
+
+    return result;
+}
+
+enum CXChildVisitResult parse_top_level(CXCursor cursor, CXCursor parent,
+                                        void *user_data) {
+    Parse_State *s = user_data;
+
+    enum CXChildVisitResult result = CXChildVisit_Continue;
+
+    auto kind       = clang_getCursorKind(cursor);
+    auto type       = clang_getCursorType(cursor);
+    auto canon_type = clang_getCanonicalType(type);
+
+    if (s->opt->flags & OPTION_VERBOSE_PARSE) {
+        auto kind_str = clang_getCursorKindSpelling(kind);
+        defer { clang_disposeString(kind_str); }
+
+        printf("parse top_level :: %s\n", clang_getCString(kind_str));
+    }
+
+    // a struct is declared. We use save it in the symbol table.
+    if (kind == CXCursor_StructDecl) {
+        auto type_str = clang_getTypeSpelling(type);
+        defer { clang_disposeString(type_str); }
+
+        auto canon_type_str = clang_getTypeSpelling(canon_type);
+        defer { clang_disposeString(canon_type_str); }
+
+        if (s->opt->flags & (OPTION_VERBOSE_PARSE | OPTION_VERBOSE_SEARCH)) {
+            printf("[+] struct: '%s'\n", clang_getCString(type_str));
+        }
+
+        // get the info for the type
+        s->current_info  = type_info_new(s);
+        *s->current_info = (Type_Info){.kind = Type_Record};
+
+        clang_visitChildren(cursor, parse_record, s);
+
+        s->current_info->record.fields      = s->current_fields.items;
+        s->current_info->record.field_count = s->current_fields.len;
+
+        // reset array, as we transferred it to fields
+        s->current_fields = (Record_Fields_Array){};
+
+        string_view name = string_view_from_cstr(
+            arena_strdup(&s->arena, clang_getCString(type_str)));
+        string_view canon_name = string_view_from_cstr(
+            arena_strdup(&s->arena, clang_getCString(canon_type_str)));
+
+        da_append(&s->symtable, (Symbol){.name       = name,
+                                         .canon_name = canon_name,
+                                         .info       = s->current_info});
+    }
+
+    // A typedef creates a reference to another type
+    else if (kind == CXCursor_TypedefDecl) {
+        auto type_str = clang_getTypeSpelling(type);
+        defer { clang_disposeString(type_str); }
+
+        auto canon_type_str = clang_getTypeSpelling(canon_type);
+        defer { clang_disposeString(canon_type_str); }
+
+        if (s->opt->flags & (OPTION_VERBOSE_PARSE | OPTION_VERBOSE_SEARCH)) {
+            printf("[=] typedef: '%s' '%s'\n", clang_getCString(type_str),
+                   clang_getCString(canon_type_str));
+        }
+
+        // FIXME: need to check the actual type kind for things that are
+        // pointers and such
+
+        auto name = string_view_from_cstr(clang_getCString(canon_type_str));
+        auto sym  = find_sym_by_name(s, name);
+        if (sym) {
+            printf(" L found sym: '%.*s'\n", (int)sym->name.len, sym->name.ptr);
+
+            string_view name = string_view_from_cstr(
+                arena_strdup(&s->arena, clang_getCString(type_str)));
+            string_view canon_name = string_view_from_cstr(
+                arena_strdup(&s->arena, clang_getCString(canon_type_str)));
+
+            da_append(&s->symtable, (Symbol){.name       = name,
+                                             .canon_name = canon_name,
+                                             .forward    = sym});
+        }
+    }
+
+    // TODO: handle enums
+    else if (kind == CXCursor_EnumDecl) {
+
+    }
+
+    // TODO: handle functions (we want to detect uses of auto-generated
+    // functions)
+    else if (kind == CXCursor_FunctionDecl) {
+
+    }
+
+    else {
+        // just ignore everything else
+    }
+
+    return result;
+}
+
+int parse_translation_unit(Parse_State *s, CXIndex index, string_view file,
+                           string_view clang_resource_dir) {
+    char const *cmd_args[] = {"-xc", "-resource-dir", clang_resource_dir.ptr};
+    int         cmd_args_count = 3;
+
+    printf("parsing: '%.*s'\n", (int)file.len, file.ptr);
+
+    auto unit =
+        clang_parseTranslationUnit(index, file.ptr, cmd_args, cmd_args_count,
+                                   nullptr, 0, CXTranslationUnit_None);
+    if (unit == nullptr) {
+        fprintf(stderr, "error: failed to parse translation unit: %.*s\n",
+                (int)file.len, file.ptr);
+        return 1;
+    }
+    defer { clang_disposeTranslationUnit(unit); }
+
+    auto cursor = clang_getTranslationUnitCursor(unit);
+    clang_visitChildren(cursor, parse_top_level, s);
+
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    Options options = parse_options(argc, argv);
+    defer { options_destroy(&options); }
+
+    if (options.flags & OPTION_VERBOSE_OPTIONS) options_dump(stderr, &options);
+
+    auto index = clang_createIndex(0, 1);
+    defer { clang_disposeIndex(index); }
+
+    Parse_State state = {.opt = &options};
+    defer {
+        da_destroy(&state.symtable);
+        arena_free(&state.arena);
+    }
+
+    add_builtin_types(&state);
+
+    for (size_t i = 0; i < options.input_files.len; ++i) {
+        int r =
+            parse_translation_unit(&state, index, options.input_files.items[i],
+                                   options.clang_resource_dir);
+        if (r) return r;
+    }
+
+    static char const *type_kind_str[Type_Record + 1] = {
+        [Type_Invalid] = "invalid", [Type_Integer] = "integer",
+        [Type_Real] = "real",       [Type_Pointer] = "pointer",
+        [Type_Record] = "record",
+    };
+
+    for (size_t i = 0; i < state.symtable.len; ++i) {
+        auto v = state.symtable.items[i];
+
+        // skip typedefs
+        if (v.forward) continue;
+
+        printf("declared '%.*s': ", (int)v.name.len, v.name.ptr);
+        if (v.info) {
+            printf("info.kind=%s\n", type_kind_str[v.info->kind]);
+
+            switch (v.info->kind) {
+            case Type_Invalid:
+                break;
+            case Type_Integer:
+                printf(" L width=%d, signed=%s\n",
+                       v.info->integer.byte_width * 8,
+                       v.info->integer.is_signed ? "yes" : "no");
+                break;
+            case Type_Real:
+                printf(" L width=%d\n", v.info->real.byte_width * 8);
+                break;
+            case Type_Pointer:
+                printf(" L inner=%s\n", v.info->pointer.inner->name);
+                break;
+            case Type_Record:
+                for (size_t i = 0; i < v.info->record.field_count; ++i) {
+                    printf(" L '%s':\n", v.info->record.fields[i].name);
+                }
+                break;
+            }
+        } else {
+            printf("<no info>\n");
+        }
+    }
+
+    return 0;
+}

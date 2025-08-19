@@ -1,1 +1,0 @@
-[{"span":{"begin":0,"end":1},"type":"Equal"},{"span":{"begin":2,"end":4},"type":"EqualEqual"},{"span":{"begin":5,"end":7},"type":"EqualGreater"},{"span":{"begin":7,"end":7},"type":"Eof"}]

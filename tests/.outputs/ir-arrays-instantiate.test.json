@@ -1,1 +1,0 @@
-{"stdout":"export func \"main\"() i32 {\n@0\n    %0 = Alloca<Array> 12/4\n    %1 = IntConst<i32> 1\n    Store +0, %0, %1\n    %3 = IntConst<i32> 2\n    Store +4, %0, %3\n    %5 = IntConst<i32> 3\n    Store +8, %0, %5\n    %7 = Copy<Array> %0\n    %8 = IntConst<i32> 0\n    ret %8\n}\n"}
