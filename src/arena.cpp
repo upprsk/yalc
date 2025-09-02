@@ -46,7 +46,7 @@ auto Arena::current_block() -> Block* {
 }
 
 auto Arena::new_block() -> Block* {
-    auto mem = malloc(BLOCK_SIZE);
+    auto mem = calloc(BLOCK_SIZE, sizeof(uint8_t));
     auto bytes = static_cast<uint8_t*>(mem);
     auto blk = static_cast<Block*>(mem);
 
