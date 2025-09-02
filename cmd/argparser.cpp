@@ -33,10 +33,11 @@ void print_help(std::string_view self) {
     println(stderr, "    --usage: show usage and exit.");
     println(stderr, "    --version: print compiler version.");
     println(stderr, "    --verbose <steps>: show more output (on stderr) for each step. This option");
-    println(stderr, "        accepts a list of steps separetd by commas: step1,step2. Thi option can");
+    println(stderr, "        accepts a list of steps separetd by commas: step1,step2. This option can");
     println(stderr, "        also be passed multiple times: --verbose step1 --verbose step2");
     println(stderr, "        available steps:");
-    println(stderr, "            exe: make the compiler plumming itself more verbose.");
+    println(stderr, "            all: apply all steps.");
+    println(stderr, "            yalc: make the compiler itself more verbose.");
     println(stderr, "            parser: make the parser verbose.");
     println(stderr, "            deps: make the dependency resolution vrebose.");
     println(stderr, "            sort: make top-level AST sorting and name resolution verbose.");
@@ -48,17 +49,9 @@ void print_help(std::string_view self) {
     println(stderr, "            tokens: dump tokenization result.");
     println(stderr, "            ast: dump parsed AST.");
     println(stderr, "            sorted: dump top-level name-resolved and sorted AST.");
-    println(stderr, "            attributes: dump AST after attributes are applied.");
-    println(stderr, "            named: dump AST full name resolutio.");
-    println(stderr, "            sema: dump the AST of each function after semantic-analysis.");
-    println(stderr, "            ir: dump the intermediate representation.");
-    println(stderr, "            ir-lower: dump the intermediate representation after lowering.");
     println(stderr, "            deps-mermaid: dump the results of top-level name-resolution as a");
     println(stderr, "                mermaid diagram.");
     println(stderr, "    -o,--output: path to output file (QBE)");
-    println(stderr, "    --dump-parsed-ast: dump the output of parsing as json");
-    println(stderr, "    --dump-named-ast: dump the output of name resolution as json");
-    println(stderr, "    --just-analyse: do not compile, just check the source");
     println(stderr, "    --error-format <format>: Change how errors are formatted.");
     println(stderr, "        available formats:");
     println(stderr, "            pretty: show the error message and context information in a readable way (default).");
@@ -101,8 +94,10 @@ auto argparse(int argc, char** argv) -> Args {
             for (auto it : rv::split(arg, ',')) {
                 std::string_view part{it};
 
-                if (part == "exe") {
-                    args.verbose = args.verbose.with_exe();
+                if (part == "all") {
+                    args.verbose = args.verbose.with_all();
+                } else if (part == "yalc") {
+                    args.verbose = args.verbose.with_yalc();
                 } else if (part == "parser") {
                     args.verbose = args.verbose.with_parser();
                 } else if (part == "deps") {
@@ -226,9 +221,10 @@ auto format_as(VerboseStep::Step step) -> std::string_view {
 
     switch (step) {
         case VerboseStep::None: name = "none"; break;
-        case VerboseStep::Exe: name = "exe"; break;
+        case VerboseStep::Yalc: name = "yalc"; break;
         case VerboseStep::Parser: name = "parser"; break;
         case VerboseStep::Sort: name = "sort"; break;
+        case VerboseStep::Deps: name = "deps"; break;
     }
 
     return name;
@@ -259,7 +255,7 @@ auto fmt::formatter<yalc::VerboseStep>::format(yalc::VerboseStep const& step,
     -> format_context::iterator {
     std::array steps{
         yalc::VerboseStep::None,
-        yalc::VerboseStep::Exe,
+        yalc::VerboseStep::Yalc,
         yalc::VerboseStep::Parser,
         yalc::VerboseStep::Sort,
     };

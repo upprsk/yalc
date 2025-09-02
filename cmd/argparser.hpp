@@ -26,14 +26,14 @@ struct DumpStep {
         DepsDebug = 1 << 9,
     };
 
-#define define_with(_name, _enum_case)                            \
-    [[nodiscard]] constexpr auto with_##_name() const->DumpStep { \
-        return {static_cast<Step>(value | _enum_case)};           \
+#define define_with(_name, _enum_case)                              \
+    [[nodiscard]] constexpr auto with_##_name() const -> DumpStep { \
+        return {static_cast<Step>(value | _enum_case)};             \
     }
 
-#define define_has(_name, _enum_case)                        \
-    [[nodiscard]] constexpr auto has_##_name() const->bool { \
-        return (value & _enum_case) != 0;                    \
+#define define_has(_name, _enum_case)                          \
+    [[nodiscard]] constexpr auto has_##_name() const -> bool { \
+        return (value & _enum_case) != 0;                      \
     }
 
 #define define_parts(_name, _enum_case) \
@@ -64,26 +64,26 @@ struct DumpStep {
 struct VerboseStep {
     enum Step {
         None = 0,
-        Exe = 1 << 1,
+        Yalc = 1 << 1,
         Parser = 1 << 2,
         Deps = 1 << 3,
         Sort = 1 << 4,
     };
 
-#define define_with(_name, _enum_case)                               \
-    [[nodiscard]] constexpr auto with_##_name() const->VerboseStep { \
-        return {static_cast<Step>(value | _enum_case)};              \
+#define define_with(_name, _enum_case)                                 \
+    [[nodiscard]] constexpr auto with_##_name() const -> VerboseStep { \
+        return {static_cast<Step>(value | _enum_case)};                \
     }
 
-#define define_has(_name, _enum_case)                        \
-    [[nodiscard]] constexpr auto has_##_name() const->bool { \
-        return (value & _enum_case) != 0;                    \
+#define define_has(_name, _enum_case)                          \
+    [[nodiscard]] constexpr auto has_##_name() const -> bool { \
+        return (value & _enum_case) != 0;                      \
     }
 
 #define define_parts(_name, _enum_case) \
     define_with(_name, _enum_case) define_has(_name, _enum_case)
 
-    define_parts(exe, Exe);
+    define_parts(yalc, Yalc);
     define_parts(parser, Parser);
     define_parts(deps, Deps);
     define_parts(sort, Sort);
@@ -91,6 +91,10 @@ struct VerboseStep {
 #undef define_with
 #undef define_has
 #undef define_parts
+
+    [[nodiscard]] constexpr auto with_all() const -> VerboseStep {
+        return {static_cast<Step>(value | -1)};
+    }
 
     [[nodiscard]] constexpr auto has(Step step) const -> bool {
         return (value & step) != 0;

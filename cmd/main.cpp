@@ -15,7 +15,7 @@
 
 auto main(int argc, char** argv) -> int {
     auto args = yalc::argparse(argc, argv);
-    if (args.verbose.has_exe()) fmt::println(stderr, "args: {}", args);
+    if (args.verbose.has_yalc()) fmt::println(stderr, "args: {}", args);
 
     auto fs = yal::FileStore{};
     auto er = yal::ErrorReporter{&fs, stderr, args.error_format};
@@ -36,7 +36,7 @@ auto main(int argc, char** argv) -> int {
             return 1;
         }
 
-        if (args.verbose.has_exe()) {
+        if (args.verbose.has_yalc()) {
             auto f = fs.get_file_by_id(id);
             fmt::println(stderr, "program: {} ({}B)", f->full_path,
                          f->contents.size());
@@ -87,7 +87,7 @@ auto main(int argc, char** argv) -> int {
             return 1;
         }
 
-        if (args.verbose.has_exe()) {
+        if (args.verbose.has_yalc()) {
             auto d = fs.get_dir_by_id(id);
             fmt::println(stderr, "program directory: {} ({} files)",
                          d->full_path, d->files.size());
@@ -100,6 +100,6 @@ auto main(int argc, char** argv) -> int {
         }
     }
 
-    if (args.verbose.has_exe()) fmt::println(stderr, "done!");
+    if (args.verbose.has_yalc()) fmt::println(stderr, "done!");
     return 0;
 }
