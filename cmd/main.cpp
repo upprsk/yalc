@@ -6,11 +6,11 @@
 
 #include "argparser.hpp"
 #include "ast.hpp"
-#include "decl.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
 #include "name_res.hpp"
 #include "parser.hpp"
+#include "symbol.hpp"
 #include "tokenizer.hpp"
 
 void test_sumithing() {
@@ -95,7 +95,7 @@ auto main(int argc, char** argv) -> int {
             fmt::println("{}", j.dump(2));
         }
 
-        auto decl_store = yal::DeclStore{};
+        auto decl_store = yal::SymbolStore{};
 
         auto mod = yal::sort_declarations_and_resolve_top_level(
             ast, decl_store, std::array{root}, er,

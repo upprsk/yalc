@@ -6,9 +6,9 @@
 #include <span>
 #include <string_view>
 
-#include "decl.hpp"
 #include "location.hpp"
 #include "macros.hpp"
+#include "symbol.hpp"
 
 namespace yal::ast {
 
@@ -105,7 +105,7 @@ struct Expr {
     ExprFlags flags;
     Location  loc{};
 
-    Decl* decl{};
+    Symbol* decl{};
 
     union {
         std::array<Expr*, 1> single;
@@ -328,7 +328,7 @@ struct Stmt {
     Location  loc{};
     Location  value_loc{};
 
-    Decl* decl{};
+    Symbol* decl{};
 
     union {
         struct {
@@ -487,7 +487,7 @@ class Node {
     // In case this is a defining node (like Func or Var), then this points to
     // the Decl that it defines. In case this is a refering node (Id), then this
     // points to the Decl that originated it.
-    Decl* decl{};
+    Symbol* decl{};
 
     // Used for union-find
     Node* forward{};
@@ -497,9 +497,9 @@ public:
 
     [[nodiscard]] constexpr auto get_kind() const -> NodeKind { return kind; }
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
-    [[nodiscard]] constexpr auto get_decl() const -> Decl* { return decl; }
+    [[nodiscard]] constexpr auto get_decl() const -> Symbol* { return decl; }
 
-    constexpr void set_decl(Decl* new_decl) { decl = new_decl; }
+    constexpr void set_decl(Symbol* new_decl) { decl = new_decl; }
 
     [[nodiscard]] constexpr auto is_err() const -> bool {
         return kind == NodeKind::Err;

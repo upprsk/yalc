@@ -7,10 +7,10 @@
 
 #include "arena.hpp"
 #include "ast.hpp"
-#include "decl.hpp"
 #include "error_reporter.hpp"
 #include "location.hpp"
 #include "node.hpp"
+#include "symbol.hpp"
 
 namespace yal {
 
@@ -713,12 +713,12 @@ class Resolved {
 
     ast::Node* node{};
     ast::Node* decl_node{};
-    Decl*      decl{};
+    Symbol*    decl{};
 
 public:
     constexpr Resolved() = default;
     constexpr Resolved(std::string_view name, ast::Node* node,
-                       ast::Node* decl_node, Decl* decl)
+                       ast::Node* decl_node, Symbol* decl)
         : name{name}, node{node}, decl_node{decl_node}, decl{decl} {}
 
     [[nodiscard]] constexpr auto get_name() const -> std::string_view {
@@ -726,7 +726,7 @@ public:
     }
 
     [[nodiscard]] constexpr auto get_node() const -> ast::Node* { return node; }
-    [[nodiscard]] constexpr auto get_decl() const -> Decl* { return decl; }
+    [[nodiscard]] constexpr auto get_decl() const -> Symbol* { return decl; }
 };
 
 class Env {
@@ -741,7 +741,7 @@ public:
     [[nodiscard]] auto child() -> Env { return {this}; }
 
     void define(std::string_view name, ast::Node* node, ast::Node* decl_node,
-                Decl* decl) {
+                Symbol* decl) {
         items[name] = {name, node, decl_node, decl};
     }
 
@@ -754,12 +754,12 @@ public:
 
 class NameRes {
     ast::Ast&             ast;
-    DeclStore&            ds;
+    SymbolStore&          ds;
     ErrorReporter&        er;
     NameResOptions const& opt;
 
 public:
-    NameRes(ast::Ast& ast, DeclStore& ds, ErrorReporter& er,
+    NameRes(ast::Ast& ast, SymbolStore& ds, ErrorReporter& er,
             NameResOptions const& opt)
         : ast{ast}, ds{ds}, er{er}, opt{opt} {}
 
@@ -853,7 +853,7 @@ private:
         }
 
         // FIXME: generate actual link name
-        auto decl = ds.new_decl(name_loc, name, name);
+        auto decl = ds.new_sym(name_loc, name, name);
         node->set_decl(decl);
         penv.define(name, node, node, decl);
 
@@ -882,7 +882,7 @@ private:
     void resolve_func_arg(Env& env, ast::NodeFuncArg* node) {
         // FIXME: generate actual link name
         auto name = node->get_name();
-        auto decl = ds.new_decl(node->get_loc(), name, name);
+        auto decl = ds.new_sym(node->get_loc(), name, name);
         node->set_decl(decl);
         env.define(name, node, node, decl);
     }
@@ -890,7 +890,7 @@ private:
     void resolve_func_named_ret(Env& env, ast::NodeFuncNamedRet* node) {
         // FIXME: generate actual link name
         auto name = node->get_name();
-        auto decl = ds.new_decl(node->get_loc(), name, name);
+        auto decl = ds.new_sym(node->get_loc(), name, name);
         node->set_decl(decl);
         env.define(name, node, node, decl);
     }
@@ -929,7 +929,7 @@ private:
             auto name = name_node->get_value();
 
             // FIXME: make actual link name
-            auto decl = ds.new_decl(node->get_loc(), name, name);
+            auto decl = ds.new_sym(node->get_loc(), name, name);
             decl_node->set_decl(decl);
             env.define(name, node, decl_node, decl);
         }
@@ -945,7 +945,7 @@ private:
 }  // namespace name_res
 
 auto sort_declarations_and_resolve_top_level(
-    ast::Ast& ast, DeclStore& ds, std::span<ast::NodeFile* const> root,
+    ast::Ast& ast, SymbolStore& ds, std::span<ast::NodeFile* const> root,
     ErrorReporter& er, NameResOptions const& opt) -> ast::NodeFlatModule* {
     ast::NodeFlatModule* resolved;
 

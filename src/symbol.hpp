@@ -11,14 +11,14 @@
 
 namespace yal {
 
-class Decl {
+class Symbol {
     Location         loc;
     std::string_view link_name;
     std::string_view local_name;
 
 public:
-    constexpr Decl(Location loc, std::string_view link_name,
-                   std::string_view local_name)
+    constexpr Symbol(Location loc, std::string_view link_name,
+                     std::string_view local_name)
         : loc{loc}, link_name{link_name}, local_name{local_name} {}
 
     [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
@@ -32,22 +32,22 @@ public:
     }
 };
 
-class DeclStore {
-    using map = ankerl::unordered_dense::map<std::string_view, Decl*>;
+class SymbolStore {
+    using map = ankerl::unordered_dense::map<std::string_view, Symbol*>;
 
-    map decls;
+    map syms;
 
     mem::Arena string_arena;
-    mem::Arena decl_arena;
+    mem::Arena sym_arena;
 
 public:
-    DeclStore() = default;
+    SymbolStore() = default;
 
-    auto new_decl(Location loc, std::string_view link_name,
-                  std::string_view local_name) -> Decl*;
+    auto new_sym(Location loc, std::string_view link_name,
+                 std::string_view local_name) -> Symbol*;
 
     [[nodiscard]] auto get_by_link_name(std::string_view link_name) const
-        -> Decl*;
+        -> Symbol*;
 
     // ========================================================================
 
@@ -56,16 +56,14 @@ public:
         map::const_iterator end;
     };
 
-    auto iter() -> Iter {
-        return {.begin = decls.cbegin(), .end = decls.cend()};
-    }
+    auto iter() -> Iter { return {.begin = syms.cbegin(), .end = syms.cend()}; }
 
 private:
     auto dupe_string(std::string_view s) -> std::string_view;
 };
 
-void to_json(nlohmann::json& j, Decl const& d);
+void to_json(nlohmann::json& j, Symbol const& d);
 
 }  // namespace yal
 
-define_formatter_from_string_view(yal::Decl);
+define_formatter_from_string_view(yal::Symbol);
