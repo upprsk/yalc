@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <libassert/assert.hpp>
 #include <span>
 #include <string_view>
 
@@ -10,6 +11,416 @@
 #include "macros.hpp"
 
 namespace yal::ast {
+
+/// All of the variants of expressions.
+enum struct ExprKind : uint8_t {
+    Err,
+
+    Neg,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+
+    Id,
+    Int,
+    String,
+};
+
+/// Flags for controlling layout of data inside of an expression.
+struct ExprFlags {
+    enum Bits {
+        None = 0,
+        ChildrenSingle = 1,
+        ChildrenPair = 2,
+    };
+
+    uint8_t value = 0;
+
+    /// Create flags from the given size.
+    ///
+    /// - size=1: ChildrenSingle
+    /// - size=2: ChildrenPair
+    /// - otherwise: no flags set
+    static constexpr auto from_size(size_t size) -> ExprFlags {
+        auto flags = ExprFlags{};
+        if (size == 1) {
+            flags |= ExprFlags::ChildrenSingle;
+        } else if (size == 2) {
+            flags |= ExprFlags::ChildrenPair;
+        }
+
+        return flags;
+    }
+
+    /// Is ChildrenSingle set?
+    [[nodiscard]] constexpr auto is_single() const -> bool {
+        return value & ChildrenSingle;
+    }
+
+    /// Is ChildrenPair set?
+    [[nodiscard]] constexpr auto is_pair() const -> bool {
+        return value & ChildrenPair;
+    }
+
+    constexpr auto operator|(ExprFlags::Bits const& r) const -> ExprFlags {
+        return {static_cast<uint8_t>(value | r)};
+    }
+
+    constexpr auto operator|=(ExprFlags::Bits const& r) -> ExprFlags {
+        value |= r;
+        return *this;
+    }
+};
+
+/// An expression in the AST.
+///
+/// The decl is used for expressions that consume identifiers (ExprKind::Id) to
+/// reference what is the declaration after name resolution.
+///
+/// Expressions support the union-find data-structure to allow non-destructive
+/// rewriting of the AST. This is done by the forward field and the find and
+/// make_equal_to methods.
+///
+/// > The union-find structure does not allow cycles, so nodes should be cloned
+/// > if needed in multiple places.
+///
+/// Children are optimized for beeing kept inline if there are less than 3. The
+/// flags control what layout to use.
+///
+/// - ChildrenSingle: children_as.single is active.
+/// - ChildrenPair: children_as.pair is active.
+/// - otherwise: children_as.ref is active.
+///
+/// What fields mean depends on kind.
+///
+/// - Neg, Add, Sub, Mul, Div, Mod: just two children for lhs and rhs of
+///   operation.
+/// - Id: No children, string_value has the identifier.
+/// - Int: No children, int_value has the value.
+/// - String: No children, string_value has the value.
+struct Expr {
+    ExprKind  kind;
+    ExprFlags flags;
+    Location  loc{};
+
+    Decl* decl{};
+
+    union {
+        std::array<Expr*, 1> single;
+        std::array<Expr*, 2> pair;
+        std::span<Expr*>     ref;
+    } children_as{};
+
+    Expr* forward{};
+
+    // NOLINTNEXTLINE(readability-redundant-member-init)
+    std::string_view string_value{};
+    uint64_t         int_value{};
+
+    /// Get the left child (the first one).
+    [[nodiscard]] constexpr auto lhs() const -> Expr* { return at(0); }
+
+    /// Get the right child (the second one).
+    [[nodiscard]] constexpr auto rhs() const -> Expr* { return at(1); }
+
+    /// Get all of the children.
+    [[nodiscard]] constexpr auto children() const -> std::span<Expr* const> {
+        if (flags.is_single()) return children_as.single;
+        if (flags.is_pair()) return children_as.pair;
+        return children_as.ref;
+    }
+
+    /// Get the children at a given index.
+    [[nodiscard]] constexpr auto at(size_t idx) const -> Expr* {
+        return children()[idx];
+    }
+
+    /// The find operation of union find.
+    [[nodiscard]] constexpr auto find() const -> Expr const* {
+        auto n = this;
+        while (n->forward) n = n->forward;
+        return n;
+    }
+
+    /// The find operation of union find.
+    [[nodiscard]] constexpr auto find() -> Expr* {
+        auto n = this;
+        while (n->forward) n = n->forward;
+        return n;
+    }
+
+    /// The union operation of union find.
+    constexpr void make_equal_to(Expr* other) {
+        auto n = find();
+        if (n != other) n->forward = other;
+    }
+};
+
+/// All of the variants of statements.
+enum struct StmtKind : uint8_t {
+    Err,
+
+    Block,
+    Return,
+    Expr,
+
+    Var,
+    MultiVar,
+};
+
+/// Data specially for a variable declaration statement.
+///
+/// Contains the list of names beeing declared as an array of Expr of kind
+/// ExprKind::Id. We store the full expression node of an Id so that we have an
+/// actual loc and decl for each.
+///
+/// Contains the list of type expressions and initializers. We can only
+/// correctly match the lengths of all three after typing.
+struct MultiVarStmt {
+    // TODO: optimize for the case where we have less than 3 items in the span.
+    std::span<Expr*> names;
+    std::span<Expr*> types;
+    std::span<Expr*> inits;
+};
+
+/// Flags for controlling layout of data inside of a statement.
+struct StmtFlags {
+    enum Bits {
+        None = 0,
+        ChildrenSingle = 1,
+        ChildrenPair = 2,
+    };
+
+    uint8_t value = 0;
+
+    /// Create flags from the given size.
+    ///
+    /// - size=1: ChildrenSingle
+    /// - size=2: ChildrenPair
+    /// - otherwise: no flags set
+    static constexpr auto from_size(size_t size) -> StmtFlags {
+        auto flags = StmtFlags{};
+        if (size == 1) {
+            flags |= StmtFlags::ChildrenSingle;
+        } else if (size == 2) {
+            flags |= StmtFlags::ChildrenPair;
+        }
+
+        return flags;
+    }
+
+    /// Is ChildrenSingle set?
+    [[nodiscard]] constexpr auto is_single() const -> bool {
+        return value & ChildrenSingle;
+    }
+
+    /// Is ChildrenPair set?
+    [[nodiscard]] constexpr auto is_pair() const -> bool {
+        return value & ChildrenPair;
+    }
+
+    constexpr auto operator|(StmtFlags::Bits const& r) const -> StmtFlags {
+        return {static_cast<uint8_t>(value | r)};
+    }
+
+    constexpr auto operator|=(StmtFlags::Bits const& r) -> StmtFlags {
+        value |= r;
+        return *this;
+    }
+};
+
+/// A statement in the AST.
+///
+/// The decl is used for statements that declare identifiers (StmtKind::Var) to
+/// reference what was declared after name resolution.
+///
+/// Statements support the union-find data-structure to allow non-destructive
+/// rewriting of the AST. This is done by the forward field and the find and
+/// make_equal_to methods.
+///
+/// > The union-find structure does not allow cycles, so nodes should be cloned
+/// > if needed in multiple places.
+///
+/// Children are optimized for beeing kept inline if there are less than 3. The
+/// flags control what layout to use.
+///
+/// - ChildrenSingle: children_as.single is active.
+/// - ChildrenPair: children_as.pair is active.
+/// - otherwise: children_as.ref is active.
+///
+/// Wether stmts or exprs are used depends on kind.
+///
+/// - Block: uses stmts
+/// - Return, Expr: uses exprs
+/// - Variable declarations: Var and MultiVar, see below.
+///
+/// #### Var
+///
+/// ```yal
+/// func f() {
+///     var x0: s32 = 10; // (1)
+///     var x1: s32;      // (2)
+///     var x2      = 10; // (3)
+/// }
+/// ```
+///
+/// value_loc is set to the location of the name and string_value to the name
+/// itself.
+///
+/// - (1): Children are the two expressions for s32 and 10.
+///
+///     (Var "x0"
+///       (Id "s32")
+///       (Int 10))
+///
+/// - (2): Children are the expression for s32 and nullptr.
+///
+///     (Var "x1"
+///       (Id "s32")
+///       #nullptr#)
+///
+/// - (3): Children are nullptr and the expression for 10.
+///
+///     (Var "x2"
+///       #nullptr#
+///       (Int 10))
+///
+/// #### MultiVar
+///
+/// ```yal
+/// func f() {
+///     var x0, x1: s32 = 10, 11; // (1)
+///     var x2, x3, x4: s32;      // (2)
+/// }
+/// ```
+///
+/// Use the special field var_stmt in children_as.
+///
+/// - (1) var_stmt.names has 2 names, one for each variable. var_stmt.types has
+///   a single expression for s32. var_stmt.inits has two expressions for 10
+///   and 11.
+///
+///     (MultiVar
+///       names:
+///         (Id "x0")
+///         (Id "x1")
+///       types:
+///         (Id "s32")
+///       inits:
+///         (Int 10)
+///         (Int 11))
+///
+/// - (2) var_stmt.names has 3 names, one for each variable. var_stmt.types has
+/// a single expression for s32. var_stmt.inits has no expressions.
+///
+///     (MultiVar
+///       names:
+///         (Id "x2")
+///         (Id "x3")
+///         (Id "x4")
+///       types:
+///         (Id "s32"))
+struct Stmt {
+    StmtKind  kind;
+    StmtFlags flags;
+    Location  loc{};
+    Location  value_loc{};
+
+    Decl* decl{};
+
+    union {
+        struct {
+            union {
+                std::array<Stmt*, 1> stmts;
+                std::array<Expr*, 1> exprs;
+            };
+        } single;
+        struct {
+            union {
+                std::array<Stmt*, 2> stmts;
+                std::array<Expr*, 2> exprs;
+            };
+        } pair;
+        struct {
+            union {
+                std::span<Stmt*> stmts;
+                std::span<Expr*> exprs;
+            };
+        } ref;
+        MultiVarStmt* var_stmt;
+    } children_as{};
+
+    // NOLINTNEXTLINE(readability-redundant-member-init)
+    std::string_view string_value{};
+
+    Stmt* forward{};
+
+    /// Get the children as expressions.
+    [[nodiscard]] constexpr auto expr_children() const
+        -> std::span<Expr* const> {
+        if (flags.is_single()) return children_as.single.exprs;
+        if (flags.is_pair()) return children_as.pair.exprs;
+        return children_as.ref.exprs;
+    }
+
+    /// Get the children as statements.
+    [[nodiscard]] constexpr auto stmt_children() const
+        -> std::span<Stmt* const> {
+        if (flags.is_single()) return children_as.single.stmts;
+        if (flags.is_pair()) return children_as.pair.stmts;
+        return children_as.ref.stmts;
+    }
+
+    /// Get the expression children at a given index
+    [[nodiscard]] constexpr auto expr_at(size_t idx) const -> Expr* {
+        return expr_children()[idx];
+    }
+
+    /// Get the statement children at a given index
+    [[nodiscard]] constexpr auto stmt_at(size_t idx) const -> Stmt* {
+        return stmt_children()[idx];
+    }
+
+    /// Get the MultiVarStmt data.
+    [[nodiscard]] constexpr auto multi_var_stmt() const -> MultiVarStmt* {
+        return children_as.var_stmt;
+    }
+
+    /// The find operation of union find.
+    [[nodiscard]] constexpr auto find() const -> Stmt const* {
+        auto n = this;
+        while (n->forward) n = n->forward;
+        return n;
+    }
+
+    /// The find operation of union find.
+    [[nodiscard]] constexpr auto find() -> Stmt* {
+        auto n = this;
+        while (n->forward) n = n->forward;
+        return n;
+    }
+
+    /// The union operation of union find.
+    constexpr void make_equal_to(Stmt* other) {
+        auto n = find();
+        if (n != other) n->forward = other;
+    }
+};
+
+void to_json(nlohmann::json& j, ExprKind const& n);
+void to_json(nlohmann::json& j, StmtKind const& n);
+
+void to_json(nlohmann::json& j, Expr const& n);
+void to_json(nlohmann::json& j, Stmt const& n);
+
+void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth = 0);
+void to_lisp(fmt::format_context& ctx, Stmt const& stmt, int depth = 0);
+
+// ============================================================================
+// OLD stuff
+// ============================================================================
 
 enum class NodeKind {
     Err,
@@ -689,6 +1100,16 @@ void to_json(nlohmann::json& j, NodeKind const& n);
 void to_json(nlohmann::json& j, Node const& t);
 
 }  // namespace yal::ast
+
+define_formatter_from_string_view(yal::ast::ExprKind);
+define_formatter_from_string_view(yal::ast::StmtKind);
+
+define_formatter_from_string_view(yal::ast::Expr);
+define_formatter_from_string_view(yal::ast::Stmt);
+
+// ============================================================================
+// OLD stuff
+// ============================================================================
 
 define_formatter_from_string_view(yal::ast::NodeKind);
 

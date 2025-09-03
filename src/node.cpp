@@ -14,6 +14,200 @@ namespace rv = std::ranges::views;
 namespace yal::ast {
 using nlohmann::json;
 
+void to_json(nlohmann::json& j, ExprKind const& n) { j = fmt::to_string(n); }
+void to_json(nlohmann::json& j, StmtKind const& n) { j = fmt::to_string(n); }
+
+void to_json(nlohmann::json& j, Expr const& n) {
+    j = json{
+        {        "kind",                          n.kind},
+        {         "loc",           fmt::to_string(n.loc)},
+        {        "decl", n.decl ? json{*n.decl} : json{}},
+        {"string_value",                  n.string_value},
+        {   "int_value",                     n.int_value},
+    };
+
+    auto children = json::array();
+    for (auto const& child : n.children()) {
+        if (child) {
+            children.push_back(*child);
+        } else
+            children.push_back(json{});
+    }
+
+    j["children"] = children;
+}
+
+void to_json(nlohmann::json& j, Stmt const& n) {
+    j = json{
+        {        "kind",                          n.kind},
+        {         "loc",           fmt::to_string(n.loc)},
+        {   "value_loc",     fmt::to_string(n.value_loc)},
+        {        "decl", n.decl ? json{*n.decl} : json{}},
+        {"string_value",                  n.string_value},
+    };
+
+    if (n.kind == StmtKind::Block) {
+        auto children = json::array();
+        for (auto const& child : n.stmt_children()) {
+            if (child) {
+                children.push_back(*child);
+            } else
+                children.push_back(json{});
+        }
+
+        j["children"] = children;
+    }
+
+    else if (n.kind == StmtKind::Return || n.kind == StmtKind::Expr ||
+             n.kind == StmtKind::Var) {
+        auto children = json::array();
+        for (auto const& child : n.expr_children()) {
+            if (child) {
+                children.push_back(*child);
+            } else
+                children.push_back(json{});
+        }
+
+        j["children"] = children;
+    }
+
+    else if (n.kind == StmtKind::MultiVar) {
+        auto children = json::array();
+        for (auto const& name : n.multi_var_stmt()->names) {
+            if (name)
+                children.push_back(*name);
+            else
+                children.push_back(json{});
+        }
+
+        j["names"] = children;
+
+        children.clear();
+        for (auto const& type : n.multi_var_stmt()->types) {
+            if (type)
+                children.push_back(*type);
+            else
+                children.push_back(json{});
+        }
+
+        j["types"] = children;
+
+        children.clear();
+        for (auto const& init : n.multi_var_stmt()->inits) {
+            if (init)
+                children.push_back(*init);
+            else
+                children.push_back(json{});
+        }
+
+        j["inits"] = children;
+    }
+}
+
+void indent_by(fmt::format_context& ctx, int depth) {
+    while (depth--) {
+        fmt::format_to(ctx.out(), "  ");
+    }
+}
+
+// same as indent_by, but moves to the next line before indenting
+void indent_by_wln(fmt::format_context& ctx, int depth) {
+    fmt::format_to(ctx.out(), "\n");
+    while (depth--) {
+        fmt::format_to(ctx.out(), "  ");
+    }
+}
+
+void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
+    // TODO: when we get types, we add them right here after the node kind
+    fmt::format_to(ctx.out(), "({}Expr", expr.kind);
+
+    if (expr.kind == ExprKind::Id || expr.kind == ExprKind::String) {
+        fmt::format_to(ctx.out(), " {:?}", expr.string_value);
+    } else if (expr.kind == ExprKind::Int) {
+        fmt::format_to(ctx.out(), " {}", expr.int_value);
+    }
+
+    if (expr.decl) {
+        indent_by_wln(ctx, depth + 1);
+        fmt::format_to(ctx.out(), "decl: {}", *expr.decl);
+    }
+
+    for (auto const& child : expr.children()) {
+        indent_by_wln(ctx, depth + 1);
+        if (child)
+            to_lisp(ctx, *child, depth + 1);
+        else
+            fmt::format_to(ctx.out(), "#nullptr#");
+    }
+
+    fmt::format_to(ctx.out(), ")");
+}
+
+void to_lisp(fmt::format_context& ctx, Stmt const& stmt, int depth) {
+    fmt::format_to(ctx.out(), "({}Stmt", stmt.kind);
+
+    if (stmt.decl) {
+        indent_by_wln(ctx, depth + 1);
+        fmt::format_to(ctx.out(), "decl: {}", *stmt.decl);
+    }
+
+    if (stmt.kind == StmtKind::Block) {
+        for (auto const& child : stmt.stmt_children()) {
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, *child, depth + 1);
+        }
+    }
+
+    else if (stmt.kind == StmtKind::Return || stmt.kind == StmtKind::Expr ||
+             stmt.kind == StmtKind::Var) {
+        for (auto const& child : stmt.expr_children()) {
+            indent_by_wln(ctx, depth + 1);
+            if (child)
+                to_lisp(ctx, *child, depth + 1);
+            else
+                fmt::format_to(ctx.out(), "#nullptr#");
+        }
+    }
+
+    else if (stmt.kind == StmtKind::MultiVar) {
+        auto types = stmt.multi_var_stmt();
+
+        if (!types->names.empty()) {
+            indent_by_wln(ctx, depth + 1);
+            fmt::format_to(ctx.out(), "names:");
+            for (auto const& name : types->names) {
+                indent_by_wln(ctx, depth + 2);
+                to_lisp(ctx, *name, depth + 2);
+            }
+        }
+
+        if (!types->types.empty()) {
+            indent_by_wln(ctx, depth + 1);
+            fmt::format_to(ctx.out(), "types:");
+            for (auto const& type : types->types) {
+                indent_by_wln(ctx, depth + 2);
+                to_lisp(ctx, *type, depth + 2);
+            }
+        }
+
+        if (!types->inits.empty()) {
+            indent_by_wln(ctx, depth + 1);
+            fmt::format_to(ctx.out(), "inits:");
+            for (auto const& init : types->inits) {
+                indent_by_wln(ctx, depth + 2);
+                to_lisp(ctx, *init, depth + 2);
+            }
+        }
+    }
+
+    fmt::format_to(ctx.out(), ")");
+}
+
+// ============================================================================
+// OLD IDEAS
+// ============================================================================
+
 auto to_json_array(std::span<Node* const> nodes) -> json {
     auto array = json::array();
     for (auto child : nodes) {
@@ -60,7 +254,7 @@ void Node::to_json_children(nlohmann::json& j) const {
 // ============================================================================
 
 #define define_as_node_kind(name, kind)                             \
-    auto as_node_##name(Node* n)->Node##kind* {                     \
+    auto as_node_##name(Node* n) -> Node##kind* {                   \
         if (!n) return nullptr;                                     \
         ASSERT(n->get_kind() == NodeKind::kind, "expected " #kind); \
         return static_cast<Node##kind*>(n);                         \
@@ -387,7 +581,62 @@ void NodeString::to_json(nlohmann::json& j) const {
 void to_json(nlohmann::json& j, NodeKind const& n) { j = fmt::to_string(n); }
 
 void to_json(nlohmann::json& j, Node const& t) { t.to_json(j); }
+
 }  // namespace yal::ast
+
+auto fmt::formatter<yal::ast::StmtKind>::format(yal::ast::StmtKind const& p,
+                                                format_context& ctx) const
+    -> format_context ::iterator {
+    std::string_view name = "???";
+    switch (p) {
+        case yal::ast::StmtKind::Err: name = "Err"; break;
+        case yal::ast::StmtKind::Block: name = "Block"; break;
+        case yal::ast::StmtKind::Return: name = "Return"; break;
+        case yal::ast::StmtKind::Expr: name = "Expr"; break;
+        case yal::ast::StmtKind::Var: name = "Var"; break;
+        case yal::ast::StmtKind::MultiVar: name = "MultiVar"; break;
+    }
+
+    return formatter<string_view>::format(name, ctx);
+}
+
+auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
+                                                format_context& ctx) const
+    -> format_context ::iterator {
+    std::string_view name = "???";
+    switch (p) {
+        case yal::ast::ExprKind::Err: name = "Err"; break;
+        case yal::ast::ExprKind::Neg: name = "Neg"; break;
+        case yal::ast::ExprKind::Add: name = "Add"; break;
+        case yal::ast::ExprKind::Sub: name = "Sub"; break;
+        case yal::ast::ExprKind::Mul: name = "Mul"; break;
+        case yal::ast::ExprKind::Div: name = "Div"; break;
+        case yal::ast::ExprKind::Mod: name = "Mod"; break;
+        case yal::ast::ExprKind::Id: name = "Id"; break;
+        case yal::ast::ExprKind::Int: name = "Int"; break;
+        case yal::ast::ExprKind::String: name = "String"; break;
+    }
+
+    return formatter<string_view>::format(name, ctx);
+}
+
+auto fmt::formatter<yal::ast::Expr>::format(yal::ast::Expr const& p,
+                                            format_context&       ctx) const
+    -> format_context::iterator {
+    yal::ast::to_lisp(ctx, p);
+    return ctx.out();
+}
+
+auto fmt::formatter<yal::ast::Stmt>::format(yal::ast::Stmt const& p,
+                                            format_context&       ctx) const
+    -> format_context::iterator {
+    yal::ast::to_lisp(ctx, p);
+    return ctx.out();
+}
+
+// ============================================================================
+// OLD stuff
+// ============================================================================
 
 auto fmt::formatter<yal::ast::NodeKind>::format(yal::ast::NodeKind const& p,
                                                 format_context& ctx) const

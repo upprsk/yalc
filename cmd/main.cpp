@@ -13,9 +13,47 @@
 #include "parser.hpp"
 #include "tokenizer.hpp"
 
+void test_sumithing() {
+    using namespace yal::ast;
+
+    auto file = File{};
+
+    std::vector<Stmt*> stmts;
+
+    stmts.push_back(file.stmt_expr({}, file.expr_id({}, "hi")));
+    stmts.push_back(file.stmt_expr({}, file.expr_int({}, 1234)));
+    stmts.push_back(file.stmt_expr({}, file.expr_string({}, "a string!")));
+
+    stmts.push_back(
+        file.stmt_var({}, "x0", {}, file.expr_id({}, "s32"), nullptr));
+
+    stmts.push_back(file.stmt_multi_var(
+        {}, std::array{file.expr_id({}, "x1"), file.expr_id({}, "x2")}, {},
+        std::array{file.expr_int({}, 11), file.expr_id({}, "hi")}));
+
+    stmts.push_back(file.stmt_block(
+        {},
+        std::array{
+            file.stmt_expr(
+                {},
+                file.expr_arith({}, ExprKind::Add, file.expr_string({}, "yay!"),
+                                file.expr_string({}, "much happy!"))),
+            file.stmt_expr({}, file.expr_neg({}, file.expr_int({}, 0x10)))}));
+
+    stmts.push_back(file.stmt_return(
+        {}, std::array{file.expr_id({}, "hi"), file.expr_int({}, 5678)}));
+
+    auto block = file.stmt_block({}, stmts);
+
+    fmt::println("{}", *block);
+    exit(0);
+}
+
 auto main(int argc, char** argv) -> int {
     auto args = yalc::argparse(argc, argv);
     if (args.verbose.has_yalc()) fmt::println(stderr, "args: {}", args);
+
+    test_sumithing();
 
     auto fs = yal::FileStore{};
     auto er = yal::ErrorReporter{&fs, stderr, args.error_format};

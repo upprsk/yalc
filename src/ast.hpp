@@ -9,6 +9,151 @@
 
 namespace yal::ast {
 
+class File {
+    mem::Arena node_arena;
+    mem::Arena strings_arena;
+
+public:
+    // Expressions
+    // ----------
+    auto expr_neg(Location loc, Expr* child) -> Expr* {
+        return node_arena.create<Expr>(Expr{
+            .kind = ExprKind::Neg,
+            .flags = {ExprFlags::ChildrenSingle},
+            .loc = loc,
+            .children_as = {.single = {child}},
+        });
+    }
+
+    auto expr_arith(Location loc, ExprKind kind, Expr* lhs, Expr* rhs)
+        -> Expr* {
+        return node_arena.create<Expr>(Expr{
+            .kind = kind,
+            .flags = {ExprFlags::ChildrenPair},
+            .loc = loc,
+            .children_as = {.pair = {lhs, rhs}},
+        });
+    }
+
+    auto expr_id(Location loc, std::string_view value) -> Expr* {
+        return node_arena.create<Expr>(Expr{
+            .kind = ExprKind::Id,
+            .flags = {},
+            .loc = loc,
+            .string_value = strings_arena.alloc_string_view(value),
+        });
+    }
+
+    auto expr_int(Location loc, uint64_t value) -> Expr* {
+        return node_arena.create<Expr>(Expr{
+            .kind = ExprKind::Int,
+            .flags = {},
+            .loc = loc,
+            .int_value = value,
+        });
+    }
+
+    auto expr_string(Location loc, std::string_view value) -> Expr* {
+        return node_arena.create<Expr>(Expr{
+            .kind = ExprKind::String,
+            .flags = {},
+            .loc = loc,
+            .string_value = strings_arena.alloc_string_view(value),
+        });
+    }
+
+    // Statements
+    // ----------
+
+    auto stmt_block(Location loc, std::span<Stmt* const> children) -> Stmt* {
+        auto flags = StmtFlags::from_size(children.size());
+        auto node = node_arena.create<Stmt>(Stmt{
+            .kind = StmtKind::Block,
+            .flags = flags,
+            .loc = loc,
+        });
+
+        if (flags.is_single()) {
+            node->children_as.single.stmts = {children[0]};
+        } else if (flags.is_pair()) {
+            node->children_as.pair.stmts = {children[0], children[1]};
+        } else {
+            node->children_as.ref.stmts = node_arena.alloc<Stmt*>(children);
+        }
+
+        return node;
+    }
+
+    auto stmt_return(Location loc, std::span<Expr* const> children) -> Stmt* {
+        return stmt_with_exprs(loc, StmtKind::Return, children);
+    }
+
+    auto stmt_expr(Location loc, Expr* child) -> Stmt* {
+        auto node = node_arena.create<Stmt>(Stmt{
+            .kind = StmtKind::Expr,
+            .flags = {StmtFlags::ChildrenSingle},
+            .loc = loc,
+            .children_as = {.single = {.exprs = {child}}},
+        });
+
+        return node;
+    }
+
+    auto stmt_var(Location loc, std::string_view name, Location name_loc,
+                  Expr* type, Expr* init) -> Stmt* {
+        auto node = node_arena.create<Stmt>(Stmt{
+            .kind = StmtKind::Var,
+            .flags = {StmtFlags::ChildrenPair},
+            .loc = loc,
+            .value_loc = name_loc,
+            .children_as = {.pair = {.exprs = {type, init}}},
+            .string_value = strings_arena.alloc_string_view(name),
+        });
+
+        return node;
+    }
+
+    auto stmt_multi_var(Location loc, std::span<Expr* const> names,
+                        std::span<Expr* const> types,
+                        std::span<Expr* const> inits) -> Stmt* {
+        auto var_stmt = node_arena.create<MultiVarStmt>(MultiVarStmt{
+            .names = node_arena.alloc<Expr*>(names),
+            .types = node_arena.alloc<Expr*>(types),
+            .inits = node_arena.alloc<Expr*>(inits),
+        });
+
+        auto node = node_arena.create<Stmt>(Stmt{
+            .kind = StmtKind::MultiVar,
+            .flags = {},
+            .loc = loc,
+            .children_as = {.var_stmt = var_stmt},
+        });
+
+        return node;
+    }
+
+private:
+    auto stmt_with_exprs(Location loc, StmtKind kind,
+                         std::span<Expr* const> children) -> Stmt* {
+        auto flags = StmtFlags::from_size(children.size());
+        auto node = node_arena.create<Stmt>(Stmt{
+            .kind = kind,
+            .flags = flags,
+            .loc = loc,
+        });
+
+        if (flags.is_single()) {
+            node->children_as.single.exprs = {children[0]};
+        } else if (flags.is_pair()) {
+            node->children_as.pair.exprs = {children[0], children[1]};
+        } else {
+            node->children_as.ref.exprs = node_arena.alloc<Expr*>(children);
+        }
+
+        return node;
+    }
+};
+
 class Ast {
     mem::Arena node_arena;
     mem::Arena strings_arena;

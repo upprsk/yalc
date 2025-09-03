@@ -34,3 +34,9 @@ void to_json(nlohmann::json& j, Decl const& d) {
 }
 
 }  // namespace yal
+
+auto fmt::formatter<yal::Decl>::format(yal ::Decl const& p,
+                                       format_context&   ctx) const
+    -> format_context ::iterator {
+    return fmt::format_to(ctx.out(), "{}", nlohmann::json{p}.dump());
+}
