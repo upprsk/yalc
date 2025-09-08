@@ -149,7 +149,9 @@ auto main_single_file(yalc::Args const& args, yal::FileStore& fs,
         .files = std::move(files),
     };
 
-    yal::ast::sort::perform_sort(er, module);
+    yal::ast::sort::perform_sort(er, module,
+                                 {.verbose_deps = args.verbose.has_deps(),
+                                  .verbose_sort = args.verbose.has_sort()});
 
     return 0;
 }
@@ -190,7 +192,9 @@ auto main_default(yalc::Args const& args, yal::FileStore& fs,
         fmt::println("{}", j.dump(2));
     }
 
-    yal::ast::sort::perform_sort(er, module);
+    yal::ast::sort::perform_sort(er, module,
+                                 {.verbose_deps = args.verbose.has_deps(),
+                                  .verbose_sort = args.verbose.has_sort()});
 
     return 0;
 }

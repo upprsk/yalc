@@ -384,7 +384,7 @@ auto sort_globals(ErrorReporter& er, std::vector<GlobalSymbol*> items)
     return sorted;
 }
 
-void perform_sort(ErrorReporter& er, Module const& module) {
+void perform_sort(ErrorReporter& er, Module const& module, Options const& opt) {
     auto s = State{.arena = {}, .gsym_map = {}, .er = er};
 
     for (auto const& file : module.files) {
@@ -402,20 +402,24 @@ void perform_sort(ErrorReporter& er, Module const& module) {
     // create list without deplicates
     auto all_symbols = vector_without_duplicates(s);
 
-    // for (auto const& [_, n] : s.scope.items) {
-    //     er.report_note(
-    //         n->decl->loc, "gsym {} in_degree={}, required_by={}", n->name,
-    //         n->in_degree,
-    //         n->required_by |
-    //             std::views::transform([](GlobalSymbol* g) { return g->name;
-    //             }));
-    // }
+    if (opt.verbose_deps) {
+        for (auto const& [_, n] : s.scope.items) {
+            er.report_note(
+                n->decl->loc, "gsym {} in_degree={}, required_by={}", n->name,
+                n->in_degree,
+                n->required_by | std::views::transform(
+                                     [](GlobalSymbol* g) { return g->name; }));
+        }
+    }
 
     auto sorted = sort_globals(er, all_symbols);
-    for (auto const& [idx, gsym] : std::views::enumerate(sorted)) {
-        auto decl = gsym->decl;
-        er.report_debug(decl->loc, "[{}] found gsym: {} ({})", idx, gsym->name,
-                        fmt::ptr(gsym));
+
+    if (opt.verbose_sort) {
+        for (auto const& [idx, gsym] : std::views::enumerate(sorted)) {
+            auto decl = gsym->decl;
+            er.report_debug(decl->loc, "[{}] found gsym: {} ({})", idx,
+                            gsym->name, fmt::ptr(gsym));
+        }
     }
 }
 

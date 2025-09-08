@@ -10,6 +10,11 @@
 
 namespace yal::ast::sort {
 
-void perform_sort(ErrorReporter& er, Module const& module);
+struct Options {
+    bool verbose_deps = false;
+    bool verbose_sort = false;
+};
+
+void perform_sort(ErrorReporter& er, Module const& module, Options const& opt = {});
 
 }  // namespace yal::ast::sort
