@@ -271,6 +271,21 @@ private:
     }
 };
 
+/// Just the `module <name>;` part of a file.
+struct ModuleDecl {
+    std::string name;
+    Location    name_loc;
+
+    FileId file;
+};
+
+/// An entire module, maybe composed of many files.
+struct Module {
+    std::string       name;
+    std::vector<File> files;
+};
+
 void to_json(nlohmann::json& j, File const& n);
+void to_json(nlohmann::json& j, Module const& n);
 
 }  // namespace yal::ast

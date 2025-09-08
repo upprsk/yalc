@@ -23,4 +23,16 @@ void to_json(nlohmann::json& j, File const& n) {
     j["decls"] = arr;
 }
 
+void to_json(nlohmann::json& j, Module const& n) {
+    j = json{
+        {"name", n.name}
+    };
+
+    auto arr = json::array();
+    for (auto const& f : n.files) {
+        arr.push_back(f);
+    }
+
+    j["files"] = arr;
+}
 }  // namespace yal::ast

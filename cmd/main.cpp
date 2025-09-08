@@ -9,12 +9,13 @@
 #include "ast.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
+#include "node.hpp"
 #include "parser.hpp"
 #include "symbol.hpp"
 #include "tokenizer.hpp"
 
-auto ingest_file(yalc::Args const& args, yal::LocalErrorReporter const& er)
-    -> yal::ast::File {
+auto tokenize_and_parse(yalc::Args const&              args,
+                        yal::LocalErrorReporter const& er) -> yal::ast::File {
     auto tokens = yal::tokenize(er);
     if (args.dump.has_tokens()) {
         nlohmann::json j = tokens;
@@ -25,12 +26,24 @@ auto ingest_file(yalc::Args const& args, yal::LocalErrorReporter const& er)
     yal::parse_into_ast_file(tokens, file_ast, er,
                              {.verbose = args.verbose.has_parser()});
 
-    if (args.dump.has_ast()) {
-        nlohmann::json j = file_ast;
+    return file_ast;
+}
+
+auto parse_module_name(yalc::Args const&              args,
+                       yal::LocalErrorReporter const& er)
+    -> yal::ast::ModuleDecl {
+    // TODO: make something more efficient than tokenizing the entire file. Or
+    // we can cache this!
+    auto tokens = yal::tokenize(er);
+    if (args.dump.has_tokens()) {
+        nlohmann::json j = tokens;
         fmt::println("{}", j.dump(2));
     }
 
-    return file_ast;
+    auto mod = yal::parse_module_declaration(tokens, er);
+    // TODO: do we want to dump this like we do with ast?
+
+    return mod;
 }
 
 auto main(int argc, char** argv) -> int {
@@ -56,15 +69,19 @@ auto main(int argc, char** argv) -> int {
                          f->contents.size());
         }
 
-        ingest_file(args, er.for_file(id));
+        auto file_ast = tokenize_and_parse(args, er.for_file(id));
+        if (args.dump.has_ast()) {
+            nlohmann::json j = file_ast;
+            fmt::println("{}", j.dump(2));
+        }
     } else {
-        auto id = fs.add_file(args.program);
-        if (id.is_invalid()) {
+        auto root_fid = fs.add_file(args.program);
+        if (root_fid.is_invalid()) {
             fmt::println(stderr, "invalid file: {}", args.program);
             return 1;
         }
 
-        auto dir_id = fs.get_dir_containing(id);
+        auto dir_id = fs.get_dir_containing(root_fid);
         auto dir = fs.get_dir_by_id(dir_id);
         if (args.verbose.has_yalc()) {
             fmt::println(stderr, "program directory: {} ({} files)",
@@ -72,12 +89,77 @@ auto main(int argc, char** argv) -> int {
 
             for (auto fileid : dir->files) {
                 auto f = fs.get_file_by_id(fileid);
-                fmt::println(stderr, "- file: {} ({}B)", f->full_path,
+                fmt::println(stderr, "- file: {} ({}B)", f->original_path,
                              f->contents.size());
             }
         }
 
-        ingest_file(args, er.for_file(id));
+        auto root_file_ast = tokenize_and_parse(args, er.for_file(root_fid));
+        if (root_file_ast.get_module_name().empty()) {
+            fmt::println(stderr, "can not determine module of: {}",
+                         args.program);
+            fmt::println(stderr, "forgot `module module_name;`?");
+
+            return 1;
+        }
+
+        auto root_module_id =
+            fs.add_module(root_file_ast.get_module_name(), dir_id);
+        for (auto file_id : dir->files) {
+            auto mod = parse_module_name(args, er.for_file(file_id));
+            if (mod.name.empty()) {
+                if (args.verbose.has_yalc()) {
+                    fmt::println(stderr,
+                                 "failed to parse module declaration of: {}",
+                                 fs.get_file_by_id(file_id)->original_path);
+                }
+
+                continue;
+            }
+
+            auto mod_id = fs.find_module(mod.name, dir_id);
+            if (mod_id.is_invalid()) {
+                // create a new module for it
+                auto m = fs.add_module(mod.name, dir_id);
+                fs.add_file_to_module(m, file_id);
+                continue;
+            }
+
+            fs.add_file_to_module(mod_id, file_id);
+        }
+
+        if (args.verbose.has_yalc()) {
+            auto modules = fs.get_all_modules();
+            fmt::println(stderr, "scan found {} modules (root is {:?})",
+                         modules.size(), root_file_ast.get_module_name());
+
+            for (auto const& module : modules) {
+                fmt::println(stderr, "module {:?}", module.name);
+                for (auto const& fid : module.files) {
+                    auto f = fs.get_file_by_id(fid);
+                    fmt::println(stderr, "- {}", f->original_path);
+                }
+            }
+        }
+
+        auto root_module = fs.get_module_by_id(root_module_id);
+        DEBUG_ASSERT(root_module != nullptr);
+
+        std::vector<yal::ast::File> files_of_module;
+        files_of_module.push_back(std::move(root_file_ast));
+        for (auto fid : root_module->files) {
+            if (fid != root_fid) {
+                auto file_ast = tokenize_and_parse(args, er.for_file(fid));
+                files_of_module.push_back(std::move(file_ast));
+            }
+        }
+
+        auto module = yal::ast::Module{.name = std::string{root_module->name},
+                                       .files = std::move(files_of_module)};
+        if (args.dump.has_ast()) {
+            nlohmann::json j = module;
+            fmt::println("{}", j.dump(2));
+        }
     }
 
     if (args.verbose.has_yalc()) fmt::println(stderr, "done!");

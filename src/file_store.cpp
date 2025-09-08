@@ -84,6 +84,25 @@ auto FileStore::add_dir_and_contents_full(std::string_view        path,
     return add_dir_and_contents_nocheck(path, full_path, contents);
 }
 
+auto FileStore::add_module(std::string_view module_name, DirId dir_id)
+    -> ModuleId {
+    auto id = find_module(module_name, dir_id);
+    if (id.is_valid()) return id;
+
+    return add_module_nocheck(module_name, dir_id);
+}
+
+void FileStore::add_file_to_module(ModuleId mid, FileId fid) {
+    auto m = get_module_by_id(mid);
+    if (!m) return;  // NOTE: should we say something?
+
+    // Do not add twice
+    // NOTE: should we ray something?
+    if (std::ranges::contains(m->files, fid)) return;
+
+    m->files.push_back(fid);
+}
+
 auto FileStore::get_file_by_id(FileId id) const -> std::optional<File> {
     if (id.value() < files.size()) return files.at(id.value());
     return std::nullopt;
@@ -119,6 +138,25 @@ auto FileStore::get_dir_containing(FileId fid) -> DirId {
     if (!path.has_parent_path()) return {};
 
     return add_dir(path.parent_path().c_str());
+}
+
+auto FileStore::find_module(std::string_view name, DirId id) const -> ModuleId {
+    auto it = std::ranges::find_if(modules, [&](Module const &m) {
+        return m.name == name && m.dir == id;
+    });
+    if (it == modules.end()) return {};
+
+    return it->id;
+}
+
+auto FileStore::get_module_by_id(ModuleId id) const -> Module const * {
+    if (id.value() < modules.size()) return &modules.at(id.value());
+    return nullptr;
+}
+
+auto FileStore::get_module_by_id(ModuleId id) -> Module * {
+    if (id.value() < modules.size()) return &modules.at(id.value());
+    return nullptr;
 }
 
 auto FileStore::read_entire_file(std::string const &path)
@@ -172,6 +210,21 @@ auto FileStore::add_dir_and_contents_nocheck(std::string_view        path,
     };
 
     dirs.push_back(d);
+
+    return id;
+}
+
+auto FileStore::add_module_nocheck(std::string_view module_name, DirId dir_id)
+    -> ModuleId {
+    auto id = ModuleId::from_raw_data(modules.size());
+    auto m = Module{
+        .id = id,
+        .name = small_arena.alloc_string_view(module_name),
+        .dir = dir_id,
+        .files = {},
+    };
+
+    modules.push_back(m);
 
     return id;
 }

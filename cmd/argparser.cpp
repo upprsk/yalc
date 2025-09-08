@@ -39,8 +39,8 @@ void print_help(std::string_view self) {
     println(stderr, "            all: apply all steps.");
     println(stderr, "            yalc: make the compiler itself more verbose.");
     println(stderr, "            parser: make the parser verbose.");
-    println(stderr, "            deps: make the dependency resolution vrebose.");
-    println(stderr, "            sort: make top-level AST sorting and name resolution verbose.");
+    println(stderr, "            deps: make the dependency resolution verbose.");
+    println(stderr, "            sort: make top-level AST sorting verbose.");
     println(stderr, "    --file: single file compilation mode.");
     println(stderr, "    --dump <step>: dump the result of an internal compilation step. This option");
     println(stderr, "        accepts a list of steps separated by a comma: step1,step2. The option");
@@ -127,18 +127,6 @@ auto argparse(int argc, char** argv) -> Args {
                     args.dump = args.dump.with_tokens();
                 } else if (part == "ast") {
                     args.dump = args.dump.with_ast();
-                } else if (part == "sorted") {
-                    args.dump = args.dump.with_sorted();
-                } else if (part == "attributes") {
-                    args.dump = args.dump.with_attributes();
-                } else if (part == "named") {
-                    args.dump = args.dump.with_named();
-                } else if (part == "sema") {
-                    args.dump = args.dump.with_sema();
-                } else if (part == "ir") {
-                    args.dump = args.dump.with_ir();
-                } else if (part == "ir-lower") {
-                    args.dump = args.dump.with_ir_lower();
                 } else if (part == "deps-mermaid") {
                     args.dump = args.dump.with_deps_mermaid();
                 } else {
@@ -203,14 +191,7 @@ auto format_as(DumpStep::Step step) -> std::string_view {
         case DumpStep::None: s = "none"; break;
         case DumpStep::Tokens: s = "tokens"; break;
         case DumpStep::Ast: s = "ast"; break;
-        case DumpStep::Sorted: s = "sorted"; break;
-        case DumpStep::Attributes: s = "attributes"; break;
-        case DumpStep::Named: s = "named"; break;
-        case DumpStep::Sema: s = "sema"; break;
-        case DumpStep::Ir: s = "ir"; break;
-        case DumpStep::IrLower: s = "ir-lower"; break;
         case DumpStep::DepsMermaid: s = "deps-mermaid"; break;
-        case DumpStep::DepsDebug: s = "deps-debug"; break;
     }
 
     return s;
@@ -238,11 +219,9 @@ auto fmt::formatter<yalc::DumpStep>::format(yalc::DumpStep const& step,
                                             format_context&       ctx) const
     -> format_context::iterator {
     std::array steps{
-        yalc::DumpStep::Tokens,      yalc::DumpStep::Ast,
-        yalc::DumpStep::Sorted,      yalc::DumpStep::Attributes,
-        yalc::DumpStep::Named,       yalc::DumpStep::Sema,
-        yalc::DumpStep::Ir,          yalc::DumpStep::IrLower,
-        yalc::DumpStep::DepsMermaid, yalc::DumpStep::DepsDebug,
+        yalc::DumpStep::Tokens,
+        yalc::DumpStep::Ast,
+        yalc::DumpStep::DepsMermaid,
     };
 
     auto it =

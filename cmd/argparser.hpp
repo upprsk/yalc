@@ -15,15 +15,8 @@ struct DumpStep {
         None = 0,
         Tokens = 1 << 0,
         Ast = 1 << 1,
-        Sorted = 1 << 2,
-        Attributes = 1 << 3,
-        Named = 1 << 4,
-        Sema = 1 << 5,
-        Ir = 1 << 6,
-        IrLower = 1 << 7,
 
         DepsMermaid = 1 << 8,
-        DepsDebug = 1 << 9,
     };
 
 #define define_with(_name, _enum_case)                              \
@@ -41,12 +34,6 @@ struct DumpStep {
 
     define_parts(tokens, Tokens);
     define_parts(ast, Ast);
-    define_parts(sorted, Sorted);
-    define_parts(attributes, Attributes);
-    define_parts(named, Named);
-    define_parts(sema, Sema);
-    define_parts(ir, Ir);
-    define_parts(ir_lower, IrLower);
 
     define_parts(deps_mermaid, DepsMermaid);
 

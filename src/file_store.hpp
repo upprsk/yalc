@@ -100,6 +100,49 @@ private:
     uint32_t data{INVALID_DATA};
 };
 
+/// A unique identifier for a module.
+class ModuleId {
+    static constexpr auto const INVALID_DATA = 0xFFFF'FFFF;
+
+    constexpr explicit ModuleId(uint32_t data) : data{data} {}
+
+public:
+    // ------------
+    // Constructors
+    // ------------
+
+    /// Default initialize to invalid.
+    constexpr ModuleId() = default;
+    constexpr ModuleId(ModuleId const &) = default;
+    constexpr ModuleId(ModuleId &&) = default;
+    constexpr auto operator=(ModuleId const &) -> ModuleId & = default;
+    constexpr auto operator=(ModuleId &&) -> ModuleId & = default;
+
+    // create a handle with the given value
+    static constexpr auto from_raw_data(uint32_t raw_data) -> ModuleId {
+        return ModuleId{raw_data};
+    }
+
+public:
+    constexpr auto operator==(ModuleId const &o) const -> bool = default;
+
+    // ------------
+
+    /// Get the internal data. Make sure to use it correctly.
+    [[nodiscard]] constexpr auto value() const -> uint32_t { return data; }
+
+    [[nodiscard]] constexpr auto is_valid() const -> bool {
+        return data != INVALID_DATA;
+    }
+
+    [[nodiscard]] constexpr auto is_invalid() const -> bool {
+        return !is_valid();
+    }
+
+private:
+    uint32_t data{INVALID_DATA};
+};
+
 class FileStore {
 public:
     struct File {
@@ -114,6 +157,15 @@ public:
         std::string_view  original_path;
         std::string_view  full_path;
         std::span<FileId> files;
+    };
+
+    struct Module {
+        ModuleId         id;
+        std::string_view name;
+        /// Directory where the module is located
+        DirId dir;
+        /// All files that are a part of this module.
+        std::vector<FileId> files;
     };
 
     constexpr FileStore() = default;
@@ -160,6 +212,14 @@ public:
 
     // ------------------------------------------------------------------------
 
+    /// Add a module.
+    auto add_module(std::string_view module_name, DirId dir_id) -> ModuleId;
+
+    /// Add a file to a module.
+    void add_file_to_module(ModuleId mid, FileId fid);
+
+    // ------------------------------------------------------------------------
+
     // get a file by id
     [[nodiscard]] auto get_file_by_id(FileId id) const -> std::optional<File>;
 
@@ -177,6 +237,22 @@ public:
     // get directory that contains a file.
     [[nodiscard]] auto get_dir_containing(FileId fid) -> DirId;
 
+    /// find a file by name (and dir)
+    [[nodiscard]] auto find_module(std::string_view name, DirId id) const
+        -> ModuleId;
+
+    /// Get a module by it's id. In case the module is not found, return
+    /// nullptr.
+    [[nodiscard]] auto get_module_by_id(ModuleId id) const -> Module const *;
+
+    /// Get a module by it's id. In case the module is not found, return
+    /// nullptr.
+    [[nodiscard]] auto get_module_by_id(ModuleId id) -> Module *;
+
+    [[nodiscard]] auto get_all_modules() const -> std::span<Module const> {
+        return modules;
+    }
+
 private:
     // read the contents of a file into the `big_arena`.
     [[nodiscard]] auto read_entire_file(std::string const &full_path)
@@ -193,12 +269,19 @@ private:
         std::string_view path, std::string_view full_path,
         std::span<FileId const> contents) -> DirId;
 
+    // add a module to the store without checking that it is present
+    [[nodiscard]] auto add_module_nocheck(std::string_view module_name,
+                                          DirId            dir_id) -> ModuleId;
+
 private:
     // list of all files, indexable by `FileId`
     std::vector<File> files;
 
     // list of all directories, indexable by `DirId`
     std::vector<Dir> dirs;
+
+    // list of all modules, indexable by `ModuleId`
+    std::vector<Module> modules;
 
     // This arena stores is meant to store small data, like the filepaths.
     mem::Arena small_arena;

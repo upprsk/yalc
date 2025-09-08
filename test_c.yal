@@ -1,4 +1,4 @@
-module main;
+module libc;
 
 @extern(link_name="getchar")
 func c_getchar() i32;

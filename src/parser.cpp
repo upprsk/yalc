@@ -135,18 +135,24 @@ class Parser {
 
     std::string_view          source;
     LocalErrorReporter const& er;
-    ast::File&                ast_file;
+    ast::File*                ast_file;
 
     ParseOptions const& opt;
 
+    bool silent_reporting = false;
+
 public:
     Parser(std::span<Token const> tokens, LocalErrorReporter const& er,
-           ParseOptions const& opt, ast::File& ast_file)
+           ParseOptions const& opt, ast::File* ast_file)
         : tokens{tokens},
           source{er.get_source()},
           er{er},
           ast_file{ast_file},
           opt{opt} {}
+
+    void set_silence(bool silenced) { silent_reporting = silenced; }
+
+    [[nodiscard]] auto get_source() const -> std::string_view { return source; }
 
     auto parse_source_file()
         -> std::tuple<std::string_view, Location, std::vector<ast::Decl*>> {
@@ -200,7 +206,7 @@ public:
         er.report_error(span(), "expected top-level declaration but got '{}'",
                         span().str(source));
 
-        auto err = ast_file.decl_err(to_loc(span()));
+        auto err = ast_file->decl_err(to_loc(span()));
         recover_parse_top_decl();
 
         return err;
@@ -215,7 +221,7 @@ public:
             if (attr) attrs.push_back(*attr);
         }
 
-        return ast_file.alloc_decl_attributes(attrs);
+        return ast_file->alloc_decl_attributes(attrs);
     }
 
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -257,7 +263,7 @@ public:
 
                     auto value = parse_expr_without_recover();
                     if (!value) {
-                        value = ast_file.expr_err(to_loc(prev_span()));
+                        value = ast_file->expr_err(to_loc(prev_span()));
                         recover_parse_attribute_value();
                     }
 
@@ -287,8 +293,8 @@ public:
             .loc = to_loc(start_span),
             .qualified_name = qualified_name,
             .name = attribute_name,
-            .args = ast_file.dupe_exprs(args),
-            .kwargs = ast_file.dupe_attribute_kvs(kwargs),
+            .args = ast_file->dupe_exprs(args),
+            .kwargs = ast_file->dupe_attribute_kvs(kwargs),
         };
     }
 
@@ -329,12 +335,12 @@ public:
             auto type = types.empty() ? nullptr : types[0];
             auto init = inits.empty() ? nullptr : inits[0];
 
-            return ast_file.decl_var(to_loc(start_span.extend(prev_span())),
-                                     name_loc, name, attributes, type, init);
+            return ast_file->decl_var(to_loc(start_span.extend(prev_span())),
+                                      name_loc, name, attributes, type, init);
         }
 
-        return ast_file.decl_multi_var(to_loc(start_span).extend(prev_span()),
-                                       attributes, names, types, inits);
+        return ast_file->decl_multi_var(to_loc(start_span).extend(prev_span()),
+                                        attributes, names, types, inits);
     }
 
     auto parse_top_def(std::span<ast::DeclAttribute> attributes) -> ast::Decl* {
@@ -372,12 +378,12 @@ public:
             auto type = types.empty() ? nullptr : types[0];
             auto init = inits.empty() ? nullptr : inits[0];
 
-            return ast_file.decl_def(to_loc(start_span.extend(prev_span())),
-                                     name_loc, name, attributes, type, init);
+            return ast_file->decl_def(to_loc(start_span.extend(prev_span())),
+                                      name_loc, name, attributes, type, init);
         }
 
-        return ast_file.decl_multi_def(to_loc(start_span).extend(prev_span()),
-                                       attributes, names, types, inits);
+        return ast_file->decl_multi_def(to_loc(start_span).extend(prev_span()),
+                                        attributes, names, types, inits);
     }
 
     auto parse_decl_ids() -> std::vector<ast::MultiVarName> {
@@ -458,48 +464,10 @@ public:
         else
             (void)consume_with_options(TokenType::Semi, TokenType::Lbrace);
 
-        return ast_file.decl_func(to_loc(start_span.extend(prev_span())),
-                                  to_loc(name_span), name, attached_type,
-                                  attributes, params, rets, body, is_c_varargs);
+        return ast_file->decl_func(
+            to_loc(start_span.extend(prev_span())), to_loc(name_span), name,
+            attached_type, attributes, params, rets, body, is_c_varargs);
     }
-
-#if 0
-    auto parse_func_gargs() -> ast::Node* {
-        auto start_span = span();
-        auto had_error = false;
-
-        if (!consume(TokenType::Lbracket))
-            return ast.new_node_err(to_loc(start_span.extend(prev_span())));
-
-        std::vector<ast::Node*> args;
-        while (!check(TokenType::Rbracket)) {
-            auto arg = parse_func_arg();
-            if (arg) args.push_back(arg);
-
-            if (check(TokenType::Rbracket)) break;
-            if (!consume_with_note(
-                    TokenType::Comma,
-                    "expected ',' to separate generic function arguments")) {
-                had_error = true;
-
-                recover_parse_func_garg();
-                if (!match(TokenType::Comma)) break;
-            }
-        }
-
-        // NOTE: we want to do something when this fails?
-        (void)consume_with_note(
-            TokenType::Rbracket,
-            "expected ']' after generic function arguments");
-
-        auto s = start_span.extend(prev_span());
-        if (!had_error && args.empty()) {
-            er.report_error(s, "generic argument list is empty");
-        }
-
-        return ast.new_node_pack(to_loc(s), args);
-    }
-#endif
 
     auto parse_func_args() -> std::pair<std::span<ast::FuncParam>, bool> {
         if (!consume(TokenType::Lparen)) {
@@ -536,7 +504,8 @@ public:
         (void)consume_with_note(TokenType::Rparen,
                                 "expected ')' after function arguments");
 
-        return std::make_pair(ast_file.alloc_func_params(params), is_c_varargs);
+        return std::make_pair(ast_file->alloc_func_params(params),
+                              is_c_varargs);
     }
 
     auto parse_func_arg() -> std::optional<ast::FuncParam> {
@@ -650,8 +619,8 @@ public:
 
         (void)consume(TokenType::Rbrace);
 
-        return ast_file.stmt_block(to_loc(start_span.extend(prev_span())),
-                                   children);
+        return ast_file->stmt_block(to_loc(start_span.extend(prev_span())),
+                                    children);
     }
 
     // ========================================================================
@@ -678,7 +647,7 @@ public:
         if (expr) return expr;
 
         recover_parse_expr();
-        return ast_file.expr_err(to_loc(start_span.extend(prev_span())));
+        return ast_file->expr_err(to_loc(start_span.extend(prev_span())));
     }
 
     // ========================================================================
@@ -703,8 +672,8 @@ public:
 
         if (match(TokenType::Minus)) {
             auto child = parse_expr_with_precedence(PREC_UNARY);
-            return ast_file.expr_neg(to_loc(start_span.extend(prev_span())),
-                                     child);
+            return ast_file->expr_neg(to_loc(start_span.extend(prev_span())),
+                                      child);
         }
 
         if (match(TokenType::Lparen)) {
@@ -721,7 +690,8 @@ public:
 
             advance();
 
-            return ast_file.expr_id(to_loc(start_span), start_span.str(source));
+            return ast_file->expr_id(to_loc(start_span),
+                                     start_span.str(source));
         }
 
         if (match(TokenType::Int)) return parse_int(start_span);
@@ -750,8 +720,8 @@ public:
                 UNREACHABLE("unexpected token kind in parse infix", tok, *left);
         }
 
-        return ast_file.expr_arith(left->loc.extend(prev_span()), kind, left,
-                                   right);
+        return ast_file->expr_arith(left->loc.extend(prev_span()), kind, left,
+                                    right);
     }
 
     // ------------------------------------------------------------------------
@@ -780,10 +750,10 @@ public:
         auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
         if (ec != std::errc{} || ptr != s.data() + s.size()) {
             er.report_bug(span, "invalid integer found in parser: '{}'", s);
-            return ast_file.expr_err(to_loc(span));
+            return ast_file->expr_err(to_loc(span));
         }
 
-        return ast_file.expr_int(to_loc(span), v);
+        return ast_file->expr_int(to_loc(span), v);
     }
 
     auto parse_int_with_base(Span const& span, int base) -> ast::Expr* {
@@ -796,10 +766,10 @@ public:
             std::from_chars(s.data(), s.data() + s.size(), v, base);
         if (ec != std::errc{} || ptr != s.data() + s.size()) {
             er.report_bug(span, "invalid integer found in parser: '{}'", s);
-            return ast_file.expr_err(to_loc(span));
+            return ast_file->expr_err(to_loc(span));
         }
 
-        return ast_file.expr_int(to_loc(span), v);
+        return ast_file->expr_int(to_loc(span), v);
     }
 
     auto parse_string(Span const& span) -> ast::Expr* {
@@ -807,7 +777,7 @@ public:
         s = s.substr(1, s.size() - 2);
 
         auto result = escape_string(er, span, s);
-        return ast_file.expr_string(to_loc(span), result);
+        return ast_file->expr_string(to_loc(span), result);
     }
 
     // ========================================================================
@@ -826,14 +796,14 @@ public:
         auto expr = parse_expr_without_recover();
         if (!expr) {
             recover_parse_expr_stmt();
-            expr = ast_file.expr_err(to_loc(start_span.extend(prev_span())));
+            expr = ast_file->expr_err(to_loc(start_span.extend(prev_span())));
         }
 
         (void)consume_with_note(TokenType::Semi,
                                 "expected end of expression statement");
 
         auto s = start_span.extend(prev_span());
-        return ast_file.stmt_expr(to_loc(s), expr);
+        return ast_file->stmt_expr(to_loc(s), expr);
     }
 
     auto parse_var() -> ast::Stmt* {
@@ -871,12 +841,12 @@ public:
             auto type = types.empty() ? nullptr : types[0];
             auto init = inits.empty() ? nullptr : inits[0];
 
-            return ast_file.stmt_var(to_loc(start_span.extend(prev_span())),
-                                     name_loc, name, type, init);
+            return ast_file->stmt_var(to_loc(start_span.extend(prev_span())),
+                                      name_loc, name, type, init);
         }
 
-        return ast_file.stmt_multi_var(to_loc(start_span).extend(prev_span()),
-                                       names, types, inits);
+        return ast_file->stmt_multi_var(to_loc(start_span).extend(prev_span()),
+                                        names, types, inits);
     }
 
     auto parse_def() -> ast::Stmt* {
@@ -914,12 +884,12 @@ public:
             auto type = types.empty() ? nullptr : types[0];
             auto init = inits.empty() ? nullptr : inits[0];
 
-            return ast_file.stmt_def(to_loc(start_span.extend(prev_span())),
-                                     name_loc, name, type, init);
+            return ast_file->stmt_def(to_loc(start_span.extend(prev_span())),
+                                      name_loc, name, type, init);
         }
 
-        return ast_file.stmt_multi_def(to_loc(start_span).extend(prev_span()),
-                                       names, types, inits);
+        return ast_file->stmt_multi_def(to_loc(start_span).extend(prev_span()),
+                                        names, types, inits);
     }
 
     auto parse_return_stmt() -> ast::Stmt* {
@@ -947,8 +917,8 @@ public:
                 TokenType::Semi, "expected ';' after function return values");
         }
 
-        return ast_file.stmt_return(to_loc(start_span.extend(prev_span())),
-                                    rets);
+        return ast_file->stmt_return(to_loc(start_span.extend(prev_span())),
+                                     rets);
     }
 
     // ========================================================================
@@ -1028,12 +998,12 @@ public:
 
         // in case we are at the end, just abort
         if (is_at_end())
-            return ast_file.decl_err(to_loc(start_span.extend(prev_span())));
+            return ast_file->decl_err(to_loc(start_span.extend(prev_span())));
 
         // too far, we can not recover this
         if (check(TokenType::Semi) || is_kw(span())) {
             (void)match(TokenType::Semi);
-            return ast_file.decl_err(to_loc(start_span.extend(prev_span())));
+            return ast_file->decl_err(to_loc(start_span.extend(prev_span())));
         }
 
         return nullptr;
@@ -1050,16 +1020,16 @@ public:
 
         // in case we are at the end, just abort
         if (is_at_end())
-            return ast_file.decl_func(to_loc(s), to_loc(name_span), name,
-                                      attached_type, attributes, {}, {},
-                                      nullptr, false);
+            return ast_file->decl_func(to_loc(s), to_loc(name_span), name,
+                                       attached_type, attributes, {}, {},
+                                       nullptr, false);
 
         // too far, we can not recover this
         if (check(TokenType::Semi) || is_kw(span())) {
             (void)match(TokenType::Semi);
-            return ast_file.decl_func(to_loc(s), to_loc(name_span), name,
-                                      attached_type, attributes, {}, {},
-                                      nullptr, false);
+            return ast_file->decl_func(to_loc(s), to_loc(name_span), name,
+                                       attached_type, attributes, {}, {},
+                                       nullptr, false);
         }
 
         return nullptr;
@@ -1150,6 +1120,8 @@ public:
 
     // NOTE: depends on peek
     constexpr void report_consume(auto&& tt) {
+        if (silent_reporting) return;
+
         if (peek().has_chars())
             er.report_error(span(), "expected '{}', but got '{}'", tt,
                             span().str(source));
@@ -1166,6 +1138,8 @@ public:
 
     // NOTE: depends on peek
     constexpr void report_consume_with_options(auto&& ftt, auto&&... tts) {
+        if (silent_reporting) return;
+
         std::string out;
         build_options_string(std::back_inserter(out), tts...);
 
@@ -1262,7 +1236,7 @@ public:
 void parse_into_ast_file(std::span<Token const> tokens, ast::File& ast_file,
                          LocalErrorReporter const& er,
                          ParseOptions const&       opt) {
-    auto p = Parser{tokens, er, opt, ast_file};
+    auto p = Parser{tokens, er, opt, &ast_file};
     auto [module_name, module_name_loc, decls] = p.parse_source_file();
 
     DEBUG_ASSERT(ast_file.get_module_name() == "");
@@ -1270,6 +1244,21 @@ void parse_into_ast_file(std::span<Token const> tokens, ast::File& ast_file,
 
     ast_file.set_module_name(module_name, module_name_loc);
     ast_file.append_declarations(std::move(decls));
+}
+
+auto parse_module_declaration(std::span<Token const>    tokens,
+                              LocalErrorReporter const& er,
+                              ParseOptions const& opt) -> ast::ModuleDecl {
+    auto p = Parser{tokens, er, opt, nullptr};
+    p.set_silence(true);
+
+    auto module_name_span = p.parse_module_decl();
+
+    return {
+        .name = std::string{module_name_span.str(p.get_source())},
+        .name_loc = p.to_loc(module_name_span),
+        .file = er.get_fileid(),
+    };
 }
 
 }  // namespace yal

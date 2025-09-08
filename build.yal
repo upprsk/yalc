@@ -1,0 +1,3 @@
+module build;
+
+func main() {}
