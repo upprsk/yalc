@@ -60,6 +60,12 @@ struct File {
                                             rhs);
     }
 
+    auto expr_field(Location loc, Expr* obj, std::string_view name) -> FieldExpr* {
+        return node_arena.create<FieldExpr>(
+            Expr{.kind = ExprKind::Field, .loc = loc}, obj,
+            strings_arena.alloc_string_view(name));
+    }
+
     auto expr_id(Location loc, std::string_view name) -> IdExpr* {
         return node_arena.create<IdExpr>(Expr{.kind = ExprKind::Id, .loc = loc},
                                          strings_arena.alloc_string_view(name));

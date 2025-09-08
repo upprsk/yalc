@@ -1,7 +1,5 @@
 module main;
 
-import std/libc;
-
 func main() {}
 
 func do_the_thing(t: T, v: V) (U, T);
@@ -10,4 +8,6 @@ def T = s32;
 var a, b, c = 1, 2, -.three;
 
 func S.hey() {}
-def S = .something;
+def S = libc.something;
+
+import std/libc;

@@ -654,7 +654,7 @@ public:
 
     // ========================================================================
 
-    // constexpr static auto const PREC_CALL = 10;
+    constexpr static auto const PREC_CALL = 10;
     constexpr static auto const PREC_UNARY = 9;
     // constexpr static auto const PREC_CAST = 8;
     constexpr static auto const PREC_MUL = 7;
@@ -746,6 +746,19 @@ public:
         auto tok = peek();
         advance();
 
+        if (tok.type == TokenType::Dot) {
+            if (match(TokenType::Id)) {
+                auto name = prev_span();
+
+                return ast_file->expr_field(left->loc.extend(name), left,
+                                            name.str(source));
+            }
+
+            er.report_error(span(), "expected field name, found {}",
+                            span().str(source));
+            return ast_file->expr_err(left->loc.extend(span()));
+        }
+
         auto right = parse_expr_with_precedence(get_precedence(tok));
 
         ast::ExprKind kind;
@@ -773,6 +786,8 @@ public:
             case TokenType::Star:
             case TokenType::Slash:
             case TokenType::Percent: return PREC_MUL;
+
+            case TokenType::Dot: return PREC_CALL;
 
             default: return PREC_NONE;
         }

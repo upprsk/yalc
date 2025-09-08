@@ -16,12 +16,14 @@ using nlohmann::json;
 
 // clang-format off
 auto Expr::as_arith() const -> ArithExpr const& { return static_cast<ArithExpr const&>(*this); }
+auto Expr::as_field() const -> FieldExpr const& { return static_cast<FieldExpr const&>(*this); }
 auto Expr::as_id() const -> IdExpr const& { return static_cast<IdExpr const&>(*this); }
 auto Expr::as_kw() const -> KwExpr const& { return static_cast<KwExpr const&>(*this); }
 auto Expr::as_int() const -> IntExpr const& { return static_cast<IntExpr const&>(*this); }
 auto Expr::as_string() const -> StringExpr const& { return static_cast<StringExpr const&>(*this); }
 
 auto Expr::as_arith() -> ArithExpr& { return static_cast<ArithExpr&>(*this); }
+auto Expr::as_field() -> FieldExpr& { return static_cast<FieldExpr&>(*this); }
 auto Expr::as_id() -> IdExpr& { return static_cast<IdExpr&>(*this); }
 auto Expr::as_kw() -> KwExpr& { return static_cast<KwExpr&>(*this); }
 auto Expr::as_int() -> IntExpr& { return static_cast<IntExpr&>(*this); }
@@ -100,6 +102,12 @@ void to_json(nlohmann::json& j, Expr const& n) {
             auto& arith = n.as_arith();
             j["lhs"] = arith.lhs ? *arith.lhs : json{};
             j["rhs"] = arith.rhs ? *arith.rhs : json{};
+        } break;
+
+        case ExprKind::Field: {
+            auto& field = n.as_field();
+            j["obj"] = field.obj ? *field.obj : json{};
+            j["field"] = field.name;
         } break;
 
         case ExprKind::Id: {
@@ -317,6 +325,13 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
 
             indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, arith.rhs, depth + 1);
+        } break;
+
+        case ExprKind::Field: {
+            auto& field = expr.as_field();
+
+            fmt::format_to(ctx.out(), " {:?}", field.name);
+            to_lisp(ctx, field.obj, depth + 1);
         } break;
 
         case ExprKind::Id: {
@@ -568,6 +583,7 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::Mul: name = "Mul"; break;
         case yal::ast::ExprKind::Div: name = "Div"; break;
         case yal::ast::ExprKind::Mod: name = "Mod"; break;
+        case yal::ast::ExprKind::Field: name = "Field"; break;
         case yal::ast::ExprKind::Id: name = "Id"; break;
         case yal::ast::ExprKind::Kw: name = "Kw"; break;
         case yal::ast::ExprKind::Int: name = "Int"; break;

@@ -23,6 +23,8 @@ enum struct ExprKind : uint8_t {
     Div,
     Mod,
 
+    Field,
+
     Id,
     Kw,
     Int,
@@ -30,6 +32,7 @@ enum struct ExprKind : uint8_t {
 };
 
 struct ArithExpr;
+struct FieldExpr;
 struct IdExpr;
 struct KwExpr;
 struct IntExpr;
@@ -51,12 +54,14 @@ struct Expr {
     Expr* forward = nullptr;
 
     [[nodiscard]] auto as_arith() const -> ArithExpr const&;
+    [[nodiscard]] auto as_field() const -> FieldExpr const&;
     [[nodiscard]] auto as_id() const -> IdExpr const&;
     [[nodiscard]] auto as_kw() const -> KwExpr const&;
     [[nodiscard]] auto as_int() const -> IntExpr const&;
     [[nodiscard]] auto as_string() const -> StringExpr const&;
 
     [[nodiscard]] auto as_arith() -> ArithExpr&;
+    [[nodiscard]] auto as_field() -> FieldExpr&;
     [[nodiscard]] auto as_id() -> IdExpr&;
     [[nodiscard]] auto as_kw() -> KwExpr&;
     [[nodiscard]] auto as_int() -> IntExpr&;
@@ -84,6 +89,11 @@ struct Expr {
 };
 
 struct ErrExpr : Expr {};
+
+struct FieldExpr : Expr {
+    Expr*            obj;
+    std::string_view name;
+};
 
 struct ArithExpr : public Expr {
     Expr* lhs = nullptr;
