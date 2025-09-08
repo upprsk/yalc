@@ -13,8 +13,8 @@ struct ParseOptions {
     bool verbose{};
 };
 
-auto parse_into_ast(std::span<Token const> tokens, ast::Ast& ast,
-                    LocalErrorReporter const& er, ParseOptions const& opt = {})
-    -> ast::NodeFile*;
+void parse_into_file(std::span<Token const> tokens, ast::File& ast_file,
+                     LocalErrorReporter const& er,
+                     ParseOptions const&       opt = {});
 
 }  // namespace yal

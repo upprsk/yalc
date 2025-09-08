@@ -135,36 +135,39 @@ class Parser {
 
     std::string_view          source;
     LocalErrorReporter const& er;
-    ast::Ast&                 ast;
+    ast::File&                ast_file;
 
     ParseOptions const& opt;
 
 public:
     Parser(std::span<Token const> tokens, LocalErrorReporter const& er,
-           ParseOptions const& opt, ast::Ast& ast)
-        : tokens{tokens}, source{er.get_source()}, er{er}, ast{ast}, opt{opt} {}
+           ParseOptions const& opt, ast::File& ast_file)
+        : tokens{tokens},
+          source{er.get_source()},
+          er{er},
+          ast_file{ast_file},
+          opt{opt} {}
 
-    auto parse_source_file() -> ast::NodeFile* {
+    auto parse_source_file()
+        -> std::tuple<std::string_view, Location, std::vector<ast::Decl*>> {
         // get rid of comments at the start of the file
         skip_comments();
 
-        auto start_span = span();
         auto module_name = parse_module_decl();
 
-        std::vector<ast::Node*> children;
+        std::vector<ast::Decl*> children;
         while (!is_at_end()) children.push_back(parse_top_decl());
 
         (void)consume(TokenType::Eof);
 
-        return ast.new_node_file(to_loc(start_span.extend(prev_span())),
-                                 children, module_name);
+        return {module_name.str(source), to_loc(module_name), children};
     }
 
-    auto parse_module_decl() -> std::string_view {
+    auto parse_module_decl() -> Span {
 #define consume_and_recover(...)     \
     if (!consume(__VA_ARGS__)) {     \
         recover_parse_module_decl(); \
-        return "";                   \
+        return {};                   \
     }
 
         // TODO: include more info in the error message
@@ -173,21 +176,22 @@ public:
         consume_and_recover(TokenType::Id);
         consume_and_recover(TokenType::Semi);
 
-        return id.span.str(source);
+        return id.span;
 
 #undef consume_and_recover
     }
 
     // ------------------------------------------------------------------------
 
-    auto parse_top_decl() -> ast::Node* {
+    auto parse_top_decl() -> ast::Decl* {
         if (opt.verbose) {
             er.report_debug(span(), "parse_top_decl() got '{}'",
                             span().str(source));
         }
 
-        auto attributes =
-            check(TokenType::Attribute) ? parse_attributes() : nullptr;
+        auto attributes = check(TokenType::Attribute)
+                              ? parse_attributes()
+                              : std::span<ast::DeclAttribute>{};
 
         if (check("var")) return parse_top_var(attributes);
         if (check("def")) return parse_top_def(attributes);
@@ -196,7 +200,7 @@ public:
         er.report_error(span(), "expected top-level declaration but got '{}'",
                         span().str(source));
 
-        auto err = ast.new_node_err(to_loc(span()));
+        auto err = ast_file.decl_err(to_loc(span()));
         recover_parse_top_decl();
 
         return err;
@@ -204,20 +208,18 @@ public:
 
     // ------------------------------------------------------------------------
 
-    auto parse_attributes() -> ast::Node* {
-        auto start_span = span();
-
-        std::vector<ast::Node*> attrs;
+    auto parse_attributes() -> std::span<ast::DeclAttribute> {
+        std::vector<ast::DeclAttribute> attrs;
         while (check(TokenType::Attribute)) {
             auto attr = parse_attribute();
-            if (attr) attrs.push_back(attr);
+            if (attr) attrs.push_back(*attr);
         }
 
-        return ast.new_node_pack(to_loc(start_span.extend(prev_span())), attrs);
+        return ast_file.alloc_decl_attributes(attrs);
     }
 
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    auto parse_attribute() -> ast::Node* {
+    auto parse_attribute() -> std::optional<ast::DeclAttribute> {
         auto start_span = span();
 
         // name of the attribute without the leading '@'
@@ -233,11 +235,12 @@ public:
             if (!consume_id_non_kw()) {
                 if (!check(TokenType::Lparen) && !check(TokenType::Attribute) &&
                     !check("var") && !check("def") && !check("func"))
-                    return nullptr;
+                    return std::nullopt;
             }
         }
 
-        std::vector<ast::Node*> args;
+        std::vector<ast::Expr*>           args;
+        std::vector<ast::DeclAttributeKV> kwargs;
 
         // we have arguments for the attribute
         if (match(TokenType::Lparen)) {
@@ -254,13 +257,14 @@ public:
 
                     auto value = parse_expr_without_recover();
                     if (!value) {
-                        value = ast.new_node_err(to_loc(prev_span()));
+                        value = ast_file.expr_err(to_loc(prev_span()));
                         recover_parse_attribute_value();
                     }
 
-                    args.push_back(
-                        ast.new_attributekv(to_loc(key.extend(prev_span())),
-                                            key.str(source), value));
+                    kwargs.push_back(ast::DeclAttributeKV{
+                        .loc = to_loc(key.extend(prev_span())),
+                        .name = key.str(source),
+                        .value = value});
                 }
 
                 else {
@@ -279,13 +283,18 @@ public:
             }
         }
 
-        return ast.new_attribute(to_loc(start_span), qualified_name,
-                                 attribute_name, args);
+        return ast::DeclAttribute{
+            .loc = to_loc(start_span),
+            .qualified_name = qualified_name,
+            .name = attribute_name,
+            .args = ast_file.dupe_exprs(args),
+            .kwargs = ast_file.dupe_attribute_kvs(kwargs),
+        };
     }
 
     // ------------------------------------------------------------------------
 
-    auto parse_top_var(ast::Node* attributes) -> ast::Node* {
+    auto parse_top_var(std::span<ast::DeclAttribute> attributes) -> ast::Decl* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'var' here every time
@@ -294,11 +303,11 @@ public:
         auto names = parse_decl_ids();
 
     types_label:
-        auto types =
-            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+        auto types = match(TokenType::Colon) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
     inits_label:
-        auto inits =
-            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+        auto inits = match(TokenType::Equal) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
 
         if (!consume(TokenType::Semi)) {
             recover_parse_top_def_or_var();
@@ -313,11 +322,22 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_top_var(to_loc(start_span.extend(prev_span())),
-                                    attributes, names, types, inits);
+        // in the simple case we want to use the single decl version
+        if (names.size() <= 1 && types.size() <= 1 && inits.size() <= 1) {
+            auto name = names.empty() ? "" : names[0].name;
+            auto name_loc = names.empty() ? to_loc(start_span) : names[0].loc;
+            auto type = types.empty() ? nullptr : types[0];
+            auto init = inits.empty() ? nullptr : inits[0];
+
+            return ast_file.decl_var(to_loc(start_span.extend(prev_span())),
+                                     name_loc, name, attributes, type, init);
+        }
+
+        return ast_file.decl_multi_var(to_loc(start_span).extend(prev_span()),
+                                       attributes, names, types, inits);
     }
 
-    auto parse_top_def(ast::Node* attributes) -> ast::Node* {
+    auto parse_top_def(std::span<ast::DeclAttribute> attributes) -> ast::Decl* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'def' here every time
@@ -325,23 +345,15 @@ public:
 
         auto names = parse_decl_ids();
 
-    generics_label:
-        // NOTE: using function gargs here, which is not perfect because the
-        // error recovery in there assumes the format of a function declaration
-        auto gargs = check(TokenType::Lbracket) ? parse_func_gargs() : nullptr;
-
     types_label:
-        auto types =
-            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+        auto types = match(TokenType::Colon) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
     inits_label:
-        auto inits =
-            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+        auto inits = match(TokenType::Equal) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
 
         if (!consume(TokenType::Semi)) {
             recover_parse_top_def_or_var();
-
-            // in case we recovered with a [, then try types again
-            if (check(TokenType::Lbracket)) goto generics_label;
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -353,13 +365,23 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_top_def(to_loc(start_span.extend(prev_span())),
-                                    attributes, gargs, names, types, inits);
+        // in the simple case we want to use the single decl version
+        if (names.size() <= 1 && types.size() <= 1 && inits.size() <= 1) {
+            auto name = names.empty() ? "" : names[0].name;
+            auto name_loc = names.empty() ? to_loc(start_span) : names[0].loc;
+            auto type = types.empty() ? nullptr : types[0];
+            auto init = inits.empty() ? nullptr : inits[0];
+
+            return ast_file.decl_def(to_loc(start_span.extend(prev_span())),
+                                     name_loc, name, attributes, type, init);
+        }
+
+        return ast_file.decl_multi_def(to_loc(start_span).extend(prev_span()),
+                                       attributes, names, types, inits);
     }
 
-    auto parse_decl_ids() -> ast::Node* {
-        auto                    start_span = span();
-        std::vector<ast::Node*> ids;
+    auto parse_decl_ids() -> std::vector<ast::MultiVarName> {
+        std::vector<ast::MultiVarName> names;
 
         do {
             auto ident = span();
@@ -369,17 +391,15 @@ public:
 
             advance();
 
-            ids.push_back(ast.new_node_id(to_loc(ident), ident.str(source)));
+            names.push_back({.name = ident.str(source), .loc = to_loc(ident)});
             if (!match(TokenType::Comma)) break;
         } while (true);
 
-        if (ids.empty()) return nullptr;
-        return ast.new_node_pack(to_loc(start_span.extend(prev_span())), ids);
+        return names;
     }
 
-    auto parse_decl_types_or_inits() -> ast::Node* {
-        auto                    start_span = span();
-        std::vector<ast::Node*> types;
+    auto parse_decl_types_or_inits() -> std::vector<ast::Expr*> {
+        std::vector<ast::Expr*> types;
 
         do {
             auto expr = parse_expr_without_recover();
@@ -389,13 +409,12 @@ public:
             if (!match(TokenType::Comma)) break;
         } while (true);
 
-        if (types.empty()) return nullptr;
-        return ast.new_node_pack(to_loc(start_span.extend(prev_span())), types);
+        return types;
     }
 
     // ------------------------------------------------------------------------
 
-    auto parse_func(ast::Node* attributes) -> ast::Node* {
+    auto parse_func(std::span<ast::DeclAttribute> attributes) -> ast::Decl* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'func' here every time
@@ -419,36 +438,32 @@ public:
             name = "";
             if (!consume_id_non_kw()) {
                 if (auto r = recover_parse_func_name_with_attached_type(
-                        start_span, attributes, name, name_span, attached_type,
-                        attached_type_span))
+                        start_span, attributes, name, name_span, attached_type))
                     return r;
             } else {
                 name = name_span.str(source);
             }
         }
 
-        ast::Node* gargs = nullptr;
-        if (check(TokenType::Lbracket)) gargs = parse_func_gargs();
+        auto [params, is_c_varargs] = parse_func_args();
 
-        auto [args, is_c_varargs] = parse_func_args();
-
-        ast::Node* ret = nullptr;
+        auto rets = std::vector<ast::FuncRet>{};
         if (!check(TokenType::Lbrace) && !check(TokenType::Semi) &&
             !check(TokenType::Eof))
-            ret = parse_func_ret();
+            rets = parse_func_ret();
 
-        ast::Node* body = nullptr;
+        ast::Stmt* body = nullptr;
         if (check(TokenType::Lbrace))
             body = parse_block();
         else
             (void)consume_with_options(TokenType::Semi, TokenType::Lbrace);
 
-        return ast.new_node_func(to_loc(start_span.extend(prev_span())),
-                                 attributes, name, name_span, attached_type,
-                                 attached_type_span, gargs, args, ret, body,
-                                 is_c_varargs);
+        return ast_file.decl_func(to_loc(start_span.extend(prev_span())),
+                                  to_loc(name_span), name, attached_type,
+                                  attributes, params, rets, body, is_c_varargs);
     }
 
+#if 0
     auto parse_func_gargs() -> ast::Node* {
         auto start_span = span();
         auto had_error = false;
@@ -484,26 +499,24 @@ public:
 
         return ast.new_node_pack(to_loc(s), args);
     }
+#endif
 
-    auto parse_func_args() -> std::pair<ast::Node*, bool> {
-        auto start_span = span();
-
+    auto parse_func_args() -> std::pair<std::span<ast::FuncParam>, bool> {
         if (!consume(TokenType::Lparen)) {
             // NOTE: this helps with error recovery when something failed when
-            // parsing generic arguments
+            // parsing generic arguments. errata: we removed generic arguments,
+            // does this still help?
             (void)match(TokenType::Rparen);
 
-            return std::make_pair(
-                ast.new_node_err(to_loc(start_span.extend(prev_span()))),
-                false);
+            return {};
         }
 
-        std::vector<ast::Node*> args;
+        std::vector<ast::FuncParam> params;
         while (!check(TokenType::Rparen)) {
             if (check(TokenType::DotDotDot)) break;
 
             auto arg = parse_func_arg();
-            if (arg) args.push_back(arg);
+            if (arg) params.push_back(*arg);
 
             if (check(TokenType::Rparen)) break;
             if (!consume_with_note(
@@ -526,36 +539,41 @@ public:
         (void)consume_with_note(TokenType::Rparen,
                                 "expected ')' after function arguments");
 
-        return std::make_pair(
-            ast.new_node_pack(to_loc(start_span.extend(prev_span())), args),
-            is_c_varargs);
+        return std::make_pair(ast_file.alloc_func_params(params), is_c_varargs);
     }
 
-    auto parse_func_arg() -> ast::Node* {
+    auto parse_func_arg() -> std::optional<ast::FuncParam> {
         auto start_span = span();
+
+        // TODO: handle marking parameter as comptime
+
         if (is_kw_and_report(start_span) ||
             !consume_with_note(TokenType::Id, "expected argument name"))
-            return nullptr;
+            return std::nullopt;
 
         auto       name = start_span.str(source);
-        ast::Node* type{};
+        ast::Expr* type = nullptr;
         if (match(TokenType::Colon)) {
             type = parse_expr_without_recover();
         }
 
-        return ast.new_node_func_arg(to_loc(start_span.extend(prev_span())),
-                                     name, type);
+        return ast::FuncParam{
+            .name = name,
+            .loc = to_loc(start_span.extend(prev_span())),
+            .type_expr = type,
+            // TODO: .is_comptime
+        };
     }
 
-    auto parse_func_ret() -> ast::Node* {
+    auto parse_func_ret() -> std::vector<ast::FuncRet> {
         if (match(TokenType::Lparen)) {
             auto start_span = prev_span();
             auto had_error = false;
 
-            std::vector<ast::Node*> rets;
+            std::vector<ast::FuncRet> rets;
             while (!check(TokenType::Rparen)) {
                 auto ret = parse_func_multi_ret_item();
-                if (ret) rets.push_back(ret);
+                if (ret) rets.push_back(*ret);
 
                 if (check(TokenType::Rparen)) break;
                 if (!consume_with_note(
@@ -577,21 +595,22 @@ public:
                 er.report_error(s, "return list is empty");
             }
 
-            return ast.new_node_pack(to_loc(s), rets);
+            return rets;
         }
 
         // NOTE: may want custom error handling here?
         auto ret = parse_expr_without_recover();
-        if (ret)
-            ret = ast.new_node_pack(ret ? ret->get_loc() : to_loc(prev_span()),
-                                    std::array{ret});
-        else
-            recover_parse_func_ret_single();
+        if (ret) {
+            return {
+                ast::FuncRet{.name = "", .loc = ret->loc, .type_expr = ret}
+            };
+        }
 
-        return ret;
+        recover_parse_func_ret_single();
+        return {};
     }
 
-    auto parse_func_multi_ret_item() -> ast::Node* {
+    auto parse_func_multi_ret_item() -> std::optional<ast::FuncRet> {
         // this is a named return, we don't have that yet
         if (check(TokenType::Id) && check_next(TokenType::Colon)) {
             auto name = span();
@@ -600,21 +619,30 @@ public:
 
             // NOTE: may want custom error handling here?
             auto type = parse_expr_without_recover();
-            return ast.new_node_func_named_ret(to_loc(name.extend(prev_span())),
-                                               name.str(source), type);
+            return ast::FuncRet{
+                .name = name.str(source),
+                .loc = to_loc(name.extend(prev_span())),
+                .type_expr = type,
+            };
         }
 
-        return parse_expr_without_recover();
+        auto start_span = span();
+        auto type = parse_expr_without_recover();
+        return ast::FuncRet{
+            .name = "",
+            .loc = type ? type->loc : to_loc(start_span.extend(prev_span())),
+            .type_expr = type,
+        };
     }
 
     // ========================================================================
 
-    auto parse_block() -> ast::Node* {
+    auto parse_block() -> ast::BlockStmt* {
         auto start_span = span();
 
         if (!consume(TokenType::Lbrace)) PANIC("handle missing '{' in block");
 
-        std::vector<ast::Node*> children;
+        std::vector<ast::Stmt*> children;
         while (!is_at_end() && !check(TokenType::Rbrace)) {
             auto stmt = parse_stmt();
             children.push_back(stmt);
@@ -622,8 +650,8 @@ public:
 
         (void)consume(TokenType::Rbrace);
 
-        return ast.new_node_block(to_loc(start_span.extend(prev_span())),
-                                  children);
+        return ast_file.stmt_block(to_loc(start_span.extend(prev_span())),
+                                   children);
     }
 
     // ========================================================================
@@ -640,22 +668,22 @@ public:
     // constexpr static auto const PREC_ASSIGN = 1;
     constexpr static auto const PREC_NONE = 0;
 
-    auto parse_expr_without_recover() -> ast::Node* {
+    auto parse_expr_without_recover() -> ast::Expr* {
         return parse_expr_with_precedence(PREC_NONE);
     }
 
-    auto parse_expr() -> ast::Node* {
+    auto parse_expr() -> ast::Expr* {
         auto start_span = span();
         auto expr = parse_expr_without_recover();
         if (expr) return expr;
 
         recover_parse_expr();
-        return ast.new_node_err(to_loc(start_span.extend(prev_span())));
+        return ast_file.expr_err(to_loc(start_span.extend(prev_span())));
     }
 
     // ========================================================================
 
-    auto parse_expr_with_precedence(int precedence) -> ast::Node* {
+    auto parse_expr_with_precedence(int precedence) -> ast::Expr* {
         auto left = parse_expr_prefix();
         if (left == nullptr) return nullptr;
 
@@ -666,7 +694,7 @@ public:
         return left;
     }
 
-    auto parse_expr_prefix() -> ast::Node* {
+    auto parse_expr_prefix() -> ast::Expr* {
         auto start_span = span();
 
         // literally a nop
@@ -675,9 +703,8 @@ public:
 
         if (match(TokenType::Minus)) {
             auto child = parse_expr_with_precedence(PREC_UNARY);
-            return ast.new_node_unary(ast::NodeKind::Neg,
-                                      to_loc(start_span.extend(prev_span())),
-                                      child);
+            return ast_file.expr_neg(to_loc(start_span.extend(prev_span())),
+                                     child);
         }
 
         if (match(TokenType::Lparen)) {
@@ -694,7 +721,7 @@ public:
 
             advance();
 
-            return ast.new_node_id(to_loc(start_span), start_span.str(source));
+            return ast_file.expr_id(to_loc(start_span), start_span.str(source));
         }
 
         if (match(TokenType::Int)) return parse_int(start_span);
@@ -706,25 +733,25 @@ public:
         return nullptr;
     }
 
-    auto parse_expr_infix(ast::Node* left) -> ast::Node* {
+    auto parse_expr_infix(ast::Expr* left) -> ast::Expr* {
         auto tok = peek();
         advance();
 
         auto right = parse_expr_with_precedence(get_precedence(tok));
 
-        ast::NodeKind kind;
+        ast::ExprKind kind;
         switch (tok.type) {
-            case TokenType::Plus: kind = ast::NodeKind::Add; break;
-            case TokenType::Minus: kind = ast::NodeKind::Sub; break;
-            case TokenType::Star: kind = ast::NodeKind::Mul; break;
-            case TokenType::Slash: kind = ast::NodeKind::Div; break;
-            case TokenType::Percent: kind = ast::NodeKind::Mod; break;
+            case TokenType::Plus: kind = ast::ExprKind::Add; break;
+            case TokenType::Minus: kind = ast::ExprKind::Sub; break;
+            case TokenType::Star: kind = ast::ExprKind::Mul; break;
+            case TokenType::Slash: kind = ast::ExprKind::Div; break;
+            case TokenType::Percent: kind = ast::ExprKind::Mod; break;
             default:
                 UNREACHABLE("unexpected token kind in parse infix", tok, *left);
         }
 
-        return ast.new_node_binary(kind, left->get_loc().extend(prev_span()),
-                                   left, right);
+        return ast_file.expr_arith(left->loc.extend(prev_span()), kind, left,
+                                   right);
     }
 
     // ------------------------------------------------------------------------
@@ -744,7 +771,7 @@ public:
 
     // ------------------------------------------------------------------------
 
-    auto parse_int(Span const& span) -> ast::Node* {
+    auto parse_int(Span const& span) -> ast::Expr* {
         // TODO: do not use replace and a dynamic string here
         auto s = std::string{span.str(source)};
         s.erase(begin(std::ranges::remove(s, '_')), s.end());
@@ -753,13 +780,13 @@ public:
         auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
         if (ec != std::errc{} || ptr != s.data() + s.size()) {
             er.report_bug(span, "invalid integer found in parser: '{}'", s);
-            return ast.new_node_err(to_loc(span));
+            return ast_file.expr_err(to_loc(span));
         }
 
-        return ast.new_node_int(to_loc(span), v);
+        return ast_file.expr_int(to_loc(span), v);
     }
 
-    auto parse_int_with_base(Span const& span, int base) -> ast::Node* {
+    auto parse_int_with_base(Span const& span, int base) -> ast::Expr* {
         // TODO: do not use replace and a dynamic string here
         auto s = std::string{span.str(source).substr(2)};
         s.erase(begin(std::ranges::remove(s, '_')), s.end());
@@ -769,23 +796,23 @@ public:
             std::from_chars(s.data(), s.data() + s.size(), v, base);
         if (ec != std::errc{} || ptr != s.data() + s.size()) {
             er.report_bug(span, "invalid integer found in parser: '{}'", s);
-            return ast.new_node_err(to_loc(span));
+            return ast_file.expr_err(to_loc(span));
         }
 
-        return ast.new_node_int(to_loc(span), v);
+        return ast_file.expr_int(to_loc(span), v);
     }
 
-    auto parse_string(Span const& span) -> ast::Node* {
+    auto parse_string(Span const& span) -> ast::Expr* {
         auto s = span.str(source);
         s = s.substr(1, s.size() - 2);
 
         auto result = escape_string(er, span, s);
-        return ast.new_node_string(to_loc(span), result);
+        return ast_file.expr_string(to_loc(span), result);
     }
 
     // ========================================================================
 
-    auto parse_stmt() -> ast::Node* {
+    auto parse_stmt() -> ast::Stmt* {
         if (opt.verbose) {
             er.report_debug(span(), "parse_stmt() got '{}'",
                             span().str(source));
@@ -799,18 +826,17 @@ public:
         auto expr = parse_expr_without_recover();
         if (!expr) {
             recover_parse_expr_stmt();
-            expr = ast.new_node_err(to_loc(start_span.extend(prev_span())));
+            expr = ast_file.expr_err(to_loc(start_span.extend(prev_span())));
         }
 
         (void)consume_with_note(TokenType::Semi,
                                 "expected end of expression statement");
 
         auto s = start_span.extend(prev_span());
-        return ast.new_node_expr_stmt(to_loc(s), expr);
+        return ast_file.stmt_expr(to_loc(s), expr);
     }
 
-    // FIXME: Allow using attributes on local var
-    auto parse_var() -> ast::Node* {
+    auto parse_var() -> ast::Stmt* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'var' here every time
@@ -819,14 +845,14 @@ public:
         auto names = parse_decl_ids();
 
     types_label:
-        auto types =
-            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+        auto types = match(TokenType::Colon) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
     inits_label:
-        auto inits =
-            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+        auto inits = match(TokenType::Equal) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
 
         if (!consume(TokenType::Semi)) {
-            recover_parse_def_or_var();
+            recover_parse_top_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -838,12 +864,22 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_top_var(to_loc(start_span.extend(prev_span())),
-                                    nullptr, names, types, inits);
+        // in the simple case we want to use the single decl version
+        if (names.size() <= 1 && types.size() <= 1 && inits.size() <= 1) {
+            auto name = names.empty() ? "" : names[0].name;
+            auto name_loc = names.empty() ? to_loc(start_span) : names[0].loc;
+            auto type = types.empty() ? nullptr : types[0];
+            auto init = inits.empty() ? nullptr : inits[0];
+
+            return ast_file.stmt_var(to_loc(start_span.extend(prev_span())),
+                                     name_loc, name, type, init);
+        }
+
+        return ast_file.stmt_multi_var(to_loc(start_span).extend(prev_span()),
+                                       names, types, inits);
     }
 
-    // FIXME: Allow using attributes on local def
-    auto parse_def() -> ast::Node* {
+    auto parse_def() -> ast::Stmt* {
         auto start_span = span();
 
         // NOTE: we have an unconsumed 'def' here every time
@@ -851,23 +887,15 @@ public:
 
         auto names = parse_decl_ids();
 
-    generics_label:
-        // NOTE: using function gargs here, which is not perfect because the
-        // error recovery in there assumes the format of a function declaration
-        auto gargs = check(TokenType::Lbracket) ? parse_func_gargs() : nullptr;
-
     types_label:
-        auto types =
-            match(TokenType::Colon) ? parse_decl_types_or_inits() : nullptr;
+        auto types = match(TokenType::Colon) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
     inits_label:
-        auto inits =
-            match(TokenType::Equal) ? parse_decl_types_or_inits() : nullptr;
+        auto inits = match(TokenType::Equal) ? parse_decl_types_or_inits()
+                                             : std::vector<ast::Expr*>{};
 
         if (!consume(TokenType::Semi)) {
-            recover_parse_def_or_var();
-
-            // in case we recovered with a [, then try types again
-            if (check(TokenType::Lbracket)) goto generics_label;
+            recover_parse_top_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -879,18 +907,29 @@ public:
             if (check(TokenType::Semi)) advance();
         }
 
-        return ast.new_node_top_def(to_loc(start_span.extend(prev_span())),
-                                    nullptr, gargs, names, types, inits);
+        // in the simple case we want to use the single decl version
+        if (names.size() <= 1 && types.size() <= 1 && inits.size() <= 1) {
+            auto name = names.empty() ? "" : names[0].name;
+            auto name_loc = names.empty() ? to_loc(start_span) : names[0].loc;
+            auto type = types.empty() ? nullptr : types[0];
+            auto init = inits.empty() ? nullptr : inits[0];
+
+            return ast_file.stmt_def(to_loc(start_span.extend(prev_span())),
+                                     name_loc, name, type, init);
+        }
+
+        return ast_file.stmt_multi_def(to_loc(start_span).extend(prev_span()),
+                                       names, types, inits);
     }
 
-    auto parse_return_stmt() -> ast::Node* {
+    auto parse_return_stmt() -> ast::Stmt* {
         auto start_span = span();
         auto had_error = false;
 
         // skip over the 'return'
         advance();
 
-        std::vector<ast::Node*> rets;
+        std::vector<ast::Expr*> rets;
         while (!check(TokenType::Semi)) {
             auto ret = parse_expr_without_recover();
             if (ret) rets.push_back(ret);
@@ -908,8 +947,8 @@ public:
                 TokenType::Semi, "expected ';' after function return values");
         }
 
-        return ast.new_node_return(to_loc(start_span.extend(prev_span())),
-                                   rets);
+        return ast_file.stmt_return(to_loc(start_span.extend(prev_span())),
+                                    rets);
     }
 
     // ========================================================================
@@ -944,12 +983,6 @@ public:
                        "func", "return");
     }
 
-    void recover_parse_func_garg() {
-        skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rbracket,
-                       TokenType::Lbrace, TokenType::Lparen, TokenType::Semi,
-                       TokenType::Attribute, "var", "def", "func");
-    }
-
     void recover_parse_func_arg() {
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
                        TokenType::Lbrace, TokenType::Semi, TokenType::Attribute,
@@ -982,46 +1015,45 @@ public:
     // ------------------------------------------------------------------------
 
     [[nodiscard]] auto recover_parse_func_name(Span const& start_span)
-        -> ast::Node* {
-        skip_while_not(TokenType::Eof, TokenType::Dot, TokenType::Lbracket,
-                       TokenType::Lparen, TokenType::Semi, TokenType::Attribute,
-                       "var", "def", "func");
+        -> ast::ErrDecl* {
+        skip_while_not(TokenType::Eof, TokenType::Dot, TokenType::Lparen,
+                       TokenType::Semi, TokenType::Attribute, "var", "def",
+                       "func");
 
         // in case we are at the end, just abort
         if (is_at_end())
-            return ast.new_node_err(to_loc(start_span.extend(prev_span())));
+            return ast_file.decl_err(to_loc(start_span.extend(prev_span())));
 
         // too far, we can not recover this
         if (check(TokenType::Semi) || is_kw(span())) {
             (void)match(TokenType::Semi);
-            return ast.new_node_err(to_loc(start_span.extend(prev_span())));
+            return ast_file.decl_err(to_loc(start_span.extend(prev_span())));
         }
 
         return nullptr;
     }
 
     [[nodiscard]] auto recover_parse_func_name_with_attached_type(
-        Span const& start_span, ast::Node* attributes, std::string_view name,
-        Span name_span, std::string_view attached_type, Span attached_type_span)
-        -> ast::Node* {
-        skip_while_not(TokenType::Eof, TokenType::Lbracket, TokenType::Lparen,
-                       TokenType::Semi, TokenType::Attribute, "var", "def",
-                       "func");
+        Span const& start_span, std::span<ast::DeclAttribute> attributes,
+        std::string_view name, Span name_span, std::string_view attached_type)
+        -> ast::FuncDecl* {
+        skip_while_not(TokenType::Eof, TokenType::Lparen, TokenType::Semi,
+                       TokenType::Attribute, "var", "def", "func");
 
         auto s = start_span.extend(prev_span());
 
         // in case we are at the end, just abort
         if (is_at_end())
-            return ast.new_node_func(to_loc(s), attributes, name, name_span,
-                                     attached_type, attached_type_span, nullptr,
-                                     nullptr, nullptr, nullptr, false);
+            return ast_file.decl_func(to_loc(s), to_loc(name_span), name,
+                                      attached_type, attributes, {}, {},
+                                      nullptr, false);
 
         // too far, we can not recover this
         if (check(TokenType::Semi) || is_kw(span())) {
             (void)match(TokenType::Semi);
-            return ast.new_node_func(to_loc(s), attributes, name, name_span,
-                                     attached_type, attached_type_span, nullptr,
-                                     nullptr, nullptr, nullptr, false);
+            return ast_file.decl_func(to_loc(s), to_loc(name_span), name,
+                                      attached_type, attributes, {}, {},
+                                      nullptr, false);
         }
 
         return nullptr;
@@ -1221,11 +1253,19 @@ public:
     }
 };
 
-auto parse_into_ast(std::span<Token const> tokens, ast::Ast& ast,
-                    LocalErrorReporter const& er, ParseOptions const& opt)
-    -> ast::NodeFile* {
-    auto p = Parser{tokens, er, opt, ast};
-    return p.parse_source_file();
+void parse_into_file(std::span<Token const> tokens, ast::File& ast_file,
+                     LocalErrorReporter const& er, ParseOptions const& opt) {
+    auto p = Parser{tokens, er, opt, ast_file};
+    auto [module_name, module_name_loc, decls] = p.parse_source_file();
+
+    if (ast_file.get_module_name() != module_name) {
+        er.report_error(
+            module_name_loc.span,
+            "incompatible module name, expected {:?} but received {:?}",
+            ast_file.get_module_name(), module_name);
+    }
+
+    ast_file.append_declarations(std::move(decls));
 }
 
 }  // namespace yal

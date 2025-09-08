@@ -28,8 +28,11 @@ void test_sumithing() {
         file.stmt_var({}, "x0", {}, file.expr_id({}, "s32"), nullptr));
 
     stmts.push_back(file.stmt_multi_var(
-        {}, std::array{file.expr_id({}, "x1"), file.expr_id({}, "x2")}, {},
-        std::array{file.expr_int({}, 11), file.expr_id({}, "hi")}));
+        {
+    },
+        std::array{MultiVarName{.name = "x1", .loc = {}},
+                   MultiVarName{.name = "x2", .loc = {}}},
+        {}, std::array{file.expr_int({}, 11), file.expr_id({}, "hi")}));
 
     stmts.push_back(file.stmt_block(
         {},
