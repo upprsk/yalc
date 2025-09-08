@@ -151,6 +151,21 @@ struct File {
 
     // NOTE: attributes should already have been allocated (with
     // `alloc_decl_attributes`).
+    auto decl_import(Location loc, Location name_loc, std::string_view name,
+                     std::span<DeclAttribute>          attributes,
+                     std::span<std::string_view const> path) -> ImportDecl* {
+        auto apath = node_arena.alloc<std::string_view>(path);
+        for (auto& p : apath) {
+            p = strings_arena.alloc_string_view(p);
+        }
+
+        return node_arena.create<ImportDecl>(
+            Decl{.kind = DeclKind::Import, .loc = loc}, attributes,
+            strings_arena.alloc_string_view(name), apath, nullptr, name_loc);
+    }
+
+    // NOTE: attributes should already have been allocated (with
+    // `alloc_decl_attributes`).
     // NOTE: params should already have been allocated (with
     // `alloc_func_params`).
     auto decl_func(Location loc, Location name_loc, std::string_view name,

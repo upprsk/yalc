@@ -43,12 +43,14 @@ auto Stmt::as_multi_var() -> MultiVarStmt& { return static_cast<MultiVarStmt&>(*
 auto Stmt::as_def() -> VarStmt& { return static_cast<VarStmt&>(*this); }
 auto Stmt::as_multi_def() -> MultiVarStmt& { return static_cast<MultiVarStmt&>(*this); }
 
+auto Decl::as_import() const -> ImportDecl const& { return static_cast<ImportDecl const&>(*this); }
 auto Decl::as_func() const -> FuncDecl const& { return static_cast<FuncDecl const&>(*this); }
 auto Decl::as_var() const -> VarDecl const& { return static_cast<VarDecl const&>(*this); }
 auto Decl::as_def() const -> VarDecl const& { return static_cast<VarDecl const&>(*this); }
 auto Decl::as_multi_var() const -> MultiVarDecl const& { return static_cast<MultiVarDecl const&>(*this); }
 auto Decl::as_multi_def() const -> MultiVarDecl const& { return static_cast<MultiVarDecl const&>(*this); }
 
+auto Decl::as_import() -> ImportDecl& { return static_cast<ImportDecl&>(*this); }
 auto Decl::as_func() -> FuncDecl& { return static_cast<FuncDecl&>(*this); }
 auto Decl::as_var() -> VarDecl& { return static_cast<VarDecl&>(*this); }
 auto Decl::as_def() -> VarDecl& { return static_cast<VarDecl&>(*this); }
@@ -216,6 +218,14 @@ void to_json(nlohmann::json& j, Decl const& n) {
 
     switch (n.kind) {
         case DeclKind::Err: break;
+
+        case DeclKind::Import: {
+            auto& imp = n.as_import();
+
+            j["name"] = imp.name;
+            j["path"] = imp.path;
+            to_json_arr(j["attributes"], imp.attributes);
+        } break;
 
         case DeclKind::Func: {
             auto& func = n.as_func();
@@ -477,6 +487,14 @@ void to_lisp(fmt::format_context& ctx, Decl const& decl, int depth) {
     switch (decl.kind) {
         case DeclKind::Err: break;
 
+        case DeclKind::Import: {
+            auto& imp = decl.as_import();
+
+            fmt::format_to(ctx.out(), " {}", fmt::join(imp.path, "/"));
+            fmt::format_to(ctx.out(), " {}", imp.name);
+            to_lisp_arr(ctx, imp.attributes, depth + 1);
+        } break;
+
         case DeclKind::Func: {
             auto& func = decl.as_func();
 
@@ -583,6 +601,7 @@ auto fmt::formatter<yal::ast::DeclKind>::format(yal::ast::DeclKind const& p,
     std::string_view name = "???";
     switch (p) {
         case yal::ast::DeclKind::Err: name = "Err"; break;
+        case yal::ast::DeclKind::Import: name = "Import"; break;
         case yal::ast::DeclKind::Func: name = "Func"; break;
         case yal::ast::DeclKind::Var: name = "Var"; break;
         case yal::ast::DeclKind::Def: name = "Def"; break;

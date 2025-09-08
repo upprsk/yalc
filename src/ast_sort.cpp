@@ -149,7 +149,8 @@ void scan_decl_for_global_refs(State& s, ast::Decl* decl, GlobalSymbol* gsym) {
     if (!decl) return;
 
     switch (decl->kind) {
-        case DeclKind::Err: break;
+        case DeclKind::Err:
+        case DeclKind::Import: break;
 
         case DeclKind::Func: {
             auto& func = decl->as_func();
@@ -220,6 +221,13 @@ void hoist_one_decl(State& s, ast::Decl* decl) {
 
     switch (decl->kind) {
         case DeclKind::Err: break;
+
+        case DeclKind::Import: {
+            auto& imp = decl->as_import();
+
+            auto gd = s.new_global_decl(imp.name, decl);
+            s.scope.items[imp.name] = gd;
+        } break;
 
         case DeclKind::Func: {
             auto& func = decl->as_func();
@@ -397,7 +405,10 @@ auto perform_sort(ErrorReporter& er, Module&& module, Options const& opt)
 
     for (auto const& file : module.files) {
         for (auto const& decl : file.get_declarations()) {
-            scan_decl_for_global_refs(s, decl, s.gsym_map.at(decl));
+            auto it = s.gsym_map.find(decl);
+            if (it != s.gsym_map.end()) {
+                scan_decl_for_global_refs(s, decl, it->second);
+            }
         }
     }
 

@@ -225,6 +225,7 @@ struct MultiVarStmt : public Stmt {
 enum struct DeclKind : uint8_t {
     Err,
 
+    Import,
     Func,
     Var,
     Def,
@@ -233,6 +234,7 @@ enum struct DeclKind : uint8_t {
     MultiDef,
 };
 
+struct ImportDecl;
 struct FuncDecl;
 struct VarDecl;
 struct MultiVarDecl;
@@ -243,12 +245,14 @@ struct Decl {
 
     Decl* forward = nullptr;
 
+    [[nodiscard]] auto as_import() const -> ImportDecl const&;
     [[nodiscard]] auto as_func() const -> FuncDecl const&;
     [[nodiscard]] auto as_var() const -> VarDecl const&;
     [[nodiscard]] auto as_def() const -> VarDecl const&;
     [[nodiscard]] auto as_multi_var() const -> MultiVarDecl const&;
     [[nodiscard]] auto as_multi_def() const -> MultiVarDecl const&;
 
+    [[nodiscard]] auto as_import() -> ImportDecl&;
     [[nodiscard]] auto as_func() -> FuncDecl&;
     [[nodiscard]] auto as_var() -> VarDecl&;
     [[nodiscard]] auto as_def() -> VarDecl&;
@@ -305,6 +309,16 @@ struct FuncRet {
     std::string_view name;  // only for named returns
     Location         loc;
     Expr*            type_expr = nullptr;
+};
+
+struct ImportDecl : Decl {
+    std::span<DeclAttribute>    attributes;
+    std::string_view            name;
+    std::span<std::string_view> path;
+
+    Symbol* sym = nullptr;
+
+    Location name_loc;
 };
 
 struct FuncDecl : Decl {

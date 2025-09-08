@@ -202,6 +202,7 @@ public:
         if (check("var")) return parse_top_var(attributes);
         if (check("def")) return parse_top_def(attributes);
         if (check("func")) return parse_func(attributes);
+        if (check("import")) return parse_import(attributes);
 
         er.report_error(span(), "expected top-level declaration but got '{}'",
                         span().str(source));
@@ -602,6 +603,34 @@ public:
             .loc = type ? type->loc : to_loc(start_span.extend(prev_span())),
             .type_expr = type,
         };
+    }
+
+    // ========================================================================
+
+    auto parse_import(std::span<ast::DeclAttribute> attributes) -> ast::Decl* {
+        auto start_span = span();
+
+        // NOTE: we have an unconsumed 'import' here every time
+        advance();
+
+        std::vector<std::string_view> path;
+        auto                          last_span = Span{};
+
+        do {
+            last_span = span();
+
+            if (consume(TokenType::Id)) {
+                path.push_back(last_span.str(source));
+            }
+        } while (!is_at_end() && match(TokenType::Slash));
+
+        auto name = path.back();
+        path.pop_back();
+
+        (void)consume(TokenType::Semi);
+
+        return ast_file->decl_import(to_loc(start_span.extend(prev_span())),
+                                     to_loc(last_span), name, attributes, path);
     }
 
     // ========================================================================
@@ -1066,7 +1095,8 @@ public:
     }
 
     [[nodiscard]] constexpr auto is_kw(std::string_view s) const -> bool {
-        return s == "var" || s == "def" || s == "func" || s == "return";
+        return s == "var" || s == "def" || s == "func" || s == "return" ||
+               s == "import";
     }
 
     // ========================================================================

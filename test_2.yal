@@ -7,4 +7,4 @@ def main_2 = main;
 
 def A = B;
 def B = C;
-def C = A;
+def C = .A;
