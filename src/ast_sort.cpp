@@ -284,8 +284,7 @@ void hoist_one_decl(State& s, ast::Decl* decl) {
     }
 }
 
-/// Report all nodes that are (probably) part of the cycle captured in
-/// `cycle_nodes`.
+/// Report all nodes that are (probably) part of the cycle.
 void report_cycle(ErrorReporter& er, GlobalSymbol* cycle_root) {
     ankerl::unordered_dense::segmented_set<GlobalSymbol*> visited;
     std::vector<GlobalSymbol*>                            worklist;
@@ -318,11 +317,9 @@ auto vector_without_duplicates(State& s) -> std::vector<GlobalSymbol*> {
     ankerl::unordered_dense::segmented_set<GlobalSymbol*> found;
 
     for (auto const& [_, n] : s.scope.items) {
-        if (n->in_degree == 0) {
-            if (!found.contains(n)) {
-                found.insert(n);
-                all_symbols.push_back(n);
-            }
+        if (!found.contains(n)) {
+            found.insert(n);
+            all_symbols.push_back(n);
         }
     }
 

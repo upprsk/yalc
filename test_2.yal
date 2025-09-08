@@ -4,3 +4,7 @@ def U = 1234+134;
 def V = some_random_thing;
 
 def main_2 = main;
+
+def A = B;
+def B = C;
+def C = A;
