@@ -1,5 +1,5 @@
 module main;
 
-func main() {
-    x;
-}
+def U = 1234+134;
+
+def main_2 = main;

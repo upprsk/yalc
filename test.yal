@@ -1,26 +1,6 @@
 module main;
 
-def A, B = 0, 1;
-def NAME = "name";
+func main() {}
 
-var g_start = A;
-
-@f.hi
-var hi_there;
-
-@export(link_name=NAME)
-var g_named = g_start;
-
-@test.yo(yo=thingy+1)
-func f(a, b: T) (w: U, 42) {
-    var x = A + B + C;
-    var y, z = x * 2, a - b;
-
-    w + hi_there;
-
-    return x + y;
-}
-
-var x = thingy;
-
-// vim: ft=yal
+func do_the_thing(t: T) U;
+def T = s32;

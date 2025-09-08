@@ -163,7 +163,7 @@ public:
             Decl{.kind = DeclKind::Func, .loc = loc},
             strings_arena.alloc_string_view(name),
             strings_arena.alloc_string_view(attached_type), attributes, params,
-            arets, body, name_loc, is_c_varargs);
+            arets, body, nullptr, name_loc, is_c_varargs);
     }
 
     // NOTE: attributes should already have been allocated (with

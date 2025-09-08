@@ -307,7 +307,8 @@ struct FuncDecl : Decl {
     std::span<FuncParam>     params;
     std::span<FuncRet>       rets;
 
-    Stmt* body = nullptr;
+    Stmt*   body = nullptr;
+    Symbol* sym = nullptr;
 
     Location name_loc;
 

@@ -7,6 +7,7 @@
 
 #include "argparser.hpp"
 #include "ast.hpp"
+#include "ast_sort.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
 #include "node.hpp"
@@ -121,7 +122,7 @@ auto create_module_from_files(yalc::Args const& args, yal::FileStore const& fs,
 }
 
 auto main_single_file(yalc::Args const& args, yal::FileStore& fs,
-                      yal::ErrorReporter& er) {
+                      yal::SymbolStore& ss, yal::ErrorReporter& er) {
     auto id = fs.add_file(args.program);
     if (id.is_invalid()) {
         fmt::println(stderr, "invalid file: {}", args.program);
@@ -140,11 +141,21 @@ auto main_single_file(yalc::Args const& args, yal::FileStore& fs,
         fmt::println("{}", j.dump(2));
     }
 
+    std::vector<yal::ast::File> files;
+    files.push_back(std::move(file_ast));
+
+    auto module = yal::ast::Module{
+        .name = std::string{file_ast.get_module_name()},
+        .files = std::move(files),
+    };
+
+    yal::ast::sort::perform_sort(er, ss, module);
+
     return 0;
 }
 
 auto main_default(yalc::Args const& args, yal::FileStore& fs,
-                  yal::ErrorReporter& er) {
+                  yal::SymbolStore& ss, yal::ErrorReporter& er) {
     auto root_fid = fs.add_file(args.program);
     if (root_fid.is_invalid()) {
         fmt::println(stderr, "invalid file: {}", args.program);
@@ -179,6 +190,8 @@ auto main_default(yalc::Args const& args, yal::FileStore& fs,
         fmt::println("{}", j.dump(2));
     }
 
+    yal::ast::sort::perform_sort(er, ss, module);
+
     return 0;
 }
 
@@ -187,15 +200,16 @@ auto main(int argc, char** argv) -> int {
     if (args.verbose.has_yalc()) fmt::println(stderr, "args: {}", args);
 
     auto fs = yal::FileStore{};
+    auto ss = yal::SymbolStore{};
     auto er = yal::ErrorReporter{&fs, stderr, args.error_format};
 
     // in case we are in single file mode, we want to add just the given file,
     // and not scan anything other than imports otherwise we want to add the
     // given directory
     if (args.single_file) {
-        if (int r = main_single_file(args, fs, er)) return r;
+        if (int r = main_single_file(args, fs, ss, er)) return r;
     } else {
-        if (int r = main_default(args, fs, er)) return r;
+        if (int r = main_default(args, fs, ss, er)) return r;
     }
 
     if (args.verbose.has_yalc()) fmt::println(stderr, "done!");

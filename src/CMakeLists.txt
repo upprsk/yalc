@@ -1,10 +1,10 @@
 add_library(yal
-    # name_res.cpp
-    # name_res.hpp
     arena.cpp
     arena.hpp
     ast.cpp
     ast.hpp
+    ast_sort.cpp
+    ast_sort.hpp
     error_reporter.cpp
     error_reporter.hpp
     file_store.cpp
