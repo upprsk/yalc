@@ -1,1 +1,1 @@
-{"data":{"kind":"File","loc":"0-6@FileId(0)","module_name":""},"out":":memory:invalid module decl 2:1:6: error: expected 'identifier', but got 'EOF'\n> 0001 | module\n               \n"}
+{"data":{"decls":[],"name":"","name_loc":"0-0@FileId(0)"},"out":":memory:invalid module decl 2:1:6: error: expected 'identifier', but got 'EOF'\n> 0001 | module\n               \n"}

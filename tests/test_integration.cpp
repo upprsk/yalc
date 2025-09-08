@@ -424,6 +424,8 @@ func f(x: i32 y: i32);
 func f(x: i32 y: i32, z: i32);
 )~~"},
 
+        // NOTE: This generic syntax has been removed, so this is now a test of
+        // how this fails
         {              "lone generic function 1", R"~~(module main;
 func f[T]() T {}
 )~~"},
@@ -857,11 +859,10 @@ func c_printf(fmt: c_string, ...);
                         fmt::format(":memory:{}", name), input);
                     auto tokens = tokenize(er.for_file(fileid));
 
-                    auto       ast = ast::Ast{};
-                    ast::Node* root =
-                        parse_into_ast(tokens, ast, er.for_file(fileid));
+                    auto ast = ast::File{};
+                    parse_into_ast_file(tokens, ast, er.for_file(fileid));
 
-                    return *root;
+                    return ast;
                 });
     }
 
