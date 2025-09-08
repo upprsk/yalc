@@ -11,6 +11,8 @@ namespace fs = std::filesystem;
 
 namespace yal {
 
+static constexpr std::string_view const YAL_EXTENSION = ".yal";
+
 auto to_absolute_path(fs::path const &path) -> fs::path {
     return fs::absolute(path);
 }
@@ -106,6 +108,17 @@ auto FileStore::find_dir_by_path(std::string_view full_path) const -> DirId {
     if (it == dirs.end()) return {};
 
     return it->id;
+}
+
+auto FileStore::get_dir_containing(FileId fid) -> DirId {
+    auto of = get_file_by_id(fid);
+    if (!of) return {};
+
+    auto f = *of;
+    auto path = fs::path{f.full_path};
+    if (!path.has_parent_path()) return {};
+
+    return add_dir(path.parent_path().c_str());
 }
 
 auto FileStore::read_entire_file(std::string const &path)

@@ -174,6 +174,9 @@ public:
     [[nodiscard]] auto find_dir_by_path(std::string_view full_path) const
         -> DirId;
 
+    // get directory that contains a file.
+    [[nodiscard]] auto get_dir_containing(FileId fid) -> DirId;
+
 private:
     // read the contents of a file into the `big_arena`.
     [[nodiscard]] auto read_entire_file(std::string const &full_path)

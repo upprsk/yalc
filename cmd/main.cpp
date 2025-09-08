@@ -3,15 +3,35 @@
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 #include "argparser.hpp"
 #include "ast.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
-// #include "name_res.hpp"
 #include "parser.hpp"
 #include "symbol.hpp"
 #include "tokenizer.hpp"
+
+auto ingest_file(yalc::Args const& args, yal::LocalErrorReporter const& er)
+    -> yal::ast::File {
+    auto tokens = yal::tokenize(er);
+    if (args.dump.has_tokens()) {
+        nlohmann::json j = tokens;
+        fmt::println("{}", j.dump(2));
+    }
+
+    auto file_ast = yal::ast::File{};
+    yal::parse_into_ast_file(tokens, file_ast, er,
+                             {.verbose = args.verbose.has_parser()});
+
+    if (args.dump.has_ast()) {
+        nlohmann::json j = file_ast;
+        fmt::println("{}", j.dump(2));
+    }
+
+    return file_ast;
+}
 
 auto main(int argc, char** argv) -> int {
     auto args = yalc::argparse(argc, argv);
@@ -21,18 +41,12 @@ auto main(int argc, char** argv) -> int {
     auto er = yal::ErrorReporter{&fs, stderr, args.error_format};
 
     // in case we are in single file mode, we want to add just the given file,
-    // otherwise we want to add the given directory
+    // and not scan anything other than imports otherwise we want to add the
+    // given directory
     if (args.single_file) {
         auto id = fs.add_file(args.program);
         if (id.is_invalid()) {
             fmt::println(stderr, "invalid file: {}", args.program);
-
-            if (std::filesystem::is_directory(args.program)) {
-                fmt::println(
-                    stderr, "note: {} is a directory, maybe try without --file",
-                    args.program);
-            }
-
             return 1;
         }
 
@@ -42,62 +56,28 @@ auto main(int argc, char** argv) -> int {
                          f->contents.size());
         }
 
-        auto tokens = yal::tokenize(er.for_file(id));
-        if (args.dump.has_tokens()) {
-            nlohmann::json j = tokens;
-            fmt::println("{}", j.dump(2));
-        }
-
-        auto root_file = yal::ast::File{};
-        yal::parse_into_ast_file(tokens, root_file, er.for_file(id),
-                                 {.verbose = args.verbose.has_parser()});
-
-        if (args.dump.has_ast()) {
-            nlohmann::json j = root_file;
-            fmt::println("{}", j.dump(2));
-        }
-
-        auto decl_store = yal::SymbolStore{};
-
-        // auto mod = yal::sort_declarations_and_resolve_top_level(
-        //     ast, decl_store, std::array{root}, er,
-        //     {.verbose = args.verbose.has_sort(),
-        //      .log_decl_dependencies = args.verbose.has_deps(),
-        //      .dump_dependencies_as_mermaid = args.dump.has_deps_mermaid()});
-        // if (args.dump.has_sorted()) {
-        //     nlohmann::json j = *mod;
-        //     fmt::println("{}", j.dump(2));
-        // }
-
-        // do not compile, just analyse and report
-        if (args.just_analyse) {
-        }
-
+        ingest_file(args, er.for_file(id));
     } else {
-        auto id = fs.add_dir(args.program);
+        auto id = fs.add_file(args.program);
         if (id.is_invalid()) {
-            fmt::println(stderr, "invalid directory: {}", args.program);
-
-            if (std::filesystem::is_regular_file(args.program)) {
-                fmt::println(
-                    stderr, "note: {} is a regular file, maybe try with --file",
-                    args.program);
-            }
-
+            fmt::println(stderr, "invalid file: {}", args.program);
             return 1;
         }
 
+        auto dir_id = fs.get_dir_containing(id);
+        auto dir = fs.get_dir_by_id(dir_id);
         if (args.verbose.has_yalc()) {
-            auto d = fs.get_dir_by_id(id);
             fmt::println(stderr, "program directory: {} ({} files)",
-                         d->full_path, d->files.size());
+                         dir->full_path, dir->files.size());
 
-            for (auto fileid : d->files) {
+            for (auto fileid : dir->files) {
                 auto f = fs.get_file_by_id(fileid);
                 fmt::println(stderr, "- file: {} ({}B)", f->full_path,
                              f->contents.size());
             }
         }
+
+        ingest_file(args, er.for_file(id));
     }
 
     if (args.verbose.has_yalc()) fmt::println(stderr, "done!");

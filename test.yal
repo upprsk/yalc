@@ -12,7 +12,7 @@ var hi_there;
 var g_named = g_start;
 
 @test.yo(yo=thingy+1)
-func f[T, U](a, b: T) (w: U, 42) {
+func f(a, b: T) (w: U, 42) {
     var x = A + B + C;
     var y, z = x * 2, a - b;
 
