@@ -15,6 +15,7 @@ struct Options {
     bool verbose_sort = false;
 };
 
-void perform_sort(ErrorReporter& er, Module const& module, Options const& opt = {});
+auto perform_sort(ErrorReporter& er, Module&& module, Options const& opt = {})
+    -> FlatModule;
 
 }  // namespace yal::ast::sort

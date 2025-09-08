@@ -46,6 +46,24 @@ public:
     constexpr Arena(Arena const& o) = delete;
     constexpr Arena(Arena&& o) : head{o.head} { o.head = nullptr; }
 
+    constexpr void move_from(Arena o) {
+        // the other arena is empty, no need to do anything
+        if (!o.head) return;
+
+        // find tail of our chain of blocks
+        if (head) {
+            auto tail = head;
+            while (tail->next) tail = tail->next;
+
+            // put the other arena at the tail of our chain
+            tail->next = o.head;
+        } else {
+            head = o.head;
+        }
+
+        o.head = nullptr;
+    }
+
     constexpr auto operator=(Arena const&) -> Arena& = delete;
     constexpr auto operator=(Arena&& o) -> Arena& {
         head = o.head;

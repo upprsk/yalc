@@ -6,6 +6,7 @@
 #include <ranges>
 #include <string_view>
 
+#include "ast.hpp"
 #include "error_reporter.hpp"
 #include "node.hpp"
 #include "symbol.hpp"
@@ -384,7 +385,8 @@ auto sort_globals(ErrorReporter& er, std::vector<GlobalSymbol*> items)
     return sorted;
 }
 
-void perform_sort(ErrorReporter& er, Module const& module, Options const& opt) {
+auto perform_sort(ErrorReporter& er, Module&& module, Options const& opt)
+    -> FlatModule {
     auto s = State{.arena = {}, .gsym_map = {}, .er = er};
 
     for (auto const& file : module.files) {
@@ -421,6 +423,18 @@ void perform_sort(ErrorReporter& er, Module const& module, Options const& opt) {
                             gsym->name, fmt::ptr(gsym));
         }
     }
+
+    auto fm = FlatModule{};
+    for (auto&& file : module.files) {
+        fm.node_arena.move_from(std::move(file.node_arena));
+        fm.strings_arena.move_from(std::move(file.strings_arena));
+    }
+
+    for (auto const& sym : sorted) {
+        fm.declarations.push_back(sym->decl);
+    }
+
+    return fm;
 }
 
 }  // namespace yal::ast::sort

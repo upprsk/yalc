@@ -15,6 +15,7 @@ struct DumpStep {
         None = 0,
         Tokens = 1 << 0,
         Ast = 1 << 1,
+        Module = 1 << 2,
 
         DepsMermaid = 1 << 8,
     };
@@ -34,6 +35,7 @@ struct DumpStep {
 
     define_parts(tokens, Tokens);
     define_parts(ast, Ast);
+    define_parts(module, Module);
 
     define_parts(deps_mermaid, DepsMermaid);
 

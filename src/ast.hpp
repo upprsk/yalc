@@ -9,7 +9,7 @@
 
 namespace yal::ast {
 
-class File {
+struct File {
     mem::Arena node_arena;
     mem::Arena strings_arena;
 
@@ -17,7 +17,6 @@ class File {
     Location           module_name_loc;
     std::vector<Decl*> declarations;
 
-public:
     [[nodiscard]] constexpr auto get_module_name() const -> std::string_view {
         return module_name;
     }
@@ -263,7 +262,6 @@ public:
         return kvs;
     }
 
-private:
     auto alloc_multi_var_names(std::span<MultiVarName const> names)
         -> std::span<MultiVarName> {
         auto anames = node_arena.alloc<MultiVarName>(names);
@@ -290,7 +288,16 @@ struct Module {
     std::vector<File> files;
 };
 
+struct FlatModule {
+    mem::Arena node_arena;
+    mem::Arena strings_arena;
+
+    std::string        name;
+    std::vector<Decl*> declarations;
+};
+
 void to_json(nlohmann::json& j, File const& n);
 void to_json(nlohmann::json& j, Module const& n);
+void to_json(nlohmann::json& j, FlatModule const& n);
 
 }  // namespace yal::ast

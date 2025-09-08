@@ -48,7 +48,7 @@ void print_help(std::string_view self) {
     println(stderr, "        available steps:");
     println(stderr, "            tokens: dump tokenization result.");
     println(stderr, "            ast: dump parsed AST.");
-    println(stderr, "            sorted: dump top-level name-resolved and sorted AST.");
+    println(stderr, "            module: dump flat sorted module.");
     println(stderr, "            deps-mermaid: dump the results of top-level name-resolution as a");
     println(stderr, "                mermaid diagram.");
     println(stderr, "    -o,--output: path to output file (QBE)");
@@ -127,6 +127,8 @@ auto argparse(int argc, char** argv) -> Args {
                     args.dump = args.dump.with_tokens();
                 } else if (part == "ast") {
                     args.dump = args.dump.with_ast();
+                } else if (part == "module") {
+                    args.dump = args.dump.with_module();
                 } else if (part == "deps-mermaid") {
                     args.dump = args.dump.with_deps_mermaid();
                 } else {
@@ -191,6 +193,7 @@ auto format_as(DumpStep::Step step) -> std::string_view {
         case DumpStep::None: s = "none"; break;
         case DumpStep::Tokens: s = "tokens"; break;
         case DumpStep::Ast: s = "ast"; break;
+        case DumpStep::Module: s = "module"; break;
         case DumpStep::DepsMermaid: s = "deps-mermaid"; break;
     }
 
