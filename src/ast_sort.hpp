@@ -10,6 +10,6 @@
 
 namespace yal::ast::sort {
 
-void perform_sort(ErrorReporter& er, SymbolStore& ss, Module const& module);
+void perform_sort(ErrorReporter& er, Module const& module);
 
 }  // namespace yal::ast::sort

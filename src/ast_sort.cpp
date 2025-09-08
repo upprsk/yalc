@@ -55,7 +55,6 @@ struct State {
     ankerl::unordered_dense::map<Decl*, GlobalSymbol*> gsym_map;
 
     ErrorReporter& er;
-    SymbolStore&   ss;
 
     ~State() {
         auto it = global_symbols;
@@ -118,6 +117,7 @@ void scan_expr_for_global_refs(State& s, LocalScope& scope, ast::Expr* expr) {
             }
         } break;
 
+        case ExprKind::Kw:
         case ExprKind::Int:
         case ExprKind::String: break;
     }
@@ -157,6 +157,13 @@ void scan_decl_for_global_refs(State& s, ast::Decl* decl, GlobalSymbol* gsym) {
                 .locals = {},
                 .current_symbol = gsym,
             };
+
+            if (!func.attached_type.empty()) {
+                if (auto g = s.scope.lookup(func.attached_type)) {
+                    g->required_by.push_back(scope.current_symbol);
+                    scope.current_symbol->in_degree++;
+                }
+            }
 
             scan_attributes_for_global_refs(s, scope, func.attributes, gsym);
 
@@ -215,17 +222,34 @@ void hoist_one_decl(State& s, ast::Decl* decl) {
 
         case DeclKind::Func: {
             auto& func = decl->as_func();
-            func.sym = s.ss.new_sym(decl->loc, func.name, func.name);
 
-            // TODO: handle namespacing/attached types
             auto gd = s.new_global_decl(func.name, decl);
-            s.scope.items[func.name] = gd;
+
+            if (func.attached_type.empty()) {
+                if (auto g = s.scope.lookup(func.name)) {
+                    s.er.report_error(
+                        decl->loc,
+                        "duplicate global identifier {:?}, can not "
+                        "redeclare global",
+                        func.name);
+                    s.er.report_note(g->decl->loc, "first defined here");
+                }
+
+                s.scope.items[func.name] = gd;
+            }
         } break;
 
         case DeclKind::Var:
         case DeclKind::Def: {
             auto& var = decl->as_var();
-            var.sym = s.ss.new_sym(decl->loc, var.name, var.name);
+
+            if (auto g = s.scope.lookup(var.name)) {
+                s.er.report_error(decl->loc,
+                                  "duplicate global identifier {:?}, can not "
+                                  "redeclare global",
+                                  var.name);
+                s.er.report_note(g->decl->loc, "first defined here");
+            }
 
             auto gd = s.new_global_decl(var.name, decl);
             s.scope.items[var.name] = gd;
@@ -235,15 +259,25 @@ void hoist_one_decl(State& s, ast::Decl* decl) {
         case DeclKind::MultiDef: {
             auto& mvar = decl->as_multi_var();
 
-            auto joined_name = fmt::to_string(fmt::join(
-                mvar.names | std::views::transform(
-                                 [](MultiVarName const& n) { return n.name; }),
-                "_"));
+            auto joined_name = fmt::format(
+                "", fmt::join(mvar.names | std::views::transform(
+                                               [](MultiVarName const& n) {
+                                                   return n.name;
+                                               }),
+                              "_"));
             auto gd =
                 s.new_global_decl(s.arena.alloc_string_view(joined_name), decl);
 
             for (auto& name : mvar.names) {
-                name.sym = s.ss.new_sym(decl->loc, name.name, name.name);
+                if (auto g = s.scope.lookup(name.name)) {
+                    s.er.report_error(
+                        decl->loc,
+                        "duplicate global identifier {:?}, can not "
+                        "redeclare global",
+                        name.name);
+                    s.er.report_note(g->decl->loc, "first defined here");
+                }
+
                 s.scope.items[name.name] = gd;
             }
         } break;
@@ -252,7 +286,7 @@ void hoist_one_decl(State& s, ast::Decl* decl) {
 
 /// Report all nodes that are (probably) part of the cycle captured in
 /// `cycle_nodes`.
-void report_cycle(State& s, GlobalSymbol* cycle_root) {
+void report_cycle(ErrorReporter& er, GlobalSymbol* cycle_root) {
     ankerl::unordered_dense::segmented_set<GlobalSymbol*> visited;
     std::vector<GlobalSymbol*>                            worklist;
 
@@ -270,8 +304,8 @@ void report_cycle(State& s, GlobalSymbol* cycle_root) {
         // this will continue if the node has already been visited
         if (!visited.insert(n).second) continue;
 
-        s.er.report_note(n->decl->loc,
-                         "this declaration is also part of the cycle");
+        er.report_note(n->decl->loc,
+                       "this declaration is also part of the cycle");
 
         for (auto dep : n->required_by) {
             if (dep->in_degree > 0) worklist.push_back(dep);
@@ -279,21 +313,29 @@ void report_cycle(State& s, GlobalSymbol* cycle_root) {
     }
 }
 
-auto sort_globals(State& s) -> std::vector<GlobalSymbol*> {
+auto vector_without_duplicates(State& s) -> std::vector<GlobalSymbol*> {
+    std::vector<GlobalSymbol*>                            all_symbols;
+    ankerl::unordered_dense::segmented_set<GlobalSymbol*> found;
+
+    for (auto const& [_, n] : s.scope.items) {
+        if (n->in_degree == 0) {
+            if (!found.contains(n)) {
+                found.insert(n);
+                all_symbols.push_back(n);
+            }
+        }
+    }
+
+    return all_symbols;
+}
+
+auto sort_globals(ErrorReporter& er, std::vector<GlobalSymbol*> items)
+    -> std::vector<GlobalSymbol*> {
     std::vector<GlobalSymbol*> sorted;
     std::deque<GlobalSymbol*>  queue;
 
-    {
-        ankerl::unordered_dense::segmented_set<GlobalSymbol*> found;
-
-        for (auto const& [_, n] : s.scope.items) {
-            if (n->in_degree == 0) {
-                if (!found.contains(n)) {
-                    found.insert(n);
-                    queue.push_back(n);
-                }
-            }
-        }
+    for (auto const& n : items) {
+        if (n->in_degree == 0) queue.push_back(n);
     }
 
     while (true) {
@@ -310,7 +352,7 @@ auto sort_globals(State& s) -> std::vector<GlobalSymbol*> {
         }
 
         std::vector<GlobalSymbol*> cycle_nodes;
-        for (auto const& [_, unordered] : s.scope.items) {
+        for (auto const& unordered : items) {
             if (unordered->in_degree > 0) {
                 cycle_nodes.push_back(unordered);
             }
@@ -332,21 +374,21 @@ auto sort_globals(State& s) -> std::vector<GlobalSymbol*> {
         auto n = cycle_nodes.front();
         n->in_degree--;
         if (n->in_degree == 0) {
-            s.er.report_error(n->decl->loc,
-                              "global declaration is part of a cycle");
+            er.report_error(n->decl->loc,
+                            "global declaration is part of a cycle");
 
             // add this back into the queue now that we removed one of the links
             queue.push_back(n);
 
-            report_cycle(s, n);
+            report_cycle(er, n);
         }
     }
 
     return sorted;
 }
 
-void perform_sort(ErrorReporter& er, SymbolStore& ss, Module const& module) {
-    auto s = State{.arena = {}, .gsym_map = {}, .er = er, .ss = ss};
+void perform_sort(ErrorReporter& er, Module const& module) {
+    auto s = State{.arena = {}, .gsym_map = {}, .er = er};
 
     for (auto const& file : module.files) {
         for (auto const& decl : file.get_declarations()) {
@@ -360,15 +402,19 @@ void perform_sort(ErrorReporter& er, SymbolStore& ss, Module const& module) {
         }
     }
 
-    for (auto const& [_, n] : s.scope.items) {
-        er.report_note(
-            n->decl->loc, "gsym {} in_degree={}, required_by={}", n->name,
-            n->in_degree,
-            n->required_by |
-                std::views::transform([](GlobalSymbol* g) { return g->name; }));
-    }
+    // create list without deplicates
+    auto all_symbols = vector_without_duplicates(s);
 
-    auto sorted = sort_globals(s);
+    // for (auto const& [_, n] : s.scope.items) {
+    //     er.report_note(
+    //         n->decl->loc, "gsym {} in_degree={}, required_by={}", n->name,
+    //         n->in_degree,
+    //         n->required_by |
+    //             std::views::transform([](GlobalSymbol* g) { return g->name;
+    //             }));
+    // }
+
+    auto sorted = sort_globals(er, all_symbols);
     for (auto const& [idx, gsym] : std::views::enumerate(sorted)) {
         auto decl = gsym->decl;
         er.report_debug(decl->loc, "[{}] found gsym: {} ({})", idx, gsym->name,
