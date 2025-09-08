@@ -66,6 +66,11 @@ public:
                                          strings_arena.alloc_string_view(name));
     }
 
+    auto expr_kw(Location loc, std::string_view name) -> KwExpr* {
+        return node_arena.create<KwExpr>(Expr{.kind = ExprKind::Kw, .loc = loc},
+                                         strings_arena.alloc_string_view(name));
+    }
+
     auto expr_int(Location loc, uint64_t value) -> IntExpr* {
         return node_arena.create<IntExpr>(
             Expr{.kind = ExprKind::Int, .loc = loc}, value);

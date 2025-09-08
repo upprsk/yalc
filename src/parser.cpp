@@ -694,6 +694,16 @@ public:
                                      start_span.str(source));
         }
 
+        if (match(TokenType::Dot)) {
+            std::string_view name;
+            if (consume(TokenType::Id)) {
+                name = prev_span().str(source);
+            }
+
+            return ast_file->expr_kw(to_loc(start_span.extend(prev_span())),
+                                     name);
+        }
+
         if (match(TokenType::Int)) return parse_int(start_span);
         if (match(TokenType::Hex)) return parse_int_with_base(start_span, 16);
         if (match(TokenType::Str)) return parse_string(start_span);

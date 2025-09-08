@@ -17,11 +17,13 @@ using nlohmann::json;
 // clang-format off
 auto Expr::as_arith() const -> ArithExpr const& { return static_cast<ArithExpr const&>(*this); }
 auto Expr::as_id() const -> IdExpr const& { return static_cast<IdExpr const&>(*this); }
+auto Expr::as_kw() const -> KwExpr const& { return static_cast<KwExpr const&>(*this); }
 auto Expr::as_int() const -> IntExpr const& { return static_cast<IntExpr const&>(*this); }
 auto Expr::as_string() const -> StringExpr const& { return static_cast<StringExpr const&>(*this); }
 
 auto Expr::as_arith() -> ArithExpr& { return static_cast<ArithExpr&>(*this); }
 auto Expr::as_id() -> IdExpr& { return static_cast<IdExpr&>(*this); }
+auto Expr::as_kw() -> KwExpr& { return static_cast<KwExpr&>(*this); }
 auto Expr::as_int() -> IntExpr& { return static_cast<IntExpr&>(*this); }
 auto Expr::as_string() -> StringExpr& { return static_cast<StringExpr&>(*this); }
 
@@ -102,6 +104,11 @@ void to_json(nlohmann::json& j, Expr const& n) {
             auto& id = n.as_id();
             j["value"] = id.value;
             j["sym"] = id.sym ? json(fmt::to_string(*id.sym)) : json{};
+        } break;
+
+        case ExprKind::Kw: {
+            auto& kw = n.as_kw();
+            j["value"] = kw.value;
         } break;
 
         case ExprKind::Int: {
@@ -310,6 +317,12 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
                 indent_by_wln(ctx, depth + 1);
                 fmt::format_to(ctx.out(), "sym: {}", *id.sym);
             }
+        } break;
+
+        case ExprKind::Kw: {
+            auto& kw = expr.as_kw();
+
+            fmt::format_to(ctx.out(), " {:?}", kw.value);
         } break;
 
         case ExprKind::Int: {
@@ -538,6 +551,7 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::Div: name = "Div"; break;
         case yal::ast::ExprKind::Mod: name = "Mod"; break;
         case yal::ast::ExprKind::Id: name = "Id"; break;
+        case yal::ast::ExprKind::Kw: name = "Kw"; break;
         case yal::ast::ExprKind::Int: name = "Int"; break;
         case yal::ast::ExprKind::String: name = "String"; break;
     }

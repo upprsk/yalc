@@ -24,12 +24,14 @@ enum struct ExprKind : uint8_t {
     Mod,
 
     Id,
+    Kw,
     Int,
     String,
 };
 
 struct ArithExpr;
 struct IdExpr;
+struct KwExpr;
 struct IntExpr;
 struct StringExpr;
 
@@ -50,11 +52,13 @@ struct Expr {
 
     [[nodiscard]] auto as_arith() const -> ArithExpr const&;
     [[nodiscard]] auto as_id() const -> IdExpr const&;
+    [[nodiscard]] auto as_kw() const -> KwExpr const&;
     [[nodiscard]] auto as_int() const -> IntExpr const&;
     [[nodiscard]] auto as_string() const -> StringExpr const&;
 
     [[nodiscard]] auto as_arith() -> ArithExpr&;
     [[nodiscard]] auto as_id() -> IdExpr&;
+    [[nodiscard]] auto as_kw() -> KwExpr&;
     [[nodiscard]] auto as_int() -> IntExpr&;
     [[nodiscard]] auto as_string() -> StringExpr&;
 
@@ -90,6 +94,10 @@ struct IdExpr : public Expr {
     std::string_view value;
 
     Symbol* sym = nullptr;
+};
+
+struct KwExpr : public Expr {
+    std::string_view value;
 };
 
 struct IntExpr : public Expr {
