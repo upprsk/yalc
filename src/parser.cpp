@@ -503,12 +503,9 @@ public:
 
     auto parse_func_args() -> std::pair<std::span<ast::FuncParam>, bool> {
         if (!consume(TokenType::Lparen)) {
-            // NOTE: this helps with error recovery when something failed when
-            // parsing generic arguments. errata: we removed generic arguments,
-            // does this still help?
-            (void)match(TokenType::Rparen);
+            recover_parse_func_arglist();
 
-            return {};
+            if (!match(TokenType::Lparen)) return {};
         }
 
         std::vector<ast::FuncParam> params;
@@ -605,6 +602,9 @@ public:
                 ast::FuncRet{.name = "", .loc = ret->loc, .type_expr = ret}
             };
         }
+
+        er.report_note(prev_span(),
+                       "when trying to parse function return type");
 
         recover_parse_func_ret_single();
         return {};
@@ -989,6 +989,12 @@ public:
                        "var", "def", "func");
     }
 
+    void recover_parse_func_arglist() {
+        skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Lparen,
+                       TokenType::Rparen, TokenType::Lbrace, TokenType::Semi,
+                       TokenType::Attribute, "var", "def", "func");
+    }
+
     void recover_parse_func_ret() {
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
                        TokenType::Semi, TokenType::Lbrace, TokenType::Attribute,
@@ -1253,18 +1259,16 @@ public:
     }
 };
 
-void parse_into_file(std::span<Token const> tokens, ast::File& ast_file,
-                     LocalErrorReporter const& er, ParseOptions const& opt) {
+void parse_into_ast_file(std::span<Token const> tokens, ast::File& ast_file,
+                         LocalErrorReporter const& er,
+                         ParseOptions const&       opt) {
     auto p = Parser{tokens, er, opt, ast_file};
     auto [module_name, module_name_loc, decls] = p.parse_source_file();
 
-    if (ast_file.get_module_name() != module_name) {
-        er.report_error(
-            module_name_loc.span,
-            "incompatible module name, expected {:?} but received {:?}",
-            ast_file.get_module_name(), module_name);
-    }
+    DEBUG_ASSERT(ast_file.get_module_name() == "");
+    DEBUG_ASSERT(ast_file.get_declarations().size() == 0);
 
+    ast_file.set_module_name(module_name, module_name_loc);
     ast_file.append_declarations(std::move(decls));
 }
 

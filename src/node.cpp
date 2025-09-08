@@ -154,7 +154,7 @@ void to_json(nlohmann::json& j, Stmt const& n) {
         case StmtKind::MultiDef: {
             auto& multi_var = n.as_multi_var();
 
-            to_json_arr(j["types"], multi_var.names);
+            to_json_arr(j["names"], multi_var.names);
             to_json_arr(j["types"], multi_var.types);
             to_json_arr(j["inits"], multi_var.inits);
         } break;
@@ -219,6 +219,7 @@ void to_json(nlohmann::json& j, Decl const& n) {
             to_json_arr(j["attributes"], func.attributes);
             to_json_arr(j["params"], func.params);
             to_json_arr(j["rets"], func.rets);
+            j["is_c_varargs"] = func.is_c_varargs;
 
             j["body"] = func.body ? *func.body : json{};
         } break;
@@ -240,7 +241,7 @@ void to_json(nlohmann::json& j, Decl const& n) {
             auto& multi_var = n.as_multi_var();
 
             to_json_arr(j["attributes"], multi_var.attributes);
-            to_json_arr(j["types"], multi_var.names);
+            to_json_arr(j["names"], multi_var.names);
             to_json_arr(j["types"], multi_var.types);
             to_json_arr(j["inits"], multi_var.inits);
         } break;
@@ -572,7 +573,7 @@ auto fmt::formatter<yal::ast::DeclKind>::format(yal::ast::DeclKind const& p,
         case yal::ast::DeclKind::Var: name = "Var"; break;
         case yal::ast::DeclKind::Def: name = "Def"; break;
         case yal::ast::DeclKind::MultiVar: name = "MultiVar"; break;
-        case yal::ast::DeclKind::MultiDef: name = " break"; break;
+        case yal::ast::DeclKind::MultiDef: name = "MultiDef"; break;
     }
 
     return formatter<string_view>::format(name, ctx);

@@ -18,12 +18,20 @@ class File {
     std::vector<Decl*> declarations;
 
 public:
-    constexpr auto get_module_name() -> std::string_view { return module_name; }
+    [[nodiscard]] constexpr auto get_module_name() const -> std::string_view {
+        return module_name;
+    }
+
+    [[nodiscard]] constexpr auto get_module_name_loc() const -> Location {
+        return module_name_loc;
+    }
 
     constexpr void set_module_name(std::string_view name, Location name_loc) {
         module_name = strings_arena.alloc_string_view(name);
         module_name_loc = name_loc;
     }
+
+    constexpr void set_module_name_loc(Location loc) { module_name_loc = loc; }
 
     constexpr void set_declarations(auto&& d) { declarations = d; }
     constexpr void append_declarations(auto&& d) {
@@ -190,7 +198,7 @@ public:
         auto anames = alloc_multi_var_names(names);
 
         return node_arena.create<MultiVarDecl>(
-            Decl{.kind = DeclKind::MultiVar, .loc = loc}, anames, attributes,
+            Decl{.kind = DeclKind::MultiVar, .loc = loc}, attributes, anames,
             dupe_exprs(types), dupe_exprs(inits));
     }
 
@@ -204,7 +212,7 @@ public:
         auto anames = alloc_multi_var_names(names);
 
         return node_arena.create<MultiVarDecl>(
-            Decl{.kind = DeclKind::MultiDef, .loc = loc}, anames, attributes,
+            Decl{.kind = DeclKind::MultiDef, .loc = loc}, attributes, anames,
             dupe_exprs(types), dupe_exprs(inits));
     }
 
@@ -262,5 +270,7 @@ private:
         return anames;
     }
 };
+
+void to_json(nlohmann::json& j, File const& n);
 
 }  // namespace yal::ast

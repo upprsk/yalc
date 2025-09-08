@@ -8,55 +8,14 @@
 #include "ast.hpp"
 #include "error_reporter.hpp"
 #include "file_store.hpp"
-#include "name_res.hpp"
+// #include "name_res.hpp"
 #include "parser.hpp"
 #include "symbol.hpp"
 #include "tokenizer.hpp"
 
-void test_sumithing() {
-    using namespace yal::ast;
-
-    auto file = File{};
-
-    std::vector<Stmt*> stmts;
-
-    stmts.push_back(file.stmt_expr({}, file.expr_id({}, "hi")));
-    stmts.push_back(file.stmt_expr({}, file.expr_int({}, 1234)));
-    stmts.push_back(file.stmt_expr({}, file.expr_string({}, "a string!")));
-
-    stmts.push_back(
-        file.stmt_var({}, "x0", {}, file.expr_id({}, "s32"), nullptr));
-
-    stmts.push_back(file.stmt_multi_var(
-        {
-    },
-        std::array{MultiVarName{.name = "x1", .loc = {}},
-                   MultiVarName{.name = "x2", .loc = {}}},
-        {}, std::array{file.expr_int({}, 11), file.expr_id({}, "hi")}));
-
-    stmts.push_back(file.stmt_block(
-        {},
-        std::array{
-            file.stmt_expr(
-                {},
-                file.expr_arith({}, ExprKind::Add, file.expr_string({}, "yay!"),
-                                file.expr_string({}, "much happy!"))),
-            file.stmt_expr({}, file.expr_neg({}, file.expr_int({}, 0x10)))}));
-
-    stmts.push_back(file.stmt_return(
-        {}, std::array{file.expr_id({}, "hi"), file.expr_int({}, 5678)}));
-
-    auto block = file.stmt_block({}, stmts);
-
-    fmt::println("{}", *block);
-    exit(0);
-}
-
 auto main(int argc, char** argv) -> int {
     auto args = yalc::argparse(argc, argv);
     if (args.verbose.has_yalc()) fmt::println(stderr, "args: {}", args);
-
-    test_sumithing();
 
     auto fs = yal::FileStore{};
     auto er = yal::ErrorReporter{&fs, stderr, args.error_format};
@@ -89,26 +48,26 @@ auto main(int argc, char** argv) -> int {
             fmt::println("{}", j.dump(2));
         }
 
-        auto ast = yal::ast::Ast{};
-        auto root = yal::parse_into_ast(tokens, ast, er.for_file(id),
-                                        {.verbose = args.verbose.has_parser()});
+        auto root_file = yal::ast::File{};
+        yal::parse_into_ast_file(tokens, root_file, er.for_file(id),
+                                 {.verbose = args.verbose.has_parser()});
 
         if (args.dump.has_ast()) {
-            nlohmann::json j = *root;
+            nlohmann::json j = root_file;
             fmt::println("{}", j.dump(2));
         }
 
         auto decl_store = yal::SymbolStore{};
 
-        auto mod = yal::sort_declarations_and_resolve_top_level(
-            ast, decl_store, std::array{root}, er,
-            {.verbose = args.verbose.has_sort(),
-             .log_decl_dependencies = args.verbose.has_deps(),
-             .dump_dependencies_as_mermaid = args.dump.has_deps_mermaid()});
-        if (args.dump.has_sorted()) {
-            nlohmann::json j = *mod;
-            fmt::println("{}", j.dump(2));
-        }
+        // auto mod = yal::sort_declarations_and_resolve_top_level(
+        //     ast, decl_store, std::array{root}, er,
+        //     {.verbose = args.verbose.has_sort(),
+        //      .log_decl_dependencies = args.verbose.has_deps(),
+        //      .dump_dependencies_as_mermaid = args.dump.has_deps_mermaid()});
+        // if (args.dump.has_sorted()) {
+        //     nlohmann::json j = *mod;
+        //     fmt::println("{}", j.dump(2));
+        // }
 
         // do not compile, just analyse and report
         if (args.just_analyse) {
