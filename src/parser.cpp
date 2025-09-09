@@ -727,6 +727,22 @@ public:
                                      start_span.str(source));
         }
 
+        if (match(TokenType::Lbracket)) {
+            return parse_multi_ptr_array_or_slice();
+        }
+
+        if (match(TokenType::Star)) {
+            auto is_const = false;
+            if (match("const")) {
+                is_const = true;
+            }
+
+            auto inner = parse_expr_with_precedence(PREC_UNARY);
+
+            return ast_file->expr_ptr(to_loc(start_span.extend(prev_span())),
+                                      inner, is_const);
+        }
+
         if (match(TokenType::Dot)) {
             std::string_view name;
             if (consume(TokenType::Id)) {
@@ -803,6 +819,57 @@ public:
     }
 
     // ------------------------------------------------------------------------
+
+    auto parse_multi_ptr_array_or_slice() -> ast::Expr* {
+        auto start_span = prev_span();
+
+        if (match(TokenType::Star)) {
+            // this is a multi pointer
+
+            // TODO: this should have some smart recovery
+            (void)consume(TokenType::Rbracket);
+
+            auto is_const = false;
+            if (match("const")) {
+                is_const = true;
+            }
+
+            auto inner = parse_expr_with_precedence(PREC_UNARY);
+
+            return ast_file->expr_multi_ptr(
+                to_loc(start_span.extend(prev_span())), inner, is_const);
+        }
+
+        if (match(TokenType::Rbracket)) {
+            // this is a multi slice
+
+            auto is_const = false;
+            if (match("const")) {
+                is_const = true;
+            }
+
+            auto inner = parse_expr_with_precedence(PREC_UNARY);
+
+            return ast_file->expr_slice(to_loc(start_span.extend(prev_span())),
+                                        inner, is_const);
+        }
+
+        // this is an array
+        auto count = parse_expr_without_recover();
+        if (!count) recover_parse_array_count();
+
+        (void)consume(TokenType::Rbracket);
+
+        auto is_const = false;
+        if (match("const")) {
+            is_const = true;
+        }
+
+        auto inner = parse_expr_with_precedence(PREC_UNARY);
+
+        return ast_file->expr_array(to_loc(start_span.extend(prev_span())),
+                                    count, inner, is_const);
+    }
 
     auto parse_call(ast::Expr* callee) -> ast::Expr* {
         std::vector<ast::Expr*> args;
@@ -1072,6 +1139,12 @@ public:
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
                        TokenType::Lbrace, TokenType::Semi, TokenType::Attribute,
                        "var", "def", "func");
+    }
+
+    void recover_parse_array_count() {
+        skip_while_not(TokenType::Eof, TokenType::Rbracket, TokenType::Semi,
+                       "const", "var", "def", "func", "return");
+        if (check(TokenType::Semi)) advance();
     }
 
     void recover_parse_expr_stmt() {

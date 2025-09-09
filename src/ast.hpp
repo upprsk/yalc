@@ -73,6 +73,27 @@ struct File {
             Expr{.kind = ExprKind::Call, .loc = loc}, callee, dupe_exprs(args));
     }
 
+    auto expr_ptr(Location loc, Expr* inner, bool is_const) -> PtrExpr* {
+        return node_arena.create<PtrExpr>(
+            Expr{.kind = ExprKind::Ptr, .loc = loc}, inner, is_const);
+    }
+
+    auto expr_multi_ptr(Location loc, Expr* inner, bool is_const) -> PtrExpr* {
+        return node_arena.create<PtrExpr>(
+            Expr{.kind = ExprKind::MultiPtr, .loc = loc}, inner, is_const);
+    }
+
+    auto expr_slice(Location loc, Expr* inner, bool is_const) -> PtrExpr* {
+        return node_arena.create<PtrExpr>(
+            Expr{.kind = ExprKind::Slice, .loc = loc}, inner, is_const);
+    }
+
+    auto expr_array(Location loc, Expr* count, Expr* inner, bool is_const)
+        -> ArrayExpr* {
+        return node_arena.create<ArrayExpr>(
+            Expr{.kind = ExprKind::Array, .loc = loc}, count, inner, is_const);
+    }
+
     auto expr_id(Location loc, std::string_view name) -> IdExpr* {
         return node_arena.create<IdExpr>(Expr{.kind = ExprKind::Id, .loc = loc},
                                          strings_arena.alloc_string_view(name));

@@ -26,6 +26,11 @@ enum struct ExprKind : uint8_t {
     Field,
     Call,
 
+    Ptr,
+    MultiPtr,
+    Slice,
+    Array,
+
     Id,
     Kw,
     Int,
@@ -35,6 +40,8 @@ enum struct ExprKind : uint8_t {
 struct ArithExpr;
 struct FieldExpr;
 struct CallExpr;
+struct PtrExpr;
+struct ArrayExpr;
 struct IdExpr;
 struct KwExpr;
 struct IntExpr;
@@ -58,6 +65,8 @@ struct Expr {
     [[nodiscard]] auto as_arith() const -> ArithExpr const&;
     [[nodiscard]] auto as_field() const -> FieldExpr const&;
     [[nodiscard]] auto as_call() const -> CallExpr const&;
+    [[nodiscard]] auto as_ptr() const -> PtrExpr const&;
+    [[nodiscard]] auto as_array() const -> ArrayExpr const&;
     [[nodiscard]] auto as_id() const -> IdExpr const&;
     [[nodiscard]] auto as_kw() const -> KwExpr const&;
     [[nodiscard]] auto as_int() const -> IntExpr const&;
@@ -66,6 +75,8 @@ struct Expr {
     [[nodiscard]] auto as_arith() -> ArithExpr&;
     [[nodiscard]] auto as_field() -> FieldExpr&;
     [[nodiscard]] auto as_call() -> CallExpr&;
+    [[nodiscard]] auto as_ptr() -> PtrExpr&;
+    [[nodiscard]] auto as_array() -> ArrayExpr&;
     [[nodiscard]] auto as_id() -> IdExpr&;
     [[nodiscard]] auto as_kw() -> KwExpr&;
     [[nodiscard]] auto as_int() -> IntExpr&;
@@ -107,6 +118,17 @@ struct FieldExpr : Expr {
 struct CallExpr : Expr {
     Expr*            callee;
     std::span<Expr*> args;  // TODO: we want keyword arguments in the future
+};
+
+struct PtrExpr : Expr {
+    Expr* inner;
+    bool  is_const;
+};
+
+struct ArrayExpr : Expr {
+    Expr* count;
+    Expr* inner;
+    bool  is_const;
 };
 
 struct IdExpr : public Expr {

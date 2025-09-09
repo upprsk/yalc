@@ -1,6 +1,7 @@
 module main;
 
-def A = D;
-def B = A;
-var c = B;
-def D = c;
+func main(args: [][*]u8) s32 {
+    var items: [1024]u8;
+
+    return 0;
+}

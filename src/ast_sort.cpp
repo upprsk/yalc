@@ -111,6 +111,27 @@ void scan_expr_for_global_refs(State& s, LocalScope& scope, ast::Expr* expr) {
             scan_expr_for_global_refs(s, scope, field.obj);
         } break;
 
+        case ExprKind::Call: {
+            auto& call = expr->as_call();
+            scan_expr_for_global_refs(s, scope, call.callee);
+            for (auto const& arg : call.args) {
+                scan_expr_for_global_refs(s, scope, arg);
+            }
+        } break;
+
+        case ExprKind::Ptr:
+        case ExprKind::MultiPtr:
+        case ExprKind::Slice: {
+            auto& ptr = expr->as_ptr();
+            scan_expr_for_global_refs(s, scope, ptr.inner);
+        } break;
+
+        case ExprKind::Array: {
+            auto& arr = expr->as_array();
+            scan_expr_for_global_refs(s, scope, arr.count);
+            scan_expr_for_global_refs(s, scope, arr.inner);
+        } break;
+
         case ExprKind::Id: {
             auto& id = expr->as_id();
             if (!scope.has_local(id.value)) {
