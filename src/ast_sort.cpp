@@ -441,6 +441,8 @@ auto perform_sort(ErrorReporter& er, Module&& module, Options const& opt)
     }
 
     auto fm = FlatModule{};
+    fm.name = module.name;
+
     for (auto&& file : module.files) {
         fm.node_arena.move_from(std::move(file.node_arena));
         fm.strings_arena.move_from(std::move(file.strings_arena));
