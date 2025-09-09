@@ -48,7 +48,9 @@ void clear_failure_handler() {
 auto get_test_fullname(Context const& ctx, Test const& t)
     -> std::vector<std::string_view> {
     std::vector<std::string_view> full_name{t.name};
-    full_name.append_range(ctx.parents);
+    full_name.append_range(ctx.parents | std::views::filter([](auto name) {
+                               return !name.empty();
+                           }));
 
     return full_name;
 }
