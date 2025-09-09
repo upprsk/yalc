@@ -690,7 +690,7 @@ func f() { var x = 10; }
         {                          "local var 1",  true, R"~~(module main;
 func f() { var x: i32 = 10; }
 )~~"},
-        {                          "local var shadows global",  true, R"~~(module main;
+        {             "local var shadows global",  true, R"~~(module main;
 func f() { var x: i32 = 10; }
 var x = 20;
 )~~"},
@@ -833,6 +833,29 @@ func f() { 1 + * 1; }
 )~~"},
         {                        "expression 16",  true, R"~~(module main;
 func f() { 1 + * 2
+)~~"},
+
+        {                        "many things 1",  true, R"~~(module main;
+func f(x: X) T() {}
+func T() Type;
+
+def X = s32;
+)~~"},
+        {                        "many things 2",  true, R"~~(module main;
+import stuff;
+
+func the_thing(a, b, c: C) stuff.thingy;
+
+def A = stuff.A;
+def B = A;
+def C = B;
+)~~"},
+
+        {                        "declaration cycle",  true, R"~~(module main;
+def A = D;
+def B = A;
+var c = B;
+def D = c;
 )~~"},
 
         {                         "#hello world",  true, R"~~(module main;

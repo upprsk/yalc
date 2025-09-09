@@ -1,4 +1,6 @@
 module main;
 
-func f() { var x: i32 = 10; }
-var x = 20;
+def A = D;
+def B = A;
+var c = B;
+def D = c;
