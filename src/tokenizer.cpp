@@ -164,6 +164,7 @@ struct Tokenizer {
                 if (match('{')) return mkt(TokenType::DotLbrace);
                 return mkt(TokenType::Dot);
             case '?': return mkt(TokenType::Question);
+            case '$': return mkt(TokenType::Dolar);
             case '(': return mkt(TokenType::Lparen);
             case ')': return mkt(TokenType::Rparen);
             case '{': return mkt(TokenType::Lbrace);
@@ -299,7 +300,8 @@ struct Tokenizer {
 // ------------------------------------------------------------------------
 
 auto tokenize(LocalErrorReporter const& er) -> std::vector<Token> {
-    auto tokenizer = Tokenizer{.source = er.get_source(), .er = &er};
+    auto tokenizer =
+        Tokenizer{.source = er.get_source(), .er = &er, .balancing_stack = {}};
     return tokenizer.tokenize_all();
 }
 
@@ -428,6 +430,7 @@ auto fmt::formatter<yal::TokenType>::format(yal::TokenType const& p,
         case yal::TokenType::DotEqual: name = ".="; break;
         case yal::TokenType::DotLbrace: name = ".{"; break;
         case yal::TokenType::Question: name = "?"; break;
+        case yal::TokenType::Dolar: name = "$"; break;
         case yal::TokenType::Lparen: name = "("; break;
         case yal::TokenType::Rparen: name = ")"; break;
         case yal::TokenType::Lbrace: name = "{"; break;

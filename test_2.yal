@@ -1,4 +1,12 @@
 module main;
 
 func foreach(arr: IntArray) {}
-func yo(arr: std.ArrayList(s32)) {}
+func yo(arr: std.ArrayList(s32,),) {}
+
+func thing($a: Type);
+
+@extern
+func putc(c: s32);
+
+@extern
+func printf(format, ...);

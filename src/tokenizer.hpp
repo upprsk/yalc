@@ -54,6 +54,7 @@ enum class TokenType : uint8_t {
     DotEqual,
     DotLbrace,
     Question,
+    Dolar,
     Lparen,
     Rparen,
     Lbrace,

@@ -512,13 +512,17 @@ public:
     auto parse_func_param() -> std::optional<ast::FuncParam> {
         auto start_span = span();
 
-        // TODO: handle marking parameter as comptime
+        auto is_comptime = false;
+        if (match(TokenType::Dolar)) {
+            is_comptime = true;
+        }
 
-        if (is_kw_and_report(start_span) ||
+        auto name_span = span();
+        if (is_kw_and_report(name_span) ||
             !consume_with_note(TokenType::Id, "expected argument name"))
             return std::nullopt;
 
-        auto       name = start_span.str(source);
+        auto       name = name_span.str(source);
         ast::Expr* type = nullptr;
         if (match(TokenType::Colon)) {
             type = parse_expr_without_recover();
@@ -528,7 +532,7 @@ public:
             .name = name,
             .loc = to_loc(start_span.extend(prev_span())),
             .type_expr = type,
-            // TODO: .is_comptime
+            .is_comptime = is_comptime,
         };
     }
 
