@@ -961,6 +961,10 @@ public:
                                          expr, rhs);
         }
 
+        if (match(TokenType::Comma)) {
+            return parse_multi_assignment(expr);
+        }
+
         (void)consume_with_note(TokenType::Semi,
                                 "expected end of expression statement");
 
@@ -1081,6 +1085,30 @@ public:
 
         return ast_file->stmt_return(to_loc(start_span.extend(prev_span())),
                                      rets);
+    }
+
+    auto parse_multi_assignment(ast::Expr* first_lhs) -> ast::Stmt* {
+        std::vector<ast::Expr*> lhs{first_lhs};
+        std::vector<ast::Expr*> rhs;
+
+        do {
+            auto expr = parse_expr();
+            lhs.push_back(expr);
+        } while (match(TokenType::Comma));
+
+        (void)consume_with_note(TokenType::Equal,
+                                "expected '=' for multiple assignment");
+
+        do {
+            auto expr = parse_expr();
+            rhs.push_back(expr);
+        } while (match(TokenType::Comma));
+
+        (void)consume_with_note(TokenType::Semi,
+                                "expected end of assignment statement");
+
+        return ast_file->stmt_multi_assign(first_lhs->loc.extend(prev_span()),
+                                           lhs, rhs);
     }
 
     // ========================================================================
