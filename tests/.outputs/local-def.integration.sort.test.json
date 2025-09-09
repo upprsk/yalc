@@ -1,0 +1,1 @@
+{"data":{"decls":[],"name":""},"out":":memory:local def:1:0: error: expected 'module', but got 'EOF'\n> 0001 | \n         \n"}

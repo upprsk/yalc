@@ -1,8 +1,4 @@
 module main;
 
-import libc;
-import std;
-
-def IntArray = std.ArrayList(libc.c_int,);
-
-func main() {}
+func f() { var x: i32 = 10; }
+var x = 20;
