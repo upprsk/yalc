@@ -42,6 +42,8 @@ auto Stmt::as_var() const -> VarStmt const& { return static_cast<VarStmt const&>
 auto Stmt::as_multi_var() const -> MultiVarStmt const& { return static_cast<MultiVarStmt const&>(*this); }
 auto Stmt::as_def() const -> VarStmt const& { return static_cast<VarStmt const&>(*this); }
 auto Stmt::as_multi_def() const -> MultiVarStmt const& { return static_cast<MultiVarStmt const&>(*this); }
+auto Stmt::as_assign() const -> AssignStmt const& { return static_cast<AssignStmt const&>(*this); }
+auto Stmt::as_multi_assign() const -> MultiAssignStmt const& { return static_cast<MultiAssignStmt const&>(*this); }
 
 auto Stmt::as_block() -> BlockStmt& { return static_cast<BlockStmt&>(*this); }
 auto Stmt::as_return() -> ReturnStmt& { return static_cast<ReturnStmt&>(*this); }
@@ -50,6 +52,8 @@ auto Stmt::as_var() -> VarStmt& { return static_cast<VarStmt&>(*this); }
 auto Stmt::as_multi_var() -> MultiVarStmt& { return static_cast<MultiVarStmt&>(*this); }
 auto Stmt::as_def() -> VarStmt& { return static_cast<VarStmt&>(*this); }
 auto Stmt::as_multi_def() -> MultiVarStmt& { return static_cast<MultiVarStmt&>(*this); }
+auto Stmt::as_assign() -> AssignStmt& { return static_cast<AssignStmt&>(*this); }
+auto Stmt::as_multi_assign() -> MultiAssignStmt& { return static_cast<MultiAssignStmt&>(*this); }
 
 auto Decl::as_import() const -> ImportDecl const& { return static_cast<ImportDecl const&>(*this); }
 auto Decl::as_func() const -> FuncDecl const& { return static_cast<FuncDecl const&>(*this); }
@@ -201,6 +205,18 @@ void to_json(nlohmann::json& j, Stmt const& n) {
             to_json_arr(j["names"], multi_var.names);
             to_json_arr(j["types"], multi_var.types);
             to_json_arr(j["inits"], multi_var.inits);
+        } break;
+
+        case StmtKind::Assign: {
+            auto& assign = n.as_assign();
+            j["lhs"] = assign.lhs ? *assign.lhs : json{};
+            j["rhs"] = assign.rhs ? *assign.rhs : json{};
+        } break;
+
+        case StmtKind::MultiAssign: {
+            auto& assign = n.as_multi_assign();
+            to_json_arr(j["lhs"], assign.lhs);
+            to_json_arr(j["rhs"], assign.rhs);
         } break;
     }
 }
@@ -503,6 +519,23 @@ void to_lisp(fmt::format_context& ctx, Stmt const& stmt, int depth) {
                 to_lisp_arr(ctx, multi_var.inits, depth + 1);
             }
         } break;
+
+        case StmtKind::Assign: {
+            auto& assign = stmt.as_assign();
+
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, assign.lhs, depth + 1);
+
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, assign.rhs, depth + 1);
+        } break;
+
+        case StmtKind::MultiAssign: {
+            auto& assign = stmt.as_multi_assign();
+
+            to_lisp_arr(ctx, assign.lhs, depth + 1);
+            to_lisp_arr(ctx, assign.rhs, depth + 1);
+        } break;
     }
 
     fmt::format_to(ctx.out(), ")");
@@ -670,6 +703,8 @@ auto fmt::formatter<yal::ast::StmtKind>::format(yal::ast::StmtKind const& p,
         case yal::ast::StmtKind::Def: name = "Def"; break;
         case yal::ast::StmtKind::MultiVar: name = "MultiVar"; break;
         case yal::ast::StmtKind::MultiDef: name = "MultiDef"; break;
+        case yal::ast::StmtKind::Assign: name = "Assign"; break;
+        case yal::ast::StmtKind::MultiAssign: name = "MultiAssign"; break;
     }
 
     return formatter<string_view>::format(name, ctx);

@@ -3,5 +3,13 @@ module main;
 func main(args: [][*]u8) s32 {
     var items: [1024]u8;
 
+    var x0 = 0;
+    var x1 = 1;
+
+    x0 = 1;
+    x1 = x0 + 1;
+
+    x0, x1 = x1, x0;
+
     return 0;
 }

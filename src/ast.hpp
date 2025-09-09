@@ -175,6 +175,18 @@ struct File {
             dupe_exprs(types), dupe_exprs(inits));
     }
 
+    auto stmt_assign(Location loc, Expr* lhs, Expr* rhs) -> AssignStmt* {
+        return node_arena.create<AssignStmt>(
+            Stmt{.kind = StmtKind::Assign, .loc = loc}, lhs, rhs);
+    }
+
+    auto stmt_multi_assign(Location loc, std::span<Expr* const> lhs,
+                           std::span<Expr* const> rhs) -> MultiAssignStmt* {
+        return node_arena.create<MultiAssignStmt>(
+            Stmt{.kind = StmtKind::MultiAssign, .loc = loc}, dupe_exprs(lhs),
+            dupe_exprs(rhs));
+    }
+
     // Declarations
     // ------------
 

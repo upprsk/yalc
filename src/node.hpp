@@ -163,6 +163,9 @@ enum struct StmtKind : uint8_t {
     Def,
     MultiVar,
     MultiDef,
+
+    Assign,
+    MultiAssign,
 };
 
 struct BlockStmt;
@@ -170,6 +173,8 @@ struct ReturnStmt;
 struct ExprStmt;
 struct VarStmt;
 struct MultiVarStmt;
+struct AssignStmt;
+struct MultiAssignStmt;
 
 /// Base class/interface for statements. All statements inherit from this,
 /// adding specific fields. There should not be any virtual methods.
@@ -193,6 +198,8 @@ struct Stmt {
     [[nodiscard]] auto as_multi_var() const -> MultiVarStmt const&;
     [[nodiscard]] auto as_def() const -> VarStmt const&;
     [[nodiscard]] auto as_multi_def() const -> MultiVarStmt const&;
+    [[nodiscard]] auto as_assign() const -> AssignStmt const&;
+    [[nodiscard]] auto as_multi_assign() const -> MultiAssignStmt const&;
 
     [[nodiscard]] auto as_block() -> BlockStmt&;
     [[nodiscard]] auto as_return() -> ReturnStmt&;
@@ -201,6 +208,8 @@ struct Stmt {
     [[nodiscard]] auto as_multi_var() -> MultiVarStmt&;
     [[nodiscard]] auto as_def() -> VarStmt&;
     [[nodiscard]] auto as_multi_def() -> MultiVarStmt&;
+    [[nodiscard]] auto as_assign() -> AssignStmt&;
+    [[nodiscard]] auto as_multi_assign() -> MultiAssignStmt&;
 
     /// The find operation of union find.
     [[nodiscard]] constexpr auto find() const -> Stmt const* {
@@ -258,6 +267,16 @@ struct MultiVarStmt : public Stmt {
     std::span<MultiVarName> names;
     std::span<Expr*>        types;
     std::span<Expr*>        inits;
+};
+
+struct AssignStmt : public Stmt {
+    Expr* lhs;
+    Expr* rhs;
+};
+
+struct MultiAssignStmt : public Stmt {
+    std::span<Expr*> lhs;
+    std::span<Expr*> rhs;
 };
 
 // ----------------------------------------------------------------------------

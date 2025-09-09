@@ -951,6 +951,16 @@ public:
             expr = ast_file->expr_err(to_loc(start_span.extend(prev_span())));
         }
 
+        if (match(TokenType::Equal)) {
+            auto rhs = parse_expr();
+
+            (void)consume_with_note(TokenType::Semi,
+                                    "expected end of assigment statement");
+
+            return ast_file->stmt_assign(to_loc(start_span.extend(prev_span())),
+                                         expr, rhs);
+        }
+
         (void)consume_with_note(TokenType::Semi,
                                 "expected end of expression statement");
 
@@ -1150,6 +1160,7 @@ public:
     void recover_parse_expr_stmt() {
         skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
                        "return");
+        if (check(TokenType::Semi)) advance();
     }
 
     // ------------------------------------------------------------------------
