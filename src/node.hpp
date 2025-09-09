@@ -24,6 +24,7 @@ enum struct ExprKind : uint8_t {
     Mod,
 
     Field,
+    Call,
 
     Id,
     Kw,
@@ -33,6 +34,7 @@ enum struct ExprKind : uint8_t {
 
 struct ArithExpr;
 struct FieldExpr;
+struct CallExpr;
 struct IdExpr;
 struct KwExpr;
 struct IntExpr;
@@ -55,6 +57,7 @@ struct Expr {
 
     [[nodiscard]] auto as_arith() const -> ArithExpr const&;
     [[nodiscard]] auto as_field() const -> FieldExpr const&;
+    [[nodiscard]] auto as_call() const -> CallExpr const&;
     [[nodiscard]] auto as_id() const -> IdExpr const&;
     [[nodiscard]] auto as_kw() const -> KwExpr const&;
     [[nodiscard]] auto as_int() const -> IntExpr const&;
@@ -62,6 +65,7 @@ struct Expr {
 
     [[nodiscard]] auto as_arith() -> ArithExpr&;
     [[nodiscard]] auto as_field() -> FieldExpr&;
+    [[nodiscard]] auto as_call() -> CallExpr&;
     [[nodiscard]] auto as_id() -> IdExpr&;
     [[nodiscard]] auto as_kw() -> KwExpr&;
     [[nodiscard]] auto as_int() -> IntExpr&;
@@ -90,14 +94,19 @@ struct Expr {
 
 struct ErrExpr : Expr {};
 
+struct ArithExpr : public Expr {
+    Expr* lhs = nullptr;
+    Expr* rhs = nullptr;
+};
+
 struct FieldExpr : Expr {
     Expr*            obj;
     std::string_view name;
 };
 
-struct ArithExpr : public Expr {
-    Expr* lhs = nullptr;
-    Expr* rhs = nullptr;
+struct CallExpr : Expr {
+    Expr*            callee;
+    std::span<Expr*> args;  // TODO: we want keyword arguments in the future
 };
 
 struct IdExpr : public Expr {

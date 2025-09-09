@@ -452,7 +452,7 @@ public:
             }
         }
 
-        auto [params, is_c_varargs] = parse_func_args();
+        auto [params, is_c_varargs] = parse_func_params();
 
         auto rets = std::vector<ast::FuncRet>{};
         if (!check(TokenType::Lbrace) && !check(TokenType::Semi) &&
@@ -470,9 +470,9 @@ public:
             attached_type, attributes, params, rets, body, is_c_varargs);
     }
 
-    auto parse_func_args() -> std::pair<std::span<ast::FuncParam>, bool> {
+    auto parse_func_params() -> std::pair<std::span<ast::FuncParam>, bool> {
         if (!consume(TokenType::Lparen)) {
-            recover_parse_func_arglist();
+            recover_parse_func_paramlist();
 
             if (!match(TokenType::Lparen)) return {};
         }
@@ -481,14 +481,14 @@ public:
         while (!check(TokenType::Rparen)) {
             if (check(TokenType::DotDotDot)) break;
 
-            auto arg = parse_func_arg();
+            auto arg = parse_func_param();
             if (arg) params.push_back(*arg);
 
             if (check(TokenType::Rparen)) break;
             if (!consume_with_note(
                     TokenType::Comma,
                     "expected ',' to separate function arguments")) {
-                recover_parse_func_arg();
+                recover_parse_func_param();
                 if (!match(TokenType::Comma)) break;
             }
         }
@@ -509,7 +509,7 @@ public:
                               is_c_varargs);
     }
 
-    auto parse_func_arg() -> std::optional<ast::FuncParam> {
+    auto parse_func_param() -> std::optional<ast::FuncParam> {
         auto start_span = span();
 
         // TODO: handle marking parameter as comptime
@@ -759,6 +759,10 @@ public:
             return ast_file->expr_err(left->loc.extend(span()));
         }
 
+        if (tok.type == TokenType::Lparen) {
+            return parse_call(left);
+        }
+
         auto right = parse_expr_with_precedence(get_precedence(tok));
 
         ast::ExprKind kind;
@@ -787,10 +791,33 @@ public:
             case TokenType::Slash:
             case TokenType::Percent: return PREC_MUL;
 
+            case TokenType::Lparen:
             case TokenType::Dot: return PREC_CALL;
 
             default: return PREC_NONE;
         }
+    }
+
+    // ------------------------------------------------------------------------
+
+    auto parse_call(ast::Expr* callee) -> ast::Expr* {
+        std::vector<ast::Expr*> args;
+        while (!check(TokenType::Rparen)) {
+            auto arg = parse_expr_without_recover();
+            if (arg) args.push_back(arg);
+
+            if (check(TokenType::Rparen)) break;
+            if (!consume_with_note(TokenType::Comma,
+                                   "expected ',' to separate call arguments")) {
+                recover_parse_call_arg();
+                if (!match(TokenType::Comma)) break;
+            }
+        }
+
+        (void)consume(TokenType::Rparen);
+
+        return ast_file->expr_call(callee->loc.extend(prev_span()), callee,
+                                   args);
     }
 
     // ------------------------------------------------------------------------
@@ -1007,13 +1034,13 @@ public:
                        "func", "return");
     }
 
-    void recover_parse_func_arg() {
+    void recover_parse_func_param() {
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
                        TokenType::Lbrace, TokenType::Semi, TokenType::Attribute,
                        "var", "def", "func");
     }
 
-    void recover_parse_func_arglist() {
+    void recover_parse_func_paramlist() {
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Lparen,
                        TokenType::Rparen, TokenType::Lbrace, TokenType::Semi,
                        TokenType::Attribute, "var", "def", "func");
@@ -1035,6 +1062,12 @@ public:
         skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
                        "return");
         if (check(TokenType::Semi)) advance();
+    }
+
+    void recover_parse_call_arg() {
+        skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
+                       TokenType::Lbrace, TokenType::Semi, TokenType::Attribute,
+                       "var", "def", "func");
     }
 
     void recover_parse_expr_stmt() {
