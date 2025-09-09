@@ -1096,8 +1096,12 @@ public:
             lhs.push_back(expr);
         } while (match(TokenType::Comma));
 
-        (void)consume_with_note(TokenType::Equal,
-                                "expected '=' for multiple assignment");
+        if (!consume_with_note(TokenType::Equal,
+                               "expected '=' for multiple assignment")) {
+            recover_parse_multi_assign();
+            return ast_file->stmt_multi_assign(
+                first_lhs->loc.extend(lhs.back()->loc), lhs, {});
+        }
 
         do {
             auto expr = parse_expr();
@@ -1182,6 +1186,12 @@ public:
     void recover_parse_array_count() {
         skip_while_not(TokenType::Eof, TokenType::Rbracket, TokenType::Semi,
                        "const", "var", "def", "func", "return");
+        if (check(TokenType::Semi)) advance();
+    }
+
+    void recover_parse_multi_assign() {
+        skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
+                       "return");
         if (check(TokenType::Semi)) advance();
     }
 
