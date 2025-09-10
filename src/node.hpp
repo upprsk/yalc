@@ -276,6 +276,10 @@ struct VarStmt : public Stmt {
     Expr* init = nullptr;
 
     Symbol* sym = nullptr;
+
+    [[nodiscard]] constexpr auto name_is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 struct MultiVarName {
@@ -389,6 +393,10 @@ struct FuncParam {
 
     ty::Type type = {};
     Symbol*  sym = nullptr;
+
+    [[nodiscard]] constexpr auto name_is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 /// Even if function returns can have names, they are purelly for documentation,
@@ -438,6 +446,10 @@ struct VarDecl : Decl {
     Expr* init = nullptr;
 
     Symbol* sym = nullptr;
+
+    [[nodiscard]] constexpr auto name_is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 struct MultiVarDecl : Decl {

@@ -733,7 +733,12 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
 
         case ast::ExprKind::Id: {
             auto& id = expr->as_id();
-            if (auto sym = scope.lookup(id.value)) {
+            if (id.is_id_discard()) {
+                s.er.report_error(id.loc,
+                                  "can not use _ (discard) as identifier");
+            }
+
+            else if (auto sym = scope.lookup(id.value)) {
                 id.sym = sym;
                 id.type = sym->value.type;
             } else {
@@ -847,8 +852,10 @@ void sema_func_params(State& s, Scope& scope, ast::FuncDecl& decl) {
             p.type = eval_expr_to_type(s, param_scope, p.type_expr);
         }
 
-        p.sym =
-            scope.define(p.name, p.loc, {.type = p.type, .as = {}}, true, true);
+        if (!p.name_is_discard()) {
+            p.sym = scope.define(p.name, p.loc, {.type = p.type, .as = {}},
+                                 true, true);
+        }
     }
 }
 
@@ -945,14 +952,19 @@ void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
                                         .loc = decl.loc,
                                         .should_fixup = true});
 
-    decl.sym =
-        parent_scope.define(decl.name, decl.name_loc,
-                            {.type = expected_type, .as = {}}, false, false);
+    if (!decl.name_is_discard()) {
+        decl.sym = parent_scope.define(decl.name, decl.name_loc,
+                                       {.type = expected_type, .as = {}}, false,
+                                       false);
+    }
 }
 
 void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
-    // alread define the thing, as it may be needed recursivelly
-    decl.sym = parent_scope.define(decl.name, decl.name_loc, {}, false, true);
+    if (!decl.name_is_discard()) {
+        // alread define the thing, as it may be needed recursivelly
+        decl.sym =
+            parent_scope.define(decl.name, decl.name_loc, {}, false, true);
+    }
 
     auto scope = parent_scope.make_child(decl.name_loc);
     scope.current_decl = &decl;
@@ -973,7 +985,9 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     auto value = eval_expr(s, scope, decl.init);
     // FIXME: handle coercing value to expected_type
 
-    decl.sym->value = value;
+    if (!decl.name_is_discard()) {
+        decl.sym->value = value;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1099,8 +1113,10 @@ void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
                                         .loc = stmt.loc,
                                         .should_fixup = true});
 
-    stmt.sym = scope.define(stmt.name, stmt.name_loc,
-                            {.type = expected_type, .as = {}}, true, false);
+    if (!stmt.name_is_discard()) {
+        stmt.sym = scope.define(stmt.name, stmt.name_loc,
+                                {.type = expected_type, .as = {}}, true, false);
+    }
 }
 
 void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {

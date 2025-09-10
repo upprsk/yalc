@@ -67,7 +67,8 @@
           (IdExpr *const s32 "b_ptr"
             sym: (Symbol "b_ptr" local (Value *const s32)))
           #nullptr#))
-      (ExprStmt
+      (VarStmt "_"
+        #nullptr#
         (AddExpr s32
           (IdExpr s32 "x"
             sym: (Symbol "x" local (Value s32)))

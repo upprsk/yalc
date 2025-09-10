@@ -15,7 +15,7 @@ func main() {
     var x = a_ptr.*;
     var y = b_ptr.*;
 
-    x + y;
+    var _ = x + y;
 }
 
 // vim: ft=yal
