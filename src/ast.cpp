@@ -2,6 +2,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "node.hpp"
+
 namespace yal::ast {
 
 using nlohmann::json;
@@ -52,4 +54,21 @@ void to_json(nlohmann::json& j, FlatModule const& n) {
     j["decls"] = arr;
 }
 
+// NOTE: in node.cpp
+void indent_by(fmt::format_context& ctx, int depth);
+void indent_by_wln(fmt::format_context& ctx, int depth);
+
 }  // namespace yal::ast
+
+auto fmt::formatter<yal::ast::FlatModule>::format(yal::ast::FlatModule const& p,
+                                                  format_context& ctx) const
+    -> format_context::iterator {
+    fmt::format_to(ctx.out(), "(FlatModule {:?}", p.name);
+
+    for (auto const& d : p.declarations) {
+        yal::ast::indent_by_wln(ctx, 1);
+        yal::ast::to_lisp(ctx, d, 1);
+    }
+
+    return fmt::format_to(ctx.out(), ")");
+}

@@ -12,8 +12,10 @@
 #include "file_store.hpp"
 #include "node.hpp"
 #include "parser.hpp"
+#include "sema.hpp"
 #include "symbol.hpp"
 #include "tokenizer.hpp"
+#include "types.hpp"
 
 void print_directory_info(yal::FileStore const&      fs,
                           yal::FileStore::Dir const& dir) {
@@ -158,6 +160,8 @@ auto main_single_file(yalc::Args const& args, yal::FileStore& fs,
         fmt::println("{}", j.dump(2));
     }
 
+    yal::sema::perform_sema(er, flat_module);
+
     return 0;
 }
 
@@ -205,6 +209,8 @@ auto main_default(yalc::Args const& args, yal::FileStore& fs,
         nlohmann::json j = flat_module;
         fmt::println("{}", j.dump(2));
     }
+
+    yal::sema::perform_sema(er, flat_module);
 
     return 0;
 }

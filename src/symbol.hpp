@@ -8,34 +8,30 @@
 #include "arena.hpp"
 #include "location.hpp"
 #include "macros.hpp"
+#include "types.hpp"
 
 namespace yal {
 
-class Symbol {
-    Location         loc;
-    std::string_view link_name;
-    std::string_view local_name;
+namespace ast {
+struct FuncDecl;
+}
 
-public:
-    constexpr Symbol(Location loc, std::string_view link_name,
-                     std::string_view local_name)
-        : loc{loc}, link_name{link_name}, local_name{local_name} {}
+struct Value {
+    ty::Type type;
+    union {
+        ty::Type       type;
+        ast::FuncDecl* func_decl;
+    } as;
+};
 
-    [[nodiscard]] constexpr auto get_loc() const -> Location { return loc; }
-
-    [[nodiscard]] constexpr auto get_link_name() const -> std::string_view {
-        return link_name;
-    }
-
-    [[nodiscard]] constexpr auto get_local_name() const -> std::string_view {
-        return local_name;
-    }
+struct Symbol {
+    std::string_view name;
+    Location         name_loc;
+    Value            value;
 };
 
 class SymbolStore {
-    using map = ankerl::unordered_dense::map<std::string_view, Symbol*>;
-
-    map syms;
+    std::vector<Symbol*> all_syms;
 
     mem::Arena string_arena;
     mem::Arena sym_arena;
@@ -43,27 +39,28 @@ class SymbolStore {
 public:
     SymbolStore() = default;
 
-    auto new_sym(Location loc, std::string_view link_name,
-                 std::string_view local_name) -> Symbol*;
-
-    [[nodiscard]] auto get_by_link_name(std::string_view link_name) const
+    auto new_sym(std::string_view name, Location name_loc, Value value)
         -> Symbol*;
 
     // ========================================================================
 
     struct Iter {
-        map::const_iterator begin;
-        map::const_iterator end;
+        std::vector<Symbol*>::const_iterator begin;
+        std::vector<Symbol*>::const_iterator end;
     };
 
-    auto iter() -> Iter { return {.begin = syms.cbegin(), .end = syms.cend()}; }
+    auto iter() -> Iter {
+        return {.begin = all_syms.cbegin(), .end = all_syms.cend()};
+    }
 
 private:
     auto dupe_string(std::string_view s) -> std::string_view;
 };
 
+void to_json(nlohmann::json& j, Value const& v);
 void to_json(nlohmann::json& j, Symbol const& d);
 
 }  // namespace yal
 
+define_formatter_from_string_view(yal::Value);
 define_formatter_from_string_view(yal::Symbol);

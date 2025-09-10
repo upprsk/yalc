@@ -130,10 +130,11 @@ struct File {
             node_arena.alloc<Stmt*>(children));
     }
 
-    auto stmt_return(Location loc, std::span<Expr* const> children)
-        -> ReturnStmt* {
+    auto stmt_return(Location loc, Location children_loc,
+                     std::span<Expr* const> children) -> ReturnStmt* {
         return node_arena.create<ReturnStmt>(
-            Stmt{.kind = StmtKind::Return, .loc = loc}, dupe_exprs(children));
+            Stmt{.kind = StmtKind::Return, .loc = loc}, dupe_exprs(children),
+            children_loc);
     }
 
     auto stmt_expr(Location loc, Expr* child) -> ExprStmt* {
@@ -214,8 +215,8 @@ struct File {
     // `alloc_decl_attributes`).
     // NOTE: params should already have been allocated (with
     // `alloc_func_params`).
-    auto decl_func(Location loc, Location name_loc, std::string_view name,
-                   std::string_view         attached_type,
+    auto decl_func(Location loc, Location rets_loc, Location name_loc,
+                   std::string_view name, std::string_view attached_type,
                    std::span<DeclAttribute> attributes,
                    std::span<FuncParam> params, std::span<FuncRet const> rets,
                    Stmt* body, bool is_c_varargs) -> FuncDecl* {
@@ -228,7 +229,7 @@ struct File {
             Decl{.kind = DeclKind::Func, .loc = loc},
             strings_arena.alloc_string_view(name),
             strings_arena.alloc_string_view(attached_type), attributes, params,
-            arets, body, nullptr, name_loc, is_c_varargs);
+            arets, body, nullptr, name_loc, rets_loc, is_c_varargs);
     }
 
     // NOTE: attributes should already have been allocated (with
@@ -362,3 +363,5 @@ void to_json(nlohmann::json& j, Module const& n);
 void to_json(nlohmann::json& j, FlatModule const& n);
 
 }  // namespace yal::ast
+
+define_formatter_from_string_view(yal::ast::FlatModule);

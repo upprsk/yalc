@@ -454,10 +454,14 @@ public:
 
         auto [params, is_c_varargs] = parse_func_params();
 
+        auto rets_span = prev_span();
         auto rets = std::vector<ast::FuncRet>{};
         if (!check(TokenType::Lbrace) && !check(TokenType::Semi) &&
-            !check(TokenType::Eof))
+            !check(TokenType::Eof)) {
+            rets_span = span();
             rets = parse_func_ret();
+            rets_span = rets_span.extend(prev_span());
+        }
 
         ast::Stmt* body = nullptr;
         if (check(TokenType::Lbrace))
@@ -465,9 +469,10 @@ public:
         else
             (void)consume_with_options(TokenType::Semi, TokenType::Lbrace);
 
-        return ast_file->decl_func(
-            to_loc(start_span.extend(prev_span())), to_loc(name_span), name,
-            attached_type, attributes, params, rets, body, is_c_varargs);
+        return ast_file->decl_func(to_loc(start_span.extend(prev_span())),
+                                   to_loc(rets_span), to_loc(name_span), name,
+                                   attached_type, attributes, params, rets,
+                                   body, is_c_varargs);
     }
 
     auto parse_func_params() -> std::pair<std::span<ast::FuncParam>, bool> {
@@ -1065,6 +1070,8 @@ public:
         // skip over the 'return'
         advance();
 
+        auto children_span = span();
+
         std::vector<ast::Expr*> rets;
         while (!check(TokenType::Semi)) {
             auto ret = parse_expr_without_recover();
@@ -1077,6 +1084,8 @@ public:
             }
         }
 
+        children_span = children_span.extend(prev_span());
+
         // NOTE: we want to do something when this fails?
         if (!had_error) {
             (void)consume_with_note(
@@ -1084,7 +1093,7 @@ public:
         }
 
         return ast_file->stmt_return(to_loc(start_span.extend(prev_span())),
-                                     rets);
+                                     to_loc(children_span), rets);
     }
 
     auto parse_multi_assignment(ast::Expr* first_lhs) -> ast::Stmt* {
@@ -1233,16 +1242,16 @@ public:
 
         // in case we are at the end, just abort
         if (is_at_end())
-            return ast_file->decl_func(to_loc(s), to_loc(name_span), name,
-                                       attached_type, attributes, {}, {},
-                                       nullptr, false);
+            return ast_file->decl_func(to_loc(s), to_loc(name_span),
+                                       to_loc(name_span), name, attached_type,
+                                       attributes, {}, {}, nullptr, false);
 
         // too far, we can not recover this
         if (check(TokenType::Semi) || is_kw(span())) {
             (void)match(TokenType::Semi);
-            return ast_file->decl_func(to_loc(s), to_loc(name_span), name,
-                                       attached_type, attributes, {}, {},
-                                       nullptr, false);
+            return ast_file->decl_func(to_loc(s), to_loc(name_span),
+                                       to_loc(name_span), name, attached_type,
+                                       attributes, {}, {}, nullptr, false);
         }
 
         return nullptr;

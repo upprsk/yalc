@@ -1,18 +1,17 @@
 module main;
 
-func main(args: [][*]u8) s32 {
-    var items: [1024]u8;
+func f_a() {}
+func f_b() s32 {}
+func f_c() (s32, u32) {
+    var first: s32; // = 0;
+    var second: u32 = 10;
 
-    var x0 = ZERO;
-    var x1 = ONE;
-
-    x0 = 1;
-    x1 = x0 + 1;
-
-    x0, x1 = x1, x0;
-
-    return x0, x1;
+    return first,
+           second;
 }
 
-def ZERO = 0;
-def ONE  = 1;
+func f(x, y: s32) (s32, thing_2: u32) {
+    return x, y;
+}
+
+// vim: ft=yal

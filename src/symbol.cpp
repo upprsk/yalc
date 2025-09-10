@@ -2,16 +2,19 @@
 
 #include <nlohmann/json.hpp>
 
+#include "fmt/base.h"
 #include "fmt/format.h"
 
 namespace yal {
 using nlohmann::json;
 
-auto SymbolStore::new_sym(Location loc, std::string_view link_name,
-                          std::string_view local_name) -> Symbol* {
-    auto d = sym_arena.create<Symbol>(loc, dupe_string(link_name),
-                                      dupe_string(local_name));
-    syms[link_name] = d;
+auto SymbolStore::new_sym(std::string_view name, Location name_loc, Value value)
+    -> Symbol* {
+    auto d = sym_arena.create<Symbol>(
+        Symbol{.name = sym_arena.alloc_string_view(name),
+               .name_loc = name_loc,
+               .value = value});
+    all_syms.push_back(d);
 
     return d;
 }
@@ -20,24 +23,39 @@ auto SymbolStore::dupe_string(std::string_view s) -> std::string_view {
     return string_arena.alloc_string_view(s);
 }
 
-auto SymbolStore::get_by_link_name(std::string_view link_name) const
-    -> Symbol* {
-    auto it = syms.find(link_name);
-    return it != syms.end() ? it->second : nullptr;
+void to_json(nlohmann::json& j, Value const& v) {
+    j = json{
+        {"type", v.type},
+    };
+
+    if (v.type.kind == ty::TypeKind::Type) {
+        j["payload"] = v.as.type;
+    }
 }
 
 void to_json(nlohmann::json& j, Symbol const& d) {
     j = json{
-        {       "loc", fmt::to_string(d.get_loc())},
-        { "link_name",           d.get_link_name()},
-        {"local_name",          d.get_local_name()},
+        {"name_loc", fmt::to_string(d.name_loc)},
+        {    "name",                     d.name},
+        {   "value",                    d.value},
     };
 }
 
 }  // namespace yal
 
+auto fmt::formatter<yal::Value>::format(yal::Value const& p,
+                                        format_context&   ctx) const
+    -> format_context ::iterator {
+    fmt::format_to(ctx.out(), "(Value {}", p.type);
+    if (p.type.kind == yal::ty::TypeKind::Type) {
+        fmt::format_to(ctx.out(), " {}", p.as.type);
+    }
+
+    return fmt::format_to(ctx.out(), ")");
+}
+
 auto fmt::formatter<yal::Symbol>::format(yal ::Symbol const& p,
                                          format_context&     ctx) const
     -> format_context ::iterator {
-    return fmt::format_to(ctx.out(), "{}", nlohmann::json{p}.dump());
+    return fmt::format_to(ctx.out(), "(Symbol {:?} {})", p.name, p.value);
 }

@@ -16,10 +16,14 @@ add_library(yal
     node.hpp
     parser.cpp
     parser.hpp
+    sema.cpp
+    sema.hpp
     symbol.cpp
     symbol.hpp
     tokenizer.cpp
     tokenizer.hpp
+    types.cpp
+    types.hpp
     utils.cpp
     utils.hpp
     yal.cpp

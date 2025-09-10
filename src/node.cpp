@@ -7,7 +7,9 @@
 #include <ranges>
 #include <string_view>
 
+#include "fmt/base.h"
 #include "fmt/format.h"
+#include "types.hpp"
 
 namespace rv = std::ranges::views;
 
@@ -348,9 +350,12 @@ void to_lisp(fmt::format_context& ctx, Expr const* expr, int depth) {
 }
 
 void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
-    // TODO: when we get types, we add them right here after the node kind
     // TODO: show forward somehow?
     fmt::format_to(ctx.out(), "({}Expr", expr.kind);
+
+    if (expr.type.kind != ty::TypeKind::Err) {
+        fmt::format_to(ctx.out(), " {}", expr.type);
+    }
 
     switch (expr.kind) {
         case ExprKind::Err: break;
@@ -570,8 +575,18 @@ void to_lisp(fmt::format_context& ctx, DeclAttribute const& n, int depth) {
 }
 
 void to_lisp(fmt::format_context& ctx, FuncParam const& n, int depth) {
-    fmt::format_to(ctx.out(), "(FuncParam {}{:?}", n.is_comptime ? "$" : "",
-                   n.name);
+    fmt::format_to(ctx.out(), "(FuncParam", n.is_comptime ? "$" : "", n.name);
+
+    if (n.type.kind != ty::TypeKind::Err) {
+        fmt::format_to(ctx.out(), " {}", n.type);
+    }
+
+    fmt::format_to(ctx.out(), " {}{:?}", n.is_comptime ? "$" : "", n.name);
+
+    if (n.sym) {
+        indent_by_wln(ctx, depth + 1);
+        fmt::format_to(ctx.out(), "sym: {}", *n.sym);
+    }
 
     indent_by_wln(ctx, depth + 1);
     to_lisp(ctx, n.type_expr, depth + 1);
@@ -580,7 +595,13 @@ void to_lisp(fmt::format_context& ctx, FuncParam const& n, int depth) {
 }
 
 void to_lisp(fmt::format_context& ctx, FuncRet const& n, int depth) {
-    fmt::format_to(ctx.out(), "(FuncRet {:?}", n.name);
+    fmt::format_to(ctx.out(), "(FuncRet");
+
+    if (n.type.kind != ty::TypeKind::Err) {
+        fmt::format_to(ctx.out(), " {}", n.type);
+    }
+
+    fmt::format_to(ctx.out(), " {:?}", n.name);
 
     indent_by_wln(ctx, depth + 1);
     to_lisp(ctx, n.type_expr, depth + 1);
@@ -609,11 +630,17 @@ void to_lisp(fmt::format_context& ctx, Decl const& decl, int depth) {
                 fmt::format_to(ctx.out(), " {:?}.", func.attached_type);
             fmt::format_to(ctx.out(), " {:?}", func.name);
 
+            if (func.sym) {
+                indent_by_wln(ctx, depth + 1);
+                fmt::format_to(ctx.out(), "sym: {}", *func.sym);
+            }
+
             // TODO: show that a function has c style varargs
             to_lisp_arr(ctx, func.attributes, depth + 1);
             to_lisp_arr(ctx, func.params, depth + 1);
             to_lisp_arr(ctx, func.rets, depth + 1);
 
+            indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, func.body, depth + 1);
         } break;
 
@@ -628,7 +655,11 @@ void to_lisp(fmt::format_context& ctx, Decl const& decl, int depth) {
             }
 
             to_lisp_arr(ctx, var.attributes, depth + 1);
+
+            indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, var.type_expr, depth + 1);
+
+            indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, var.init, depth + 1);
         } break;
 

@@ -9,6 +9,7 @@
 #include "location.hpp"
 #include "macros.hpp"
 #include "symbol.hpp"
+#include "types.hpp"
 
 namespace yal::ast {
 
@@ -59,6 +60,7 @@ struct StringExpr;
 struct Expr {
     ExprKind kind;
     Location loc;
+    ty::Type type = {};
 
     Expr* forward = nullptr;
 
@@ -240,6 +242,7 @@ struct BlockStmt : public Stmt {
 
 struct ReturnStmt : public Stmt {
     std::span<Expr*> children;
+    Location         children_loc;
 };
 
 struct ExprStmt : public Stmt {
@@ -363,12 +366,20 @@ struct FuncParam {
 
     Expr* type_expr = nullptr;
     bool  is_comptime = false;
+    // NOTE: quite a lot of padding here
+
+    ty::Type type = {};
+    Symbol*  sym = nullptr;
 };
 
+/// Even if function returns can have names, they are purelly for documentation,
+/// so FuncRet should not have an associated symbol.
 struct FuncRet {
     std::string_view name;  // only for named returns
     Location         loc;
     Expr*            type_expr = nullptr;
+
+    ty::Type type = {};
 };
 
 struct ImportDecl : Decl {
@@ -393,6 +404,7 @@ struct FuncDecl : Decl {
     Symbol* sym = nullptr;
 
     Location name_loc;
+    Location rets_loc;
 
     bool is_c_varargs = false;
 };

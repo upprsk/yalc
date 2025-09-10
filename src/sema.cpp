@@ -1,0 +1,703 @@
+#include "sema.hpp"
+
+#include <fmt/ranges.h>
+
+#include <algorithm>
+#include <string_view>
+
+#include "error_reporter.hpp"
+#include "location.hpp"
+#include "node.hpp"
+#include "symbol.hpp"
+#include "types.hpp"
+
+namespace yal::sema {
+
+// ----------------------------------------------------------------------------
+
+struct Scope {
+    Scope*               parent = nullptr;
+    Location             loc;
+    std::vector<Symbol*> symbols;
+
+    ast::Decl*   current_decl;
+    SymbolStore* symbol_store;
+
+    constexpr auto define(Symbol* sym) -> Symbol* {
+        symbols.push_back(sym);
+        return sym;
+    }
+
+    constexpr auto define(std::string_view name, Location name_loc, Value value)
+        -> Symbol* {
+        auto sym = symbol_store->new_sym(name, name_loc, value);
+        symbols.push_back(sym);
+        return sym;
+    }
+
+    constexpr auto lookup(std::string_view name) -> Symbol* {
+        if (auto sym = lookup_here(name)) return sym;
+        return parent ? parent->lookup(name) : nullptr;
+    }
+
+    constexpr auto lookup_here(std::string_view name) -> Symbol* {
+        auto it = std::ranges::find_last_if(
+            symbols, [&](Symbol const* sym) { return sym->name == name; });
+
+        if (it.begin() == symbols.end()) return nullptr;
+        return *it.begin();
+    }
+
+    constexpr auto make_child(Location loc) -> Scope {
+        return {.parent = this,
+                .loc = loc,
+                .symbols = {},
+                .current_decl = current_decl,
+                .symbol_store = symbol_store};
+    }
+};
+
+struct State {
+    ErrorReporter& er;
+    ty::TypeStore& ts;
+    Options const& opts;
+};
+
+// ----------------------------------------------------------------------------
+
+auto get_default_int() -> ty::Type {
+    // FIXME: use s32 or s64 depending on the platform
+
+    return ty::make_int(8, true);  // s64
+}
+
+// ----------------------------------------------------------------------------
+
+struct CoercionResult {
+    ty::Type type;
+    bool     source_requires_fixup = false;
+    bool     requires_a_cast = false;
+};
+
+struct CoercionOpts {
+    Location loc;
+    Location source_loc;
+    Location target_loc;
+};
+
+auto coerce_type(State& s, ty::Type source, ty::Type target,
+                 CoercionOpts const& opts) -> CoercionResult {
+    // comptime_int -> int OK
+    // TODO: comptime_int -> float OK
+
+    // don't deal with errors here, to avoid too many extra error messages when
+    // something goes wrong
+    if (source.is_err()) return {.type = target};
+
+    if (source.is_comptime_int() && target.is_int()) {
+        return {.type = target, .source_requires_fixup = true};
+    }
+
+    // If the kinds are different, then coercion is not possible
+    if (source.kind != target.kind) {
+        s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
+                          target);
+        s.er.report_note(opts.source_loc, "this has type {}", source);
+        s.er.report_note(opts.target_loc, "but expected type {} from here",
+                         target);
+
+        // TODO: could detect that some form of cast is possible:
+        // - floats <-> ints
+        // - arrays <-> slices
+        return {.type = target};
+    }
+
+    // If the definitions are distinct, then coercion is not possible (requires
+    // a cast)
+    if (source.sym != target.sym) {
+        s.er.report_error(
+            opts.loc, "can not coerce from {} to {}, these are distinct types",
+            source, target);
+        s.er.report_note(opts.source_loc, "this has type {}", source);
+        s.er.report_note(opts.target_loc, "but expected type {} from here",
+                         target);
+
+        return {.type = target, .requires_a_cast = true};
+    }
+
+    // both are integers
+    if (target.is_int()) {
+        auto const& source_int = source.as.integer;
+        auto const& target_int = target.as.integer;
+
+        if (source_int.byte_size != target_int.byte_size) {
+            s.er.report_error(
+                opts.loc,
+                "can not coerce from {} to {}, integers differ in size", source,
+                target);
+            s.er.report_note(opts.source_loc, "this has type {}", source);
+            s.er.report_note(opts.target_loc, "but expected type {} from here",
+                             target);
+
+            return {.type = target, .requires_a_cast = true};
+        }
+
+        if (source_int.is_signed != target_int.is_signed) {
+            s.er.report_error(
+                opts.loc,
+                "can not coerce from {} to {}, integers differ in signness",
+                source, target);
+            s.er.report_note(opts.source_loc, "this has type {}", source);
+            s.er.report_note(opts.target_loc, "but expected type {} from here",
+                             target);
+
+            return {.type = target, .requires_a_cast = true};
+        }
+
+        // should both actually be the same, nice!
+        return {.type = target};
+    }
+
+    PANIC("coerction: type combination not implemented", source, target);
+}
+
+// ----------------------------------------------------------------------------
+
+auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
+    if (!expr) {
+        s.er.report_error(scope.loc,
+                          "in this scope: can not evaluate missing expression");
+
+        return {};  // return error value
+    }
+
+    switch (expr->kind) {
+        case ast::ExprKind::Err:
+
+        case ast::ExprKind::Neg:
+        case ast::ExprKind::Add:
+        case ast::ExprKind::Sub:
+        case ast::ExprKind::Mul:
+        case ast::ExprKind::Div:
+        case ast::ExprKind::Mod: break;
+
+        case ast::ExprKind::Field:
+        case ast::ExprKind::Call: break;
+
+        case ast::ExprKind::Ptr:
+        case ast::ExprKind::MultiPtr:
+        case ast::ExprKind::Slice: break;
+
+        case ast::ExprKind::Array: break;
+
+        case ast::ExprKind::Id: {
+            auto& id = expr->as_id();
+            if (!id.sym) return {};  // return error value
+            return id.sym->value;
+        } break;
+
+        case ast::ExprKind::Kw:
+        case ast::ExprKind::Int:
+        case ast::ExprKind::String: break;
+    }
+
+    PANIC("EVAL: not implemented", *expr);
+}
+
+auto eval_expr_to_type(State& s, Scope& scope, ast::Expr* expr) -> ty::Type {
+    auto v = eval_expr(s, scope, expr);
+    if (v.type.kind != ty::TypeKind::Type) {
+        if (v.type.kind != ty::TypeKind::Err) {
+            auto loc = expr ? expr->loc : scope.loc;
+            s.er.report_error(loc, "can not use value of type {} as type",
+                              v.type);
+        }
+
+        return {};  // return error type
+    }
+
+    return v.as.type;
+}
+
+// ============================================================================
+
+void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
+                                     ty::Type target_type) {
+    ASSERT(expr->type.is_comptime_int());
+    ASSERT(target_type.is_int());
+
+    switch (expr->kind) {
+        case ast::ExprKind::Err: break;
+
+        case ast::ExprKind::Neg:
+        case ast::ExprKind::Add:
+        case ast::ExprKind::Sub:
+        case ast::ExprKind::Mul:
+        case ast::ExprKind::Div:
+        case ast::ExprKind::Mod:
+        case ast::ExprKind::Field:
+        case ast::ExprKind::Call:
+        case ast::ExprKind::Ptr:
+        case ast::ExprKind::MultiPtr:
+        case ast::ExprKind::Slice:
+        case ast::ExprKind::Array:
+        case ast::ExprKind::Id:
+        case ast::ExprKind::Kw:
+            PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
+            break;
+
+        case ast::ExprKind::Int: expr->type = target_type; break;
+
+        case ast::ExprKind::String:
+            PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
+            break;
+    }
+}
+
+// ============================================================================
+
+void sema_expr(State& s, Scope& scope, ast::Expr* expr,
+               ty::Type expected_type) {
+    if (!expr) return;
+
+    switch (expr->kind) {
+        case ast::ExprKind::Err: break;
+
+        case ast::ExprKind::Neg:
+
+        case ast::ExprKind::Add:
+        case ast::ExprKind::Sub:
+        case ast::ExprKind::Mul:
+        case ast::ExprKind::Div:
+        case ast::ExprKind::Mod:
+
+        case ast::ExprKind::Field:
+        case ast::ExprKind::Call: PANIC("SEMA EXPR: not implemented", *expr);
+
+        case ast::ExprKind::Ptr:
+        case ast::ExprKind::MultiPtr:
+        case ast::ExprKind::Slice: PANIC("SEMA EXPR: not implemented", *expr);
+
+        case ast::ExprKind::Array: PANIC("SEMA EXPR: not implemented", *expr);
+
+        case ast::ExprKind::Id: {
+            auto& id = expr->as_id();
+            if (auto sym = scope.lookup(id.value)) {
+                id.sym = sym;
+                id.type = sym->value.type;
+            } else {
+                s.er.report_error(expr->loc, "undefined identifier {:?}",
+                                  id.value);
+            }
+        } break;
+
+        case ast::ExprKind::Kw: PANIC("SEMA EXPR: not implemented", *expr);
+
+        case ast::ExprKind::Int: {
+            auto& integer = expr->as_int();
+
+            if (expected_type.is_int()) {
+                integer.type = expected_type;
+                // FIXME: check that the literal fits in the expected type
+            } else {
+                integer.type = ty::make_comptime_int();
+            }
+        } break;
+
+        case ast::ExprKind::String: PANIC("SEMA EXPR: not implemented", *expr);
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+void sema_func_params(State& s, Scope& scope, ast::FuncDecl& decl) {
+    for (auto& p : decl.params) {
+        auto param_scope = scope.make_child(p.loc);
+        sema_expr(s, param_scope, p.type_expr, ty::make_type());
+
+        if (p.type_expr) {
+            p.type = eval_expr_to_type(s, param_scope, p.type_expr);
+        }
+
+        p.sym = scope.define(p.name, p.loc, {.type = p.type, .as = {}});
+    }
+}
+
+void sema_func_rets(State& s, Scope& scope, ast::FuncDecl& decl) {
+    for (auto& r : decl.rets) {
+        auto ret_scope = scope.make_child(r.loc);
+        sema_expr(s, ret_scope, r.type_expr, ty::make_type());
+
+        if (r.type_expr) {
+            r.type = eval_expr_to_type(s, ret_scope, r.type_expr);
+        }
+    }
+}
+
+void sema_fixup_func_params(State& s, ast::FuncDecl& decl) {
+    ty::Type* latest_type = nullptr;
+    for (auto& p : std::views::reverse(decl.params)) {
+        if (p.type_expr == nullptr) {
+            if (latest_type == nullptr) {
+                s.er.report_error(
+                    p.loc, "missing type for function parameter {:?}", p.name);
+                continue;
+            }
+
+            p.type = *latest_type;
+            p.sym->value.type = p.type;
+        } else {
+            latest_type = &p.type;
+        }
+    }
+}
+
+void sema_fixup_func_rets(State& s, ast::FuncDecl& decl) {
+    ty::Type* latest_type = nullptr;
+    for (auto& r : std::views::reverse(decl.rets)) {
+        if (r.type_expr == nullptr) {
+            if (latest_type == nullptr) {
+                s.er.report_error(r.loc, "missing type for function return");
+                continue;
+            }
+
+            r.type = *latest_type;
+        } else {
+            latest_type = &r.type;
+        }
+    }
+}
+
+auto create_func_type(State& s, ast::FuncDecl& decl) -> ty::Type {
+    std::vector<ty::Type> param_types;
+    std::vector<ty::Type> ret_types;
+
+    param_types.reserve(decl.params.size());
+    ret_types.reserve(decl.rets.size());
+
+    for (auto const& p : decl.params) param_types.push_back(p.type);
+    for (auto const& r : decl.rets) ret_types.push_back(r.type);
+
+    return s.ts.type_func(param_types, ret_types);
+}
+
+void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
+    ASSERT(decl.attached_type == "", decl.name,
+           "attached types have not been implemented yet");
+
+    // TODO: function type?
+    decl.sym = parent_scope.define(decl.name, decl.name_loc, {});
+
+    auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_decl = &decl;
+
+    ASSERT(decl.attributes.size() == 0, decl.name,
+           "attributes have not been implemented yet");
+
+    sema_func_params(s, scope, decl);
+    sema_func_rets(s, scope, decl);
+
+    sema_fixup_func_params(s, decl);
+    sema_fixup_func_rets(s, decl);
+
+    auto type = create_func_type(s, decl);
+    decl.sym->value = {.type = type, .as = {.func_decl = &decl}};
+}
+
+// ----------------------------------------------------------------------------
+
+void sema_decl_header(State& s, Scope& scope, ast::Decl* decl) {
+    if (!decl) return;
+
+    switch (decl->kind) {
+        case ast::DeclKind::Err: break;
+
+        case ast::DeclKind::Import:
+            PANIC("SEMA: imports not implemented", *decl);
+
+        case ast::DeclKind::Func:
+            sema_func_decl_header(s, scope, decl->as_func());
+            break;
+
+        case ast::DeclKind::Var:
+        case ast::DeclKind::Def:
+        case ast::DeclKind::MultiVar:
+        case ast::DeclKind::MultiDef:
+            PANIC("SEMA: var and def not implemented", *decl);
+    }
+}
+
+// ============================================================================
+
+auto get_current_function_type(Scope& scope) -> ty::TypeFunc* {
+    if (scope.current_decl->kind != ast::DeclKind::Func) return nullptr;
+
+    auto sym = scope.current_decl->as_func().sym;
+    ASSERT(sym != nullptr, *scope.current_decl);
+    ASSERT(sym->value.type.is_func(), *scope.current_decl);
+
+    return sym->value.type.as.func;
+}
+
+void sema_stmt_return(State& s, Scope& scope, ast::ReturnStmt& stmt) {
+    ASSERT(scope.current_decl != nullptr, stmt);
+
+    auto                          expected_returns_loc = stmt.loc;
+    std::span<ty::Type const>     expected_returns;
+    std::span<ast::FuncRet const> expected_return_rename_later;
+
+    auto current_function = get_current_function_type(scope);
+    if (current_function == nullptr) {
+        s.er.report_error(stmt.loc, "use of return outside of function");
+    } else {
+        expected_returns = current_function->rets;
+        expected_returns_loc = scope.current_decl->as_func().rets_loc;
+        expected_return_rename_later = scope.current_decl->as_func().rets;
+
+        if (stmt.children.size() != expected_returns.size()) {
+            s.er.report_error(
+                stmt.children_loc,
+                "incorrect number of return values, expected {} but got {}",
+                expected_returns.size(), stmt.children.size());
+
+            s.er.report_note(expected_returns_loc,
+                             "{} return values declared here",
+                             expected_returns.size());
+        }
+    }
+
+    for (auto const& [idx, r] : std::views::enumerate(stmt.children)) {
+        auto expected_type = ty::Type{};
+        if (static_cast<size_t>(idx) < expected_returns.size())
+            expected_type = expected_returns[idx];
+
+        sema_expr(s, scope, r, expected_type);
+    }
+
+    // now check that all types do actually match
+
+    auto len = std::min({stmt.children.size(), expected_returns.size(),
+                         expected_return_rename_later.size()});
+    for (size_t i = 0; i < len; ++i) {
+        auto const& r = stmt.children[i];
+        auto const& r_type = expected_returns[i];
+        auto const& r_decl = expected_return_rename_later[i];
+
+        auto result = coerce_type(
+            s, r->type, r_type,
+            {.loc = r->loc, .source_loc = r->loc, .target_loc = r_decl.loc});
+        if (result.source_requires_fixup) {
+            fixup_comptime_integers_in_expr(s, r, result.type);
+        }
+
+        // FIXME: handle when an implicit conversion happens, as that requires
+        // an additonal AST node.
+
+        if (s.opts.verbose_coercions) {
+            s.er.report_debug(r->loc,
+                              "{} -> {} result={} (requires_a_cast={}, "
+                              "source_requires_fixup={})",
+                              r->type, r_type, result.type,
+                              result.requires_a_cast ? "yes" : "no",
+                              result.source_requires_fixup ? "yes" : "no");
+        }
+    }
+}
+
+void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
+    // var x;              // type=null and init=null -> error
+    // var x: type;        // init=null -> ok
+    // var x = init;       // type=null -> ok
+    // var x: type = init; // ok
+
+    sema_expr(s, scope, stmt.type_expr, ty::make_type());
+
+    auto expected_type = ty::Type{};
+    if (stmt.type_expr) {
+        expected_type = eval_expr_to_type(s, scope, stmt.type_expr);
+    }
+
+    sema_expr(s, scope, stmt.init, expected_type);
+
+    if (stmt.type_expr == nullptr && stmt.init == nullptr) {
+        s.er.report_error(stmt.loc,
+                          "variable declaration requires at least type or "
+                          "initializer, got none");
+    }
+
+    else if (stmt.type_expr != nullptr && stmt.init == nullptr) {
+        // only got the type, so there is nothing to do here.
+    }
+
+    else if (stmt.type_expr == nullptr && stmt.init != nullptr) {
+        expected_type = stmt.init->type;
+
+        // in case the type of the expression is comptime_int, then we need to
+        // move it to the default integer type
+        if (expected_type.is_comptime_int()) {
+            expected_type = get_default_int();
+            fixup_comptime_integers_in_expr(s, stmt.init, expected_type);
+        }
+    }
+
+    else {
+        // we may have failed to get the type from type_expr, in such case we
+        // don't do anything here
+        if (expected_type.is_valid()) {
+            auto result = coerce_type(s, stmt.init->type, expected_type,
+                                      {.loc = stmt.loc,
+                                       .source_loc = stmt.type_expr->loc,
+                                       .target_loc = stmt.init->loc});
+            if (result.source_requires_fixup) {
+                fixup_comptime_integers_in_expr(s, stmt.init, result.type);
+            }
+
+            // FIXME: handle when an implicit conversion happens, as that
+            // requires an additonal AST node.
+
+            if (s.opts.verbose_coercions) {
+                s.er.report_debug(stmt.loc,
+                                  "{} -> {} result={} (requires_a_cast={}, "
+                                  "source_requires_fixup={})",
+                                  stmt.init->type, expected_type, result.type,
+                                  result.requires_a_cast ? "yes" : "no",
+                                  result.source_requires_fixup ? "yes" : "no");
+            }
+
+            expected_type = result.type;
+        }
+    }
+
+    scope.define(stmt.name, stmt.name_loc, {.type = expected_type, .as = {}});
+}
+
+void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
+    if (!stmt) return;
+
+    switch (stmt->kind) {
+        case ast::StmtKind::Err: break;
+
+        case ast::StmtKind::Block: {
+            auto& block = stmt->as_block();
+            auto  block_scope = scope.make_child(stmt->loc);
+
+            for (auto const& child : block.children) {
+                sema_stmt(s, block_scope, child);
+            }
+        } break;
+
+        case ast::StmtKind::Return:
+            sema_stmt_return(s, scope, stmt->as_return());
+            break;
+
+        case ast::StmtKind::Expr: PANIC("SEMA: not implemented", *stmt);
+
+        case ast::StmtKind::Var: sema_stmt_var(s, scope, stmt->as_var()); break;
+
+        case ast::StmtKind::Def:
+        case ast::StmtKind::MultiVar:
+        case ast::StmtKind::MultiDef:
+        case ast::StmtKind::Assign:
+        case ast::StmtKind::MultiAssign: PANIC("SEMA: not implemented", *stmt);
+    }
+}
+
+// ============================================================================
+
+void sema_func_decl(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
+    auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_decl = &decl;
+
+    for (auto& p : decl.params) scope.define(p.sym);
+
+    if (decl.body) {
+        sema_stmt(s, scope, decl.body);
+    } else {
+        // FIXME: add @extern support
+        s.er.report_error(decl.loc, "missing function body, missing @extern?");
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+void sema_decl(State& s, Scope& scope, ast::Decl* decl) {
+    if (!decl) return;
+
+    switch (decl->kind) {
+        case ast::DeclKind::Err: break;
+
+        case ast::DeclKind::Import:
+            PANIC("SEMA: imports not implemented", *decl);
+
+        case ast::DeclKind::Func:
+            sema_func_decl(s, scope, decl->as_func());
+            break;
+
+        case ast::DeclKind::Var:
+        case ast::DeclKind::Def:
+        case ast::DeclKind::MultiVar:
+        case ast::DeclKind::MultiDef:
+            PANIC("SEMA: var and def not implemented", *decl);
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+void define_builtin_types(ty::TypeStore& /* ts */, Scope& builtin_scope) {
+    auto type_type = ty::make_type();
+    auto s8_type = ty::make_int(1, true);
+    auto u8_type = ty::make_int(1, false);
+    auto s16_type = ty::make_int(2, true);
+    auto u16_type = ty::make_int(2, false);
+    auto s32_type = ty::make_int(4, true);
+    auto u32_type = ty::make_int(4, false);
+    auto s64_type = ty::make_int(8, true);
+    auto u64_type = ty::make_int(8, false);
+
+    builtin_scope.define("s8", {},
+                         {.type = type_type, .as = {.type = s8_type}});
+    builtin_scope.define("u8", {},
+                         {.type = type_type, .as = {.type = u8_type}});
+    builtin_scope.define("s16", {},
+                         {.type = type_type, .as = {.type = s16_type}});
+    builtin_scope.define("u16", {},
+                         {.type = type_type, .as = {.type = u16_type}});
+    builtin_scope.define("s32", {},
+                         {.type = type_type, .as = {.type = s32_type}});
+    builtin_scope.define("u32", {},
+                         {.type = type_type, .as = {.type = u32_type}});
+    builtin_scope.define("s64", {},
+                         {.type = type_type, .as = {.type = s64_type}});
+    builtin_scope.define("u64", {},
+                         {.type = type_type, .as = {.type = u64_type}});
+}
+
+void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
+                  Options const& opts) {
+    ty::TypeStore type_store;
+    auto          s = State{.er = er, .ts = type_store, .opts = opts};
+
+    auto symbol_store = SymbolStore{};
+    auto builtin_scope = Scope{.loc = {},
+                               .symbols = {},
+                               .current_decl = nullptr,
+                               .symbol_store = &symbol_store};
+
+    define_builtin_types(s.ts, builtin_scope);
+
+    auto scope = builtin_scope.make_child({});
+
+    // do sema on all of the things at global scope
+    for (auto const& decl : module.declarations) {
+        sema_decl_header(s, scope, decl);
+    }
+
+    // do inner analisys
+    for (auto const& decl : module.declarations) {
+        sema_decl(s, scope, decl);
+    }
+
+    fmt::println("{}", module);
+}
+
+}  // namespace yal::sema
