@@ -22,14 +22,14 @@
           sym: (Symbol "s32" (Value type s32)))
         #nullptr#)
       (VarStmt "second"
-        (IdExpr type "s64"
-          sym: (Symbol "s64" (Value type s64)))
-        (IntExpr s64 10))
+        (IdExpr type "u32"
+          sym: (Symbol "u32" (Value type u32)))
+        (IntExpr u32 10))
       (ReturnStmt
         (IdExpr s32 "first"
           sym: (Symbol "first" (Value s32)))
-        (IdExpr s64 "second"
-          sym: (Symbol "second" (Value s64))))))
+        (IdExpr u32 "second"
+          sym: (Symbol "second" (Value u32))))))
   (FuncDecl "f"
     sym: (Symbol "f" (Value func(s32, s32) (s32, u32)))
     (FuncParam s32 "x"
@@ -47,5 +47,9 @@
         sym: (Symbol "u32" (Value type u32))))
     (BlockStmt
       (ReturnStmt
-        (IntExpr s32 0)
-        (IdExpr "some_func")))))
+        (IdExpr s32 "x"
+          sym: (Symbol "x" (Value s32)))
+        (CastExpr u32
+          (IdExpr "_")
+          (IdExpr s32 "y"
+            sym: (Symbol "y" (Value s32))))))))

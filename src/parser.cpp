@@ -722,16 +722,6 @@ public:
             return expr;
         }
 
-        if (check(TokenType::Id)) {
-            // make sure that we are not trying to do something stupid
-            if (is_kw_and_report(start_span)) return nullptr;
-
-            advance();
-
-            return ast_file->expr_id(to_loc(start_span),
-                                     start_span.str(source));
-        }
-
         if (match(TokenType::Lbracket)) {
             return parse_multi_ptr_array_or_slice();
         }
@@ -761,6 +751,28 @@ public:
         if (match(TokenType::Int)) return parse_int(start_span);
         if (match(TokenType::Hex)) return parse_int_with_base(start_span, 16);
         if (match(TokenType::Str)) return parse_string(start_span);
+
+        if (match("cast")) {
+            // TODO: this should have some smart recovery
+            (void)consume(TokenType::Lparen);
+            auto type_expr = parse_expr_without_recover();
+            (void)consume(TokenType::Rparen);
+
+            auto expr = parse_expr_with_precedence(PREC_UNARY);
+            return ast_file->expr_cast(to_loc(start_span.extend(prev_span())),
+                                       type_expr, expr);
+        }
+
+        // this needs to be after keywords
+        if (check(TokenType::Id)) {
+            // make sure that we are not trying to do something stupid
+            if (is_kw_and_report(start_span)) return nullptr;
+
+            advance();
+
+            return ast_file->expr_id(to_loc(start_span),
+                                     start_span.str(source));
+        }
 
         er.report_error(start_span, "expected expression, but got '{}'",
                         start_span.str(source));
@@ -1279,7 +1291,7 @@ public:
 
     [[nodiscard]] constexpr auto is_kw(std::string_view s) const -> bool {
         return s == "var" || s == "def" || s == "func" || s == "return" ||
-               s == "import";
+               s == "import" || s == "cast";
     }
 
     // ========================================================================

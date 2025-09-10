@@ -54,6 +54,10 @@ struct File {
         return expr_arith(loc, ExprKind::Neg, child, nullptr);
     }
 
+    auto expr_cast(Location loc, Expr* type_expr, Expr* child) -> ArithExpr* {
+        return expr_arith(loc, ExprKind::Cast, type_expr, child);
+    }
+
     auto expr_arith(Location loc, ExprKind kind, Expr* lhs, Expr* rhs)
         -> ArithExpr* {
         return node_arena.create<ArithExpr>(Expr{.kind = kind, .loc = loc}, lhs,

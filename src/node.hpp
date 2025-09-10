@@ -24,6 +24,8 @@ enum struct ExprKind : uint8_t {
     Div,
     Mod,
 
+    Cast,
+
     Field,
     Call,
 
@@ -39,6 +41,7 @@ enum struct ExprKind : uint8_t {
 };
 
 struct ArithExpr;
+struct CastExpr;
 struct FieldExpr;
 struct CallExpr;
 struct PtrExpr;
@@ -65,6 +68,7 @@ struct Expr {
     Expr* forward = nullptr;
 
     [[nodiscard]] auto as_arith() const -> ArithExpr const&;
+    [[nodiscard]] auto as_cast() const -> CastExpr const&;
     [[nodiscard]] auto as_field() const -> FieldExpr const&;
     [[nodiscard]] auto as_call() const -> CallExpr const&;
     [[nodiscard]] auto as_ptr() const -> PtrExpr const&;
@@ -75,6 +79,7 @@ struct Expr {
     [[nodiscard]] auto as_string() const -> StringExpr const&;
 
     [[nodiscard]] auto as_arith() -> ArithExpr&;
+    [[nodiscard]] auto as_cast() -> CastExpr&;
     [[nodiscard]] auto as_field() -> FieldExpr&;
     [[nodiscard]] auto as_call() -> CallExpr&;
     [[nodiscard]] auto as_ptr() -> PtrExpr&;
@@ -83,6 +88,8 @@ struct Expr {
     [[nodiscard]] auto as_kw() -> KwExpr&;
     [[nodiscard]] auto as_int() -> IntExpr&;
     [[nodiscard]] auto as_string() -> StringExpr&;
+
+    [[nodiscard]] auto is_id_discard() const -> bool;
 
     /// The find operation of union find.
     [[nodiscard]] constexpr auto find() const -> Expr const* {
@@ -110,6 +117,15 @@ struct ErrExpr : Expr {};
 struct ArithExpr : public Expr {
     Expr* lhs = nullptr;
     Expr* rhs = nullptr;
+};
+
+struct CastExpr : public Expr {
+    Expr* type_expr = nullptr;
+    Expr* child = nullptr;
+
+    [[nodiscard]] constexpr auto type_is_infer() const -> bool {
+        return type_expr ? type_expr->is_id_discard() : false;
+    }
 };
 
 struct FieldExpr : Expr {

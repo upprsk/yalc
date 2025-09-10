@@ -18,6 +18,7 @@ using nlohmann::json;
 
 // clang-format off
 auto Expr::as_arith() const -> ArithExpr const& { return static_cast<ArithExpr const&>(*this); }
+auto Expr::as_cast() const -> CastExpr const& { return static_cast<CastExpr const&>(*this); }
 auto Expr::as_field() const -> FieldExpr const& { return static_cast<FieldExpr const&>(*this); }
 auto Expr::as_call() const -> CallExpr const& { return static_cast<CallExpr const&>(*this); }
 auto Expr::as_ptr() const -> PtrExpr const& { return static_cast<PtrExpr const&>(*this); }
@@ -28,6 +29,7 @@ auto Expr::as_int() const -> IntExpr const& { return static_cast<IntExpr const&>
 auto Expr::as_string() const -> StringExpr const& { return static_cast<StringExpr const&>(*this); }
 
 auto Expr::as_arith() -> ArithExpr& { return static_cast<ArithExpr&>(*this); }
+auto Expr::as_cast() -> CastExpr& { return static_cast<CastExpr&>(*this); }
 auto Expr::as_field() -> FieldExpr& { return static_cast<FieldExpr&>(*this); }
 auto Expr::as_call() -> CallExpr& { return static_cast<CallExpr&>(*this); }
 auto Expr::as_ptr() -> PtrExpr& { return static_cast<PtrExpr&>(*this); }
@@ -72,6 +74,10 @@ auto Decl::as_multi_var() -> MultiVarDecl& { return static_cast<MultiVarDecl&>(*
 auto Decl::as_multi_def() -> MultiVarDecl& { return static_cast<MultiVarDecl&>(*this); }
 // clang-format on
 
+auto Expr::is_id_discard() const -> bool {
+    return kind == ExprKind::Id && as_id().value == "_";
+}
+
 void to_json(nlohmann::json& j, ExprKind const& n) { j = fmt::to_string(n); }
 void to_json(nlohmann::json& j, StmtKind const& n) { j = fmt::to_string(n); }
 void to_json(nlohmann::json& j, DeclKind const& n) { j = fmt::to_string(n); }
@@ -114,6 +120,12 @@ void to_json(nlohmann::json& j, Expr const& n) {
             auto& arith = n.as_arith();
             j["lhs"] = arith.lhs ? *arith.lhs : json{};
             j["rhs"] = arith.rhs ? *arith.rhs : json{};
+        } break;
+
+        case ExprKind::Cast: {
+            auto& cast = n.as_cast();
+            j["type_expr"] = cast.type_expr ? *cast.type_expr : json{};
+            j["child"] = cast.child ? *cast.child : json{};
         } break;
 
         case ExprKind::Field: {
@@ -373,6 +385,16 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
 
             indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, arith.rhs, depth + 1);
+        } break;
+
+        case ExprKind::Cast: {
+            auto& cast = expr.as_cast();
+
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, cast.type_expr, depth + 1);
+
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, cast.child, depth + 1);
         } break;
 
         case ExprKind::Field: {
@@ -706,6 +728,7 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::Mul: name = "Mul"; break;
         case yal::ast::ExprKind::Div: name = "Div"; break;
         case yal::ast::ExprKind::Mod: name = "Mod"; break;
+        case yal::ast::ExprKind::Cast: name = "Cast"; break;
         case yal::ast::ExprKind::Field: name = "Field"; break;
         case yal::ast::ExprKind::Call: name = "Call"; break;
         case yal::ast::ExprKind::Ptr: name = "Ptr"; break;

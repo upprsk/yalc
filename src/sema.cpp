@@ -79,6 +79,12 @@ struct CoercionResult {
     bool     requires_a_cast = false;
 };
 
+struct CastResult {
+    ty::Type type;
+    bool     source_requires_fixup = false;
+    bool     redundant_cast = false;
+};
+
 struct CoercionOpts {
     Location loc;
     Location source_loc;
@@ -161,6 +167,35 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
     PANIC("coerction: type combination not implemented", source, target);
 }
 
+auto cast_type(State& s, ty::Type source, ty::Type target,
+               CoercionOpts const& opts) -> CastResult {
+    // don't deal with errors here, to avoid too many extra error messages when
+    // something goes wrong
+    if (source.is_err() || target.is_err()) return {.type = target};
+
+    if (source.is_comptime_int() && target.is_int()) {
+        return {.type = target, .source_requires_fixup = true};
+    }
+
+    // both are integers, can cast without much problem
+    if (source.is_int() && target.is_int()) {
+        auto is_redundant_cast =
+            source.sym == target.sym &&
+            source.as.integer.byte_size == target.as.integer.byte_size &&
+            source.as.integer.is_signed == target.as.integer.is_signed;
+
+        if (is_redundant_cast) {
+            s.er.report_warn(opts.loc, "redundant cast from {} to {}", source,
+                             target);
+        }
+
+        return {.type = target, .redundant_cast = is_redundant_cast};
+    }
+
+    s.er.report_error(opts.loc, "can not cast from {} to {}", source, target);
+    return {.type = target};
+}
+
 // ----------------------------------------------------------------------------
 
 auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
@@ -180,6 +215,8 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod: break;
+
+        case ast::ExprKind::Cast: break;
 
         case ast::ExprKind::Field:
         case ast::ExprKind::Call: break;
@@ -235,6 +272,7 @@ void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
+        case ast::ExprKind::Cast:
         case ast::ExprKind::Field:
         case ast::ExprKind::Call:
         case ast::ExprKind::Ptr:
@@ -256,6 +294,54 @@ void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
 
 // ============================================================================
 
+void sema_expr(State& s, Scope& scope, ast::Expr* expr, ty::Type expected_type);
+
+void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
+                    ty::Type expected_type) {
+    if (!expr.type_is_infer()) {
+        sema_expr(s, scope, expr.type_expr, ty::make_type());
+    }
+
+    auto type = ty::Type{};
+
+    if (!expr.type_is_infer()) {
+        type = eval_expr_to_type(s, scope, expr.type_expr);
+    } else {
+        type = expected_type;
+        if (!type.is_valid()) {
+            s.er.report_error(expr.loc, "could not infer type for cast");
+        }
+    }
+
+    sema_expr(s, scope, expr.child, type);
+
+    // now we need to cast it
+    if (expr.type_expr && expr.child) {
+        auto result = cast_type(s, expr.child->type, type,
+                                {.loc = expr.loc,
+                                 .source_loc = expr.child->loc,
+                                 .target_loc = expr.type_expr->loc});
+
+        if (result.source_requires_fixup) {
+            fixup_comptime_integers_in_expr(s, expr.child, result.type);
+        }
+
+        // FIXME: handle when an implicit conversion happens, as that
+        // requires an additonal AST node.
+
+        if (s.opts.verbose_coercions) {
+            s.er.report_debug(expr.loc,
+                              "{} -> {} result={} (source_requires_fixup={})",
+                              expr.child->type, type, result.type,
+                              result.source_requires_fixup ? "yes" : "no");
+        }
+
+        type = result.type;
+    }
+
+    expr.type = type;
+}
+
 void sema_expr(State& s, Scope& scope, ast::Expr* expr,
                ty::Type expected_type) {
     if (!expr) return;
@@ -270,6 +356,10 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
+
+        case ast::ExprKind::Cast:
+            sema_expr_cast(s, scope, expr->as_cast(), expected_type);
+            break;
 
         case ast::ExprKind::Field:
         case ast::ExprKind::Call: PANIC("SEMA EXPR: not implemented", *expr);

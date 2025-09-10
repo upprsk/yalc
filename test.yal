@@ -11,7 +11,7 @@ func f_c() (s32, u32) {
 }
 
 func f(x, y: s32) (s32, thing_2: u32) {
-    return x, y;
+    return x, cast(_)y;
 }
 
 // vim: ft=yal
