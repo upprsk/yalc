@@ -85,10 +85,24 @@ struct CastResult {
     bool     redundant_cast = false;
 };
 
+struct UnifyResult {
+    ty::Type type;
+    bool     lhs_requires_fixup = false;
+    bool     rhs_requires_fixup = false;
+};
+
 struct CoercionOpts {
     Location loc;
     Location source_loc;
     Location target_loc;
+};
+
+struct UnifyOpts {
+    Location loc;
+    Location lhs_loc;
+    Location rhs_loc;
+
+    ty::Type expected_type;
 };
 
 auto coerce_type(State& s, ty::Type source, ty::Type target,
@@ -167,6 +181,85 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
     PANIC("coerction: type combination not implemented", source, target);
 }
 
+auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
+    -> UnifyResult {
+    // don't deal with errors here, to avoid too many extra error messages when
+    // something goes wrong
+    if (lhs.is_err()) return {.type = rhs};
+    if (rhs.is_err()) return {.type = lhs};
+
+    if (lhs.is_comptime_int() && rhs.is_int()) {
+        return {.type = rhs, .lhs_requires_fixup = true};
+    }
+
+    if (lhs.is_int() && rhs.is_comptime_int()) {
+        return {.type = lhs, .rhs_requires_fixup = true};
+    }
+
+    if (lhs.kind != rhs.kind) {
+        s.er.report_error(opts.loc, "incompatible types: {} and {}", lhs, rhs);
+        s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+        s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+
+        // TODO: could detect that some form of cast is possible:
+        // - floats <-> ints
+        // - arrays <-> slices
+        return {.type =
+                    opts.expected_type.is_valid() ? opts.expected_type : lhs};
+    }
+
+    // If the definitions are distinct, then coercion is not possible (requires
+    // a cast)
+    if (lhs.sym != rhs.sym) {
+        s.er.report_error(
+            opts.loc, "incompatible types: {} and {}, these are distinct types",
+            lhs, rhs);
+        s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+        s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+
+        return {.type =
+                    opts.expected_type.is_valid() ? opts.expected_type : lhs};
+    }
+
+    // both are integers
+    if (lhs.is_int()) {
+        auto const& source_int = lhs.as.integer;
+        auto const& target_int = rhs.as.integer;
+
+        if (source_int.byte_size != target_int.byte_size) {
+            s.er.report_error(
+                opts.loc,
+                "incompatible types: {} and {}, integers differ in size", lhs,
+                rhs);
+            s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+            s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+
+            return {.type = opts.expected_type.is_valid() ? opts.expected_type
+                                                          : lhs};
+        }
+
+        if (source_int.is_signed != target_int.is_signed) {
+            s.er.report_error(
+                opts.loc,
+                "incompatible types: {} and {}, integers differ in signness",
+                lhs, rhs);
+            s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+            s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+
+            return {.type = opts.expected_type.is_valid() ? opts.expected_type
+                                                          : lhs};
+        }
+
+        // should both actually be the same, nice!
+        return {.type = lhs};
+    }
+
+    s.er.report_error(opts.loc, "incompatible types: {} and {}", lhs, rhs);
+    s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+    s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+    return {.type = opts.expected_type.is_valid() ? opts.expected_type : lhs};
+}
+
 auto cast_type(State& s, ty::Type source, ty::Type target,
                CoercionOpts const& opts) -> CastResult {
     // don't deal with errors here, to avoid too many extra error messages when
@@ -196,7 +289,40 @@ auto cast_type(State& s, ty::Type source, ty::Type target,
     return {.type = target};
 }
 
-// ----------------------------------------------------------------------------
+auto type_supports_operator(ty::Type type, ast::ExprKind op) -> bool {
+    switch (op) {
+        case ast::ExprKind::Err: return true;  // to avoid bogus messages
+
+        case ast::ExprKind::Neg:
+        case ast::ExprKind::Add:
+        case ast::ExprKind::Sub:
+        case ast::ExprKind::Mul:
+        case ast::ExprKind::Div:
+        case ast::ExprKind::Mod: return type.is_int() || type.is_comptime_int();
+
+        default: PANIC("invalid op received", op);
+    }
+}
+
+auto operator_to_sym(ast::ExprKind op) -> std::string_view {
+    std::string_view name = "?";
+    switch (op) {
+        case ast::ExprKind::Err: name = "Err"; break;
+
+        case ast::ExprKind::Neg: name = "negate"; break;
+        case ast::ExprKind::Add: name = "+"; break;
+        case ast::ExprKind::Sub: name = "-"; break;
+        case ast::ExprKind::Mul: name = "*"; break;
+        case ast::ExprKind::Div: name = "/"; break;
+        case ast::ExprKind::Mod: name = "%"; break;
+
+        default: PANIC("invalid op received", op);
+    }
+
+    return name;
+}
+
+// ============================================================================
 
 auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
     if (!expr) {
@@ -296,6 +422,49 @@ void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
 
 void sema_expr(State& s, Scope& scope, ast::Expr* expr, ty::Type expected_type);
 
+void sema_expr_arith(State& s, Scope& scope, ast::ArithExpr& expr,
+                     ty::Type expected_type) {
+    sema_expr(s, scope, expr.lhs, expected_type);
+    sema_expr(s, scope, expr.rhs, expected_type);
+
+    if (expr.lhs && expr.rhs) {
+        auto result = unify_types(s, expr.lhs->type, expr.rhs->type,
+                                  {.loc = expr.loc,
+                                   .lhs_loc = expr.lhs->loc,
+                                   .rhs_loc = expr.rhs->loc,
+                                   .expected_type = expected_type});
+        if (result.lhs_requires_fixup) {
+            fixup_comptime_integers_in_expr(s, expr.lhs, result.type);
+        }
+        if (result.rhs_requires_fixup) {
+            fixup_comptime_integers_in_expr(s, expr.rhs, result.type);
+        }
+
+        // FIXME: handle when an implicit conversion happens, as that
+        // requires an additonal AST node.
+
+        if (s.opts.verbose_coercions) {
+            s.er.report_debug(expr.loc,
+                              "{} <-> {} result={} (lhs_requires_fixup={}, "
+                              "rhs_requires_fixup={})",
+                              expr.lhs->type, expr.rhs->type, result.type,
+                              result.lhs_requires_fixup ? "yes" : "no",
+                              result.rhs_requires_fixup ? "yes" : "no");
+        }
+
+        expr.type = result.type;
+    }
+
+    // check that the operator is supported by the type
+    if (expr.type.is_valid()) {
+        if (!type_supports_operator(expr.type, expr.kind)) {
+            s.er.report_error(expr.loc,
+                              "operator {} can not be used with type {}",
+                              operator_to_sym(expr.kind), expr.type);
+        }
+    }
+}
+
 void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
                     ty::Type expected_type) {
     if (!expr.type_is_infer()) {
@@ -356,6 +525,8 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
+            sema_expr_arith(s, scope, expr->as_arith(), expected_type);
+            break;
 
         case ast::ExprKind::Cast:
             sema_expr_cast(s, scope, expr->as_cast(), expected_type);
@@ -398,7 +569,82 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
     }
 }
 
-// ----------------------------------------------------------------------------
+// ============================================================================
+
+struct VarDesc {
+    ast::Expr* type_expr;
+    ast::Expr* init;
+    Location   loc;
+};
+
+auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
+    // var x;              // type=null and init=null -> error
+    // var x: type;        // init=null -> ok
+    // var x = init;       // type=null -> ok
+    // var x: type = init; // ok
+
+    sema_expr(s, scope, var.type_expr, ty::make_type());
+
+    auto expected_type = ty::Type{};
+    if (var.type_expr) {
+        expected_type = eval_expr_to_type(s, scope, var.type_expr);
+    }
+
+    sema_expr(s, scope, var.init, expected_type);
+
+    if (var.type_expr == nullptr && var.init == nullptr) {
+        s.er.report_error(var.loc,
+                          "variable declaration requires at least type or "
+                          "initializer, got none");
+    }
+
+    else if (var.type_expr != nullptr && var.init == nullptr) {
+        // only got the type, so there is nothing to do here.
+    }
+
+    else if (var.type_expr == nullptr && var.init != nullptr) {
+        expected_type = var.init->type;
+
+        // in case the type of the expression is comptime_int, then we need to
+        // move it to the default integer type
+        if (expected_type.is_comptime_int()) {
+            expected_type = get_default_int();
+            fixup_comptime_integers_in_expr(s, var.init, expected_type);
+        }
+    }
+
+    else {
+        // we may have failed to get the type from type_expr, in such case we
+        // don't do anything here
+        if (expected_type.is_valid()) {
+            auto result = coerce_type(s, var.init->type, expected_type,
+                                      {.loc = var.loc,
+                                       .source_loc = var.type_expr->loc,
+                                       .target_loc = var.init->loc});
+            if (result.source_requires_fixup) {
+                fixup_comptime_integers_in_expr(s, var.init, result.type);
+            }
+
+            // FIXME: handle when an implicit conversion happens, as that
+            // requires an additonal AST node.
+
+            if (s.opts.verbose_coercions) {
+                s.er.report_debug(var.loc,
+                                  "{} -> {} result={} (requires_a_cast={}, "
+                                  "source_requires_fixup={})",
+                                  var.init->type, expected_type, result.type,
+                                  result.requires_a_cast ? "yes" : "no",
+                                  result.source_requires_fixup ? "yes" : "no");
+            }
+
+            expected_type = result.type;
+        }
+    }
+
+    return expected_type;
+}
+
+// ============================================================================
 
 void sema_func_params(State& s, Scope& scope, ast::FuncDecl& decl) {
     for (auto& p : decl.params) {
@@ -475,7 +721,6 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     ASSERT(decl.attached_type == "", decl.name,
            "attached types have not been implemented yet");
 
-    // TODO: function type?
     decl.sym = parent_scope.define(decl.name, decl.name_loc, {});
 
     auto scope = parent_scope.make_child(decl.name_loc);
@@ -494,6 +739,23 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     decl.sym->value = {.type = type, .as = {.func_decl = &decl}};
 }
 
+void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
+    decl.sym = parent_scope.define(decl.name, decl.name_loc, {});
+
+    auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_decl = &decl;
+
+    ASSERT(decl.attributes.size() == 0, decl.name,
+           "attributes have not been implemented yet");
+
+    auto expected_type = sema_some_var(
+        s, scope,
+        {.type_expr = decl.type_expr, .init = decl.init, .loc = decl.loc});
+
+    parent_scope.define(decl.name, decl.name_loc,
+                        {.type = expected_type, .as = {}});
+}
+
 // ----------------------------------------------------------------------------
 
 void sema_decl_header(State& s, Scope& scope, ast::Decl* decl) {
@@ -503,17 +765,20 @@ void sema_decl_header(State& s, Scope& scope, ast::Decl* decl) {
         case ast::DeclKind::Err: break;
 
         case ast::DeclKind::Import:
-            PANIC("SEMA: imports not implemented", *decl);
+            PANIC("SEMA header: imports not implemented", *decl);
 
         case ast::DeclKind::Func:
             sema_func_decl_header(s, scope, decl->as_func());
             break;
 
         case ast::DeclKind::Var:
+            sema_var_decl_header(s, scope, decl->as_var());
+            break;
+
         case ast::DeclKind::Def:
         case ast::DeclKind::MultiVar:
         case ast::DeclKind::MultiDef:
-            PANIC("SEMA: var and def not implemented", *decl);
+            PANIC("SEMA header: var and def not implemented", *decl);
     }
 }
 
@@ -595,68 +860,9 @@ void sema_stmt_return(State& s, Scope& scope, ast::ReturnStmt& stmt) {
 }
 
 void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
-    // var x;              // type=null and init=null -> error
-    // var x: type;        // init=null -> ok
-    // var x = init;       // type=null -> ok
-    // var x: type = init; // ok
-
-    sema_expr(s, scope, stmt.type_expr, ty::make_type());
-
-    auto expected_type = ty::Type{};
-    if (stmt.type_expr) {
-        expected_type = eval_expr_to_type(s, scope, stmt.type_expr);
-    }
-
-    sema_expr(s, scope, stmt.init, expected_type);
-
-    if (stmt.type_expr == nullptr && stmt.init == nullptr) {
-        s.er.report_error(stmt.loc,
-                          "variable declaration requires at least type or "
-                          "initializer, got none");
-    }
-
-    else if (stmt.type_expr != nullptr && stmt.init == nullptr) {
-        // only got the type, so there is nothing to do here.
-    }
-
-    else if (stmt.type_expr == nullptr && stmt.init != nullptr) {
-        expected_type = stmt.init->type;
-
-        // in case the type of the expression is comptime_int, then we need to
-        // move it to the default integer type
-        if (expected_type.is_comptime_int()) {
-            expected_type = get_default_int();
-            fixup_comptime_integers_in_expr(s, stmt.init, expected_type);
-        }
-    }
-
-    else {
-        // we may have failed to get the type from type_expr, in such case we
-        // don't do anything here
-        if (expected_type.is_valid()) {
-            auto result = coerce_type(s, stmt.init->type, expected_type,
-                                      {.loc = stmt.loc,
-                                       .source_loc = stmt.type_expr->loc,
-                                       .target_loc = stmt.init->loc});
-            if (result.source_requires_fixup) {
-                fixup_comptime_integers_in_expr(s, stmt.init, result.type);
-            }
-
-            // FIXME: handle when an implicit conversion happens, as that
-            // requires an additonal AST node.
-
-            if (s.opts.verbose_coercions) {
-                s.er.report_debug(stmt.loc,
-                                  "{} -> {} result={} (requires_a_cast={}, "
-                                  "source_requires_fixup={})",
-                                  stmt.init->type, expected_type, result.type,
-                                  result.requires_a_cast ? "yes" : "no",
-                                  result.source_requires_fixup ? "yes" : "no");
-            }
-
-            expected_type = result.type;
-        }
-    }
+    auto expected_type = sema_some_var(
+        s, scope,
+        {.type_expr = stmt.type_expr, .init = stmt.init, .loc = stmt.loc});
 
     scope.define(stmt.name, stmt.name_loc, {.type = expected_type, .as = {}});
 }
@@ -724,6 +930,9 @@ void sema_decl(State& s, Scope& scope, ast::Decl* decl) {
             break;
 
         case ast::DeclKind::Var:
+            // everything already done in sema_decl_header
+            break;
+
         case ast::DeclKind::Def:
         case ast::DeclKind::MultiVar:
         case ast::DeclKind::MultiDef:

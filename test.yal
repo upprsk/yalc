@@ -1,5 +1,8 @@
 module main;
 
+var global_var: s32;
+var global_var_2 = 0;
+
 func f_a() {}
 func f_b() s32 {}
 func f_c() (s32, u32) {
@@ -10,8 +13,9 @@ func f_c() (s32, u32) {
            second;
 }
 
-func f(x, y: s32) (s32, thing_2: u32) {
-    return x, cast(_)y;
+func f(x: u32, y: s32) (u32, thing_2: s32) {
+    var xy: u32 = x + cast(_)y;
+    return xy, global_var + cast(_)global_var_2;
 }
 
 // vim: ft=yal
