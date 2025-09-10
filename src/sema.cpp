@@ -128,6 +128,7 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
     // don't deal with errors here, to avoid too many extra error messages when
     // something goes wrong
     if (source.is_err()) return {.type = target};
+    if (target.is_err()) return {.type = target};
 
     if (source.is_comptime_int() && target.is_int()) {
         return {.type = target, .source_requires_fixup = true};
@@ -359,6 +360,32 @@ auto cast_type(State& s, ty::Type source, ty::Type target,
             source.sym == target.sym &&
             source.as.integer.byte_size == target.as.integer.byte_size &&
             source.as.integer.is_signed == target.as.integer.is_signed;
+
+        if (is_redundant_cast) {
+            s.er.report_warn(opts.loc, "redundant cast from {} to {}", source,
+                             target);
+        }
+
+        return {.type = target, .redundant_cast = is_redundant_cast};
+    }
+
+    // both are pointers, may be able to cast
+    if (source.is_ptr() && target.is_ptr()) {
+        // source is const but target is, not allowed
+        if (source.flags.is_const() && !target.flags.is_const()) {
+            s.er.report_error(
+                opts.loc,
+                "can not cast away constness of pointer. From {} to {}", source,
+                target);
+        }
+
+        // NOTE: do we want some variant of the static_cast vs reinterpret_cast
+        // thing? For now our cast is C-style, does everything.
+
+        auto is_redundant_cast =
+            source.sym == target.sym &&
+            source.flags.is_const() == target.flags.is_const() &&
+            types_equal(source.as.ptr->inner, target.as.ptr->inner);
 
         if (is_redundant_cast) {
             s.er.report_warn(opts.loc, "redundant cast from {} to {}", source,
@@ -732,6 +759,64 @@ void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
     expr.type = type;
 }
 
+void sema_expr_call(State& s, Scope& scope, ast::CallExpr& expr,
+                    ty::Type expected_type) {
+    sema_expr(s, scope, expr.callee, {});
+
+    std::span<ty::Type const> expected_args;
+    std::span<ty::Type const> expected_rets;
+
+    if (expr.callee->type.is_func()) {
+        expected_args = expr.callee->type.as.func->params;
+        expected_rets = expr.callee->type.as.func->rets;
+
+        if (expr.args.size() != expected_args.size()) {
+            s.er.report_error(expr.args_loc,
+                              "incorrect number of arguments for function, "
+                              "expected {} but got {}",
+                              expected_args.size(), expr.args.size());
+        }
+    } else {
+        s.er.report_error(expr.callee->loc,
+                          "can not call value of non-function type {}",
+                          expr.callee->type);
+    }
+
+    for (auto const& [idx, arg] : std::views::enumerate(expr.args)) {
+        auto expected_type = ty::Type{};
+        if (static_cast<size_t>(idx) < expected_args.size())
+            expected_type = expected_args[idx];
+
+        sema_expr(s, scope, arg, expected_type);
+
+        auto result = coerce_type(s, arg->type, expected_type,
+                                  {.loc = arg->loc,
+                                   .source_loc = arg->loc,
+                                   .target_loc = expr.callee->loc});
+        if (result.source_requires_fixup) {
+            fixup_comptime_integers_in_expr(s, arg, result.type);
+        }
+
+        // FIXME: handle when an implicit conversion happens, as that
+        // requires an additonal AST node.
+
+        if (s.opts.verbose_coercions) {
+            s.er.report_debug(expr.loc,
+                              "{} -> {} result={} (source_requires_fixup={})",
+                              arg->type, expected_type, result.type,
+                              result.source_requires_fixup ? "yes" : "no");
+        }
+    }
+
+    if (expected_rets.size() == 0) {
+        expr.type = ty::make_void();
+    } else if (expected_rets.size() == 1) {
+        expr.type = expected_rets[0];
+    } else {
+        expr.type = s.ts.type_tuple(expected_rets);
+    }
+}
+
 void sema_expr_deref(State& s, Scope& scope, ast::ArithExpr& expr,
                      ty::Type expected_type) {
     // FIXME: we need a way to make the expected_type for the child to work,
@@ -794,8 +879,11 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
             sema_expr_cast(s, scope, expr->as_cast(), expected_type);
             break;
 
-        case ast::ExprKind::Field:
-        case ast::ExprKind::Call: PANIC("SEMA EXPR: not implemented", *expr);
+        case ast::ExprKind::Field: PANIC("SEMA EXPR: not implemented", *expr);
+
+        case ast::ExprKind::Call:
+            sema_expr_call(s, scope, expr->as_call(), expected_type);
+            break;
 
         case ast::ExprKind::Deref:
             sema_expr_deref(s, scope, expr->as_arith(), expected_type);
@@ -898,13 +986,42 @@ auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
             expected_type = get_default_int();
             fixup_comptime_integers_in_expr(s, var.init, expected_type);
         }
+
+        // in case the type is a tuple, then we called a function that returns
+        // multiple values but we only support a single return.
+        if (expected_type.is_tuple()) {
+            DEBUG_ASSERT(expected_type.as.tuple->items.size() > 1);
+
+            s.er.report_error(var.init->loc,
+                              "initializer returns {} values of types {}, but "
+                              "unpacked only 1",
+                              expected_type.as.tuple->items.size(),
+                              expected_type);
+
+            expected_type = expected_type.as.tuple->items[0];
+        }
     }
 
     else {
+        auto init_type = var.init->type;
+
+        // in case the type is a tuple, then we called a function that returns
+        // multiple values but we only support a single return.
+        if (init_type.is_tuple()) {
+            DEBUG_ASSERT(init_type.as.tuple->items.size() > 1);
+
+            s.er.report_error(var.init->loc,
+                              "initializer returns {} values of types {}, but "
+                              "unpacked only 1",
+                              init_type.as.tuple->items.size(), init_type);
+
+            init_type = init_type.as.tuple->items[0];
+        }
+
         // we may have failed to get the type from type_expr, in such case we
         // don't do anything here
         if (expected_type.is_valid()) {
-            auto result = coerce_type(s, var.init->type, expected_type,
+            auto result = coerce_type(s, init_type, expected_type,
                                       {.loc = var.loc,
                                        .source_loc = var.type_expr->loc,
                                        .target_loc = var.init->loc});
@@ -919,7 +1036,7 @@ auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
                 s.er.report_debug(var.loc,
                                   "{} -> {} result={} (requires_a_cast={}, "
                                   "source_requires_fixup={})",
-                                  var.init->type, expected_type, result.type,
+                                  init_type, expected_type, result.type,
                                   result.requires_a_cast ? "yes" : "no",
                                   result.source_requires_fixup ? "yes" : "no");
             }
@@ -1189,7 +1306,8 @@ void sema_stmt_return(State& s, Scope& scope, ast::ReturnStmt& stmt) {
 void sema_stmt_expr(State& s, Scope& scope, ast::ExprStmt& stmt) {
     sema_expr(s, scope, stmt.child, {});
 
-    if (stmt.child && !stmt.child->type.is_void()) {
+    if (stmt.child && !stmt.child->type.is_void() &&
+        !stmt.child->type.is_err()) {
         s.er.report_warn(stmt.child->loc,
                          "discard of expression result of type {}",
                          stmt.child->type);

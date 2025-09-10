@@ -71,10 +71,11 @@ struct File {
             strings_arena.alloc_string_view(name));
     }
 
-    auto expr_call(Location loc, Expr* callee, std::span<Expr* const> args)
-        -> CallExpr* {
+    auto expr_call(Location loc, Location args_loc, Expr* callee,
+                   std::span<Expr* const> args) -> CallExpr* {
         return node_arena.create<CallExpr>(
-            Expr{.kind = ExprKind::Call, .loc = loc}, callee, dupe_exprs(args));
+            Expr{.kind = ExprKind::Call, .loc = loc}, callee, dupe_exprs(args),
+            args_loc);
     }
 
     auto expr_deref(Location loc, Expr* child) -> ArithExpr* {

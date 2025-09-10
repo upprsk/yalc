@@ -900,6 +900,8 @@ public:
     }
 
     auto parse_call(ast::Expr* callee) -> ast::Expr* {
+        auto args_span = prev_span();  // span of opening (
+
         std::vector<ast::Expr*> args;
         while (!check(TokenType::Rparen)) {
             auto arg = parse_expr_without_recover();
@@ -914,9 +916,10 @@ public:
         }
 
         (void)consume(TokenType::Rparen);
+        args_span = args_span.extend(prev_span());
 
-        return ast_file->expr_call(callee->loc.extend(prev_span()), callee,
-                                   args);
+        return ast_file->expr_call(callee->loc.extend(prev_span()),
+                                   to_loc(args_span), callee, args);
     }
 
     // ------------------------------------------------------------------------

@@ -42,6 +42,8 @@ void to_json(nlohmann::json& j, Type const& n) {
             j["params"] = n.as.func->params;
             j["rets"] = n.as.func->rets;
             break;
+
+        case TypeKind::Tuple: j["items"] = n.as.tuple->items; break;
     }
 }
 
@@ -99,6 +101,10 @@ void to_repr(fmt::format_context& ctx, Type const& type) {
                                fmt::join(type.as.func->rets, ", "));
             }
             break;
+        case TypeKind::Tuple:
+            fmt::format_to(ctx.out(), "({})",
+                           fmt::join(type.as.tuple->items, ", "));
+            break;
     }
 
     if (type.sym) fmt::format_to(ctx.out(), ")");
@@ -120,6 +126,7 @@ auto fmt::formatter<yal::ty::TypeKind>::format(yal::ty::TypeKind const& p,
         case yal::ty::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::ty::TypeKind::Slice: name = "Slice"; break;
         case yal::ty::TypeKind::Func: name = "Func"; break;
+        case yal::ty::TypeKind::Tuple: name = "Tuple"; break;
     }
 
     return formatter<string_view>::format(name, ctx);

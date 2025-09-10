@@ -139,6 +139,8 @@ struct FieldExpr : Expr {
 struct CallExpr : Expr {
     Expr*            callee;
     std::span<Expr*> args;  // TODO: we want keyword arguments in the future
+
+    Location args_loc;
 };
 
 struct PtrExpr : Expr {

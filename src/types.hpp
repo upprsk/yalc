@@ -29,6 +29,7 @@ enum struct TypeKind : uint8_t {
     Slice,
 
     Func,
+    Tuple,  // just for function returns!
 };
 
 struct TypeFlags {
@@ -64,10 +65,12 @@ struct TypeInt {
 
 struct TypePtr;
 struct TypeFunc;
+struct TypeTuple;
 union TypeAs {
-    TypeInt   integer;
-    TypePtr*  ptr;
-    TypeFunc* func;
+    TypeInt    integer;
+    TypePtr*   ptr;
+    TypeFunc*  func;
+    TypeTuple* tuple;
 };
 
 struct Type {
@@ -114,6 +117,10 @@ struct Type {
     [[nodiscard]] constexpr auto is_func() const -> bool {
         return kind == TypeKind::Func;
     }
+
+    [[nodiscard]] constexpr auto is_tuple() const -> bool {
+        return kind == TypeKind::Tuple;
+    }
 };
 
 struct TypePtr {
@@ -125,6 +132,10 @@ struct TypeFunc {
     std::span<Type> rets;
 };
 
+struct TypeTuple {
+    std::span<Type> items;
+};
+
 struct TypeStore {
     mem::Arena arena;
 
@@ -134,6 +145,12 @@ struct TypeStore {
         auto func = arena.create<TypeFunc>(arena.alloc<Type>(params),
                                            arena.alloc<Type>(rets));
         return {.kind = TypeKind::Func, .as = {.func = func}, .sym = sym};
+    }
+
+    auto type_tuple(std::span<ty::Type const> items, Symbol* sym = nullptr)
+        -> Type {
+        auto tuple = arena.create<TypeTuple>(arena.alloc<Type>(items));
+        return {.kind = TypeKind::Tuple, .as = {.tuple = tuple}, .sym = sym};
     }
 
     auto type_ptr(ty::Type inner, bool is_const, Symbol* sym = nullptr)
