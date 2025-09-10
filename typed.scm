@@ -27,10 +27,10 @@
         sym: (Symbol "s32" const (Value type s32))))
     (BlockStmt))
   (DefDecl "B"
-    sym: (Symbol "B" const (Value s64 10))
-    (IdExpr type "s64"
-      sym: (Symbol "s64" const (Value type s64)))
-    (IntExpr s64 10))
+    sym: (Symbol "B" const (Value s32 10))
+    (IdExpr type "s32"
+      sym: (Symbol "s32" const (Value type s32)))
+    (IntExpr s32 10))
   (FuncDecl "main"
     sym: (Symbol "main" const (Value func()))
     (BlockStmt
@@ -47,11 +47,11 @@
             sym: (Symbol "a" local (Value s32)))
           #nullptr#))
       (VarStmt "b_ptr"
-        sym: (Symbol "b_ptr" local (Value *const s64))
+        sym: (Symbol "b_ptr" local (Value *const s32))
         #nullptr#
-        (RefExpr *const s64
-          (IdExpr s64 "B"
-            sym: (Symbol "B" const (Value s64 10)))
+        (RefExpr *const s32
+          (IdExpr s32 "B"
+            sym: (Symbol "B" const (Value s32 10)))
           #nullptr#))
       (VarStmt "x"
         sym: (Symbol "x" local (Value s32))
@@ -61,9 +61,15 @@
             sym: (Symbol "a_ptr" local (Value *s32)))
           #nullptr#))
       (VarStmt "y"
-        sym: (Symbol "y" local (Value s64))
+        sym: (Symbol "y" local (Value s32))
         #nullptr#
-        (DerefExpr s64
-          (IdExpr *const s64 "b_ptr"
-            sym: (Symbol "b_ptr" local (Value *const s64)))
-          #nullptr#)))))
+        (DerefExpr s32
+          (IdExpr *const s32 "b_ptr"
+            sym: (Symbol "b_ptr" local (Value *const s32)))
+          #nullptr#))
+      (ExprStmt
+        (AddExpr s32
+          (IdExpr s32 "x"
+            sym: (Symbol "x" local (Value s32)))
+          (IdExpr s32 "y"
+            sym: (Symbol "y" local (Value s32))))))))

@@ -1082,6 +1082,16 @@ void sema_stmt_return(State& s, Scope& scope, ast::ReturnStmt& stmt) {
     }
 }
 
+void sema_stmt_expr(State& s, Scope& scope, ast::ExprStmt& stmt) {
+    sema_expr(s, scope, stmt.child, {});
+
+    if (stmt.child && !stmt.child->type.is_void()) {
+        s.er.report_warn(stmt.child->loc,
+                         "discard of expression result of type {}",
+                         stmt.child->type);
+    }
+}
+
 void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
     auto expected_type = sema_some_var(s, scope,
                                        {.type_expr = stmt.type_expr,
@@ -1112,7 +1122,9 @@ void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
             sema_stmt_return(s, scope, stmt->as_return());
             break;
 
-        case ast::StmtKind::Expr: PANIC("SEMA: not implemented", *stmt);
+        case ast::StmtKind::Expr:
+            sema_stmt_expr(s, scope, stmt->as_expr());
+            break;
 
         case ast::StmtKind::Var: sema_stmt_var(s, scope, stmt->as_var()); break;
 
