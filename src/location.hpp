@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 #include <string_view>
@@ -25,6 +26,9 @@ struct Span {
     }
 
     [[nodiscard]] constexpr auto extend(Span o) const -> Span {
+        // in case we try to extend, but the given thing is before our end,
+        // ignore it and use our end
+        o.end = std::max(o.end, end);
         return {.begin = begin, .end = o.end};
     }
 
