@@ -4,10 +4,11 @@ func add_ptrs(a: *const s32, b: *const s32) s32 {}
 
 func add_all(s: []const s32) s32 {}
 
-def B: s32 = 10;
+def A      = 10;
+def B: s64 = 10;
 
 func main() {
-    var a: s32 = 10;
+    var a: s32 = A;
     var a_ptr = a&;
 
     var b_ptr = B&;
@@ -15,7 +16,11 @@ func main() {
     var x = a_ptr.*;
     var y = b_ptr.*;
 
-    var _ = x + y;
+    a_ptr = x&;
+    b_ptr = y&;
+
+    a_ptr.* = A + 10;
+    // b_ptr.* = cast(_)x;
 }
 
 // vim: ft=yal

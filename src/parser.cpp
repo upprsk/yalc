@@ -1016,7 +1016,7 @@ public:
                                              : std::vector<ast::Expr*>{};
 
         if (!consume(TokenType::Semi)) {
-            recover_parse_top_def_or_var();
+            recover_parse_def_or_var();
 
             // in case we recovered with a colon, then try types again
             if (check(TokenType::Colon)) goto types_label;
@@ -1175,8 +1175,8 @@ public:
 
     void recover_parse_def_or_var() {
         skip_while_not(TokenType::Eof, TokenType::Colon, TokenType::Equal,
-                       TokenType::Semi, TokenType::Attribute, "var", "def",
-                       "func", "return");
+                       TokenType::Semi, TokenType::Rbrace, TokenType::Rparen,
+                       TokenType::Attribute, "var", "def", "func", "return");
     }
 
     void recover_parse_func_param() {

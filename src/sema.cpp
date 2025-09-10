@@ -106,6 +106,20 @@ struct UnifyOpts {
     ty::Type expected_type;
 };
 
+auto types_equal(ty::Type lhs, ty::Type rhs) -> bool {
+    if (lhs.kind != rhs.kind) return false;
+    if (lhs.is_int())
+        return lhs.as.integer.byte_size == rhs.as.integer.byte_size &&
+               lhs.as.integer.is_signed == rhs.as.integer.is_signed;
+    if (lhs.is_ptr() || lhs.is_multi_ptr() || lhs.is_slice())
+        return lhs.flags.is_const() == rhs.flags.is_const() &&
+               types_equal(lhs.as.ptr->inner, rhs.as.ptr->inner);
+
+    // FIXME: add other types
+
+    return false;
+}
+
 auto coerce_type(State& s, ty::Type source, ty::Type target,
                  CoercionOpts const& opts) -> CoercionResult {
     // comptime_int -> int OK
@@ -146,6 +160,9 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
         return {.type = target, .requires_a_cast = true};
     }
 
+    // both are comptime_int
+    if (target.is_comptime_int()) return {.type = target};
+
     // both are integers
     if (target.is_int()) {
         auto const& source_int = source.as.integer;
@@ -176,6 +193,38 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
         }
 
         // should both actually be the same, nice!
+        return {.type = target};
+    }
+
+    if (target.is_ptr()) {
+        auto const& source_ptr = source.as.ptr;
+        auto const& target_ptr = target.as.ptr;
+
+        if (!types_equal(source_ptr->inner, target_ptr->inner)) {
+            s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
+                              target);
+            s.er.report_note(opts.source_loc, "this has type {}", source);
+            s.er.report_note(opts.target_loc, "but expected type {} from here",
+                             target);
+
+            return {.type = target};
+        }
+
+        // var -> var: OK
+        // var -> const: OK
+        // const -> var: bad
+        // const -> const: OK
+
+        if (source.flags.is_const() && !target.flags.is_const()) {
+            s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
+                              target);
+            s.er.report_note(opts.source_loc, "this has type {}", source);
+            s.er.report_note(opts.target_loc, "but expected type {} from here",
+                             target);
+
+            return {.type = target};
+        }
+
         return {.type = target};
     }
 
@@ -222,6 +271,9 @@ auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
                     opts.expected_type.is_valid() ? opts.expected_type : lhs};
     }
 
+    // both are comptime_int
+    if (lhs.is_comptime_int()) return {.type = lhs};
+
     // both are integers
     if (lhs.is_int()) {
         auto const& source_int = lhs.as.integer;
@@ -252,6 +304,36 @@ auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
         }
 
         // should both actually be the same, nice!
+        return {.type = lhs};
+    }
+
+    if (lhs.is_ptr()) {
+        auto const& source_ptr = rhs.as.ptr;
+        auto const& target_ptr = lhs.as.ptr;
+
+        if (!types_equal(source_ptr->inner, target_ptr->inner)) {
+            s.er.report_error(opts.loc, "incompatible types: {} and {}", rhs,
+                              lhs);
+            s.er.report_note(opts.lhs_loc, "this has type {}", rhs);
+            s.er.report_note(opts.rhs_loc, "this has type {}", lhs);
+
+            return {.type = lhs};
+        }
+
+        // var -> var: OK
+        // var -> const: OK
+        // const -> var: bad
+        // const -> const: OK
+
+        if (rhs.flags.is_const() && !lhs.flags.is_const()) {
+            s.er.report_error(opts.loc, "incompatible types: {} and {}", rhs,
+                              lhs);
+            s.er.report_note(opts.lhs_loc, "this has type {}", rhs);
+            s.er.report_note(opts.rhs_loc, "this has type {}", lhs);
+
+            return {.type = lhs};
+        }
+
         return {.type = lhs};
     }
 
@@ -479,12 +561,12 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr, ty::Type expected_type);
 
 // ----------------------------------------------------------------------------
 
-struct RvalueInfo {
-    bool is_rvalue = false;
+struct LvalueInfo {
+    bool is_lvalue = false;
     bool is_const = false;
 };
 
-auto calc_rvalue_info(ast::Expr* expr) -> RvalueInfo {
+auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
     if (!expr)
         // not rvalue
         return {};
@@ -510,7 +592,15 @@ auto calc_rvalue_info(ast::Expr* expr) -> RvalueInfo {
             // not an rvalue
             return {};
 
-        case ast::ExprKind::Deref:
+        case ast::ExprKind::Deref: {
+            auto& deref = expr->as_arith();
+            auto  info = calc_rvalue_info(deref.lhs);
+
+            auto is_const =
+                deref.lhs ? deref.lhs->type.flags.is_const() : false;
+            return {.is_lvalue = info.is_lvalue, .is_const = is_const};
+        }
+
         case ast::ExprKind::Ref:
             // not an rvalue
             return {};
@@ -531,7 +621,7 @@ auto calc_rvalue_info(ast::Expr* expr) -> RvalueInfo {
 
             // this is an rvalue, and may or may not be a constant depending on
             // the symbol
-            return {.is_rvalue = true, .is_const = id.sym->is_const};
+            return {.is_lvalue = true, .is_const = id.sym->is_const};
         }
 
         case ast::ExprKind::Kw:
@@ -666,7 +756,7 @@ void sema_expr_ref(State& s, Scope& scope, ast::ArithExpr& expr,
 
     // NOTE: there might be some bugs sneaking in here
     auto info = calc_rvalue_info(expr.lhs);
-    if (!info.is_rvalue) {
+    if (!info.is_lvalue) {
         s.er.report_error(expr.loc, "can not take address of lvalue");
     }
 
@@ -1119,6 +1209,48 @@ void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
     }
 }
 
+void sema_stmt_assign(State& s, Scope& scope, ast::AssignStmt& stmt) {
+    sema_expr(s, scope, stmt.lhs, {});
+
+    auto info = calc_rvalue_info(stmt.lhs);
+    if (!info.is_lvalue) {
+        auto loc = stmt.lhs ? stmt.lhs->loc : stmt.loc;
+        s.er.report_error(loc, "can not assign to rvalue");
+    }
+
+    if (info.is_const) {
+        auto loc = stmt.lhs ? stmt.lhs->loc : stmt.loc;
+        s.er.report_error(loc, "can not assign to constant");
+    }
+
+    auto expected_type = ty::Type{};
+    if (stmt.lhs) expected_type = stmt.lhs->type;
+
+    sema_expr(s, scope, stmt.rhs, expected_type);
+
+    if (stmt.lhs && stmt.rhs) {
+        auto result = coerce_type(s, stmt.rhs->type, stmt.lhs->type,
+                                  {.loc = stmt.loc,
+                                   .source_loc = stmt.rhs->loc,
+                                   .target_loc = stmt.lhs->loc});
+        if (result.source_requires_fixup) {
+            fixup_comptime_integers_in_expr(s, stmt.rhs, result.type);
+        }
+
+        // FIXME: handle when an implicit conversion happens, as that requires
+        // an additonal AST node.
+
+        if (s.opts.verbose_coercions) {
+            s.er.report_debug(stmt.loc,
+                              "{} -> {} result={} (requires_a_cast={}, "
+                              "source_requires_fixup={})",
+                              stmt.lhs->type, stmt.rhs->type, result.type,
+                              result.requires_a_cast ? "yes" : "no",
+                              result.source_requires_fixup ? "yes" : "no");
+        }
+    }
+}
+
 void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
     if (!stmt) return;
 
@@ -1146,8 +1278,12 @@ void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
 
         case ast::StmtKind::Def:
         case ast::StmtKind::MultiVar:
-        case ast::StmtKind::MultiDef:
+        case ast::StmtKind::MultiDef: PANIC("SEMA: not implemented", *stmt);
+
         case ast::StmtKind::Assign:
+            sema_stmt_assign(s, scope, stmt->as_assign());
+            break;
+
         case ast::StmtKind::MultiAssign: PANIC("SEMA: not implemented", *stmt);
     }
 }
