@@ -16,7 +16,7 @@ enum class ErrorReporterFormat { Pretty, Json };
 
 class LocalErrorReporter {
     static constexpr auto const error_style = fmt::fg(fmt::color::red);
-    static constexpr auto const warn_style = fmt::fg(fmt::color::yellow);
+    static constexpr auto const warn_style = fmt::fg(fmt::color::magenta);
     static constexpr auto const note_style = fmt::fg(fmt::color::cyan);
     static constexpr auto const debug_style =
         fmt::fg(fmt::color::medium_purple);
