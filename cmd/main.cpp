@@ -160,7 +160,8 @@ auto main_single_file(yalc::Args const& args, yal::FileStore& fs,
         fmt::println("{}", j.dump(2));
     }
 
-    yal::sema::perform_sema(er, flat_module);
+    yal::sema::perform_sema(
+        er, flat_module, {.verbose_coercions = args.verbose.has_coercions()});
 
     return 0;
 }
@@ -210,7 +211,8 @@ auto main_default(yalc::Args const& args, yal::FileStore& fs,
         fmt::println("{}", j.dump(2));
     }
 
-    yal::sema::perform_sema(er, flat_module);
+    yal::sema::perform_sema(
+        er, flat_module, {.verbose_coercions = args.verbose.has_coercions()});
 
     return 0;
 }

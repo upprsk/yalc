@@ -41,6 +41,7 @@ void print_help(std::string_view self) {
     println(stderr, "            parser: make the parser verbose.");
     println(stderr, "            deps: make the dependency resolution verbose.");
     println(stderr, "            sort: make top-level AST sorting verbose.");
+    println(stderr, "            coercions: make type coercions during semantic analisys verbose.");
     println(stderr, "    --file: single file compilation mode.");
     println(stderr, "    --dump <step>: dump the result of an internal compilation step. This option");
     println(stderr, "        accepts a list of steps separated by a comma: step1,step2. The option");
@@ -103,7 +104,9 @@ auto argparse(int argc, char** argv) -> Args {
                 } else if (part == "deps") {
                     args.verbose = args.verbose.with_deps();
                 } else if (part == "sort") {
-                    args.verbose = args.verbose.with_sort();
+                    args.verbose = args.verbose.with_deps();
+                } else if (part == "coercions") {
+                    args.verbose = args.verbose.with_coercions();
                 } else {
                     println(stderr, "error: unknown verbose step: {:?}", part);
                 }
@@ -209,6 +212,7 @@ auto format_as(VerboseStep::Step step) -> std::string_view {
         case VerboseStep::Parser: name = "parser"; break;
         case VerboseStep::Sort: name = "sort"; break;
         case VerboseStep::Deps: name = "deps"; break;
+        case VerboseStep::Coercions: name = "coercions"; break;
     }
 
     return name;

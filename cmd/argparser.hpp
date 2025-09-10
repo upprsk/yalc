@@ -57,6 +57,7 @@ struct VerboseStep {
         Parser = 1 << 2,
         Deps = 1 << 3,
         Sort = 1 << 4,
+        Coercions = 1 << 5,
     };
 
 #define define_with(_name, _enum_case)                                 \
@@ -76,6 +77,7 @@ struct VerboseStep {
     define_parts(parser, Parser);
     define_parts(deps, Deps);
     define_parts(sort, Sort);
+    define_parts(coercions, Coercions);
 
 #undef define_with
 #undef define_has
