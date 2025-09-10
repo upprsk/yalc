@@ -800,6 +800,14 @@ public:
             return parse_call(left);
         }
 
+        if (tok.type == TokenType::Ampersand) {
+            return ast_file->expr_ref(left->loc.extend(tok.span), left);
+        }
+
+        if (tok.type == TokenType::DotStar) {
+            return ast_file->expr_deref(left->loc.extend(tok.span), left);
+        }
+
         auto right = parse_expr_with_precedence(get_precedence(tok));
 
         ast::ExprKind kind;
@@ -830,6 +838,9 @@ public:
 
             case TokenType::Lparen:
             case TokenType::Dot: return PREC_CALL;
+
+            case TokenType::Ampersand:
+            case TokenType::DotStar: return PREC_CALL;
 
             default: return PREC_NONE;
         }

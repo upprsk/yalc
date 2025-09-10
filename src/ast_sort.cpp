@@ -101,7 +101,9 @@ void scan_expr_for_global_refs(State& s, LocalScope& scope, ast::Expr* expr) {
         case ExprKind::Mul:
         case ExprKind::Div:
         case ExprKind::Mod:
-        case ExprKind::Cast: {
+        case ExprKind::Cast:
+        case ExprKind::Deref:
+        case ExprKind::Ref: {
             auto& arith = expr->as_arith();
             scan_expr_for_global_refs(s, scope, arith.lhs);
             scan_expr_for_global_refs(s, scope, arith.rhs);

@@ -32,6 +32,9 @@ struct Symbol {
     std::string_view name;
     Location         name_loc;
     Value            value;
+
+    bool is_const;
+    bool is_local;
 };
 
 class SymbolStore {
@@ -43,8 +46,8 @@ class SymbolStore {
 public:
     SymbolStore() = default;
 
-    auto new_sym(std::string_view name, Location name_loc, Value value)
-        -> Symbol*;
+    auto new_sym(std::string_view name, Location name_loc, Value value,
+                 bool is_local, bool is_const) -> Symbol*;
 
     // ========================================================================
 

@@ -116,7 +116,9 @@ void to_json(nlohmann::json& j, Expr const& n) {
         case ExprKind::Sub:
         case ExprKind::Mul:
         case ExprKind::Div:
-        case ExprKind::Mod: {
+        case ExprKind::Mod:
+        case ExprKind::Deref:
+        case ExprKind::Ref: {
             auto& arith = n.as_arith();
             j["lhs"] = arith.lhs ? *arith.lhs : json{};
             j["rhs"] = arith.rhs ? *arith.rhs : json{};
@@ -377,7 +379,9 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
         case ExprKind::Sub:
         case ExprKind::Mul:
         case ExprKind::Div:
-        case ExprKind::Mod: {
+        case ExprKind::Mod:
+        case ExprKind::Deref:
+        case ExprKind::Ref: {
             auto& arith = expr.as_arith();
 
             indent_by_wln(ctx, depth + 1);
@@ -731,6 +735,8 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::Cast: name = "Cast"; break;
         case yal::ast::ExprKind::Field: name = "Field"; break;
         case yal::ast::ExprKind::Call: name = "Call"; break;
+        case yal::ast::ExprKind::Deref: name = "Deref"; break;
+        case yal::ast::ExprKind::Ref: name = "Ref"; break;
         case yal::ast::ExprKind::Ptr: name = "Ptr"; break;
         case yal::ast::ExprKind::MultiPtr: name = "MultiPtr"; break;
         case yal::ast::ExprKind::Slice: name = "Slice"; break;

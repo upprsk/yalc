@@ -46,6 +46,15 @@ struct TypeFlags {
     friend constexpr auto operator|(TypeFlags lhs, TypeFlags rhs) -> TypeFlags {
         return {static_cast<Flag>(lhs.value | rhs.value)};
     }
+
+    friend constexpr auto operator|(TypeFlags lhs, Flag rhs) -> TypeFlags {
+        return {static_cast<Flag>(lhs.value | rhs)};
+    }
+
+    friend constexpr auto operator|=(TypeFlags& lhs, Flag rhs) -> TypeFlags {
+        lhs = lhs | rhs;
+        return lhs;
+    }
 };
 
 struct TypeInt {
@@ -90,6 +99,18 @@ struct Type {
         return kind == TypeKind::ComptimeInt;
     }
 
+    [[nodiscard]] constexpr auto is_ptr() const -> bool {
+        return kind == TypeKind::Ptr;
+    }
+
+    [[nodiscard]] constexpr auto is_multi_ptr() const -> bool {
+        return kind == TypeKind::MultiPtr;
+    }
+
+    [[nodiscard]] constexpr auto is_slice() const -> bool {
+        return kind == TypeKind::Slice;
+    }
+
     [[nodiscard]] constexpr auto is_func() const -> bool {
         return kind == TypeKind::Func;
     }
@@ -114,6 +135,30 @@ struct TypeStore {
                                            arena.alloc<Type>(rets));
         return {.kind = TypeKind::Func, .as = {.func = func}, .sym = sym};
     }
+
+    auto type_ptr(ty::Type inner, bool is_const, Symbol* sym = nullptr)
+        -> Type {
+        return type_ptr_like(TypeKind::Ptr, inner, is_const, sym);
+    }
+
+    auto type_multi_ptr(ty::Type inner, bool is_const, Symbol* sym = nullptr)
+        -> Type {
+        return type_ptr_like(TypeKind::MultiPtr, inner, is_const, sym);
+    }
+
+    auto type_slice(ty::Type inner, bool is_const, Symbol* sym = nullptr)
+        -> Type {
+        return type_ptr_like(TypeKind::Slice, inner, is_const, sym);
+    }
+
+    auto type_ptr_like(TypeKind kind, ty::Type inner, bool is_const,
+                       Symbol* sym = nullptr) -> Type {
+        auto ptr = arena.create<TypePtr>(inner);
+        auto flags = TypeFlags{};
+        if (is_const) flags |= TypeFlags::Const;
+
+        return {.kind = kind, .flags = flags, .as = {.ptr = ptr}, .sym = sym};
+    }
 };
 
 constexpr auto make_void(Symbol* sym = nullptr) -> Type {
@@ -133,6 +178,14 @@ constexpr auto make_int(uint8_t byte_size, bool is_signed,
 
 constexpr auto make_comptime_int(Symbol* sym = nullptr) -> Type {
     return {.kind = TypeKind::ComptimeInt, .as = {}, .sym = sym};
+}
+
+constexpr auto make_ptr(ty::TypePtr* ptr, bool is_const, Symbol* sym = nullptr)
+    -> Type {
+    return {.kind = TypeKind::Ptr,
+            .flags = {.value = is_const ? TypeFlags::Const : TypeFlags::None},
+            .as = {.ptr = ptr},
+            .sym = sym};
 }
 
 void to_json(nlohmann::json& j, TypeKind const& n);

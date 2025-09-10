@@ -29,6 +29,9 @@ enum struct ExprKind : uint8_t {
     Field,
     Call,
 
+    Deref,
+    Ref,
+
     Ptr,
     MultiPtr,
     Slice,

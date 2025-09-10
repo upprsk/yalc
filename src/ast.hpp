@@ -77,6 +77,14 @@ struct File {
             Expr{.kind = ExprKind::Call, .loc = loc}, callee, dupe_exprs(args));
     }
 
+    auto expr_deref(Location loc, Expr* child) -> ArithExpr* {
+        return expr_arith(loc, ExprKind::Deref, child, nullptr);
+    }
+
+    auto expr_ref(Location loc, Expr* child) -> ArithExpr* {
+        return expr_arith(loc, ExprKind::Ref, child, nullptr);
+    }
+
     auto expr_ptr(Location loc, Expr* inner, bool is_const) -> PtrExpr* {
         return node_arena.create<PtrExpr>(
             Expr{.kind = ExprKind::Ptr, .loc = loc}, inner, is_const);

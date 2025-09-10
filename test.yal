@@ -1,23 +1,19 @@
 module main;
 
-var global_var: s32;
-var global_var_2 = 0;
+func add_ptrs(a: *const s32, b: *const s32) s32 {}
 
-def ZERO = 0;
+func add_all(s: []const s32) s32 {}
 
-func f_a() {}
-func f_b() s32 {}
-func f_c() (s32, u32) {
-    var first: s32; // = 0;
-    var second: u32 = ZERO + 10;
+def B: s64 = 10;
 
-    return first + ZERO,
-           second;
-}
+func main() {
+    var a: s32 = 10;
+    var a_ptr = a&;
 
-func f(x: u32, y: s32) (u32, thing_2: s32) {
-    var xy: u32 = x + cast(_)y;
-    return xy, global_var + cast(_)global_var_2;
+    var b_ptr = B&;
+
+    var x = a_ptr.*;
+    var y = b_ptr.*;
 }
 
 // vim: ft=yal

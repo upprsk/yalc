@@ -28,9 +28,10 @@ struct Scope {
         return sym;
     }
 
-    constexpr auto define(std::string_view name, Location name_loc, Value value)
-        -> Symbol* {
-        auto sym = symbol_store->new_sym(name, name_loc, value);
+    constexpr auto define(std::string_view name, Location name_loc, Value value,
+                          bool is_local, bool is_const) -> Symbol* {
+        auto sym =
+            symbol_store->new_sym(name, name_loc, value, is_local, is_const);
         symbols.push_back(sym);
         return sym;
     }
@@ -322,7 +323,19 @@ auto operator_to_sym(ast::ExprKind op) -> std::string_view {
     return name;
 }
 
+auto remove_ptr(ty::Type ty) -> ty::Type {
+    if (ty.is_ptr()) return ty.as.ptr->inner;
+
+    // this is not technically correct, but should give better error messages
+    if (ty.is_multi_ptr()) return ty.as.ptr->inner;
+    if (ty.is_slice()) return ty.as.ptr->inner;
+
+    return {};  // error type
+}
+
 // ============================================================================
+
+auto eval_expr_to_type(State& s, Scope& scope, ast::Expr* expr) -> ty::Type;
 
 auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
     if (!expr) {
@@ -340,16 +353,38 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
         case ast::ExprKind::Sub:
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
-        case ast::ExprKind::Mod: break;
+        case ast::ExprKind::Mod:
+        case ast::ExprKind::Deref:
+        case ast::ExprKind::Ref: break;
 
         case ast::ExprKind::Cast: break;
 
         case ast::ExprKind::Field:
         case ast::ExprKind::Call: break;
 
-        case ast::ExprKind::Ptr:
-        case ast::ExprKind::MultiPtr:
-        case ast::ExprKind::Slice: break;
+        case ast::ExprKind::Ptr: {
+            auto& ptr = expr->as_ptr();
+
+            auto inner = eval_expr_to_type(s, scope, ptr.inner);
+            auto type = s.ts.type_ptr(inner, ptr.is_const);
+            return {.type = ty::make_type(), .as = {.type = type}};
+        } break;
+
+        case ast::ExprKind::MultiPtr: {
+            auto& ptr = expr->as_ptr();
+
+            auto inner = eval_expr_to_type(s, scope, ptr.inner);
+            auto type = s.ts.type_multi_ptr(inner, ptr.is_const);
+            return {.type = ty::make_type(), .as = {.type = type}};
+        } break;
+
+        case ast::ExprKind::Slice: {
+            auto& ptr = expr->as_ptr();
+
+            auto inner = eval_expr_to_type(s, scope, ptr.inner);
+            auto type = s.ts.type_slice(inner, ptr.is_const);
+            return {.type = ty::make_type(), .as = {.type = type}};
+        } break;
 
         case ast::ExprKind::Array: break;
 
@@ -415,6 +450,9 @@ void fixup_comptime_integers_in_expr(State& s, ast::Expr* expr,
                                             target_type);
             break;
 
+        case ast::ExprKind::Deref:
+        case ast::ExprKind::Ref: break;
+
         case ast::ExprKind::Cast:
         case ast::ExprKind::Field:
         case ast::ExprKind::Call:
@@ -438,6 +476,82 @@ void fixup_comptime_integers_in_expr(State& s, ast::Expr* expr,
 // ============================================================================
 
 void sema_expr(State& s, Scope& scope, ast::Expr* expr, ty::Type expected_type);
+
+// ----------------------------------------------------------------------------
+
+struct RvalueInfo {
+    bool is_rvalue = false;
+    bool is_const = false;
+};
+
+auto calc_rvalue_info(ast::Expr* expr) -> RvalueInfo {
+    if (!expr)
+        // not rvalue
+        return {};
+
+    switch (expr->kind) {
+        case ast::ExprKind::Err:
+        case ast::ExprKind::Neg:
+        case ast::ExprKind::Add:
+        case ast::ExprKind::Sub:
+        case ast::ExprKind::Mul:
+        case ast::ExprKind::Div:
+        case ast::ExprKind::Mod:
+        case ast::ExprKind::Cast:
+            // not rvalue
+            return {};
+
+        case ast::ExprKind::Field:
+            // is an rvalue depending on obj
+            // FIXME: check when this is ok, for now it is not an rvalue
+            return {};
+
+        case ast::ExprKind::Call:
+            // not an rvalue
+            return {};
+
+        case ast::ExprKind::Deref:
+        case ast::ExprKind::Ref:
+            // not an rvalue
+            return {};
+
+        case ast::ExprKind::Ptr:
+        case ast::ExprKind::MultiPtr:
+        case ast::ExprKind::Slice:
+            // not an rvalue
+            return {};
+
+        case ast::ExprKind::Array:
+            // FIXME: this would be an rvalue
+            return {};
+
+        case ast::ExprKind::Id: {
+            auto& id = expr->as_id();
+            ASSERT(id.sym != nullptr);
+
+            // this is an rvalue, and may or may not be a constant depending on
+            // the symbol
+            return {.is_rvalue = true, .is_const = id.sym->is_const};
+        }
+
+        case ast::ExprKind::Kw:
+            // not an rvalue
+            return {};
+
+        case ast::ExprKind::Int:
+            // not an rvalue
+            return {};
+
+        case ast::ExprKind::String:
+            // NOTE: is this an rvalue? can we do something here? For now it is
+            // not an rvalue
+            return {};
+    }
+
+    UNREACHABLE(expr);
+}
+
+// ----------------------------------------------------------------------------
 
 void sema_expr_arith(State& s, Scope& scope, ast::ArithExpr& expr,
                      ty::Type expected_type) {
@@ -528,6 +642,47 @@ void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
     expr.type = type;
 }
 
+void sema_expr_deref(State& s, Scope& scope, ast::ArithExpr& expr,
+                     ty::Type expected_type) {
+    // FIXME: we need a way to make the expected_type for the child to work,
+    // i.e. make it into a pointer?
+    expected_type = {};
+    sema_expr(s, scope, expr.lhs, expected_type);
+    if (expr.lhs) {
+        if (expr.lhs->type.is_ptr()) {
+            expr.type = expr.lhs->type.as.ptr->inner;
+        } else {
+            s.er.report_error(
+                expr.lhs->loc,
+                "can not dereference value of non-pointer type {}",
+                expr.lhs->type);
+        }
+    }
+}
+
+void sema_expr_ref(State& s, Scope& scope, ast::ArithExpr& expr,
+                   ty::Type expected_type) {
+    sema_expr(s, scope, expr.lhs, remove_ptr(expected_type));
+
+    // NOTE: there might be some bugs sneaking in here
+    auto info = calc_rvalue_info(expr.lhs);
+    if (!info.is_rvalue) {
+        s.er.report_error(expr.loc, "can not take address of lvalue");
+    }
+
+    if (expr.lhs) {
+        if (expr.lhs->type.is_comptime_int()) {
+            // can not take address of comptime_int!
+            s.er.report_error(expr.lhs->loc,
+                              "can not take address of comptime_int");
+            // :)
+            expr.lhs->type = get_default_int();
+        }
+
+        expr.type = s.ts.type_ptr(expr.lhs->type, info.is_const);
+    }
+}
+
 void sema_expr(State& s, Scope& scope, ast::Expr* expr,
                ty::Type expected_type) {
     if (!expr) return;
@@ -552,9 +707,27 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
         case ast::ExprKind::Field:
         case ast::ExprKind::Call: PANIC("SEMA EXPR: not implemented", *expr);
 
+        case ast::ExprKind::Deref:
+            sema_expr_deref(s, scope, expr->as_arith(), expected_type);
+            break;
+        case ast::ExprKind::Ref:
+            sema_expr_ref(s, scope, expr->as_arith(), expected_type);
+            break;
+
         case ast::ExprKind::Ptr:
         case ast::ExprKind::MultiPtr:
-        case ast::ExprKind::Slice: PANIC("SEMA EXPR: not implemented", *expr);
+        case ast::ExprKind::Slice: {
+            auto& ptr = expr->as_ptr();
+
+            sema_expr(s, scope, ptr.inner, ty::make_type());
+            if (ptr.inner && !ptr.inner->type.is_type()) {
+                s.er.report_error(ptr.inner->loc,
+                                  "can not use value of type {} as type",
+                                  ptr.inner->type);
+            }
+
+            ptr.type = ty::make_type();
+        } break;
 
         case ast::ExprKind::Array: PANIC("SEMA EXPR: not implemented", *expr);
 
@@ -674,7 +847,8 @@ void sema_func_params(State& s, Scope& scope, ast::FuncDecl& decl) {
             p.type = eval_expr_to_type(s, param_scope, p.type_expr);
         }
 
-        p.sym = scope.define(p.name, p.loc, {.type = p.type, .as = {}});
+        p.sym =
+            scope.define(p.name, p.loc, {.type = p.type, .as = {}}, true, true);
     }
 }
 
@@ -740,7 +914,7 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     ASSERT(decl.attached_type == "", decl.name,
            "attached types have not been implemented yet");
 
-    decl.sym = parent_scope.define(decl.name, decl.name_loc, {});
+    decl.sym = parent_scope.define(decl.name, decl.name_loc, {}, false, true);
 
     auto scope = parent_scope.make_child(decl.name_loc);
     scope.current_decl = &decl;
@@ -771,13 +945,14 @@ void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
                                         .loc = decl.loc,
                                         .should_fixup = true});
 
-    decl.sym = parent_scope.define(decl.name, decl.name_loc,
-                                   {.type = expected_type, .as = {}});
+    decl.sym =
+        parent_scope.define(decl.name, decl.name_loc,
+                            {.type = expected_type, .as = {}}, false, false);
 }
 
 void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     // alread define the thing, as it may be needed recursivelly
-    decl.sym = parent_scope.define(decl.name, decl.name_loc, {});
+    decl.sym = parent_scope.define(decl.name, decl.name_loc, {}, false, true);
 
     auto scope = parent_scope.make_child(decl.name_loc);
     scope.current_decl = &decl;
@@ -914,7 +1089,8 @@ void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
                                         .loc = stmt.loc,
                                         .should_fixup = true});
 
-    scope.define(stmt.name, stmt.name_loc, {.type = expected_type, .as = {}});
+    stmt.sym = scope.define(stmt.name, stmt.name_loc,
+                            {.type = expected_type, .as = {}}, true, false);
 }
 
 void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
@@ -996,7 +1172,6 @@ void sema_decl(State& s, Scope& scope, ast::Decl* decl) {
 // ----------------------------------------------------------------------------
 
 void define_builtin_types(ty::TypeStore& /* ts */, Scope& builtin_scope) {
-    auto type_type = ty::make_type();
     auto s8_type = ty::make_int(1, true);
     auto u8_type = ty::make_int(1, false);
     auto s16_type = ty::make_int(2, true);
@@ -1006,22 +1181,18 @@ void define_builtin_types(ty::TypeStore& /* ts */, Scope& builtin_scope) {
     auto s64_type = ty::make_int(8, true);
     auto u64_type = ty::make_int(8, false);
 
-    builtin_scope.define("s8", {},
-                         {.type = type_type, .as = {.type = s8_type}});
-    builtin_scope.define("u8", {},
-                         {.type = type_type, .as = {.type = u8_type}});
-    builtin_scope.define("s16", {},
-                         {.type = type_type, .as = {.type = s16_type}});
-    builtin_scope.define("u16", {},
-                         {.type = type_type, .as = {.type = u16_type}});
-    builtin_scope.define("s32", {},
-                         {.type = type_type, .as = {.type = s32_type}});
-    builtin_scope.define("u32", {},
-                         {.type = type_type, .as = {.type = u32_type}});
-    builtin_scope.define("s64", {},
-                         {.type = type_type, .as = {.type = s64_type}});
-    builtin_scope.define("u64", {},
-                         {.type = type_type, .as = {.type = u64_type}});
+    auto mkty = [](ty::Type t) {
+        return Value{.type = ty::make_type(), .as = {.type = t}};
+    };
+
+    builtin_scope.define("s8", {}, mkty(s8_type), false, true);
+    builtin_scope.define("u8", {}, mkty(u8_type), false, true);
+    builtin_scope.define("s16", {}, mkty(s16_type), false, true);
+    builtin_scope.define("u16", {}, mkty(u16_type), false, true);
+    builtin_scope.define("s32", {}, mkty(s32_type), false, true);
+    builtin_scope.define("u32", {}, mkty(u32_type), false, true);
+    builtin_scope.define("s64", {}, mkty(s64_type), false, true);
+    builtin_scope.define("u64", {}, mkty(u64_type), false, true);
 }
 
 void perform_sema(ErrorReporter& er, ast::FlatModule const& module,

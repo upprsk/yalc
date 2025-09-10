@@ -8,12 +8,14 @@
 namespace yal {
 using nlohmann::json;
 
-auto SymbolStore::new_sym(std::string_view name, Location name_loc, Value value)
-    -> Symbol* {
+auto SymbolStore::new_sym(std::string_view name, Location name_loc, Value value,
+                          bool is_local, bool is_const) -> Symbol* {
     auto d = sym_arena.create<Symbol>(
         Symbol{.name = sym_arena.alloc_string_view(name),
                .name_loc = name_loc,
-               .value = value});
+               .value = value,
+               .is_const = is_const,
+               .is_local = is_local});
     all_syms.push_back(d);
 
     return d;
@@ -70,5 +72,10 @@ auto fmt::formatter<yal::Value>::format(yal::Value const& p,
 auto fmt::formatter<yal::Symbol>::format(yal ::Symbol const& p,
                                          format_context&     ctx) const
     -> format_context ::iterator {
-    return fmt::format_to(ctx.out(), "(Symbol {:?} {})", p.name, p.value);
+    fmt::format_to(ctx.out(), "(Symbol {:?}", p.name);
+
+    if (p.is_local) fmt::format_to(ctx.out(), " local");
+    if (p.is_const) fmt::format_to(ctx.out(), " const");
+
+    return fmt::format_to(ctx.out(), " {})", p.value);
 }
