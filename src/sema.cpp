@@ -359,8 +359,16 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
             return id.sym->value;
         } break;
 
-        case ast::ExprKind::Kw:
-        case ast::ExprKind::Int:
+        case ast::ExprKind::Kw: break;
+
+        case ast::ExprKind::Int: {
+            auto& integer = expr->as_int();
+
+            return {
+                .type = expr->type,
+                .as = {.integer = {.value = integer.value, .has_value = true}}};
+        } break;
+
         case ast::ExprKind::String: break;
     }
 
@@ -384,7 +392,7 @@ auto eval_expr_to_type(State& s, Scope& scope, ast::Expr* expr) -> ty::Type {
 
 // ============================================================================
 
-void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
+void fixup_comptime_integers_in_expr(State& s, ast::Expr* expr,
                                      ty::Type target_type) {
     ASSERT(expr->type.is_comptime_int());
     ASSERT(target_type.is_int());
@@ -393,11 +401,20 @@ void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
         case ast::ExprKind::Err: break;
 
         case ast::ExprKind::Neg:
+            PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
+            break;
+
         case ast::ExprKind::Add:
         case ast::ExprKind::Sub:
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
+            fixup_comptime_integers_in_expr(s, expr->as_arith().lhs,
+                                            target_type);
+            fixup_comptime_integers_in_expr(s, expr->as_arith().rhs,
+                                            target_type);
+            break;
+
         case ast::ExprKind::Cast:
         case ast::ExprKind::Field:
         case ast::ExprKind::Call:
@@ -405,16 +422,16 @@ void fixup_comptime_integers_in_expr(State& /* s */, ast::Expr* expr,
         case ast::ExprKind::MultiPtr:
         case ast::ExprKind::Slice:
         case ast::ExprKind::Array:
-        case ast::ExprKind::Id:
-        case ast::ExprKind::Kw:
             PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
             break;
+
+        case ast::ExprKind::Id: expr->type = target_type; break;
+
+        case ast::ExprKind::Kw: break;
 
         case ast::ExprKind::Int: expr->type = target_type; break;
 
-        case ast::ExprKind::String:
-            PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
-            break;
+        case ast::ExprKind::String: break;
     }
 }
 
@@ -575,6 +592,8 @@ struct VarDesc {
     ast::Expr* type_expr;
     ast::Expr* init;
     Location   loc;
+
+    bool should_fixup;
 };
 
 auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
@@ -607,7 +626,7 @@ auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
 
         // in case the type of the expression is comptime_int, then we need to
         // move it to the default integer type
-        if (expected_type.is_comptime_int()) {
+        if (expected_type.is_comptime_int() && var.should_fixup) {
             expected_type = get_default_int();
             fixup_comptime_integers_in_expr(s, var.init, expected_type);
         }
@@ -740,6 +759,24 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
 }
 
 void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
+    auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_decl = &decl;
+
+    ASSERT(decl.attributes.size() == 0, decl.name,
+           "attributes have not been implemented yet");
+
+    auto expected_type = sema_some_var(s, scope,
+                                       {.type_expr = decl.type_expr,
+                                        .init = decl.init,
+                                        .loc = decl.loc,
+                                        .should_fixup = true});
+
+    decl.sym = parent_scope.define(decl.name, decl.name_loc,
+                                   {.type = expected_type, .as = {}});
+}
+
+void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
+    // alread define the thing, as it may be needed recursivelly
     decl.sym = parent_scope.define(decl.name, decl.name_loc, {});
 
     auto scope = parent_scope.make_child(decl.name_loc);
@@ -748,12 +785,20 @@ void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     ASSERT(decl.attributes.size() == 0, decl.name,
            "attributes have not been implemented yet");
 
-    auto expected_type = sema_some_var(
-        s, scope,
-        {.type_expr = decl.type_expr, .init = decl.init, .loc = decl.loc});
+    auto expected_type = sema_some_var(s, scope,
+                                       {.type_expr = decl.type_expr,
+                                        .init = decl.init,
+                                        .loc = decl.loc,
+                                        .should_fixup = false});
 
-    parent_scope.define(decl.name, decl.name_loc,
-                        {.type = expected_type, .as = {}});
+    if (decl.init == nullptr) {
+        s.er.report_error(decl.loc, "constants must have an initializer");
+    }
+
+    auto value = eval_expr(s, scope, decl.init);
+    // FIXME: handle coercing value to expected_type
+
+    decl.sym->value = value;
 }
 
 // ----------------------------------------------------------------------------
@@ -776,6 +821,9 @@ void sema_decl_header(State& s, Scope& scope, ast::Decl* decl) {
             break;
 
         case ast::DeclKind::Def:
+            sema_def_decl_header(s, scope, decl->as_def());
+            break;
+
         case ast::DeclKind::MultiVar:
         case ast::DeclKind::MultiDef:
             PANIC("SEMA header: var and def not implemented", *decl);
@@ -860,9 +908,11 @@ void sema_stmt_return(State& s, Scope& scope, ast::ReturnStmt& stmt) {
 }
 
 void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
-    auto expected_type = sema_some_var(
-        s, scope,
-        {.type_expr = stmt.type_expr, .init = stmt.init, .loc = stmt.loc});
+    auto expected_type = sema_some_var(s, scope,
+                                       {.type_expr = stmt.type_expr,
+                                        .init = stmt.init,
+                                        .loc = stmt.loc,
+                                        .should_fixup = true});
 
     scope.define(stmt.name, stmt.name_loc, {.type = expected_type, .as = {}});
 }
@@ -934,6 +984,9 @@ void sema_decl(State& s, Scope& scope, ast::Decl* decl) {
             break;
 
         case ast::DeclKind::Def:
+            // everything already done in sema_decl_header
+            break;
+
         case ast::DeclKind::MultiVar:
         case ast::DeclKind::MultiDef:
             PANIC("SEMA: var and def not implemented", *decl);

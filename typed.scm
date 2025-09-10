@@ -1,13 +1,17 @@
 (FlatModule "main"
   (VarDecl "global_var"
-    sym: (Symbol "global_var" (Value #error#))
+    sym: (Symbol "global_var" (Value s32))
     (IdExpr type "s32"
       sym: (Symbol "s32" (Value type s32)))
     #nullptr#)
   (VarDecl "global_var_2"
-    sym: (Symbol "global_var_2" (Value #error#))
+    sym: (Symbol "global_var_2" (Value s64))
     #nullptr#
     (IntExpr s64 0))
+  (DefDecl "ZERO"
+    sym: (Symbol "ZERO" (Value comptime_int 0))
+    #nullptr#
+    (IntExpr comptime_int 0))
   (FuncDecl "f_a"
     sym: (Symbol "f_a" (Value func()))
     (BlockStmt))
@@ -33,10 +37,16 @@
       (VarStmt "second"
         (IdExpr type "u32"
           sym: (Symbol "u32" (Value type u32)))
-        (IntExpr u32 10))
+        (AddExpr u32
+          (IdExpr u32 "ZERO"
+            sym: (Symbol "ZERO" (Value comptime_int 0)))
+          (IntExpr u32 10)))
       (ReturnStmt
-        (IdExpr s32 "first"
-          sym: (Symbol "first" (Value s32)))
+        (AddExpr s32
+          (IdExpr s32 "first"
+            sym: (Symbol "first" (Value s32)))
+          (IdExpr s32 "ZERO"
+            sym: (Symbol "ZERO" (Value comptime_int 0))))
         (IdExpr u32 "second"
           sym: (Symbol "second" (Value u32))))))
   (FuncDecl "f"

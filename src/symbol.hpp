@@ -21,6 +21,10 @@ struct Value {
     union {
         ty::Type       type;
         ast::FuncDecl* func_decl;
+        struct {
+            uint64_t value;
+            bool     has_value;
+        } integer;
     } as;
 };
 

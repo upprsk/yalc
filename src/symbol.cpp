@@ -31,6 +31,13 @@ void to_json(nlohmann::json& j, Value const& v) {
     if (v.type.kind == ty::TypeKind::Type) {
         j["payload"] = v.as.type;
     }
+
+    if ((v.type.kind == ty::TypeKind::Int ||
+         v.type.kind == ty::TypeKind::ComptimeInt) &&
+        v.as.integer.has_value) {
+        // FIXME: handle different sizes and signness of integers correctly
+        j["payload"] = v.as.integer.value;
+    }
 }
 
 void to_json(nlohmann::json& j, Symbol const& d) {
@@ -49,6 +56,12 @@ auto fmt::formatter<yal::Value>::format(yal::Value const& p,
     fmt::format_to(ctx.out(), "(Value {}", p.type);
     if (p.type.kind == yal::ty::TypeKind::Type) {
         fmt::format_to(ctx.out(), " {}", p.as.type);
+    }
+    if ((p.type.kind == yal::ty::TypeKind::Int ||
+         p.type.kind == yal::ty::TypeKind::ComptimeInt) &&
+        p.as.integer.has_value) {
+        // FIXME: handle different sizes and signness of integers correctly
+        fmt::format_to(ctx.out(), " {}", p.as.integer.value);
     }
 
     return fmt::format_to(ctx.out(), ")");
