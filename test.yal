@@ -4,12 +4,7 @@ module main;
 func getchar() s32;
 
 func main() {
-    while true {
-        var c = getchar();
-        if cast(_)c {
-            // something...
-        }
-    }
+    var i = -1;
 }
 
 // vim: ft=yal

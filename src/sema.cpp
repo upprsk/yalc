@@ -593,7 +593,11 @@ void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
         case ast::ExprKind::Err: break;
 
         case ast::ExprKind::Neg:
-            PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
+            fixup_types_in_expr(s, expr->as_arith().lhs, target_type);
+
+            // FIXME: this does not look right, should probably do a full
+            // re-check of the expr
+            expr->type = target_type;
             break;
 
         case ast::ExprKind::Add:
@@ -758,6 +762,10 @@ void sema_expr_arith(State& s, Scope& scope, ast::ArithExpr& expr,
         }
 
         expr.type = result.type;
+    }
+
+    else if (expr.lhs) {
+        expr.type = expr.lhs->type;
     }
 
     // check that the operator is supported by the type
