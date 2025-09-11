@@ -58,7 +58,7 @@ void to_repr(fmt::format_context& ctx, Type const* type) {
 }
 
 void to_repr(fmt::format_context& ctx, Type const& type) {
-    if (type.sym) fmt::format_to(ctx.out(), "{} (or ", type.sym->name);
+    if (type.sym) fmt::format_to(ctx.out(), "{} (distinct of ", type.sym->name);
 
     switch (type.kind) {
         case TypeKind::Err: fmt::format_to(ctx.out(), "#error#"); break;

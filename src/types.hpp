@@ -124,6 +124,14 @@ struct Type {
         return kind == TypeKind::Slice;
     }
 
+    [[nodiscard]] constexpr auto is_some_ptr() const -> bool {
+        return is_ptr() || is_multi_ptr();
+    }
+
+    [[nodiscard]] constexpr auto is_ptr_like() const -> bool {
+        return is_ptr() || is_multi_ptr() || is_slice();
+    }
+
     [[nodiscard]] constexpr auto is_func() const -> bool {
         return kind == TypeKind::Func;
     }

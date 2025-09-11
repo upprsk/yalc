@@ -121,6 +121,71 @@ auto types_equal(ty::Type lhs, ty::Type rhs) -> bool {
     return false;
 }
 
+auto coerce_type_int(State& s, ty::Type source, ty::Type target,
+                     CoercionOpts const& opts) -> CoercionResult {
+    auto const& source_int = source.as.integer;
+    auto const& target_int = target.as.integer;
+
+    if (source_int.byte_size != target_int.byte_size) {
+        s.er.report_error(
+            opts.loc, "can not coerce from {} to {}, integers differ in size",
+            source, target);
+        s.er.report_note(opts.source_loc, "this has type {}", source);
+        s.er.report_note(opts.target_loc, "but expected type {} from here",
+                         target);
+
+        return {.type = target, .requires_a_cast = true};
+    }
+
+    if (source_int.is_signed != target_int.is_signed) {
+        s.er.report_error(
+            opts.loc,
+            "can not coerce from {} to {}, integers differ in signness", source,
+            target);
+        s.er.report_note(opts.source_loc, "this has type {}", source);
+        s.er.report_note(opts.target_loc, "but expected type {} from here",
+                         target);
+
+        return {.type = target, .requires_a_cast = true};
+    }
+
+    // should both actually be the same, nice!
+    return {.type = target};
+}
+
+auto coerce_type_ptr_like_or_slice(State& s, ty::Type source, ty::Type target,
+                                   CoercionOpts const& opts) -> CoercionResult {
+    auto const& source_ptr = source.as.ptr;
+    auto const& target_ptr = target.as.ptr;
+
+    if (!types_equal(source_ptr->inner, target_ptr->inner)) {
+        s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
+                          target);
+        s.er.report_note(opts.source_loc, "this has type {}", source);
+        s.er.report_note(opts.target_loc, "but expected type {} from here",
+                         target);
+
+        return {.type = target};
+    }
+
+    // var -> var: OK
+    // var -> const: OK
+    // const -> var: bad
+    // const -> const: OK
+
+    if (source.flags.is_const() && !target.flags.is_const()) {
+        s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
+                          target);
+        s.er.report_note(opts.source_loc, "this has type {}", source);
+        s.er.report_note(opts.target_loc, "but expected type {} from here",
+                         target);
+
+        return {.type = target};
+    }
+
+    return {.type = target};
+}
+
 auto coerce_type(State& s, ty::Type source, ty::Type target,
                  CoercionOpts const& opts) -> CoercionResult {
     // comptime_int -> int OK
@@ -172,71 +237,75 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
     if (target.is_bool()) return {.type = target};
 
     // both are integers
-    if (target.is_int()) {
-        auto const& source_int = source.as.integer;
-        auto const& target_int = target.as.integer;
+    if (target.is_int()) return coerce_type_int(s, source, target, opts);
 
-        if (source_int.byte_size != target_int.byte_size) {
-            s.er.report_error(
-                opts.loc,
-                "can not coerce from {} to {}, integers differ in size", source,
-                target);
-            s.er.report_note(opts.source_loc, "this has type {}", source);
-            s.er.report_note(opts.target_loc, "but expected type {} from here",
-                             target);
-
-            return {.type = target, .requires_a_cast = true};
-        }
-
-        if (source_int.is_signed != target_int.is_signed) {
-            s.er.report_error(
-                opts.loc,
-                "can not coerce from {} to {}, integers differ in signness",
-                source, target);
-            s.er.report_note(opts.source_loc, "this has type {}", source);
-            s.er.report_note(opts.target_loc, "but expected type {} from here",
-                             target);
-
-            return {.type = target, .requires_a_cast = true};
-        }
-
-        // should both actually be the same, nice!
-        return {.type = target};
-    }
-
-    if (target.is_ptr()) {
-        auto const& source_ptr = source.as.ptr;
-        auto const& target_ptr = target.as.ptr;
-
-        if (!types_equal(source_ptr->inner, target_ptr->inner)) {
-            s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
-                              target);
-            s.er.report_note(opts.source_loc, "this has type {}", source);
-            s.er.report_note(opts.target_loc, "but expected type {} from here",
-                             target);
-
-            return {.type = target};
-        }
-
-        // var -> var: OK
-        // var -> const: OK
-        // const -> var: bad
-        // const -> const: OK
-
-        if (source.flags.is_const() && !target.flags.is_const()) {
-            s.er.report_error(opts.loc, "can not coerce from {} to {}", source,
-                              target);
-            s.er.report_note(opts.source_loc, "this has type {}", source);
-            s.er.report_note(opts.target_loc, "but expected type {} from here",
-                             target);
-
-            return {.type = target};
-        }
-
-        return {.type = target};
-    }
+    if (target.is_ptr_like())
+        return coerce_type_ptr_like_or_slice(s, source, target, opts);
 
     PANIC("coerction: type combination not implemented", source, target);
+}
+
+// ----------------------------------------------------------------------------
+
+auto unify_types_int(State& s, ty::Type lhs, ty::Type rhs,
+                     UnifyOpts const& opts) -> UnifyResult {
+    auto const& source_int = lhs.as.integer;
+    auto const& target_int = rhs.as.integer;
+
+    if (source_int.byte_size != target_int.byte_size) {
+        s.er.report_error(
+            opts.loc, "incompatible types: {} and {}, integers differ in size",
+            lhs, rhs);
+        s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+        s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+
+        return {.type =
+                    opts.expected_type.is_valid() ? opts.expected_type : lhs};
+    }
+
+    if (source_int.is_signed != target_int.is_signed) {
+        s.er.report_error(
+            opts.loc,
+            "incompatible types: {} and {}, integers differ in signness", lhs,
+            rhs);
+        s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
+        s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
+
+        return {.type =
+                    opts.expected_type.is_valid() ? opts.expected_type : lhs};
+    }
+
+    // should both actually be the same, nice!
+    return {.type = lhs};
+}
+
+auto unify_types_ptr(State& s, ty::Type lhs, ty::Type rhs,
+                     UnifyOpts const& opts) -> UnifyResult {
+    auto const& source_ptr = rhs.as.ptr;
+    auto const& target_ptr = lhs.as.ptr;
+
+    if (!types_equal(source_ptr->inner, target_ptr->inner)) {
+        s.er.report_error(opts.loc, "incompatible types: {} and {}", rhs, lhs);
+        s.er.report_note(opts.lhs_loc, "this has type {}", rhs);
+        s.er.report_note(opts.rhs_loc, "this has type {}", lhs);
+
+        return {.type = lhs};
+    }
+
+    // var -> var: OK
+    // var -> const: OK
+    // const -> var: bad
+    // const -> const: OK
+
+    if (rhs.flags.is_const() && !lhs.flags.is_const()) {
+        s.er.report_error(opts.loc, "incompatible types: {} and {}", rhs, lhs);
+        s.er.report_note(opts.lhs_loc, "this has type {}", rhs);
+        s.er.report_note(opts.rhs_loc, "this has type {}", lhs);
+
+        return {.type = lhs};
+    }
+
+    return {.type = lhs};
 }
 
 auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
@@ -294,72 +363,43 @@ auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
     if (lhs.is_bool()) return {.type = lhs};
 
     // both are integers
-    if (lhs.is_int()) {
-        auto const& source_int = lhs.as.integer;
-        auto const& target_int = rhs.as.integer;
+    if (lhs.is_int()) return unify_types_int(s, lhs, rhs, opts);
 
-        if (source_int.byte_size != target_int.byte_size) {
-            s.er.report_error(
-                opts.loc,
-                "incompatible types: {} and {}, integers differ in size", lhs,
-                rhs);
-            s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
-            s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
-
-            return {.type = opts.expected_type.is_valid() ? opts.expected_type
-                                                          : lhs};
-        }
-
-        if (source_int.is_signed != target_int.is_signed) {
-            s.er.report_error(
-                opts.loc,
-                "incompatible types: {} and {}, integers differ in signness",
-                lhs, rhs);
-            s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
-            s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
-
-            return {.type = opts.expected_type.is_valid() ? opts.expected_type
-                                                          : lhs};
-        }
-
-        // should both actually be the same, nice!
-        return {.type = lhs};
-    }
-
-    if (lhs.is_ptr()) {
-        auto const& source_ptr = rhs.as.ptr;
-        auto const& target_ptr = lhs.as.ptr;
-
-        if (!types_equal(source_ptr->inner, target_ptr->inner)) {
-            s.er.report_error(opts.loc, "incompatible types: {} and {}", rhs,
-                              lhs);
-            s.er.report_note(opts.lhs_loc, "this has type {}", rhs);
-            s.er.report_note(opts.rhs_loc, "this has type {}", lhs);
-
-            return {.type = lhs};
-        }
-
-        // var -> var: OK
-        // var -> const: OK
-        // const -> var: bad
-        // const -> const: OK
-
-        if (rhs.flags.is_const() && !lhs.flags.is_const()) {
-            s.er.report_error(opts.loc, "incompatible types: {} and {}", rhs,
-                              lhs);
-            s.er.report_note(opts.lhs_loc, "this has type {}", rhs);
-            s.er.report_note(opts.rhs_loc, "this has type {}", lhs);
-
-            return {.type = lhs};
-        }
-
-        return {.type = lhs};
-    }
+    // both are pointers
+    if (lhs.is_ptr_like()) return unify_types_ptr(s, lhs, rhs, opts);
 
     s.er.report_error(opts.loc, "incompatible types: {} and {}", lhs, rhs);
     s.er.report_note(opts.lhs_loc, "this has type {}", lhs);
     s.er.report_note(opts.rhs_loc, "this has type {}", rhs);
     return {.type = opts.expected_type.is_valid() ? opts.expected_type : lhs};
+}
+
+// ----------------------------------------------------------------------------
+
+auto cast_type_ptr_like(State& s, ty::Type source, ty::Type target,
+                        CoercionOpts const& opts) -> CastResult {
+    // source is const but target is, not allowed
+    if (source.flags.is_const() && !target.flags.is_const()) {
+        s.er.report_error(
+            opts.loc,
+            "can not cast away constness of pointers or slices. From {} to {}",
+            source, target);
+    }
+
+    // NOTE: do we want some variant of the static_cast vs reinterpret_cast
+    // thing? For now our cast is C-style, does everything.
+
+    auto is_redundant_cast =
+        source.sym == target.sym &&
+        source.flags.is_const() == target.flags.is_const() &&
+        types_equal(source.as.ptr->inner, target.as.ptr->inner);
+
+    if (is_redundant_cast) {
+        s.er.report_warn(opts.loc, "redundant cast from {} to {}", source,
+                         target);
+    }
+
+    return {.type = target, .redundant_cast = is_redundant_cast};
 }
 
 auto cast_type(State& s, ty::Type source, ty::Type target,
@@ -389,30 +429,11 @@ auto cast_type(State& s, ty::Type source, ty::Type target,
     }
 
     // both are pointers, may be able to cast
-    if (source.is_ptr() && target.is_ptr()) {
-        // source is const but target is, not allowed
-        if (source.flags.is_const() && !target.flags.is_const()) {
-            s.er.report_error(
-                opts.loc,
-                "can not cast away constness of pointer. From {} to {}", source,
-                target);
-        }
+    if (source.is_some_ptr() && target.is_some_ptr())
+        return cast_type_ptr_like(s, source, target, opts);
 
-        // NOTE: do we want some variant of the static_cast vs reinterpret_cast
-        // thing? For now our cast is C-style, does everything.
-
-        auto is_redundant_cast =
-            source.sym == target.sym &&
-            source.flags.is_const() == target.flags.is_const() &&
-            types_equal(source.as.ptr->inner, target.as.ptr->inner);
-
-        if (is_redundant_cast) {
-            s.er.report_warn(opts.loc, "redundant cast from {} to {}", source,
-                             target);
-        }
-
-        return {.type = target, .redundant_cast = is_redundant_cast};
-    }
+    if (source.is_slice() && target.is_slice())
+        return cast_type_ptr_like(s, source, target, opts);
 
     if (source.is_bool() && target.is_bool()) {
         auto is_redundant_cast = source.sym == target.sym;
@@ -745,7 +766,7 @@ auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
 
             // this is an rvalue, and may or may not be a constant depending on
             // the symbol
-            return {.is_lvalue = true, .is_const = id.sym->is_const};
+            return {.is_lvalue = true, .is_const = id.sym->is_const()};
         }
 
         case ast::ExprKind::Kw:
@@ -1425,7 +1446,29 @@ void sema_attributes(State& s, Scope& /* scope */, Symbol* sym,
         }
 
         if (attribute.name == "extern") {
-            sym->is_extern = true;
+            if (sym) {
+                if (sym->is_extern()) {
+                    s.er.report_error(attribute.loc,
+                                      "duplicate @extern attribute");
+                }
+
+                sym->flags |= SymbolFlags::Extern;
+            }
+
+            if (attribute.args.size() > 0 || attribute.kwargs.size() > 0) {
+                s.er.report_bug(
+                    attribute.loc,
+                    "arguments for @extern have not been implemented yet");
+            }
+        } else if (attribute.name == "distinct") {
+            if (sym) {
+                if (sym->is_distinct()) {
+                    s.er.report_error(attribute.loc,
+                                      "duplicate @distinct attribute");
+                }
+
+                sym->flags |= SymbolFlags::Distinct;
+            }
 
             if (attribute.args.size() > 0 || attribute.kwargs.size() > 0) {
                 s.er.report_bug(
@@ -1525,6 +1568,10 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     scope.current_decl = &decl;
 
     sema_attributes(s, scope, decl.sym, decl.attributes);
+    if (decl.sym && decl.sym->is_distinct()) {
+        s.er.report_error(decl.loc, "distinct has no effect on functions");
+        decl.sym->remove_distinct();
+    }
 
     sema_func_params(s, scope, decl);
     sema_func_rets(s, scope, decl);
@@ -1566,8 +1613,11 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     auto scope = parent_scope.make_child(decl.name_loc);
     scope.current_decl = &decl;
 
-    ASSERT(decl.attributes.size() == 0, decl.name,
-           "attributes have not been implemented yet");
+    sema_attributes(s, scope, decl.sym, decl.attributes);
+    if (decl.sym && decl.sym->is_extern()) {
+        s.er.report_error(decl.loc, "constants can not be extern");
+        decl.sym->remove_extern();
+    }
 
     /* auto expected_type = */ sema_some_var(s, scope,
                                              {.type_expr = decl.type_expr,
@@ -1584,6 +1634,19 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
 
     if (!decl.name_is_discard()) {
         decl.sym->value = value;
+    }
+
+    if (decl.sym && decl.sym->is_distinct()) {
+        auto type = decl.sym->value.type;
+        if (type.is_type()) {
+            // as this is distinct, give it a proper definition
+            decl.sym->value.as.type.sym = decl.sym;
+        } else {
+            s.er.report_error(decl.loc,
+                              "distinct has no effect on no type definitions, "
+                              "found value of type {}",
+                              type);
+        }
     }
 }
 
@@ -1889,14 +1952,14 @@ void sema_func_decl(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     for (auto& p : decl.params) scope.define(p.sym);
 
     if (decl.body) {
-        if (decl.sym->is_extern) {
+        if (decl.sym->is_extern()) {
             s.er.report_error(
                 decl.loc, "function marked with @extern can not have a body");
         }
 
         sema_stmt(s, scope, decl.body);
     } else {
-        if (!decl.sym->is_extern) {
+        if (!decl.sym->is_extern()) {
             s.er.report_error(decl.loc,
                               "missing function body, missing @extern?");
         }

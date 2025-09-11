@@ -32,14 +32,82 @@ struct Value {
     } as;
 };
 
+struct SymbolFlags {
+    enum Flag : uint8_t {
+        None = 0,
+        Const = 1 << 0,
+        Local = 1 << 1,
+        Extern = 1 << 2,
+        Distinct = 1 << 3,
+    };
+
+    Flag value = None;
+
+    [[nodiscard]] constexpr auto is_const() const -> bool {
+        return value & Const;
+    }
+
+    [[nodiscard]] constexpr auto is_local() const -> bool {
+        return value & Local;
+    }
+
+    [[nodiscard]] constexpr auto is_extern() const -> bool {
+        return value & Extern;
+    }
+
+    [[nodiscard]] constexpr auto is_distinct() const -> bool {
+        return value & Distinct;
+    }
+
+    [[nodiscard]] constexpr auto without_extern() const -> SymbolFlags {
+        return {static_cast<Flag>(value & ~Extern)};
+    }
+
+    [[nodiscard]] constexpr auto without_distinct() const -> SymbolFlags {
+        return {static_cast<Flag>(value & ~Distinct)};
+    }
+
+    friend constexpr auto operator|(SymbolFlags lhs, SymbolFlags rhs)
+        -> SymbolFlags {
+        return {static_cast<Flag>(lhs.value | rhs.value)};
+    }
+
+    friend constexpr auto operator|(SymbolFlags lhs, Flag rhs) -> SymbolFlags {
+        return {static_cast<Flag>(lhs.value | rhs)};
+    }
+
+    friend constexpr auto operator|=(SymbolFlags& lhs, Flag rhs)
+        -> SymbolFlags {
+        lhs = lhs | rhs;
+        return lhs;
+    }
+};
+
 struct Symbol {
     std::string_view name;
     Location         name_loc;
     Value            value;
 
-    bool is_const;
-    bool is_local;
-    bool is_extern;
+    SymbolFlags flags;
+
+    [[nodiscard]] constexpr auto is_const() const -> bool {
+        return flags.is_const();
+    }
+
+    [[nodiscard]] constexpr auto is_local() const -> bool {
+        return flags.is_local();
+    }
+
+    [[nodiscard]] constexpr auto is_extern() const -> bool {
+        return flags.is_extern();
+    }
+
+    [[nodiscard]] constexpr auto is_distinct() const -> bool {
+        return flags.is_distinct();
+    }
+
+    constexpr void remove_extern() { flags = flags.without_extern(); }
+    constexpr void remove_distinct() { flags = flags.without_distinct(); }
 };
 
 class SymbolStore {

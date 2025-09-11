@@ -3,15 +3,21 @@ module main;
 @extern
 func getchar() s32;
 
-func discard_until_eof() {
-    var c: s32;
-    while c > 0 {
-        c = getchar();
-    }
-}
+@distinct
+def string = []const u8;
+
+func test_string(s: string) {}
+func test_slice(s: []const u8) {}
 
 func main() {
-    discard_until_eof();
+    var string_var: string;
+    var slice_var:  []const u8;
+
+    test_string(string_var);
+    test_slice(string_var);
+
+    test_string(slice_var);
+    test_slice(slice_var);
 }
 
 // vim: ft=yal

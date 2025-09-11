@@ -14,9 +14,9 @@ auto SymbolStore::new_sym(std::string_view name, Location name_loc, Value value,
         Symbol{.name = sym_arena.alloc_string_view(name),
                .name_loc = name_loc,
                .value = value,
-               .is_const = is_const,
-               .is_local = is_local,
-               .is_extern = false});
+               .flags = SymbolFlags{} |
+                        (is_const ? SymbolFlags::Const : SymbolFlags::None) |
+                        (is_local ? SymbolFlags::Local : SymbolFlags::None)});
     all_syms.push_back(d);
 
     return d;
@@ -70,13 +70,15 @@ auto fmt::formatter<yal::Value>::format(yal::Value const& p,
     return fmt::format_to(ctx.out(), ")");
 }
 
-auto fmt::formatter<yal::Symbol>::format(yal ::Symbol const& p,
-                                         format_context&     ctx) const
+auto fmt::formatter<yal::Symbol>::format(yal::Symbol const& p,
+                                         format_context&    ctx) const
     -> format_context ::iterator {
     fmt::format_to(ctx.out(), "(Symbol {:?}", p.name);
 
-    if (p.is_local) fmt::format_to(ctx.out(), " local");
-    if (p.is_const) fmt::format_to(ctx.out(), " const");
+    if (p.is_local()) fmt::format_to(ctx.out(), " local");
+    if (p.is_const()) fmt::format_to(ctx.out(), " const");
+    if (p.is_extern()) fmt::format_to(ctx.out(), " extern");
+    if (p.is_distinct()) fmt::format_to(ctx.out(), " distinct");
 
     return fmt::format_to(ctx.out(), " {})", p.value);
 }
