@@ -42,6 +42,8 @@ auto Expr::as_string() -> StringExpr& { return static_cast<StringExpr&>(*this); 
 auto Stmt::as_block() const -> BlockStmt const& { return static_cast<BlockStmt const&>(*this); }
 auto Stmt::as_return() const -> ReturnStmt const& { return static_cast<ReturnStmt const&>(*this); }
 auto Stmt::as_expr() const -> ExprStmt const& { return static_cast<ExprStmt const&>(*this); }
+auto Stmt::as_while() const -> WhileStmt const& { return static_cast<WhileStmt const&>(*this); }
+auto Stmt::as_if() const -> IfStmt const& { return static_cast<IfStmt const&>(*this); }
 auto Stmt::as_var() const -> VarStmt const& { return static_cast<VarStmt const&>(*this); }
 auto Stmt::as_multi_var() const -> MultiVarStmt const& { return static_cast<MultiVarStmt const&>(*this); }
 auto Stmt::as_def() const -> VarStmt const& { return static_cast<VarStmt const&>(*this); }
@@ -52,6 +54,8 @@ auto Stmt::as_multi_assign() const -> MultiAssignStmt const& { return static_cas
 auto Stmt::as_block() -> BlockStmt& { return static_cast<BlockStmt&>(*this); }
 auto Stmt::as_return() -> ReturnStmt& { return static_cast<ReturnStmt&>(*this); }
 auto Stmt::as_expr() -> ExprStmt& { return static_cast<ExprStmt&>(*this); }
+auto Stmt::as_while() -> WhileStmt& { return static_cast<WhileStmt&>(*this); }
+auto Stmt::as_if() -> IfStmt& { return static_cast<IfStmt&>(*this); }
 auto Stmt::as_var() -> VarStmt& { return static_cast<VarStmt&>(*this); }
 auto Stmt::as_multi_var() -> MultiVarStmt& { return static_cast<MultiVarStmt&>(*this); }
 auto Stmt::as_def() -> VarStmt& { return static_cast<VarStmt&>(*this); }
@@ -202,6 +206,19 @@ void to_json(nlohmann::json& j, Stmt const& n) {
         case StmtKind::Expr: {
             auto& expr = n.as_expr();
             j["child"] = *expr.child;
+        } break;
+
+        case StmtKind::While: {
+            auto& w = n.as_while();
+            j["cond"] = w.cond ? *w.cond : json{};
+            j["body"] = w.body ? *w.body : json{};
+        } break;
+
+        case StmtKind::If: {
+            auto& i = n.as_if();
+            j["cond"] = i.cond ? *i.cond : json{};
+            j["when_true"] = i.when_true ? *i.when_true : json{};
+            j["when_false"] = i.when_false ? *i.when_false : json{};
         } break;
 
         case StmtKind::Var:
@@ -511,6 +528,24 @@ void to_lisp(fmt::format_context& ctx, Stmt const& stmt, int depth) {
             to_lisp(ctx, expr.child, depth + 1);
         } break;
 
+        case StmtKind::While: {
+            auto& w = stmt.as_while();
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, w.cond, depth + 1);
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, w.body, depth + 1);
+        } break;
+
+        case StmtKind::If: {
+            auto& i = stmt.as_if();
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, i.cond, depth + 1);
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, i.when_true, depth + 1);
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, i.when_false, depth + 1);
+        } break;
+
         case StmtKind::Var:
         case StmtKind::Def: {
             auto& var = stmt.as_var();
@@ -759,6 +794,8 @@ auto fmt::formatter<yal::ast::StmtKind>::format(yal::ast::StmtKind const& p,
         case yal::ast::StmtKind::Block: name = "Block"; break;
         case yal::ast::StmtKind::Return: name = "Return"; break;
         case yal::ast::StmtKind::Expr: name = "Expr"; break;
+        case yal::ast::StmtKind::While: name = "While"; break;
+        case yal::ast::StmtKind::If: name = "If"; break;
         case yal::ast::StmtKind::Var: name = "Var"; break;
         case yal::ast::StmtKind::Def: name = "Def"; break;
         case yal::ast::StmtKind::MultiVar: name = "MultiVar"; break;

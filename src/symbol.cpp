@@ -15,7 +15,8 @@ auto SymbolStore::new_sym(std::string_view name, Location name_loc, Value value,
                .name_loc = name_loc,
                .value = value,
                .is_const = is_const,
-               .is_local = is_local});
+               .is_local = is_local,
+               .is_extern = false});
     all_syms.push_back(d);
 
     return d;

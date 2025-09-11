@@ -9,12 +9,20 @@
   (FuncDecl "main"
     sym: (Symbol "main" const (Value func()))
     (BlockStmt
-      (VarStmt "c"
-        sym: (Symbol "c" local (Value u8))
-        #nullptr#
-        (CastExpr u8
-          (IdExpr type "u8"
-            sym: (Symbol "u8" const (Value type u8)))
-          (CallExpr s32
-            (IdExpr func() s32 "getchar"
-              sym: (Symbol "getchar" const (Value func() s32)))))))))
+      (WhileStmt
+        (IdExpr bool "true"
+          sym: (Symbol "true" const (Value bool)))
+        (BlockStmt
+          (VarStmt "c"
+            sym: (Symbol "c" local (Value s32))
+            #nullptr#
+            (CallExpr s32
+              (IdExpr func() s32 "getchar"
+                sym: (Symbol "getchar" const (Value func() s32)))))
+          (IfStmt
+            (CastExpr bool
+              (IdExpr "_")
+              (IdExpr s32 "c"
+                sym: (Symbol "c" local (Value s32))))
+            (BlockStmt)
+            #nullptr#))))))

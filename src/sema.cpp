@@ -168,6 +168,9 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
     // both are comptime_int
     if (target.is_comptime_int()) return {.type = target};
 
+    // both are bool
+    if (target.is_bool()) return {.type = target};
+
     // both are integers
     if (target.is_int()) {
         auto const& source_int = source.as.integer;
@@ -408,6 +411,26 @@ auto cast_type(State& s, ty::Type source, ty::Type target,
         return {.type = target, .redundant_cast = is_redundant_cast};
     }
 
+    if (source.is_bool() && target.is_bool()) {
+        auto is_redundant_cast = source.sym == target.sym;
+
+        if (is_redundant_cast) {
+            s.er.report_warn(opts.loc, "redundant cast from {} to {}", source,
+                             target);
+        }
+
+        return {.type = target, .redundant_cast = is_redundant_cast};
+    }
+
+    if (source.is_bool() && target.is_int()) {
+        return {.type = target};
+    }
+
+    if (source.is_int() && target.is_bool()) {
+        // This will do the C thing where 0 is false and everything else is true
+        return {.type = target};
+    }
+
     s.er.report_error(opts.loc, "can not cast from {} to {}", source, target);
     return {.type = target};
 }
@@ -617,6 +640,7 @@ void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
 
 // ============================================================================
 
+void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt);
 void sema_expr(State& s, Scope& scope, ast::Expr* expr, ty::Type expected_type);
 
 // ----------------------------------------------------------------------------
@@ -1436,11 +1460,11 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     ASSERT(decl.attributes.size() == 0, decl.name,
            "attributes have not been implemented yet");
 
-    auto expected_type = sema_some_var(s, scope,
-                                       {.type_expr = decl.type_expr,
-                                        .init = decl.init,
-                                        .loc = decl.loc,
-                                        .should_fixup = false});
+    /* auto expected_type = */ sema_some_var(s, scope,
+                                             {.type_expr = decl.type_expr,
+                                              .init = decl.init,
+                                              .loc = decl.loc,
+                                              .should_fixup = false});
 
     if (decl.init == nullptr) {
         s.er.report_error(decl.loc, "constants must have an initializer");
@@ -1571,6 +1595,61 @@ void sema_stmt_expr(State& s, Scope& scope, ast::ExprStmt& stmt) {
     }
 }
 
+void sema_stmt_while(State& s, Scope& scope, ast::WhileStmt& stmt) {
+    auto expected_type = ty::make_bool();
+    sema_expr(s, scope, stmt.cond, expected_type);
+
+    auto result = coerce_type(s, stmt.cond->type, expected_type,
+                              {.loc = stmt.loc,
+                               .source_loc = stmt.cond->loc,
+                               .target_loc = stmt.loc});
+    if (result.source_requires_fixup) {
+        fixup_types_in_expr(s, stmt.cond, result.type);
+    }
+
+    // FIXME: handle when an implicit conversion happens, as that requires
+    // an additonal AST node.
+
+    if (s.opts.verbose_coercions) {
+        s.er.report_debug(stmt.loc,
+                          "{} -> {} result={} (requires_a_cast={}, "
+                          "source_requires_fixup={})",
+                          stmt.cond->type, expected_type, result.type,
+                          result.requires_a_cast ? "yes" : "no",
+                          result.source_requires_fixup ? "yes" : "no");
+    }
+
+    sema_stmt(s, scope, stmt.body);
+}
+
+void sema_stmt_if(State& s, Scope& scope, ast::IfStmt& stmt) {
+    auto expected_type = ty::make_bool();
+    sema_expr(s, scope, stmt.cond, expected_type);
+
+    auto result = coerce_type(s, stmt.cond->type, expected_type,
+                              {.loc = stmt.loc,
+                               .source_loc = stmt.cond->loc,
+                               .target_loc = stmt.loc});
+    if (result.source_requires_fixup) {
+        fixup_types_in_expr(s, stmt.cond, result.type);
+    }
+
+    // FIXME: handle when an implicit conversion happens, as that requires
+    // an additonal AST node.
+
+    if (s.opts.verbose_coercions) {
+        s.er.report_debug(stmt.loc,
+                          "{} -> {} result={} (requires_a_cast={}, "
+                          "source_requires_fixup={})",
+                          stmt.cond->type, expected_type, result.type,
+                          result.requires_a_cast ? "yes" : "no",
+                          result.source_requires_fixup ? "yes" : "no");
+    }
+
+    sema_stmt(s, scope, stmt.when_true);
+    sema_stmt(s, scope, stmt.when_false);
+}
+
 void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
     auto expected_type = sema_some_var(s, scope,
                                        {.type_expr = stmt.type_expr,
@@ -1669,6 +1748,11 @@ void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
             sema_stmt_expr(s, scope, stmt->as_expr());
             break;
 
+        case ast::StmtKind::While:
+            sema_stmt_while(s, scope, stmt->as_while());
+            break;
+        case ast::StmtKind::If: sema_stmt_if(s, scope, stmt->as_if()); break;
+
         case ast::StmtKind::Var: sema_stmt_var(s, scope, stmt->as_var()); break;
 
         case ast::StmtKind::Def: PANIC("SEMA: not implemented", *stmt);
@@ -1741,7 +1825,7 @@ void sema_decl(State& s, Scope& scope, ast::Decl* decl) {
 
 // ----------------------------------------------------------------------------
 
-void define_builtin_types(ty::TypeStore& /* ts */, Scope& builtin_scope) {
+void define_builtins(ty::TypeStore& /* ts */, Scope& builtin_scope) {
     auto s8_type = ty::make_int(1, true);
     auto u8_type = ty::make_int(1, false);
     auto s16_type = ty::make_int(2, true);
@@ -1763,6 +1847,17 @@ void define_builtin_types(ty::TypeStore& /* ts */, Scope& builtin_scope) {
     builtin_scope.define("u32", {}, mkty(u32_type), false, true);
     builtin_scope.define("s64", {}, mkty(s64_type), false, true);
     builtin_scope.define("u64", {}, mkty(u64_type), false, true);
+
+    builtin_scope.define(
+        "true", {},
+        {.type = ty::make_bool(),
+         .as = {.boolean = {.value = true, .has_value = true}}},
+        false, true);
+    builtin_scope.define(
+        "false", {},
+        {.type = ty::make_bool(),
+         .as = {.boolean = {.value = false, .has_value = true}}},
+        false, true);
 }
 
 void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
@@ -1776,7 +1871,7 @@ void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
                                .current_decl = nullptr,
                                .symbol_store = &symbol_store};
 
-    define_builtin_types(s.ts, builtin_scope);
+    define_builtins(s.ts, builtin_scope);
 
     auto scope = builtin_scope.make_child({});
 

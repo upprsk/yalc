@@ -181,6 +181,8 @@ enum struct StmtKind : uint8_t {
     Block,
     Return,
     Expr,
+    While,
+    If,
 
     Var,
     Def,
@@ -194,6 +196,8 @@ enum struct StmtKind : uint8_t {
 struct BlockStmt;
 struct ReturnStmt;
 struct ExprStmt;
+struct WhileStmt;
+struct IfStmt;
 struct VarStmt;
 struct MultiVarStmt;
 struct AssignStmt;
@@ -217,6 +221,8 @@ struct Stmt {
     [[nodiscard]] auto as_block() const -> BlockStmt const&;
     [[nodiscard]] auto as_return() const -> ReturnStmt const&;
     [[nodiscard]] auto as_expr() const -> ExprStmt const&;
+    [[nodiscard]] auto as_while() const -> WhileStmt const&;
+    [[nodiscard]] auto as_if() const -> IfStmt const&;
     [[nodiscard]] auto as_var() const -> VarStmt const&;
     [[nodiscard]] auto as_multi_var() const -> MultiVarStmt const&;
     [[nodiscard]] auto as_def() const -> VarStmt const&;
@@ -227,6 +233,8 @@ struct Stmt {
     [[nodiscard]] auto as_block() -> BlockStmt&;
     [[nodiscard]] auto as_return() -> ReturnStmt&;
     [[nodiscard]] auto as_expr() -> ExprStmt&;
+    [[nodiscard]] auto as_while() -> WhileStmt&;
+    [[nodiscard]] auto as_if() -> IfStmt&;
     [[nodiscard]] auto as_var() -> VarStmt&;
     [[nodiscard]] auto as_multi_var() -> MultiVarStmt&;
     [[nodiscard]] auto as_def() -> VarStmt&;
@@ -268,6 +276,19 @@ struct ReturnStmt : public Stmt {
 
 struct ExprStmt : public Stmt {
     Expr* child;
+};
+
+struct WhileStmt : public Stmt {
+    // TODO: inplace declarations?
+    Expr* cond;
+    Stmt* body;
+};
+
+struct IfStmt : public Stmt {
+    // TODO: inplace declarations?
+    Expr* cond;
+    Stmt* when_true;
+    Stmt* when_false;
 };
 
 struct VarStmt : public Stmt {

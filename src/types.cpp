@@ -33,7 +33,8 @@ void to_json(nlohmann::json& j, Type const& n) {
             j["byte_size"] = n.as.integer.byte_size;
             j["is_signed"] = n.as.integer.is_signed;
             break;
-        case TypeKind::ComptimeInt: break;
+        case TypeKind::ComptimeInt:
+        case TypeKind::Bool: break;
 
         case TypeKind::Ptr:
         case TypeKind::MultiPtr:
@@ -72,6 +73,7 @@ void to_repr(fmt::format_context& ctx, Type const& type) {
                            type.as.integer.is_signed ? "s" : "u",
                            type.as.integer.byte_size * 8);
             break;
+        case TypeKind::Bool: fmt::format_to(ctx.out(), "bool"); break;
 
         case TypeKind::ComptimeInt:
             fmt::format_to(ctx.out(), "comptime_int");
@@ -127,6 +129,7 @@ auto fmt::formatter<yal::ty::TypeKind>::format(yal::ty::TypeKind const& p,
         case yal::ty::TypeKind::Type: name = "Type"; break;
         case yal::ty::TypeKind::Int: name = "Int"; break;
         case yal::ty::TypeKind::ComptimeInt: name = "ComptimeInt"; break;
+        case yal::ty::TypeKind::Bool: name = "Bool"; break;
         case yal::ty::TypeKind::Ptr: name = "Ptr"; break;
         case yal::ty::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::ty::TypeKind::Slice: name = "Slice"; break;

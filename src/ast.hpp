@@ -155,6 +155,17 @@ struct File {
             Stmt{.kind = StmtKind::Expr, .loc = loc}, child);
     }
 
+    auto stmt_while(Location loc, Expr* cond, Stmt* body) -> WhileStmt* {
+        return node_arena.create<WhileStmt>(
+            Stmt{.kind = StmtKind::While, .loc = loc}, cond, body);
+    }
+
+    auto stmt_if(Location loc, Expr* cond, Stmt* when_true, Stmt* when_false)
+        -> IfStmt* {
+        return node_arena.create<IfStmt>(Stmt{.kind = StmtKind::If, .loc = loc},
+                                         cond, when_true, when_false);
+    }
+
     auto stmt_var(Location loc, Location name_loc, std::string_view name,
                   Expr* type, Expr* init) -> VarStmt* {
         return node_arena.create<VarStmt>(

@@ -975,6 +975,8 @@ public:
         if (check("var")) return parse_var();
         if (check("def")) return parse_def();
         if (check("return")) return parse_return_stmt();
+        if (check("while")) return parse_while_stmt();
+        if (check("if")) return parse_if_stmt();
 
         auto expr = parse_expr_without_recover();
         if (!expr) {
@@ -1120,6 +1122,40 @@ public:
 
         return ast_file->stmt_return(to_loc(start_span.extend(prev_span())),
                                      to_loc(children_span), rets);
+    }
+
+    auto parse_while_stmt() -> ast::Stmt* {
+        auto start_span = span();
+
+        // skip over the 'while'
+        advance();
+
+        auto cond = parse_expr();
+        auto body = parse_block();
+
+        return ast_file->stmt_while(to_loc(start_span.extend(prev_span())),
+                                    cond, body);
+    }
+
+    auto parse_if_stmt() -> ast::Stmt* {
+        auto start_span = span();
+
+        // skip over the 'if'
+        advance();
+
+        auto cond = parse_expr();
+        auto when_true = parse_block();
+
+        ast::Stmt* when_false = nullptr;
+        if (match("else")) {
+            if (check("if"))
+                when_false = parse_if_stmt();
+            else
+                when_false = parse_block();
+        }
+
+        return ast_file->stmt_if(to_loc(start_span.extend(prev_span())), cond,
+                                 when_true, when_false);
     }
 
     auto parse_multi_assignment(ast::Expr* first_lhs) -> ast::Stmt* {

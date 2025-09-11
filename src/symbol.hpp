@@ -25,6 +25,10 @@ struct Value {
             uint64_t value;
             bool     has_value;
         } integer;
+        struct {
+            bool value;
+            bool has_value;
+        } boolean;
     } as;
 };
 

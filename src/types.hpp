@@ -24,6 +24,7 @@ enum struct TypeKind : uint8_t {
 
     Int,
     ComptimeInt,
+    Bool,
 
     Ptr,
     MultiPtr,
@@ -105,6 +106,10 @@ struct Type {
 
     [[nodiscard]] constexpr auto is_comptime_int() const -> bool {
         return kind == TypeKind::ComptimeInt;
+    }
+
+    [[nodiscard]] constexpr auto is_bool() const -> bool {
+        return kind == TypeKind::Bool;
     }
 
     [[nodiscard]] constexpr auto is_ptr() const -> bool {
@@ -204,6 +209,10 @@ constexpr auto make_int(uint8_t byte_size, bool is_signed,
 
 constexpr auto make_comptime_int(Symbol* sym = nullptr) -> Type {
     return {.kind = TypeKind::ComptimeInt, .as = {}, .sym = sym};
+}
+
+constexpr auto make_bool(Symbol* sym = nullptr) -> Type {
+    return {.kind = TypeKind::Bool, .as = {}, .sym = sym};
 }
 
 constexpr auto make_ptr(ty::TypePtr* ptr, bool is_const, Symbol* sym = nullptr)
