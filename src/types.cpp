@@ -40,6 +40,11 @@ void to_json(nlohmann::json& j, Type const& n) {
         case TypeKind::MultiPtr:
         case TypeKind::Slice: j["inner"] = n.as.ptr->inner; break;
 
+        case TypeKind::Array:
+            j["count"] = n.as.array->count;
+            j["inner"] = n.as.array->inner;
+            break;
+
         case TypeKind::Func:
             j["params"] = n.as.func->params;
             j["rets"] = n.as.func->rets;
@@ -95,6 +100,12 @@ void to_repr(fmt::format_context& ctx, Type const& type) {
             to_repr(ctx, type.as.ptr->inner);
             break;
 
+        case TypeKind::Array:
+            fmt::format_to(ctx.out(), "[{}]{}", type.as.array->count,
+                           type.flags.is_const() ? "const " : "");
+            to_repr(ctx, type.as.array->inner);
+            break;
+
         case TypeKind::Func:
             fmt::format_to(ctx.out(), "func({})",
                            fmt::join(type.as.func->params, ", "));
@@ -133,6 +144,7 @@ auto fmt::formatter<yal::ty::TypeKind>::format(yal::ty::TypeKind const& p,
         case yal::ty::TypeKind::Ptr: name = "Ptr"; break;
         case yal::ty::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::ty::TypeKind::Slice: name = "Slice"; break;
+        case yal::ty::TypeKind::Array: name = "Array"; break;
         case yal::ty::TypeKind::Func: name = "Func"; break;
         case yal::ty::TypeKind::Tuple: name = "Tuple"; break;
     }

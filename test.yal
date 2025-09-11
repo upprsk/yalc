@@ -3,6 +3,8 @@ module main;
 func main() {
     def KB    = 1024;
     def BUFSZ = KB;
+
+    var buf: [BUFSZ]u8;
 }
 
 // vim: ft=yal

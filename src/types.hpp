@@ -30,6 +30,8 @@ enum struct TypeKind : uint8_t {
     MultiPtr,
     Slice,
 
+    Array,
+
     Func,
     Tuple,  // just for function returns!
 };
@@ -66,11 +68,13 @@ struct TypeInt {
 };
 
 struct TypePtr;
+struct TypeArray;
 struct TypeFunc;
 struct TypeTuple;
 union TypeAs {
     TypeInt    integer;
     TypePtr*   ptr;
+    TypeArray* array;
     TypeFunc*  func;
     TypeTuple* tuple;
 };
@@ -108,6 +112,10 @@ struct Type {
         return kind == TypeKind::ComptimeInt;
     }
 
+    [[nodiscard]] constexpr auto is_any_int() const -> bool {
+        return is_int() || is_comptime_int();
+    }
+
     [[nodiscard]] constexpr auto is_bool() const -> bool {
         return kind == TypeKind::Bool;
     }
@@ -132,6 +140,10 @@ struct Type {
         return is_ptr() || is_multi_ptr() || is_slice();
     }
 
+    [[nodiscard]] constexpr auto is_array() const -> bool {
+        return kind == TypeKind::Array;
+    }
+
     [[nodiscard]] constexpr auto is_func() const -> bool {
         return kind == TypeKind::Func;
     }
@@ -143,6 +155,11 @@ struct Type {
 
 struct TypePtr {
     Type inner;
+};
+
+struct TypeArray {
+    uint64_t count;
+    Type     inner;
 };
 
 struct TypeFunc {
@@ -193,6 +210,18 @@ struct TypeStore {
         if (is_const) flags |= TypeFlags::Const;
 
         return {.kind = kind, .flags = flags, .as = {.ptr = ptr}, .sym = sym};
+    }
+
+    auto type_array(uint64_t count, ty::Type inner, bool is_const,
+                    Symbol* sym = nullptr) -> Type {
+        auto array = arena.create<TypeArray>(count, inner);
+        auto flags = TypeFlags{};
+        if (is_const) flags |= TypeFlags::Const;
+
+        return {.kind = TypeKind::Array,
+                .flags = flags,
+                .as = {.array = array},
+                .sym = sym};
     }
 };
 

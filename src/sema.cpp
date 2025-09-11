@@ -3,6 +3,7 @@
 #include <fmt/ranges.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <ranges>
 #include <string_view>
 
@@ -591,7 +592,26 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
             return {.type = ty::make_type(), .as = {.type = type}};
         } break;
 
-        case ast::ExprKind::Array: break;
+        case ast::ExprKind::Array: {
+            auto& arr = expr->as_array();
+
+            uint64_t count = 0;
+
+            auto count_value = eval_expr(s, scope, arr.count);
+            if (count_value.type.is_any_int()) {
+                if (count_value.as.integer.has_value) {
+                    count = count_value.as.integer.value;
+                } else {
+                    auto loc = arr.count ? arr.count->loc : arr.loc;
+                    s.er.report_error(loc,
+                                      "array size must be compile-time known");
+                }
+            }
+
+            auto inner = eval_expr_to_type(s, scope, arr.inner);
+            auto type = s.ts.type_array(count, inner, arr.is_const);
+            return {.type = ty::make_type(), .as = {.type = type}};
+        } break;
 
         case ast::ExprKind::Id: {
             auto& id = expr->as_id();
@@ -1130,7 +1150,28 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
             ptr.type = ty::make_type();
         } break;
 
-        case ast::ExprKind::Array: PANIC("SEMA EXPR: not implemented", *expr);
+        case ast::ExprKind::Array: {
+            auto& arr = expr->as_array();
+
+            // need a way of signaling that we want any integer...
+            sema_expr(s, scope, arr.count, ty::make_comptime_int());
+            if (arr.count && !arr.count->type.is_any_int()) {
+                s.er.report_error(arr.inner->loc,
+                                  "can not use value of type {} as size of "
+                                  "array, expected an integer",
+                                  arr.count->type);
+            }
+
+            sema_expr(s, scope, arr.inner, ty::make_type());
+
+            if (arr.inner && !arr.inner->type.is_type()) {
+                s.er.report_error(arr.inner->loc,
+                                  "can not use value of type {} as type",
+                                  arr.inner->type);
+            }
+
+            arr.type = ty::make_type();
+        } break;
 
         case ast::ExprKind::Id: {
             auto& id = expr->as_id();
@@ -1862,11 +1903,11 @@ void sema_stmt_def(State& s, Scope& scope, ast::VarStmt& stmt) {
         stmt.sym = scope.define(stmt.name, stmt.name_loc, {}, false, true);
     }
 
-    auto expected_type = sema_some_var(s, scope,
-                                       {.type_expr = stmt.type_expr,
-                                        .init = stmt.init,
-                                        .loc = stmt.loc,
-                                        .should_fixup = false});
+    /* auto expected_type = */ sema_some_var(s, scope,
+                                             {.type_expr = stmt.type_expr,
+                                              .init = stmt.init,
+                                              .loc = stmt.loc,
+                                              .should_fixup = false});
     if (stmt.init == nullptr) {
         s.er.report_error(stmt.loc, "constants must have an initializer");
     }
