@@ -21,6 +21,7 @@ func main() {
     var z = add_ptrs(x&, y&);
 
     var w = a + b + cast(_)c;
+    var it_works = 10 + a + cast(_)(c + 1) + C;
 }
 
 // vim: ft=yal

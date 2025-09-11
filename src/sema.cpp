@@ -128,8 +128,11 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
 
     // don't deal with errors here, to avoid too many extra error messages when
     // something goes wrong
-    if (source.is_err()) return {.type = target};
-    if (target.is_err()) return {.type = target};
+    if (source.is_err() || target.is_err()) return {.type = target};
+
+    if (source.is_pending_cast()) {
+        return {.type = target, .source_requires_fixup = true};
+    }
 
     if (source.is_comptime_int() && target.is_int()) {
         return {.type = target, .source_requires_fixup = true};
@@ -240,6 +243,14 @@ auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
     if (lhs.is_err()) return {.type = rhs};
     if (rhs.is_err()) return {.type = lhs};
 
+    if (lhs.is_pending_cast()) {
+        return {.type = rhs, .lhs_requires_fixup = true};
+    }
+
+    if (rhs.is_pending_cast()) {
+        return {.type = lhs, .rhs_requires_fixup = true};
+    }
+
     if (lhs.is_comptime_int() && rhs.is_int()) {
         return {.type = rhs, .lhs_requires_fixup = true};
     }
@@ -349,7 +360,8 @@ auto cast_type(State& s, ty::Type source, ty::Type target,
                CoercionOpts const& opts) -> CastResult {
     // don't deal with errors here, to avoid too many extra error messages when
     // something goes wrong
-    if (source.is_err() || target.is_err()) return {.type = target};
+    if (source.is_err() || target.is_err() || target.is_pending_cast())
+        return {.type = target};
 
     if (source.is_comptime_int() && target.is_int()) {
         return {.type = target, .source_requires_fixup = true};
@@ -537,9 +549,11 @@ auto eval_expr_to_type(State& s, Scope& scope, ast::Expr* expr) -> ty::Type {
 
 // ============================================================================
 
-void fixup_comptime_integers_in_expr(State& s, ast::Expr* expr,
-                                     ty::Type target_type) {
-    ASSERT(expr->type.is_comptime_int());
+auto cast_expr_apply(State& s, ast::CastExpr& expr, ty::Type type) -> ty::Type;
+
+void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
+    ASSERT(expr->type.is_comptime_int() || expr->type.is_pending_cast(),
+           expr->type);
     ASSERT(target_type.is_int());
 
     switch (expr->kind) {
@@ -554,16 +568,20 @@ void fixup_comptime_integers_in_expr(State& s, ast::Expr* expr,
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
-            fixup_comptime_integers_in_expr(s, expr->as_arith().lhs,
-                                            target_type);
-            fixup_comptime_integers_in_expr(s, expr->as_arith().rhs,
-                                            target_type);
+            fixup_types_in_expr(s, expr->as_arith().lhs, target_type);
+            fixup_types_in_expr(s, expr->as_arith().rhs, target_type);
             break;
 
         case ast::ExprKind::Deref:
         case ast::ExprKind::Ref: break;
 
-        case ast::ExprKind::Cast:
+        case ast::ExprKind::Cast: {
+            auto& cast = expr->as_cast();
+            ASSERT(cast.type_is_infer());
+
+            expr->type = cast_expr_apply(s, cast, target_type);
+        } break;
+
         case ast::ExprKind::Field:
         case ast::ExprKind::Call:
         case ast::ExprKind::Ptr:
@@ -683,10 +701,10 @@ void sema_expr_arith(State& s, Scope& scope, ast::ArithExpr& expr,
                                    .rhs_loc = expr.rhs->loc,
                                    .expected_type = expected_type});
         if (result.lhs_requires_fixup) {
-            fixup_comptime_integers_in_expr(s, expr.lhs, result.type);
+            fixup_types_in_expr(s, expr.lhs, result.type);
         }
         if (result.rhs_requires_fixup) {
-            fixup_comptime_integers_in_expr(s, expr.rhs, result.type);
+            fixup_types_in_expr(s, expr.rhs, result.type);
         }
 
         // FIXME: handle when an implicit conversion happens, as that
@@ -714,6 +732,29 @@ void sema_expr_arith(State& s, Scope& scope, ast::ArithExpr& expr,
     }
 }
 
+auto cast_expr_apply(State& s, ast::CastExpr& expr, ty::Type type) -> ty::Type {
+    auto result = cast_type(s, expr.child->type, type,
+                            {.loc = expr.loc,
+                             .source_loc = expr.child->loc,
+                             .target_loc = expr.type_expr->loc});
+
+    if (result.source_requires_fixup) {
+        fixup_types_in_expr(s, expr.child, result.type);
+    }
+
+    // FIXME: handle when an implicit conversion happens, as that
+    // requires an additonal AST node.
+
+    if (s.opts.verbose_coercions) {
+        s.er.report_debug(expr.loc,
+                          "{} -> {} result={} (source_requires_fixup={})",
+                          expr.child->type, type, result.type,
+                          result.source_requires_fixup ? "yes" : "no");
+    }
+
+    return result.type;
+}
+
 void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
                     ty::Type expected_type) {
     if (!expr.type_is_infer()) {
@@ -725,9 +766,10 @@ void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
     if (!expr.type_is_infer()) {
         type = eval_expr_to_type(s, scope, expr.type_expr);
     } else {
-        type = expected_type;
-        if (!type.is_valid()) {
-            s.er.report_error(expr.loc, "could not infer type for cast");
+        if (expected_type.is_valid()) {
+            type = expected_type;
+        } else {
+            type = ty::make_pending_cast();
         }
     }
 
@@ -735,26 +777,7 @@ void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
 
     // now we need to cast it
     if (expr.type_expr && expr.child) {
-        auto result = cast_type(s, expr.child->type, type,
-                                {.loc = expr.loc,
-                                 .source_loc = expr.child->loc,
-                                 .target_loc = expr.type_expr->loc});
-
-        if (result.source_requires_fixup) {
-            fixup_comptime_integers_in_expr(s, expr.child, result.type);
-        }
-
-        // FIXME: handle when an implicit conversion happens, as that
-        // requires an additonal AST node.
-
-        if (s.opts.verbose_coercions) {
-            s.er.report_debug(expr.loc,
-                              "{} -> {} result={} (source_requires_fixup={})",
-                              expr.child->type, type, result.type,
-                              result.source_requires_fixup ? "yes" : "no");
-        }
-
-        type = result.type;
+        type = cast_expr_apply(s, expr, type);
     }
 
     expr.type = type;
@@ -795,7 +818,7 @@ void sema_expr_call(State& s, Scope& scope, ast::CallExpr& expr,
                                    .source_loc = arg->loc,
                                    .target_loc = expr.callee->loc});
         if (result.source_requires_fixup) {
-            fixup_comptime_integers_in_expr(s, arg, result.type);
+            fixup_types_in_expr(s, arg, result.type);
         }
 
         // FIXME: handle when an implicit conversion happens, as that
@@ -995,7 +1018,7 @@ auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
         // move it to the default integer type
         if (expected_type.is_comptime_int() && var.should_fixup) {
             expected_type = get_default_int();
-            fixup_comptime_integers_in_expr(s, var.init, expected_type);
+            fixup_types_in_expr(s, var.init, expected_type);
         }
 
         // in case the type is a tuple, then we called a function that returns
@@ -1037,7 +1060,7 @@ auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
                                        .source_loc = var.type_expr->loc,
                                        .target_loc = var.init->loc});
             if (result.source_requires_fixup) {
-                fixup_comptime_integers_in_expr(s, var.init, result.type);
+                fixup_types_in_expr(s, var.init, result.type);
             }
 
             // FIXME: handle when an implicit conversion happens, as that
@@ -1167,8 +1190,8 @@ auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
                 ASSERT(init_for_expanded_type[i].second == false,
                        "should never get a comptime_int from a tuple",
                        *init_for_expanded_type[i].first);
-                fixup_comptime_integers_in_expr(
-                    s, init_for_expanded_type[i].first, expected_type);
+                fixup_types_in_expr(s, init_for_expanded_type[i].first,
+                                    expected_type);
             }
         }
     }
@@ -1210,8 +1233,7 @@ auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
                                        .source_loc = init_type.second,
                                        .target_loc = expected_type_expr->loc});
             if (result.source_requires_fixup) {
-                fixup_comptime_integers_in_expr(s, expected_type_expr,
-                                                result.type);
+                fixup_types_in_expr(s, expected_type_expr, result.type);
             }
 
             // FIXME: handle when an implicit conversion happens, as that
@@ -1471,7 +1493,7 @@ void sema_stmt_return(State& s, Scope& scope, ast::ReturnStmt& stmt) {
             s, r->type, r_type,
             {.loc = r->loc, .source_loc = r->loc, .target_loc = r_decl.loc});
         if (result.source_requires_fixup) {
-            fixup_comptime_integers_in_expr(s, r, result.type);
+            fixup_types_in_expr(s, r, result.type);
         }
 
         // FIXME: handle when an implicit conversion happens, as that requires
@@ -1557,7 +1579,7 @@ void sema_stmt_assign(State& s, Scope& scope, ast::AssignStmt& stmt) {
                                    .source_loc = stmt.rhs->loc,
                                    .target_loc = stmt.lhs->loc});
         if (result.source_requires_fixup) {
-            fixup_comptime_integers_in_expr(s, stmt.rhs, result.type);
+            fixup_types_in_expr(s, stmt.rhs, result.type);
         }
 
         // FIXME: handle when an implicit conversion happens, as that requires

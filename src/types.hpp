@@ -87,6 +87,10 @@ struct Type {
         return kind == TypeKind::Err;
     }
 
+    [[nodiscard]] constexpr auto is_pending_cast() const -> bool {
+        return kind == TypeKind::PendingCast;
+    }
+
     [[nodiscard]] constexpr auto is_void() const -> bool {
         return kind == TypeKind::Void;
     }
@@ -178,6 +182,10 @@ struct TypeStore {
         return {.kind = kind, .flags = flags, .as = {.ptr = ptr}, .sym = sym};
     }
 };
+
+constexpr auto make_pending_cast(Symbol* sym = nullptr) -> Type {
+    return {.kind = TypeKind::PendingCast, .as = {}, .sym = sym};
+}
 
 constexpr auto make_void(Symbol* sym = nullptr) -> Type {
     return {.kind = TypeKind::Void, .as = {}, .sym = sym};

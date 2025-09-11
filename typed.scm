@@ -115,7 +115,24 @@
               sym: (Symbol "a" local (Value s32)))
             (IdExpr s32 "b"
               sym: (Symbol "b" local (Value s32))))
-          (CastExpr
+          (CastExpr s32
             (IdExpr "_")
             (IdExpr s64 "c"
-              sym: (Symbol "c" local (Value s64)))))))))
+              sym: (Symbol "c" local (Value s64))))))
+      (VarStmt "it_works"
+        sym: (Symbol "it_works" local (Value s32))
+        #nullptr#
+        (AddExpr s32
+          (AddExpr s32
+            (AddExpr s32
+              (IntExpr s32 10)
+              (IdExpr s32 "a"
+                sym: (Symbol "a" local (Value s32))))
+            (CastExpr s32
+              (IdExpr "_")
+              (AddExpr s64
+                (IdExpr s64 "c"
+                  sym: (Symbol "c" local (Value s64)))
+                (IntExpr s64 1))))
+          (IdExpr s32 "C"
+            sym: (Symbol "C" const (Value comptime_int 10))))))))
