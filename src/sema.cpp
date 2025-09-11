@@ -1651,6 +1651,7 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
 
     auto value = eval_expr(s, scope, decl.init);
     // FIXME: handle coercing value to expected_type
+    ASSERT(decl.type_expr == nullptr, decl);
 
     if (!decl.name_is_discard()) {
         decl.sym->value = value;
@@ -1855,6 +1856,46 @@ void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
     }
 }
 
+void sema_stmt_def(State& s, Scope& scope, ast::VarStmt& stmt) {
+    if (!stmt.name_is_discard()) {
+        // alread define the thing, as it may be needed recursivelly
+        stmt.sym = scope.define(stmt.name, stmt.name_loc, {}, false, true);
+    }
+
+    auto expected_type = sema_some_var(s, scope,
+                                       {.type_expr = stmt.type_expr,
+                                        .init = stmt.init,
+                                        .loc = stmt.loc,
+                                        .should_fixup = false});
+    if (stmt.init == nullptr) {
+        s.er.report_error(stmt.loc, "constants must have an initializer");
+    }
+
+    auto value = eval_expr(s, scope, stmt.init);
+    // FIXME: handle coercing value to expected_type
+    ASSERT(stmt.type_expr == nullptr, stmt);
+
+    if (!stmt.name_is_discard()) {
+        stmt.sym->value = value;
+    }
+
+    // FIXME: currently there is no way to make a local def distinct. Keeping
+    // the code here as a reminder. Do we want to add attributes to locals? Or
+    // use something else for signaling distinct?
+    if (stmt.sym && stmt.sym->is_distinct()) {
+        auto type = stmt.sym->value.type;
+        if (type.is_type()) {
+            // as this is distinct, give it a proper definition
+            stmt.sym->value.as.type.sym = stmt.sym;
+        } else {
+            s.er.report_error(stmt.loc,
+                              "distinct has no effect on type definitions, "
+                              "found value of type {}",
+                              type);
+        }
+    }
+}
+
 void sema_stmt_multi_var(State& s, Scope& scope, ast::MultiVarStmt& stmt) {
     auto expected_type = sema_some_multi_var(s, scope,
                                              {.names = stmt.names,
@@ -1946,8 +1987,7 @@ void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
         case ast::StmtKind::If: sema_stmt_if(s, scope, stmt->as_if()); break;
 
         case ast::StmtKind::Var: sema_stmt_var(s, scope, stmt->as_var()); break;
-
-        case ast::StmtKind::Def: PANIC("SEMA: not implemented", *stmt);
+        case ast::StmtKind::Def: sema_stmt_def(s, scope, stmt->as_def()); break;
 
         case ast::StmtKind::MultiVar:
             sema_stmt_multi_var(s, scope, stmt->as_multi_var());

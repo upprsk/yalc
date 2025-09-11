@@ -1,28 +1,8 @@
 module main;
 
-@extern
-func getchar() s32;
-
-@distinct
-def string = []const u8;
-
-func test_string(s: string) {}
-func test_slice(s: []const u8) {}
-
 func main() {
-    var string_var: string;
-    var slice_var:  []const u8;
-
-    var hey: typeof(string_var);
-
-    // test_string(string_var);
-    // test_slice(string_var);
-
-    // test_string(slice_var);
-    // test_slice(slice_var);
-
-    test_string(hey);
-    test_slice(hey);
+    def KB    = 1024;
+    def BUFSZ = KB;
 }
 
 // vim: ft=yal
