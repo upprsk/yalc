@@ -25,6 +25,7 @@ void to_json(nlohmann::json& j, Type const& n) {
 
     switch (n.kind) {
         case TypeKind::Err:
+        case TypeKind::PendingCast:
         case TypeKind::Void:
         case TypeKind::Type: break;
 
@@ -60,6 +61,9 @@ void to_repr(fmt::format_context& ctx, Type const& type) {
 
     switch (type.kind) {
         case TypeKind::Err: fmt::format_to(ctx.out(), "#error#"); break;
+        case TypeKind::PendingCast:
+            fmt::format_to(ctx.out(), "#pending-cast#");
+            break;
         case TypeKind::Void: fmt::format_to(ctx.out(), "void"); break;
         case TypeKind::Type: fmt::format_to(ctx.out(), "type"); break;
 
@@ -118,6 +122,7 @@ auto fmt::formatter<yal::ty::TypeKind>::format(yal::ty::TypeKind const& p,
     std::string_view name = "???";
     switch (p) {
         case yal::ty::TypeKind::Err: name = "Err"; break;
+        case yal::ty::TypeKind::PendingCast: name = "PendingCast"; break;
         case yal::ty::TypeKind::Void: name = "Void"; break;
         case yal::ty::TypeKind::Type: name = "Type"; break;
         case yal::ty::TypeKind::Int: name = "Int"; break;

@@ -17,6 +17,7 @@ namespace yal::ty {
 
 enum struct TypeKind : uint8_t {
     Err,
+    PendingCast,
 
     Void,
     Type,

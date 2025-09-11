@@ -10,12 +10,17 @@ func noice() (s32, s32) {
     return 0, 1;
 }
 
+def C = 10;
+
 func main() {
-    var a, b = noice();
+    var a, b, c = noice(), 10 + C;
 
     var x = 10 + a;
     var y = 20 + b;
+    var z = 30 + c;
     var z = add_ptrs(x&, y&);
+
+    var w = a + b + cast(_)c;
 }
 
 // vim: ft=yal

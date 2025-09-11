@@ -1126,13 +1126,16 @@ auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
     }
 
     else if (expected_types.empty()) {
+        std::vector<std::pair<ast::Expr*, bool>> init_for_expanded_type;
         for (auto const& init_expr : var.inits) {
             if (init_expr->type.is_tuple()) {
                 for (auto const& ty : init_expr->type.as.tuple->items) {
                     expected_types.push_back(ty);
+                    init_for_expanded_type.emplace_back(init_expr, true);
                 }
             } else {
                 expected_types.push_back(init_expr->type);
+                init_for_expanded_type.emplace_back(init_expr, false);
             }
         }
 
@@ -1150,6 +1153,22 @@ auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
                         init_expr->type.as.tuple->items.size(),
                         init_expr->type);
                 }
+            }
+        }
+
+        for (size_t i = 0; i < expected_types.size(); ++i) {
+            auto& expected_type = expected_types[i];
+
+            // in case the type of the expression is comptime_int, then we need
+            // to move it to the default integer type
+            if (expected_type.is_comptime_int() && var.should_fixup) {
+                expected_type = get_default_int();
+
+                ASSERT(init_for_expanded_type[i].second == false,
+                       "should never get a comptime_int from a tuple",
+                       *init_for_expanded_type[i].first);
+                fixup_comptime_integers_in_expr(
+                    s, init_for_expanded_type[i].first, expected_type);
             }
         }
     }
@@ -1186,34 +1205,28 @@ auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
             auto expected_type_expr = var.type_exprs[i];
             auto init_type = init_types[i];
 
-            // we may have failed to get the type from type_expr, in such case
-            // we don't do anything here
-            if (expected_type.is_valid()) {
-                auto result =
-                    coerce_type(s, init_type.first, expected_type,
-                                {.loc = var.loc,
-                                 .source_loc = init_type.second,
-                                 .target_loc = expected_type_expr->loc});
-                if (result.source_requires_fixup) {
-                    fixup_comptime_integers_in_expr(s, expected_type_expr,
-                                                    result.type);
-                }
-
-                // FIXME: handle when an implicit conversion happens, as that
-                // requires an additonal AST node.
-
-                if (s.opts.verbose_coercions) {
-                    s.er.report_debug(
-                        var.loc,
-                        "{} -> {} result={} (requires_a_cast={}, "
-                        "source_requires_fixup={})",
-                        init_type, expected_type, result.type,
-                        result.requires_a_cast ? "yes" : "no",
-                        result.source_requires_fixup ? "yes" : "no");
-                }
-
-                expected_type = result.type;
+            auto result = coerce_type(s, init_type.first, expected_type,
+                                      {.loc = var.loc,
+                                       .source_loc = init_type.second,
+                                       .target_loc = expected_type_expr->loc});
+            if (result.source_requires_fixup) {
+                fixup_comptime_integers_in_expr(s, expected_type_expr,
+                                                result.type);
             }
+
+            // FIXME: handle when an implicit conversion happens, as that
+            // requires an additonal AST node.
+
+            if (s.opts.verbose_coercions) {
+                s.er.report_debug(var.loc,
+                                  "{} -> {} result={} (requires_a_cast={}, "
+                                  "source_requires_fixup={})",
+                                  init_type, expected_type, result.type,
+                                  result.requires_a_cast ? "yes" : "no",
+                                  result.source_requires_fixup ? "yes" : "no");
+            }
+
+            expected_type = result.type;
         }
     }
 
