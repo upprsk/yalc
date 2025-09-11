@@ -669,7 +669,7 @@ public:
     constexpr static auto const PREC_MUL = 7;
     constexpr static auto const PREC_ADD = 6;
     // constexpr static auto const PREC_SHIFT = 5;
-    // constexpr static auto const PREC_COMP = 4;
+    constexpr static auto const PREC_COMP = 4;
     // constexpr static auto const PREC_BIT = 3;
     // constexpr static auto const PREC_LOGIC = 2;
     // constexpr static auto const PREC_ASSIGN = 1;
@@ -711,6 +711,12 @@ public:
         if (match(TokenType::Minus)) {
             auto child = parse_expr_with_precedence(PREC_UNARY);
             return ast_file->expr_neg(to_loc(start_span.extend(prev_span())),
+                                      child);
+        }
+
+        if (match(TokenType::Bang)) {
+            auto child = parse_expr_with_precedence(PREC_UNARY);
+            return ast_file->expr_not(to_loc(start_span.extend(prev_span())),
                                       child);
         }
 
@@ -817,6 +823,14 @@ public:
             case TokenType::Star: kind = ast::ExprKind::Mul; break;
             case TokenType::Slash: kind = ast::ExprKind::Div; break;
             case TokenType::Percent: kind = ast::ExprKind::Mod; break;
+            case TokenType::EqualEqual: kind = ast::ExprKind::Equal; break;
+            case TokenType::BangEqual: kind = ast::ExprKind::NotEqual; break;
+            case TokenType::Less: kind = ast::ExprKind::Less; break;
+            case TokenType::LessEqual: kind = ast::ExprKind::LessEqual; break;
+            case TokenType::Greater: kind = ast::ExprKind::Greater; break;
+            case TokenType::GreaterEqual:
+                kind = ast::ExprKind::GreaterEqual;
+                break;
             default:
                 UNREACHABLE("unexpected token kind in parse infix", tok, *left);
         }
@@ -835,6 +849,13 @@ public:
             case TokenType::Star:
             case TokenType::Slash:
             case TokenType::Percent: return PREC_MUL;
+
+            case TokenType::Less:
+            case TokenType::LessEqual:
+            case TokenType::Greater:
+            case TokenType::GreaterEqual:
+            case TokenType::EqualEqual:
+            case TokenType::BangEqual: return PREC_COMP;
 
             case TokenType::Lparen:
             case TokenType::Dot: return PREC_CALL;

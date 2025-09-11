@@ -54,6 +54,10 @@ struct File {
         return expr_arith(loc, ExprKind::Neg, child, nullptr);
     }
 
+    auto expr_not(Location loc, Expr* child) -> ArithExpr* {
+        return expr_arith(loc, ExprKind::Not, child, nullptr);
+    }
+
     auto expr_cast(Location loc, Expr* type_expr, Expr* child) -> ArithExpr* {
         return expr_arith(loc, ExprKind::Cast, type_expr, child);
     }

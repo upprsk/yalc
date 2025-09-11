@@ -290,6 +290,9 @@ auto unify_types(State& s, ty::Type lhs, ty::Type rhs, UnifyOpts const& opts)
     // both are comptime_int
     if (lhs.is_comptime_int()) return {.type = lhs};
 
+    // both are bool
+    if (lhs.is_bool()) return {.type = lhs};
+
     // both are integers
     if (lhs.is_int()) {
         auto const& source_int = lhs.as.integer;
@@ -446,6 +449,15 @@ auto type_supports_operator(ty::Type type, ast::ExprKind op) -> bool {
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod: return type.is_int() || type.is_comptime_int();
 
+        case ast::ExprKind::Not:
+        case ast::ExprKind::Equal:
+        case ast::ExprKind::NotEqual:
+        case ast::ExprKind::Less:
+        case ast::ExprKind::Greater:
+        case ast::ExprKind::LessEqual:
+        case ast::ExprKind::GreaterEqual:
+            return type.is_int() || type.is_comptime_int() || type.is_bool();
+
         default: PANIC("invalid op received", op);
     }
 }
@@ -499,6 +511,13 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
+        case ast::ExprKind::Not:
+        case ast::ExprKind::Equal:
+        case ast::ExprKind::NotEqual:
+        case ast::ExprKind::Less:
+        case ast::ExprKind::Greater:
+        case ast::ExprKind::LessEqual:
+        case ast::ExprKind::GreaterEqual:
         case ast::ExprKind::Deref:
         case ast::ExprKind::Ref: break;
 
@@ -605,6 +624,13 @@ void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
         case ast::ExprKind::Mul:
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
+        case ast::ExprKind::Not:
+        case ast::ExprKind::Equal:
+        case ast::ExprKind::NotEqual:
+        case ast::ExprKind::Less:
+        case ast::ExprKind::Greater:
+        case ast::ExprKind::LessEqual:
+        case ast::ExprKind::GreaterEqual:
             fixup_types_in_expr(s, expr->as_arith().lhs, target_type);
             fixup_types_in_expr(s, expr->as_arith().rhs, target_type);
 
@@ -668,6 +694,13 @@ auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
         case ast::ExprKind::Cast:
+        case ast::ExprKind::Not:
+        case ast::ExprKind::Equal:
+        case ast::ExprKind::NotEqual:
+        case ast::ExprKind::Less:
+        case ast::ExprKind::Greater:
+        case ast::ExprKind::LessEqual:
+        case ast::ExprKind::GreaterEqual:
             // not rvalue
             return {};
 
@@ -705,7 +738,10 @@ auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
 
         case ast::ExprKind::Id: {
             auto& id = expr->as_id();
-            ASSERT(id.sym != nullptr);
+
+            // in case there is no sym, return that it is an lvalue to reduce
+            // bogus error messages
+            if (id.sym == nullptr) return {.is_lvalue = true};
 
             // this is an rvalue, and may or may not be a constant depending on
             // the symbol
@@ -774,6 +810,60 @@ void sema_expr_arith(State& s, Scope& scope, ast::ArithExpr& expr,
             s.er.report_error(expr.loc,
                               "operator {} can not be used with type {}",
                               operator_to_sym(expr.kind), expr.type);
+        }
+    }
+}
+
+void sema_expr_comp(State& s, Scope& scope, ast::ArithExpr& expr,
+                    ty::Type expected_type) {
+    sema_expr(s, scope, expr.lhs, expected_type);
+    sema_expr(s, scope, expr.rhs, expected_type);
+
+    expr.type = ty::make_bool();
+
+    if (expr.lhs && expr.rhs) {
+        auto result = unify_types(s, expr.lhs->type, expr.rhs->type,
+                                  {.loc = expr.loc,
+                                   .lhs_loc = expr.lhs->loc,
+                                   .rhs_loc = expr.rhs->loc,
+                                   .expected_type = expected_type});
+        if (result.lhs_requires_fixup) {
+            fixup_types_in_expr(s, expr.lhs, result.type);
+        }
+        if (result.rhs_requires_fixup) {
+            fixup_types_in_expr(s, expr.rhs, result.type);
+        }
+
+        // FIXME: handle when an implicit conversion happens, as that
+        // requires an additonal AST node.
+
+        if (s.opts.verbose_coercions) {
+            s.er.report_debug(expr.loc,
+                              "{} <-> {} result={} (lhs_requires_fixup={}, "
+                              "rhs_requires_fixup={})",
+                              expr.lhs->type, expr.rhs->type, result.type,
+                              result.lhs_requires_fixup ? "yes" : "no",
+                              result.rhs_requires_fixup ? "yes" : "no");
+        }
+
+        // check that the operator is supported by the type
+        if (result.type.is_valid()) {
+            if (!type_supports_operator(result.type, expr.kind)) {
+                s.er.report_error(expr.loc,
+                                  "operator {} can not be used with type {}",
+                                  operator_to_sym(expr.kind), result.type);
+            }
+        }
+    }
+
+    else if (expr.lhs) {
+        // check that the operator is supported by the type
+        if (expr.lhs->type.is_valid()) {
+            if (!type_supports_operator(expr.lhs->type, expr.kind)) {
+                s.er.report_error(expr.loc,
+                                  "operator {} can not be used with type {}",
+                                  operator_to_sym(expr.kind), expr.lhs->type);
+            }
         }
     }
 }
@@ -954,6 +1044,17 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
         case ast::ExprKind::Div:
         case ast::ExprKind::Mod:
             sema_expr_arith(s, scope, expr->as_arith(), expected_type);
+            break;
+
+        case ast::ExprKind::Not:
+
+        case ast::ExprKind::Equal:
+        case ast::ExprKind::NotEqual:
+        case ast::ExprKind::Less:
+        case ast::ExprKind::Greater:
+        case ast::ExprKind::LessEqual:
+        case ast::ExprKind::GreaterEqual:
+            sema_expr_comp(s, scope, expr->as_arith(), expected_type);
             break;
 
         case ast::ExprKind::Cast:

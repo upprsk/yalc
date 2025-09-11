@@ -24,6 +24,14 @@ enum struct ExprKind : uint8_t {
     Div,
     Mod,
 
+    Not,
+    Equal,
+    NotEqual,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
+
     Cast,
 
     Field,

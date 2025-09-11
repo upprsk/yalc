@@ -3,8 +3,15 @@ module main;
 @extern
 func getchar() s32;
 
+func discard_until_eof() {
+    var c: s32;
+    while c > 0 {
+        c = getchar();
+    }
+}
+
 func main() {
-    var i = -1;
+    discard_until_eof();
 }
 
 // vim: ft=yal

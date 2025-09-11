@@ -101,6 +101,13 @@ void scan_expr_for_global_refs(State& s, LocalScope& scope, ast::Expr* expr) {
         case ExprKind::Mul:
         case ExprKind::Div:
         case ExprKind::Mod:
+        case ast::ExprKind::Not:
+        case ast::ExprKind::Equal:
+        case ast::ExprKind::NotEqual:
+        case ast::ExprKind::Less:
+        case ast::ExprKind::Greater:
+        case ast::ExprKind::LessEqual:
+        case ast::ExprKind::GreaterEqual:
         case ExprKind::Cast:
         case ExprKind::Deref:
         case ExprKind::Ref: {

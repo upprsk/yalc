@@ -121,6 +121,13 @@ void to_json(nlohmann::json& j, Expr const& n) {
         case ExprKind::Mul:
         case ExprKind::Div:
         case ExprKind::Mod:
+        case ExprKind::Not:
+        case ExprKind::Equal:
+        case ExprKind::NotEqual:
+        case ExprKind::Less:
+        case ExprKind::Greater:
+        case ExprKind::LessEqual:
+        case ExprKind::GreaterEqual:
         case ExprKind::Deref:
         case ExprKind::Ref: {
             auto& arith = n.as_arith();
@@ -397,6 +404,13 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
         case ExprKind::Mul:
         case ExprKind::Div:
         case ExprKind::Mod:
+        case ExprKind::Not:
+        case ExprKind::Equal:
+        case ExprKind::NotEqual:
+        case ExprKind::Less:
+        case ExprKind::Greater:
+        case ExprKind::LessEqual:
+        case ExprKind::GreaterEqual:
         case ExprKind::Deref:
         case ExprKind::Ref: {
             auto& arith = expr.as_arith();
@@ -767,6 +781,13 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::Mul: name = "Mul"; break;
         case yal::ast::ExprKind::Div: name = "Div"; break;
         case yal::ast::ExprKind::Mod: name = "Mod"; break;
+        case yal::ast::ExprKind::Not: name = "Not"; break;
+        case yal::ast::ExprKind::Equal: name = "Equal"; break;
+        case yal::ast::ExprKind::NotEqual: name = "NotEqual"; break;
+        case yal::ast::ExprKind::Less: name = "Less"; break;
+        case yal::ast::ExprKind::Greater: name = "Greater"; break;
+        case yal::ast::ExprKind::LessEqual: name = "LessEqual"; break;
+        case yal::ast::ExprKind::GreaterEqual: name = "GreaterEqual"; break;
         case yal::ast::ExprKind::Cast: name = "Cast"; break;
         case yal::ast::ExprKind::Field: name = "Field"; break;
         case yal::ast::ExprKind::Call: name = "Call"; break;
