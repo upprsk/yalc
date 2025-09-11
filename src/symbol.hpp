@@ -35,6 +35,7 @@ struct Symbol {
 
     bool is_const;
     bool is_local;
+    bool is_extern;
 };
 
 class SymbolStore {

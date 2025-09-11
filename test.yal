@@ -1,27 +1,10 @@
 module main;
 
-func add_ptrs(a: *const s32, b: *const s32) s32 {
-    return a.* + b.*;
-}
-
-func add_all(s: []const s32) s32 {}
-
-func noice() (s32, s32) {
-    return 0, 1;
-}
-
-def C = 10;
+@extern
+func getchar() s32;
 
 func main() {
-    var a, b, c = noice(), 10 + C;
-
-    var x = 10 + a;
-    var y = 20 + b;
-    var z = 30 + c;
-    var z = add_ptrs(x&, y&);
-
-    var w = a + b + cast(_)c;
-    var it_works = 10 + a + cast(_)(c + 1) + C;
+    var c = cast(u8)getchar();
 }
 
 // vim: ft=yal

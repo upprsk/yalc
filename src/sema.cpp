@@ -1282,6 +1282,32 @@ auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
 
 // ============================================================================
 
+void sema_attributes(State& s, Scope& /* scope */, Symbol* sym,
+                     std::span<ast::DeclAttribute> attributes) {
+    for (auto const& attribute : attributes) {
+        if (!attribute.qualified_name.empty()) {
+            s.er.report_error(attribute.loc,
+                              "qualified attributes have not been implemented");
+            continue;
+        }
+
+        if (attribute.name == "extern") {
+            sym->is_extern = true;
+
+            if (attribute.args.size() > 0 || attribute.kwargs.size() > 0) {
+                s.er.report_bug(
+                    attribute.loc,
+                    "arguments for @extern have not been implemented yet");
+            }
+        } else {
+            s.er.report_warn(attribute.loc, "unknown attribute @{}",
+                             attribute.name);
+        }
+    }
+}
+
+// ============================================================================
+
 void sema_func_params(State& s, Scope& scope, ast::FuncDecl& decl) {
     for (auto& p : decl.params) {
         auto param_scope = scope.make_child(p.loc);
@@ -1365,8 +1391,7 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     auto scope = parent_scope.make_child(decl.name_loc);
     scope.current_decl = &decl;
 
-    ASSERT(decl.attributes.size() == 0, decl.name,
-           "attributes have not been implemented yet");
+    sema_attributes(s, scope, decl.sym, decl.attributes);
 
     sema_func_params(s, scope, decl);
     sema_func_rets(s, scope, decl);
@@ -1671,10 +1696,17 @@ void sema_func_decl(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     for (auto& p : decl.params) scope.define(p.sym);
 
     if (decl.body) {
+        if (decl.sym->is_extern) {
+            s.er.report_error(
+                decl.loc, "function marked with @extern can not have a body");
+        }
+
         sema_stmt(s, scope, decl.body);
     } else {
-        // FIXME: add @extern support
-        s.er.report_error(decl.loc, "missing function body, missing @extern?");
+        if (!decl.sym->is_extern) {
+            s.er.report_error(decl.loc,
+                              "missing function body, missing @extern?");
+        }
     }
 }
 

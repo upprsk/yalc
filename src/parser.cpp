@@ -291,7 +291,7 @@ public:
         }
 
         return ast::DeclAttribute{
-            .loc = to_loc(start_span),
+            .loc = to_loc(start_span.extend(prev_span())),
             .qualified_name = qualified_name,
             .name = attribute_name,
             .args = ast_file->dupe_exprs(args),
