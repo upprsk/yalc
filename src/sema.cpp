@@ -552,9 +552,19 @@ auto eval_expr_to_type(State& s, Scope& scope, ast::Expr* expr) -> ty::Type {
 auto cast_expr_apply(State& s, ast::CastExpr& expr, ty::Type type) -> ty::Type;
 
 void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
+    if (s.opts.verbose_coercions) {
+        s.er.report_debug(expr->loc, "fixup: {} -> {}", expr->type,
+                          target_type);
+    }
+
+    // in case of an error, just abort
+    if (expr->type.is_err() || target_type.is_err() ||
+        target_type.is_comptime_int())
+        return;
+
     ASSERT(expr->type.is_comptime_int() || expr->type.is_pending_cast(),
            expr->type);
-    ASSERT(target_type.is_int());
+    ASSERT(target_type.is_int(), target_type);
 
     switch (expr->kind) {
         case ast::ExprKind::Err: break;
@@ -570,6 +580,10 @@ void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
         case ast::ExprKind::Mod:
             fixup_types_in_expr(s, expr->as_arith().lhs, target_type);
             fixup_types_in_expr(s, expr->as_arith().rhs, target_type);
+
+            // FIXME: this does not look right, should probably do a full
+            // re-check of the expr
+            expr->type = target_type;
             break;
 
         case ast::ExprKind::Deref:
@@ -790,6 +804,8 @@ void sema_expr_call(State& s, Scope& scope, ast::CallExpr& expr,
     std::span<ty::Type const> expected_args;
     std::span<ty::Type const> expected_rets;
 
+    auto is_err = false;
+
     if (expr.callee->type.is_func()) {
         expected_args = expr.callee->type.as.func->params;
         expected_rets = expr.callee->type.as.func->rets;
@@ -801,9 +817,13 @@ void sema_expr_call(State& s, Scope& scope, ast::CallExpr& expr,
                               expected_args.size(), expr.args.size());
         }
     } else {
-        s.er.report_error(expr.callee->loc,
-                          "can not call value of non-function type {}",
-                          expr.callee->type);
+        if (!expr.callee->type.is_err()) {
+            s.er.report_error(expr.callee->loc,
+                              "can not call value of non-function type {}",
+                              expr.callee->type);
+        }
+
+        is_err = true;
     }
 
     for (auto const& [idx, arg] : std::views::enumerate(expr.args)) {
@@ -838,6 +858,11 @@ void sema_expr_call(State& s, Scope& scope, ast::CallExpr& expr,
         expr.type = expected_rets[0];
     } else {
         expr.type = s.ts.type_tuple(expected_rets);
+    }
+
+    // in case of an error, set our return to an error as well
+    if (is_err) {
+        expr.type = ty::Type{};
     }
 }
 
