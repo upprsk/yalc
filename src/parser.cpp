@@ -644,18 +644,25 @@ public:
 
     // ========================================================================
 
+    /// These are some tokens that can only happen at the top-level, and because
+    /// of that we are sure that a block is done.
+    [[nodiscard]] auto is_block_terminator() const -> bool {
+        return check("func") || check("import");
+    }
+
     auto parse_block() -> ast::BlockStmt* {
         auto start_span = span();
 
-        if (!consume(TokenType::Lbrace)) PANIC("handle missing '{' in block");
+        auto had_missing_brace = !consume(TokenType::Lbrace);
 
         std::vector<ast::Stmt*> children;
-        while (!is_at_end() && !check(TokenType::Rbrace)) {
+        while (!is_at_end() && !check(TokenType::Rbrace) &&
+               !is_block_terminator()) {
             auto stmt = parse_stmt();
             children.push_back(stmt);
         }
 
-        (void)consume(TokenType::Rbrace);
+        if (!had_missing_brace) (void)consume(TokenType::Rbrace);
 
         return ast_file->stmt_block(to_loc(start_span.extend(prev_span())),
                                     children);
@@ -1292,8 +1299,8 @@ public:
     }
 
     void recover_parse_expr() {
-        skip_while_not(TokenType::Eof, TokenType::Semi, "var", "def", "func",
-                       "return");
+        skip_while_not(TokenType::Eof, TokenType::Semi, TokenType::Rbrace,
+                       "var", "def", "func", "return");
         if (check(TokenType::Semi)) advance();
     }
 
