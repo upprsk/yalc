@@ -116,6 +116,13 @@ void scan_expr_for_global_refs(State& s, LocalScope& scope, ast::Expr* expr) {
             scan_expr_for_global_refs(s, scope, arith.rhs);
         } break;
 
+        case ExprKind::Index: {
+            auto& index = expr->as_index();
+            scan_expr_for_global_refs(s, scope, index.obj);
+            scan_expr_for_global_refs(s, scope, index.index_start);
+            scan_expr_for_global_refs(s, scope, index.index_end);
+        } break;
+
         case ExprKind::Field: {
             auto& field = expr->as_field();
             scan_expr_for_global_refs(s, scope, field.obj);

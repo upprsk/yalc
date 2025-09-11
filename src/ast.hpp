@@ -68,6 +68,13 @@ struct File {
                                             rhs);
     }
 
+    auto expr_index(Location loc, Expr* obj, Expr* index_start, Expr* index_end,
+                    bool is_slicing) -> IndexExpr* {
+        return node_arena.create<IndexExpr>(
+            Expr{.kind = ExprKind::Index, .loc = loc}, obj, index_start,
+            index_end, is_slicing);
+    }
+
     auto expr_field(Location loc, Expr* obj, std::string_view name)
         -> FieldExpr* {
         return node_arena.create<FieldExpr>(

@@ -34,6 +34,7 @@ enum struct ExprKind : uint8_t {
 
     Cast,
 
+    Index,
     Field,
     Call,
 
@@ -53,6 +54,7 @@ enum struct ExprKind : uint8_t {
 
 struct ArithExpr;
 struct CastExpr;
+struct IndexExpr;
 struct FieldExpr;
 struct CallExpr;
 struct PtrExpr;
@@ -80,6 +82,7 @@ struct Expr {
 
     [[nodiscard]] auto as_arith() const -> ArithExpr const&;
     [[nodiscard]] auto as_cast() const -> CastExpr const&;
+    [[nodiscard]] auto as_index() const -> IndexExpr const&;
     [[nodiscard]] auto as_field() const -> FieldExpr const&;
     [[nodiscard]] auto as_call() const -> CallExpr const&;
     [[nodiscard]] auto as_ptr() const -> PtrExpr const&;
@@ -90,6 +93,7 @@ struct Expr {
     [[nodiscard]] auto as_string() const -> StringExpr const&;
 
     [[nodiscard]] auto as_arith() -> ArithExpr&;
+    [[nodiscard]] auto as_index() -> IndexExpr&;
     [[nodiscard]] auto as_cast() -> CastExpr&;
     [[nodiscard]] auto as_field() -> FieldExpr&;
     [[nodiscard]] auto as_call() -> CallExpr&;
@@ -138,6 +142,13 @@ struct CastExpr : public Expr {
     [[nodiscard]] constexpr auto type_is_infer() const -> bool {
         return type_expr ? type_expr->is_id_discard() : false;
     }
+};
+
+struct IndexExpr : public Expr {
+    Expr* obj = nullptr;
+    Expr* index_start = nullptr;
+    Expr* index_end = nullptr;
+    bool  is_slicing = false;
 };
 
 struct FieldExpr : Expr {

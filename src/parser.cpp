@@ -806,6 +806,10 @@ public:
             return parse_call(left);
         }
 
+        if (tok.type == TokenType::Lbracket) {
+            return parse_index(left);
+        }
+
         if (tok.type == TokenType::Ampersand) {
             return ast_file->expr_ref(left->loc.extend(tok.span), left);
         }
@@ -858,6 +862,7 @@ public:
             case TokenType::BangEqual: return PREC_COMP;
 
             case TokenType::Lparen:
+            case TokenType::Lbracket:
             case TokenType::Dot: return PREC_CALL;
 
             case TokenType::Ampersand:
@@ -941,6 +946,29 @@ public:
 
         return ast_file->expr_call(callee->loc.extend(prev_span()),
                                    to_loc(args_span), callee, args);
+    }
+
+    auto parse_index(ast::Expr* obj) -> ast::Expr* {
+        auto       is_slicing = false;
+        ast::Expr* index_start = nullptr;
+        ast::Expr* index_end = nullptr;
+        if (!check(TokenType::Colon)) {
+            index_start = parse_expr_without_recover();
+        }
+
+        if (match(TokenType::Colon)) {
+            is_slicing = true;
+            if (!check(TokenType::Rbracket)) {
+                index_end = parse_expr_without_recover();
+            }
+        }
+
+        if (!consume(TokenType::Rbracket)) {
+            recover_parse_index();
+        }
+
+        return ast_file->expr_index(obj->loc.extend(prev_span()), obj,
+                                    index_start, index_end, is_slicing);
     }
 
     // ------------------------------------------------------------------------
@@ -1273,6 +1301,12 @@ public:
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
                        TokenType::Lbrace, TokenType::Semi, TokenType::Attribute,
                        "var", "def", "func");
+    }
+
+    void recover_parse_index() {
+        skip_while_not(TokenType::Eof, TokenType::Rbracket, TokenType::Lbrace,
+                       TokenType::Semi, TokenType::Attribute, "var", "def",
+                       "func");
     }
 
     void recover_parse_array_count() {

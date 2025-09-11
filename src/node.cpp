@@ -19,6 +19,7 @@ using nlohmann::json;
 // clang-format off
 auto Expr::as_arith() const -> ArithExpr const& { return static_cast<ArithExpr const&>(*this); }
 auto Expr::as_cast() const -> CastExpr const& { return static_cast<CastExpr const&>(*this); }
+auto Expr::as_index() const -> IndexExpr const& { return static_cast<IndexExpr const&>(*this); }
 auto Expr::as_field() const -> FieldExpr const& { return static_cast<FieldExpr const&>(*this); }
 auto Expr::as_call() const -> CallExpr const& { return static_cast<CallExpr const&>(*this); }
 auto Expr::as_ptr() const -> PtrExpr const& { return static_cast<PtrExpr const&>(*this); }
@@ -30,6 +31,7 @@ auto Expr::as_string() const -> StringExpr const& { return static_cast<StringExp
 
 auto Expr::as_arith() -> ArithExpr& { return static_cast<ArithExpr&>(*this); }
 auto Expr::as_cast() -> CastExpr& { return static_cast<CastExpr&>(*this); }
+auto Expr::as_index() -> IndexExpr& { return static_cast<IndexExpr&>(*this); }
 auto Expr::as_field() -> FieldExpr& { return static_cast<FieldExpr&>(*this); }
 auto Expr::as_call() -> CallExpr& { return static_cast<CallExpr&>(*this); }
 auto Expr::as_ptr() -> PtrExpr& { return static_cast<PtrExpr&>(*this); }
@@ -108,6 +110,7 @@ void to_json_arr(json& j, std::span<T> const& items) {
     }
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void to_json(nlohmann::json& j, Expr const& n) {
     j = json{
         {"kind",                n.kind},
@@ -141,6 +144,14 @@ void to_json(nlohmann::json& j, Expr const& n) {
             auto& cast = n.as_cast();
             j["type_expr"] = cast.type_expr ? *cast.type_expr : json{};
             j["child"] = cast.child ? *cast.child : json{};
+        } break;
+
+        case ExprKind::Index: {
+            auto& index = n.as_index();
+            j["obj"] = index.obj ? *index.obj : json{};
+            j["index_start"] = index.index_start ? *index.index_start : json{};
+            j["index_end"] = index.index_end ? *index.index_end : json{};
+            j["is_slicing"] = index.is_slicing;
         } break;
 
         case ExprKind::Field: {
@@ -432,6 +443,20 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
 
             indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, cast.child, depth + 1);
+        } break;
+
+        case ExprKind::Index: {
+            auto& index = expr.as_index();
+
+            if (index.is_slicing) fmt::format_to(ctx.out(), " slicing");
+
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, index.obj, depth + 1);
+
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, index.index_start, depth + 1);
+            indent_by_wln(ctx, depth + 1);
+            to_lisp(ctx, index.index_end, depth + 1);
         } break;
 
         case ExprKind::Field: {
@@ -791,6 +816,7 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::LessEqual: name = "LessEqual"; break;
         case yal::ast::ExprKind::GreaterEqual: name = "GreaterEqual"; break;
         case yal::ast::ExprKind::Cast: name = "Cast"; break;
+        case yal::ast::ExprKind::Index: name = "Index"; break;
         case yal::ast::ExprKind::Field: name = "Field"; break;
         case yal::ast::ExprKind::Call: name = "Call"; break;
         case yal::ast::ExprKind::Deref: name = "Deref"; break;

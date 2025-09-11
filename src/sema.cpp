@@ -484,6 +484,10 @@ auto type_supports_operator(ty::Type type, ast::ExprKind op) -> bool {
     }
 }
 
+auto type_supports_index(ty::Type type) -> bool {
+    return type.is_slice() || type.is_array() || type.is_multi_ptr();
+}
+
 auto operator_to_sym(ast::ExprKind op) -> std::string_view {
     std::string_view name = "?";
     switch (op) {
@@ -543,7 +547,8 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
         case ast::ExprKind::Deref:
         case ast::ExprKind::Ref: break;
 
-        case ast::ExprKind::Cast: break;
+        case ast::ExprKind::Cast:
+        case ast::ExprKind::Index: break;
 
         case ast::ExprKind::Field:
         case ast::ExprKind::Call: {
@@ -710,6 +715,7 @@ void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
             expr->type = cast_expr_apply(s, cast, target_type);
         } break;
 
+        case ast::ExprKind::Index:
         case ast::ExprKind::Field:
         case ast::ExprKind::Call:
         case ast::ExprKind::Ptr:
@@ -741,9 +747,9 @@ struct LvalueInfo {
     bool is_const = false;
 };
 
-auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
+auto calc_lvalue_info(ast::Expr* expr) -> LvalueInfo {
     if (!expr)
-        // not rvalue
+        // not lvalue
         return {};
 
     switch (expr->kind) {
@@ -762,21 +768,32 @@ auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
         case ast::ExprKind::Greater:
         case ast::ExprKind::LessEqual:
         case ast::ExprKind::GreaterEqual:
-            // not rvalue
+            // not lvalue
             return {};
 
+        case ast::ExprKind::Index: {
+            auto& index = expr->as_index();
+            if (index.is_slicing) return {};  // not lvalue
+
+            auto info = calc_lvalue_info(index.obj);
+
+            auto is_const =
+                index.obj ? index.obj->type.flags.is_const() : false;
+            return {.is_lvalue = info.is_lvalue, .is_const = is_const};
+        }
+
         case ast::ExprKind::Field:
-            // is an rvalue depending on obj
-            // FIXME: check when this is ok, for now it is not an rvalue
+            // is an lvalue depending on obj
+            // FIXME: check when this is ok, for now it is not an lvalue
             return {};
 
         case ast::ExprKind::Call:
-            // not an rvalue
+            // not an lvalue
             return {};
 
         case ast::ExprKind::Deref: {
             auto& deref = expr->as_arith();
-            auto  info = calc_rvalue_info(deref.lhs);
+            auto  info = calc_lvalue_info(deref.lhs);
 
             auto is_const =
                 deref.lhs ? deref.lhs->type.flags.is_const() : false;
@@ -784,17 +801,17 @@ auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
         }
 
         case ast::ExprKind::Ref:
-            // not an rvalue
+            // not an lvalue
             return {};
 
         case ast::ExprKind::Ptr:
         case ast::ExprKind::MultiPtr:
         case ast::ExprKind::Slice:
-            // not an rvalue
+            // not an lvalue
             return {};
 
         case ast::ExprKind::Array:
-            // FIXME: this would be an rvalue
+            // array type is not an lvalue
             return {};
 
         case ast::ExprKind::Id: {
@@ -804,22 +821,15 @@ auto calc_rvalue_info(ast::Expr* expr) -> LvalueInfo {
             // bogus error messages
             if (id.sym == nullptr) return {.is_lvalue = true};
 
-            // this is an rvalue, and may or may not be a constant depending on
+            // this is an lvalue, and may or may not be a constant depending on
             // the symbol
             return {.is_lvalue = true, .is_const = id.sym->is_const()};
         }
 
         case ast::ExprKind::Kw:
-            // not an rvalue
-            return {};
-
         case ast::ExprKind::Int:
-            // not an rvalue
-            return {};
-
         case ast::ExprKind::String:
-            // NOTE: is this an rvalue? can we do something here? For now it is
-            // not an rvalue
+            // not an lvalue
             return {};
     }
 
@@ -980,8 +990,71 @@ void sema_expr_cast(State& s, Scope& scope, ast::CastExpr& expr,
     expr.type = type;
 }
 
+void sema_expr_index(State& s, Scope& scope, ast::IndexExpr& expr,
+                     ty::Type expected_type) {
+    // FIXME: we need a way to make the expected_type for the child to work,
+    // i.e. make it into a slice/array?
+    expected_type = {};
+    sema_expr(s, scope, expr.obj, expected_type);
+    sema_expr(s, scope, expr.index_start, expected_type);
+    sema_expr(s, scope, expr.index_end, expected_type);
+
+    if (expr.obj) {
+        auto utype = expr.obj->type;
+        if (type_supports_index(utype)) {
+            std::string_view name = "#error#";
+            if (utype.is_slice())
+                name = "slice";
+            else if (utype.is_array())
+                name = "array";
+            else if (utype.is_multi_ptr())
+                name = "multi-pointer";
+
+            if (expr.index_start && !expr.index_start->type.is_any_int()) {
+                s.er.report_error(expr.index_start->loc,
+                                  "can not use non-integer type {} to index {}",
+                                  expr.index_start->type, name);
+            }
+
+            if (expr.index_end && !expr.index_end->type.is_any_int()) {
+                s.er.report_error(expr.index_end->loc,
+                                  "can not use non-integer type {} to index {}",
+                                  expr.index_end->type, name);
+            }
+        }
+
+        else {
+            s.er.report_error(expr.obj->loc,
+                              "can not index into value of type {}", utype);
+        }
+
+        if (utype.is_slice()) {
+            if (expr.is_slicing)
+                expr.type = utype;
+            else
+                expr.type = utype.as.ptr->inner;
+        }
+
+        if (utype.is_multi_ptr()) {
+            if (expr.is_slicing)
+                expr.type = s.ts.type_slice(utype.as.ptr->inner,
+                                            utype.flags.is_const());
+            else
+                expr.type = utype.as.ptr->inner;
+        }
+
+        if (utype.is_array()) {
+            if (expr.is_slicing)
+                expr.type = s.ts.type_slice(utype.as.array->inner,
+                                            utype.flags.is_const());
+            else
+                expr.type = utype.as.array->inner;
+        }
+    }
+}
+
 void sema_expr_call(State& s, Scope& scope, ast::CallExpr& expr,
-                    ty::Type expected_type) {
+                    ty::Type /* expected_type */) {
     sema_expr(s, scope, expr.callee, {});
 
     std::span<ty::Type const> expected_args;
@@ -1072,7 +1145,7 @@ void sema_expr_ref(State& s, Scope& scope, ast::ArithExpr& expr,
     sema_expr(s, scope, expr.lhs, remove_ptr(expected_type));
 
     // NOTE: there might be some bugs sneaking in here
-    auto info = calc_rvalue_info(expr.lhs);
+    auto info = calc_lvalue_info(expr.lhs);
     if (!info.is_lvalue) {
         s.er.report_error(expr.loc, "can not take address of lvalue");
     }
@@ -1120,6 +1193,10 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
 
         case ast::ExprKind::Cast:
             sema_expr_cast(s, scope, expr->as_cast(), expected_type);
+            break;
+
+        case ast::ExprKind::Index:
+            sema_expr_index(s, scope, expr->as_index(), expected_type);
             break;
 
         case ast::ExprKind::Field: PANIC("SEMA EXPR: not implemented", *expr);
@@ -1960,7 +2037,7 @@ void sema_stmt_multi_var(State& s, Scope& scope, ast::MultiVarStmt& stmt) {
 void sema_stmt_assign(State& s, Scope& scope, ast::AssignStmt& stmt) {
     sema_expr(s, scope, stmt.lhs, {});
 
-    auto info = calc_rvalue_info(stmt.lhs);
+    auto info = calc_lvalue_info(stmt.lhs);
     if (!info.is_lvalue) {
         auto loc = stmt.lhs ? stmt.lhs->loc : stmt.loc;
         s.er.report_error(loc, "can not assign to rvalue");

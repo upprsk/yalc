@@ -5,6 +5,14 @@ func main() {
     def BUFSZ = KB;
 
     var buf: [BUFSZ]u8;
+    var buf_0 = buf[0];
+    var buf_1 = buf[:];
+    var buf_2 = buf[0:];
+    var buf_3 = buf[:0];
+    var buf_4 = buf[0:0];
+    var buf_5 = buf[];
+
+    buf[0] = 0;
 }
 
 // vim: ft=yal
