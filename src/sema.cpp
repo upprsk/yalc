@@ -1643,7 +1643,7 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
             decl.sym->value.as.type.sym = decl.sym;
         } else {
             s.er.report_error(decl.loc,
-                              "distinct has no effect on no type definitions, "
+                              "distinct has no effect on type definitions, "
                               "found value of type {}",
                               type);
         }
