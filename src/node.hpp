@@ -101,6 +101,7 @@ struct Expr {
     [[nodiscard]] auto as_string() -> StringExpr&;
 
     [[nodiscard]] auto is_id_discard() const -> bool;
+    [[nodiscard]] auto is_id_with_value(std::string_view value) const -> bool;
 
     /// The find operation of union find.
     [[nodiscard]] constexpr auto find() const -> Expr const* {

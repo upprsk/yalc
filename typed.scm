@@ -35,30 +35,26 @@
           (IdExpr type "u8"
             sym: (Symbol "u8" const (Value type u8))))
         #nullptr#)
+      (VarStmt "hey"
+        sym: (Symbol "hey" local (Value string (distinct of []const u8)))
+        (CallExpr void
+          (IdExpr func(#error#) "typeof"
+            sym: (Symbol "typeof" const (Value func(#error#))))
+          (IdExpr string (distinct of []const u8) "string_var"
+            sym: (Symbol "string_var" local (Value string (distinct of []const u8)))))
+        #nullptr#)
       (ExprStmt
         (CallExpr void
           (IdExpr func(string (distinct of []const u8)) "test_string"
             sym: (Symbol "test_string" const (Value func(string (distinct of []const u8)))))
-          (IdExpr string (distinct of []const u8) "string_var"
-            sym: (Symbol "string_var" local (Value string (distinct of []const u8))))))
+          (IdExpr string (distinct of []const u8) "hey"
+            sym: (Symbol "hey" local (Value string (distinct of []const u8))))))
       (ExprStmt
         (CallExpr void
           (IdExpr func([]const u8) "test_slice"
             sym: (Symbol "test_slice" const (Value func([]const u8))))
-          (IdExpr string (distinct of []const u8) "string_var"
-            sym: (Symbol "string_var" local (Value string (distinct of []const u8))))))
-      (ExprStmt
-        (CallExpr void
-          (IdExpr func(string (distinct of []const u8)) "test_string"
-            sym: (Symbol "test_string" const (Value func(string (distinct of []const u8)))))
-          (IdExpr []const u8 "slice_var"
-            sym: (Symbol "slice_var" local (Value []const u8)))))
-      (ExprStmt
-        (CallExpr void
-          (IdExpr func([]const u8) "test_slice"
-            sym: (Symbol "test_slice" const (Value func([]const u8))))
-          (IdExpr []const u8 "slice_var"
-            sym: (Symbol "slice_var" local (Value []const u8)))))))
+          (IdExpr string (distinct of []const u8) "hey"
+            sym: (Symbol "hey" local (Value string (distinct of []const u8))))))))
   (FuncDecl "test_string"
     sym: (Symbol "test_string" const (Value func(string (distinct of []const u8))))
     (FuncParam string (distinct of []const u8) "s"

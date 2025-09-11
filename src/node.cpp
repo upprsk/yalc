@@ -78,8 +78,10 @@ auto Decl::as_multi_var() -> MultiVarDecl& { return static_cast<MultiVarDecl&>(*
 auto Decl::as_multi_def() -> MultiVarDecl& { return static_cast<MultiVarDecl&>(*this); }
 // clang-format on
 
-auto Expr::is_id_discard() const -> bool {
-    return kind == ExprKind::Id && as_id().value == "_";
+auto Expr::is_id_discard() const -> bool { return is_id_with_value("_"); }
+
+auto Expr::is_id_with_value(std::string_view value) const -> bool {
+    return kind == ExprKind::Id && as_id().value == value;
 }
 
 void to_json(nlohmann::json& j, ExprKind const& n) { j = fmt::to_string(n); }

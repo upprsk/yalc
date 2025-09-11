@@ -63,6 +63,8 @@ struct State {
     ErrorReporter& er;
     ty::TypeStore& ts;
     Options const& opts;
+
+    Symbol* typeof_symbol = nullptr;
 };
 
 // ----------------------------------------------------------------------------
@@ -230,11 +232,9 @@ auto coerce_type(State& s, ty::Type source, ty::Type target,
         return {.type = target, .requires_a_cast = true};
     }
 
-    // both are comptime_int
-    if (target.is_comptime_int()) return {.type = target};
-
-    // both are bool
-    if (target.is_bool()) return {.type = target};
+    // both are the same of a type withou any extra data
+    if (target.is_comptime_int() || target.is_type() || target.is_bool())
+        return {.type = target};
 
     // both are integers
     if (target.is_int()) return coerce_type_int(s, source, target, opts);
@@ -545,7 +545,27 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
         case ast::ExprKind::Cast: break;
 
         case ast::ExprKind::Field:
-        case ast::ExprKind::Call: break;
+        case ast::ExprKind::Call: {
+            auto& call = expr->as_call();
+            if (call.callee && call.callee->is_id_with_value("typeof")) {
+                if (call.args.size() != 1) {
+                    s.er.report_error(
+                        call.args_loc,
+                        "incorrect number of arguments for function, "
+                        "expected 1 but got {}",
+                        call.args.size());
+
+                    if (call.args.size() < 1) return {};  // error value
+                }
+
+                return {.type = ty::make_type(),
+                        .as = {.type = call.args[0]->type}};
+            }
+
+            s.er.report_error(call.loc,
+                              "can not call this function at compile-time");
+            return {};  // error type
+        } break;
 
         case ast::ExprKind::Ptr: {
             auto& ptr = expr->as_ptr();
@@ -1997,7 +2017,9 @@ void sema_decl(State& s, Scope& scope, ast::Decl* decl) {
 
 // ----------------------------------------------------------------------------
 
-void define_builtins(ty::TypeStore& /* ts */, Scope& builtin_scope) {
+void define_builtins(State& s, Scope& builtin_scope) {
+    auto& ts = s.ts;
+
     auto s8_type = ty::make_int(1, true);
     auto u8_type = ty::make_int(1, false);
     auto s16_type = ty::make_int(2, true);
@@ -2030,6 +2052,15 @@ void define_builtins(ty::TypeStore& /* ts */, Scope& builtin_scope) {
         {.type = ty::make_bool(),
          .as = {.boolean = {.value = false, .has_value = true}}},
         false, true);
+
+    s.typeof_symbol = builtin_scope.define(
+        "typeof", {},
+        // FIXME: the argument type is #error#, as that should not trigger any
+        // error messages and allow any coercions. Need Something better.
+        {.type = ts.type_func(std::array{ty::Type{}}, {}),
+         // FIXME: do we put anything here? Some marker that it is a builtin?
+         .as = {.func_decl = nullptr}},
+        false, true);
 }
 
 void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
@@ -2043,7 +2074,7 @@ void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
                                .current_decl = nullptr,
                                .symbol_store = &symbol_store};
 
-    define_builtins(s.ts, builtin_scope);
+    define_builtins(s, builtin_scope);
 
     auto scope = builtin_scope.make_child({});
 

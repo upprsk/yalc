@@ -13,11 +13,16 @@ func main() {
     var string_var: string;
     var slice_var:  []const u8;
 
-    test_string(string_var);
-    test_slice(string_var);
+    var hey: typeof(string_var);
 
-    test_string(slice_var);
-    test_slice(slice_var);
+    // test_string(string_var);
+    // test_slice(string_var);
+
+    // test_string(slice_var);
+    // test_slice(slice_var);
+
+    test_string(hey);
+    test_slice(hey);
 }
 
 // vim: ft=yal
