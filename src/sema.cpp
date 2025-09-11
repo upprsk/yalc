@@ -3,6 +3,7 @@
 #include <fmt/ranges.h>
 
 #include <algorithm>
+#include <ranges>
 #include <string_view>
 
 #include "error_reporter.hpp"
@@ -952,6 +953,16 @@ struct VarDesc {
     bool should_fixup;
 };
 
+struct MultiVarDesc {
+    std::span<ast::MultiVarName const> names;
+    std::span<ast::Expr* const>        type_exprs;
+    std::span<ast::Expr* const>        inits;
+    Location                           loc;
+
+    bool should_fixup;
+};
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
     // var x;              // type=null and init=null -> error
     // var x: type;        // init=null -> ok
@@ -1046,6 +1057,167 @@ auto sema_some_var(State& s, Scope& scope, VarDesc const& var) -> ty::Type {
     }
 
     return expected_type;
+}
+
+auto sema_some_multi_var(State& s, Scope& scope, MultiVarDesc const& var)
+    -> std::vector<ty::Type> {
+    for (auto const& type : var.type_exprs) {
+        sema_expr(s, scope, type, ty::make_type());
+    }
+
+    auto expected_types = std::vector<ty::Type>{};
+    for (auto const& type_expr : var.type_exprs) {
+        auto expr = eval_expr_to_type(s, scope, type_expr);
+        expected_types.push_back(expr);
+    }
+
+    for (auto const& [idx, init_expr] : std::views::enumerate(var.inits)) {
+        auto expected_type = ty::Type{};
+        if (static_cast<size_t>(idx) < expected_types.size())
+            expected_type = expected_types[idx];
+
+        sema_expr(s, scope, init_expr, expected_type);
+    }
+
+    // type=empty and init=empty -> error
+    //     var x, y;
+    //
+    // type=1 and init=empty -> spread type to all
+    //     var x, y: s32;
+    //
+    // type=names and init=empty -> match types to names
+    //     var x, y: s32, u32;
+    //
+    // type!=names and init=empty -> invalid combination
+    //     var x, y, z: s32, u32;
+    //
+    // type=empty and init!empty -> need to spread any function calls with
+    // multiple returns and fixup
+    //     var x, y = 10, 11;
+    //     var x, y = call_that_returns_2_things();
+    //
+    // type!empty and init!empty -> need to spread any function calls with
+    // multiple returns, do fixup and then coercion
+    //     var x, y: s32, s32 = 10, 11;
+    //     var x, y: s32, s32 = call_that_returns_2_things();
+
+    if (expected_types.empty() && var.inits.empty()) {
+        s.er.report_error(var.loc,
+                          "variable declaration requires at least type or "
+                          "initializer, got none");
+    }
+
+    else if (expected_types.size() == 1 && var.inits.empty()) {
+        auto expected_type = expected_types[0];
+        expected_types.resize(var.names.size(), expected_type);
+    }
+
+    else if (expected_types.size() == var.names.size() && var.inits.empty()) {
+        // every name has a type, everything is already setup
+    }
+
+    else if (var.inits.empty()) {
+        // invalid combination, can not spread and number of names and types
+        // does not match
+        s.er.report_error(var.loc,
+                          "wrong number of types in variable declaration, "
+                          "found {} identifiers but {} types",
+                          var.names.size(), expected_types.size());
+    }
+
+    else if (expected_types.empty()) {
+        for (auto const& init_expr : var.inits) {
+            if (init_expr->type.is_tuple()) {
+                for (auto const& ty : init_expr->type.as.tuple->items) {
+                    expected_types.push_back(ty);
+                }
+            } else {
+                expected_types.push_back(init_expr->type);
+            }
+        }
+
+        if (var.names.size() != expected_types.size()) {
+            s.er.report_error(var.loc,
+                              "wrong number of values in variable declaration, "
+                              "found {} identifiers but {} values",
+                              var.names.size(), expected_types.size());
+
+            for (auto const init_expr : var.inits) {
+                if (init_expr->type.is_tuple()) {
+                    s.er.report_note(
+                        init_expr->loc,
+                        "this function returns {} values of types {}",
+                        init_expr->type.as.tuple->items.size(),
+                        init_expr->type);
+                }
+            }
+        }
+    }
+
+    else {
+        std::vector<std::pair<ty::Type, Location>> init_types;
+        for (auto const& init_expr : var.inits) {
+            if (init_expr->type.is_tuple()) {
+                for (auto const& ty : init_expr->type.as.tuple->items) {
+                    init_types.emplace_back(ty, init_expr->loc);
+                }
+            } else {
+                init_types.emplace_back(init_expr->type, init_expr->loc);
+            }
+        }
+
+        if (var.names.size() != expected_types.size()) {
+            s.er.report_error(var.loc,
+                              "wrong number of types in variable declaration, "
+                              "found {} identifiers but {} types",
+                              var.names.size(), expected_types.size());
+        }
+
+        if (expected_types.size() != init_types.size()) {
+            s.er.report_error(var.loc,
+                              "wrong number of values in variable declaration, "
+                              "found {} types but {} values",
+                              expected_types.size(), init_types.size());
+        }
+
+        auto count = std::min(expected_types.size(), init_types.size());
+        for (size_t i = 0; i < count; ++i) {
+            auto expected_type = expected_types[i];
+            auto expected_type_expr = var.type_exprs[i];
+            auto init_type = init_types[i];
+
+            // we may have failed to get the type from type_expr, in such case
+            // we don't do anything here
+            if (expected_type.is_valid()) {
+                auto result =
+                    coerce_type(s, init_type.first, expected_type,
+                                {.loc = var.loc,
+                                 .source_loc = init_type.second,
+                                 .target_loc = expected_type_expr->loc});
+                if (result.source_requires_fixup) {
+                    fixup_comptime_integers_in_expr(s, expected_type_expr,
+                                                    result.type);
+                }
+
+                // FIXME: handle when an implicit conversion happens, as that
+                // requires an additonal AST node.
+
+                if (s.opts.verbose_coercions) {
+                    s.er.report_debug(
+                        var.loc,
+                        "{} -> {} result={} (requires_a_cast={}, "
+                        "source_requires_fixup={})",
+                        init_type, expected_type, result.type,
+                        result.requires_a_cast ? "yes" : "no",
+                        result.source_requires_fixup ? "yes" : "no");
+                }
+
+                expected_type = result.type;
+            }
+        }
+    }
+
+    return expected_types;
 }
 
 // ============================================================================
@@ -1327,6 +1499,26 @@ void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
     }
 }
 
+void sema_stmt_multi_var(State& s, Scope& scope, ast::MultiVarStmt& stmt) {
+    auto expected_type = sema_some_multi_var(s, scope,
+                                             {.names = stmt.names,
+                                              .type_exprs = stmt.types,
+                                              .inits = stmt.inits,
+                                              .loc = stmt.loc,
+                                              .should_fixup = true});
+
+    for (size_t i = 0; i < stmt.names.size(); ++i) {
+        auto& name = stmt.names[i];
+        auto  type = ty::Type{};
+        if (i < expected_type.size()) type = expected_type[i];
+
+        if (!name.name_is_discard()) {
+            name.sym = scope.define(name.name, name.loc,
+                                    {.type = type, .as = {}}, true, false);
+        }
+    }
+}
+
 void sema_stmt_assign(State& s, Scope& scope, ast::AssignStmt& stmt) {
     sema_expr(s, scope, stmt.lhs, {});
 
@@ -1394,8 +1586,12 @@ void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
 
         case ast::StmtKind::Var: sema_stmt_var(s, scope, stmt->as_var()); break;
 
-        case ast::StmtKind::Def:
+        case ast::StmtKind::Def: PANIC("SEMA: not implemented", *stmt);
+
         case ast::StmtKind::MultiVar:
+            sema_stmt_multi_var(s, scope, stmt->as_multi_var());
+            break;
+
         case ast::StmtKind::MultiDef: PANIC("SEMA: not implemented", *stmt);
 
         case ast::StmtKind::Assign:

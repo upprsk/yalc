@@ -289,6 +289,10 @@ struct MultiVarName {
     Location         loc;
 
     Symbol* sym = nullptr;
+
+    [[nodiscard]] constexpr auto name_is_discard() const -> bool {
+        return name == "_";
+    }
 };
 
 struct MultiVarStmt : public Stmt {

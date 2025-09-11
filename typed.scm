@@ -51,18 +51,30 @@
   (FuncDecl "main"
     sym: (Symbol "main" const (Value func()))
     (BlockStmt
+      (MultiVarStmt
+        names:
+        (a
+          sym: (Symbol "a" local (Value s32)))
+        (b
+          sym: (Symbol "b" local (Value s32)))
+        inits:
+        (CallExpr (s32, s32)
+          (IdExpr func() (s32, s32) "noice"
+            sym: (Symbol "noice" const (Value func() (s32, s32))))))
       (VarStmt "x"
         sym: (Symbol "x" local (Value s32))
-        (IdExpr type "s32"
-          sym: (Symbol "s32" const (Value type s32)))
+        #nullptr#
         (AddExpr s32
           (IntExpr s32 10)
-          (IdExpr "a")))
+          (IdExpr s32 "a"
+            sym: (Symbol "a" local (Value s32)))))
       (VarStmt "y"
         sym: (Symbol "y" local (Value s32))
-        (IdExpr type "s32"
-          sym: (Symbol "s32" const (Value type s32)))
-        (IntExpr s32 20))
+        #nullptr#
+        (AddExpr s32
+          (IntExpr s32 20)
+          (IdExpr s32 "b"
+            sym: (Symbol "b" local (Value s32)))))
       (VarStmt "z"
         sym: (Symbol "z" local (Value s32))
         #nullptr#

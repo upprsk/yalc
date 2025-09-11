@@ -11,10 +11,10 @@ func noice() (s32, s32) {
 }
 
 func main() {
-    // var a = noice();
+    var a, b = noice();
 
-    var x: s32 = 10 + a;
-    var y: s32 = 20;
+    var x = 10 + a;
+    var y = 20 + b;
     var z = add_ptrs(x&, y&);
 }
 
