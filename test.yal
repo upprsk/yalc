@@ -3,13 +3,20 @@ module main;
 def KB    = 1024;
 def BUFSZ = KB;
 
-// def S = struct {};
+def Counter = struct {
+    start: s32 = 0;
+    end:   s32;
+};
+
+// def SP = struct($T: type) {};
 
 func main() {
-    if this_is_some_expr {
-    }
+    def Local_Struct = struct {
+        a: s32;
+        b: struct {
+            ls: s32;
+        };
+    };
 }
-
-func another_func() {}
 
 // vim: ft=yal

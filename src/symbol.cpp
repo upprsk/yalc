@@ -9,14 +9,17 @@ namespace yal {
 using nlohmann::json;
 
 auto SymbolStore::new_sym(std::string_view name, Location name_loc, Value value,
-                          bool is_local, bool is_const) -> Symbol* {
+                          bool is_local, bool is_const, bool is_fully_defined)
+    -> Symbol* {
     auto d = sym_arena.create<Symbol>(
         Symbol{.name = sym_arena.alloc_string_view(name),
                .name_loc = name_loc,
                .value = value,
                .flags = SymbolFlags{} |
                         (is_const ? SymbolFlags::Const : SymbolFlags::None) |
-                        (is_local ? SymbolFlags::Local : SymbolFlags::None)});
+                        (is_local ? SymbolFlags::Local : SymbolFlags::None) |
+                        (is_fully_defined ? SymbolFlags::FullyDefined
+                                          : SymbolFlags::None)});
     all_syms.push_back(d);
 
     return d;
@@ -79,6 +82,7 @@ auto fmt::formatter<yal::Symbol>::format(yal::Symbol const& p,
     if (p.is_const()) fmt::format_to(ctx.out(), " const");
     if (p.is_extern()) fmt::format_to(ctx.out(), " extern");
     if (p.is_distinct()) fmt::format_to(ctx.out(), " distinct");
+    if (!p.is_fully_defined()) fmt::format_to(ctx.out(), " not fully defined");
 
     return fmt::format_to(ctx.out(), " {})", p.value);
 }

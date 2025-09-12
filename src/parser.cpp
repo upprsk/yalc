@@ -776,6 +776,8 @@ public:
                                        type_expr, expr);
         }
 
+        if (match("struct")) return parse_struct();
+
         // this needs to be after keywords
         if (check(TokenType::Id)) {
             // make sure that we are not trying to do something stupid
@@ -930,6 +932,62 @@ public:
 
         return ast_file->expr_array(to_loc(start_span.extend(prev_span())),
                                     count, inner, is_const);
+    }
+
+    /// These are some tokens that can not appear in a struct type definition,
+    /// so we can break out.
+    [[nodiscard]] auto is_struct_terminator() const -> bool {
+        return check("func") || check("import") || check("def") || check("var");
+    }
+
+    auto parse_struct() -> ast::Expr* {
+        auto start_span = prev_span();
+
+        if (match(TokenType::Lparen))
+            PANIC("struct parameters not implemented");
+
+        std::vector<ast::StructField> fields;
+        auto had_missing_brace = !consume(TokenType::Lbrace);
+
+        while (!is_at_end() && !check(TokenType::Rbrace) &&
+               !is_struct_terminator()) {
+            auto name_span = span();
+            if (is_kw_and_report(name_span) ||
+                !consume_with_note(TokenType::Id, "expected field name")) {
+                recover_parse_struct_field();
+                continue;
+            }
+
+            // TODO: support defining multiple fields at once?
+            //     struct {
+            //         a, b: s32;
+            //     }
+
+            auto name = name_span.str(source);
+
+            (void)consume(TokenType::Colon);
+            auto type_expr = parse_expr();
+
+            ast::Expr* init = nullptr;
+            if (match(TokenType::Equal)) {
+                init = parse_expr_without_recover();
+            }
+
+            (void)consume(TokenType::Semi);
+
+            fields.push_back(ast::StructField{
+                .name = name,
+                .loc = to_loc(name_span.extend(prev_span())),
+                .name_loc = to_loc(name_span),
+                .type_expr = type_expr,
+                .init = init,
+            });
+        }
+
+        if (!had_missing_brace) (void)consume(TokenType::Rbrace);
+
+        return ast_file->expr_struct(to_loc(start_span.extend(prev_span())),
+                                     fields);
     }
 
     auto parse_call(ast::Expr* callee) -> ast::Expr* {
@@ -1278,6 +1336,11 @@ public:
         skip_while_not(TokenType::Eof, TokenType::Comma, TokenType::Rparen,
                        TokenType::Lbrace, TokenType::Semi, TokenType::Attribute,
                        "var", "def", "func");
+    }
+
+    void recover_parse_struct_field() {
+        skip_while_not(TokenType::Eof, TokenType::Rbrace, TokenType::Semi,
+                       TokenType::Attribute, "var", "def", "func");
     }
 
     void recover_parse_func_paramlist() {

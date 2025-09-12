@@ -45,6 +45,7 @@ enum struct ExprKind : uint8_t {
     MultiPtr,
     Slice,
     Array,
+    Struct,
 
     Id,
     Kw,
@@ -59,6 +60,7 @@ struct FieldExpr;
 struct CallExpr;
 struct PtrExpr;
 struct ArrayExpr;
+struct StructExpr;
 struct IdExpr;
 struct KwExpr;
 struct IntExpr;
@@ -87,6 +89,7 @@ struct Expr {
     [[nodiscard]] auto as_call() const -> CallExpr const&;
     [[nodiscard]] auto as_ptr() const -> PtrExpr const&;
     [[nodiscard]] auto as_array() const -> ArrayExpr const&;
+    [[nodiscard]] auto as_struct() const -> StructExpr const&;
     [[nodiscard]] auto as_id() const -> IdExpr const&;
     [[nodiscard]] auto as_kw() const -> KwExpr const&;
     [[nodiscard]] auto as_int() const -> IntExpr const&;
@@ -99,6 +102,7 @@ struct Expr {
     [[nodiscard]] auto as_call() -> CallExpr&;
     [[nodiscard]] auto as_ptr() -> PtrExpr&;
     [[nodiscard]] auto as_array() -> ArrayExpr&;
+    [[nodiscard]] auto as_struct() -> StructExpr&;
     [[nodiscard]] auto as_id() -> IdExpr&;
     [[nodiscard]] auto as_kw() -> KwExpr&;
     [[nodiscard]] auto as_int() -> IntExpr&;
@@ -172,6 +176,33 @@ struct ArrayExpr : Expr {
     Expr* count;
     Expr* inner;
     bool  is_const;
+};
+
+struct StructField {
+    std::string_view name;
+    Location         loc;
+    Location         name_loc;
+
+    Expr* type_expr;
+    Expr* init;
+    Value init_value = {};
+
+    // TODO: Do we want attributes here?
+
+    ty::Type type = {};
+
+    [[nodiscard]] constexpr auto name_is_discard() const -> bool {
+        return name == "_";
+    }
+};
+
+struct StructExpr : Expr {
+    std::span<StructField> fields;
+
+    // this is so that we can handle recursive structs.
+    ty::Type ty_struct = {};
+
+    // TODO: struct parameters
 };
 
 struct IdExpr : public Expr {
@@ -516,6 +547,8 @@ void to_json(nlohmann::json& j, Expr const& n);
 void to_json(nlohmann::json& j, Stmt const& n);
 void to_json(nlohmann::json& j, Decl const& n);
 
+void to_json(nlohmann::json& j, StructField const& n);
+
 void to_json(nlohmann::json& j, MultiVarName const& n);
 void to_json(nlohmann::json& j, DeclAttributeKV const& n);
 void to_json(nlohmann::json& j, DeclAttribute const& n);
@@ -528,6 +561,8 @@ void to_lisp(fmt::format_context& ctx, Stmt const* stmt, int depth = 0);
 void to_lisp(fmt::format_context& ctx, Stmt const& stmt, int depth = 0);
 void to_lisp(fmt::format_context& ctx, Decl const* decl, int depth = 0);
 void to_lisp(fmt::format_context& ctx, Decl const& decl, int depth = 0);
+
+void to_lisp(fmt::format_context& ctx, StructField const& n, int depth = 0);
 
 void to_lisp(fmt::format_context& ctx, MultiVarName const& n, int depth = 0);
 void to_lisp(fmt::format_context& ctx, DeclAttributeKV const& n, int depth = 0);

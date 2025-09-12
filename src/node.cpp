@@ -24,6 +24,7 @@ auto Expr::as_field() const -> FieldExpr const& { return static_cast<FieldExpr c
 auto Expr::as_call() const -> CallExpr const& { return static_cast<CallExpr const&>(*this); }
 auto Expr::as_ptr() const -> PtrExpr const& { return static_cast<PtrExpr const&>(*this); }
 auto Expr::as_array() const -> ArrayExpr const& { return static_cast<ArrayExpr const&>(*this); }
+auto Expr::as_struct() const -> StructExpr const& { return static_cast<StructExpr const&>(*this); }
 auto Expr::as_id() const -> IdExpr const& { return static_cast<IdExpr const&>(*this); }
 auto Expr::as_kw() const -> KwExpr const& { return static_cast<KwExpr const&>(*this); }
 auto Expr::as_int() const -> IntExpr const& { return static_cast<IntExpr const&>(*this); }
@@ -36,6 +37,7 @@ auto Expr::as_field() -> FieldExpr& { return static_cast<FieldExpr&>(*this); }
 auto Expr::as_call() -> CallExpr& { return static_cast<CallExpr&>(*this); }
 auto Expr::as_ptr() -> PtrExpr& { return static_cast<PtrExpr&>(*this); }
 auto Expr::as_array() -> ArrayExpr& { return static_cast<ArrayExpr&>(*this); }
+auto Expr::as_struct() -> StructExpr& { return static_cast<StructExpr&>(*this); }
 auto Expr::as_id() -> IdExpr& { return static_cast<IdExpr&>(*this); }
 auto Expr::as_kw() -> KwExpr& { return static_cast<KwExpr&>(*this); }
 auto Expr::as_int() -> IntExpr& { return static_cast<IntExpr&>(*this); }
@@ -110,6 +112,17 @@ void to_json_arr(json& j, std::span<T> const& items) {
     }
 }
 
+void to_json(nlohmann::json& j, StructField const& n) {
+    j = json{
+        {      "name",                              n.name},
+        {       "loc",                               n.loc},
+        {  "name_loc",                          n.name_loc},
+        { "type_expr", n.type_expr ? *n.type_expr : json{}},
+        {      "init",           n.init ? *n.init : json{}},
+        {"init_value",                        n.init_value},
+    };
+}
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void to_json(nlohmann::json& j, Expr const& n) {
     j = json{
@@ -179,6 +192,11 @@ void to_json(nlohmann::json& j, Expr const& n) {
             j["count"] = arr.count ? *arr.count : json{};
             j["inner"] = arr.inner ? *arr.inner : json{};
             j["is_const"] = arr.is_const;
+        } break;
+
+        case ExprKind::Struct: {
+            auto& s = n.as_struct();
+            j["fields"] = s.fields;
         } break;
 
         case ExprKind::Id: {
@@ -392,6 +410,24 @@ void to_lisp_arr(fmt::format_context& ctx, std::span<T> const& items,
     }
 }
 
+void to_lisp(fmt::format_context& ctx, StructField const& n, int depth) {
+    fmt::format_to(ctx.out(), "(StructField");
+    if (n.type.is_valid()) fmt::format_to(ctx.out(), " {}", n.type);
+    fmt::format_to(ctx.out(), " {:?}", n.name);
+
+    indent_by_wln(ctx, depth + 1);
+    to_lisp(ctx, n.type_expr, depth + 1);
+    indent_by_wln(ctx, depth + 1);
+    to_lisp(ctx, n.init, depth + 1);
+
+    if (n.init_value.is_valid()) {
+        indent_by_wln(ctx, depth + 1);
+        fmt::format_to(ctx.out(), "init_value: {}", n.init_value);
+    }
+
+    fmt::format_to(ctx.out(), ")");
+}
+
 void to_lisp(fmt::format_context& ctx, Expr const* expr, int depth) {
     if (expr) {
         to_lisp(ctx, *expr, depth);
@@ -496,6 +532,16 @@ void to_lisp(fmt::format_context& ctx, Expr const& expr, int depth) {
 
             indent_by_wln(ctx, depth + 1);
             to_lisp(ctx, arr.inner, depth + 1);
+        } break;
+
+        case ExprKind::Struct: {
+            auto& s = expr.as_struct();
+            if (s.ty_struct.is_valid()) {
+                indent_by_wln(ctx, depth + 1);
+                fmt::format_to(ctx.out(), " (type: {})", s.ty_struct);
+            }
+
+            to_lisp_arr(ctx, s.fields, depth + 1);
         } break;
 
         case ExprKind::Id: {
@@ -825,6 +871,7 @@ auto fmt::formatter<yal::ast::ExprKind>::format(yal::ast::ExprKind const& p,
         case yal::ast::ExprKind::MultiPtr: name = "MultiPtr"; break;
         case yal::ast::ExprKind::Slice: name = "Slice"; break;
         case yal::ast::ExprKind::Array: name = "Array"; break;
+        case yal::ast::ExprKind::Struct: name = "Struct"; break;
         case yal::ast::ExprKind::Id: name = "Id"; break;
         case yal::ast::ExprKind::Kw: name = "Kw"; break;
         case yal::ast::ExprKind::Int: name = "Int"; break;

@@ -149,6 +149,14 @@ void scan_expr_for_global_refs(State& s, LocalScope& scope, ast::Expr* expr) {
             scan_expr_for_global_refs(s, scope, arr.inner);
         } break;
 
+        case ExprKind::Struct: {
+            auto& st = expr->as_struct();
+            for (auto const& field : st.fields) {
+                scan_expr_for_global_refs(s, scope, field.type_expr);
+                scan_expr_for_global_refs(s, scope, field.init);
+            }
+        } break;
+
         case ExprKind::Id: {
             auto& id = expr->as_id();
             if (!scope.has_local(id.value)) {

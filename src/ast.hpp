@@ -118,6 +118,17 @@ struct File {
             Expr{.kind = ExprKind::Array, .loc = loc}, count, inner, is_const);
     }
 
+    auto expr_struct(Location loc, std::span<StructField const> fields)
+        -> StructExpr* {
+        auto afields = node_arena.alloc<StructField>(fields);
+        for (auto& field : afields) {
+            field.name = strings_arena.alloc_string_view(field.name);
+        }
+
+        return node_arena.create<StructExpr>(
+            Expr{.kind = ExprKind::Struct, .loc = loc}, afields);
+    }
+
     auto expr_id(Location loc, std::string_view name) -> IdExpr* {
         return node_arena.create<IdExpr>(Expr{.kind = ExprKind::Id, .loc = loc},
                                          strings_arena.alloc_string_view(name));

@@ -31,6 +31,7 @@ enum struct TypeKind : uint8_t {
     Slice,
 
     Array,
+    Struct,
 
     Func,
     Tuple,  // just for function returns!
@@ -69,14 +70,16 @@ struct TypeInt {
 
 struct TypePtr;
 struct TypeArray;
+struct TypeStruct;
 struct TypeFunc;
 struct TypeTuple;
 union TypeAs {
-    TypeInt    integer;
-    TypePtr*   ptr;
-    TypeArray* array;
-    TypeFunc*  func;
-    TypeTuple* tuple;
+    TypeInt     integer;
+    TypePtr*    ptr;
+    TypeArray*  array;
+    TypeStruct* st;
+    TypeFunc*   func;
+    TypeTuple*  tuple;
 };
 
 struct Type {
@@ -162,6 +165,18 @@ struct TypeArray {
     Type     inner;
 };
 
+struct TypeStructField {
+    std::string_view name;
+    ty::Type         type;
+    // FIXME: how to store initial type?
+    // TIP: we could put it in sym and have structs always have syms, even
+    // without a name!
+};
+
+struct TypeStruct {
+    std::span<TypeStructField> fields;
+};
+
 struct TypeFunc {
     std::span<Type> params;
     std::span<Type> rets;
@@ -223,6 +238,16 @@ struct TypeStore {
                 .as = {.array = array},
                 .sym = sym};
     }
+
+    auto type_struct(std::span<TypeStructField const> fields,
+                     Symbol*                          sym = nullptr) -> Type {
+        auto afields = arena.alloc<TypeStructField>(fields);
+        for (auto& field : afields)
+            field.name = arena.alloc_string_view(field.name);
+
+        auto st = arena.create<TypeStruct>(afields);
+        return {.kind = TypeKind::Struct, .as = {.st = st}, .sym = sym};
+    }
 };
 
 constexpr auto make_pending_cast(Symbol* sym = nullptr) -> Type {
@@ -264,8 +289,22 @@ void to_json(nlohmann::json& j, TypeKind const& n);
 void to_json(nlohmann::json& j, TypeFlags const& n);
 void to_json(nlohmann::json& j, Type const& n);
 
-void to_repr(fmt::format_context& ctx, Type const* type);
-void to_repr(fmt::format_context& ctx, Type const& type);
+void to_json(nlohmann::json& j, TypeStructField const& n);
+
+struct TypeReprOptions {
+    bool short_structs = false;
+
+    [[nodiscard]] constexpr auto with_short_structs() const -> TypeReprOptions {
+        auto o = *this;
+        o.short_structs = true;
+        return o;
+    }
+};
+
+void to_repr(fmt::format_context& ctx, Type const* type,
+             TypeReprOptions const& opts = {});
+void to_repr(fmt::format_context& ctx, Type const& type,
+             TypeReprOptions const& opts = {});
 
 }  // namespace yal::ty
 

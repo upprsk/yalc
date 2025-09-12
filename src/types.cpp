@@ -17,6 +17,13 @@ void to_json(nlohmann::json& j, TypeFlags const& n) {
     if (n.value & TypeFlags::Const) j.push_back("const");
 }
 
+void to_json(nlohmann::json& j, TypeStructField const& n) {
+    j = json{
+        {"name", n.name},
+        {"type", n.type},
+    };
+}
+
 void to_json(nlohmann::json& j, Type const& n) {
     j = json{
         { "kind",  n.kind},
@@ -45,6 +52,8 @@ void to_json(nlohmann::json& j, Type const& n) {
             j["inner"] = n.as.array->inner;
             break;
 
+        case TypeKind::Struct: j["fields"] = n.as.st->fields; break;
+
         case TypeKind::Func:
             j["params"] = n.as.func->params;
             j["rets"] = n.as.func->rets;
@@ -54,16 +63,18 @@ void to_json(nlohmann::json& j, Type const& n) {
     }
 }
 
-void to_repr(fmt::format_context& ctx, Type const* type) {
+void to_repr(fmt::format_context& ctx, Type const* type,
+             TypeReprOptions const& opts) {
     if (type) {
-        to_repr(ctx, *type);
+        to_repr(ctx, *type, opts);
     } else {
         fmt::format_to(ctx.out(), "#nullptr#");
     }
 }
 
-void to_repr(fmt::format_context& ctx, Type const& type) {
-    if (type.sym) fmt::format_to(ctx.out(), "{} (distinct of ", type.sym->name);
+void to_repr(fmt::format_context& ctx, Type const& type,
+             TypeReprOptions const& opts) {
+    if (type.sym) fmt::format_to(ctx.out(), "{} (", type.sym->name);
 
     switch (type.kind) {
         case TypeKind::Err: fmt::format_to(ctx.out(), "#error#"); break;
@@ -87,23 +98,44 @@ void to_repr(fmt::format_context& ctx, Type const& type) {
         case TypeKind::Ptr:
             fmt::format_to(ctx.out(), "*{}",
                            type.flags.is_const() ? "const " : "");
-            to_repr(ctx, type.as.ptr->inner);
+            to_repr(ctx, type.as.ptr->inner, opts);
             break;
         case TypeKind::MultiPtr:
             fmt::format_to(ctx.out(), "[*]{}",
                            type.flags.is_const() ? "const " : "");
-            to_repr(ctx, type.as.ptr->inner);
+            to_repr(ctx, type.as.ptr->inner, opts);
             break;
         case TypeKind::Slice:
             fmt::format_to(ctx.out(), "[]{}",
                            type.flags.is_const() ? "const " : "");
-            to_repr(ctx, type.as.ptr->inner);
+            to_repr(ctx, type.as.ptr->inner, opts);
             break;
 
         case TypeKind::Array:
             fmt::format_to(ctx.out(), "[{}]{}", type.as.array->count,
                            type.flags.is_const() ? "const " : "");
-            to_repr(ctx, type.as.array->inner);
+            to_repr(ctx, type.as.array->inner, opts);
+            break;
+
+        case TypeKind::Struct:
+            fmt::format_to(ctx.out(), "struct {{");
+
+            if (opts.short_structs) {
+                fmt::format_to(ctx.out(), " ... ");
+            } else {
+                for (auto const& [idx, field] :
+                     std::views::enumerate(type.as.st->fields)) {
+                    fmt::format_to(ctx.out(), "{}: ", field.name);
+                    to_repr(ctx, field.type, opts.with_short_structs());
+                    if (static_cast<size_t>(idx) !=
+                        type.as.st->fields.size() - 1)
+                        // NOTE: this is not a semicolon because that breakes
+                        // lisp syntax highlighting
+                        fmt::format_to(ctx.out(), ", ");
+                }
+            }
+
+            fmt::format_to(ctx.out(), "}}");
             break;
 
         case TypeKind::Func:
@@ -145,6 +177,7 @@ auto fmt::formatter<yal::ty::TypeKind>::format(yal::ty::TypeKind const& p,
         case yal::ty::TypeKind::MultiPtr: name = "MultiPtr"; break;
         case yal::ty::TypeKind::Slice: name = "Slice"; break;
         case yal::ty::TypeKind::Array: name = "Array"; break;
+        case yal::ty::TypeKind::Struct: name = "Struct"; break;
         case yal::ty::TypeKind::Func: name = "Func"; break;
         case yal::ty::TypeKind::Tuple: name = "Tuple"; break;
     }

@@ -23,6 +23,7 @@ struct Scope {
     std::vector<Symbol*> symbols;
 
     ast::Decl*   current_decl;
+    Symbol*      current_sym;
     SymbolStore* symbol_store;
 
     constexpr auto define(Symbol* sym) -> Symbol* {
@@ -31,9 +32,10 @@ struct Scope {
     }
 
     constexpr auto define(std::string_view name, Location name_loc, Value value,
-                          bool is_local, bool is_const) -> Symbol* {
-        auto sym =
-            symbol_store->new_sym(name, name_loc, value, is_local, is_const);
+                          bool is_local, bool is_const,
+                          bool is_fully_defined = false) -> Symbol* {
+        auto sym = symbol_store->new_sym(name, name_loc, value, is_local,
+                                         is_const, is_fully_defined);
         symbols.push_back(sym);
         return sym;
     }
@@ -56,6 +58,7 @@ struct Scope {
                 .loc = loc,
                 .symbols = {},
                 .current_decl = current_decl,
+                .current_sym = current_sym,
                 .symbol_store = symbol_store};
     }
 };
@@ -520,6 +523,12 @@ auto remove_ptr(ty::Type ty) -> ty::Type {
 
 auto eval_expr_to_type(State& s, Scope& scope, ast::Expr* expr) -> ty::Type;
 
+auto eval_expr_struct(State& /* s */, Scope& /* scope */, ast::StructExpr& st)
+    -> Value {
+    // structs are evaluated eagerly
+    return {.type = ty::make_type(), .as = {.type = st.ty_struct}};
+}
+
 auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
     if (!expr) {
         s.er.report_error(scope.loc,
@@ -529,7 +538,7 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
     }
 
     switch (expr->kind) {
-        case ast::ExprKind::Err:
+        case ast::ExprKind::Err: return {};  // return error value
 
         case ast::ExprKind::Neg:
         case ast::ExprKind::Add:
@@ -617,6 +626,9 @@ auto eval_expr(State& s, Scope& scope, ast::Expr* expr) -> Value {
             auto type = s.ts.type_array(count, inner, arr.is_const);
             return {.type = ty::make_type(), .as = {.type = type}};
         } break;
+
+        case ast::ExprKind::Struct:
+            return eval_expr_struct(s, scope, expr->as_struct());
 
         case ast::ExprKind::Id: {
             auto& id = expr->as_id();
@@ -722,6 +734,7 @@ void fixup_types_in_expr(State& s, ast::Expr* expr, ty::Type target_type) {
         case ast::ExprKind::MultiPtr:
         case ast::ExprKind::Slice:
         case ast::ExprKind::Array:
+        case ast::ExprKind::Struct:
             PANIC("FIXUP comptime_int: not implemented", *expr, target_type);
             break;
 
@@ -811,7 +824,8 @@ auto calc_lvalue_info(ast::Expr* expr) -> LvalueInfo {
             return {};
 
         case ast::ExprKind::Array:
-            // array type is not an lvalue
+        case ast::ExprKind::Struct:
+            // not an lvalue
             return {};
 
         case ast::ExprKind::Id: {
@@ -1163,6 +1177,106 @@ void sema_expr_ref(State& s, Scope& scope, ast::ArithExpr& expr,
     }
 }
 
+void sema_expr_struct(State& s, Scope& scope, ast::StructExpr& expr,
+                      ty::Type /* expected_type */) {
+    expr.type = ty::make_type();
+
+    {
+        // FIXME: figure out how to create struct symbols
+        Symbol* sym = nullptr;
+
+        if (scope.current_sym && !scope.current_sym->value.is_valid()) {
+            sym = scope.current_sym;
+            s.er.report_debug(expr.loc, "overriding sym for: {}", sym->name);
+        } else {
+            std::vector<Symbol*> syms;
+            auto                 it = &scope;
+            while (it) {
+                if (syms.empty() || syms.back() != it->current_sym) {
+                    if (it->current_sym) syms.push_back(it->current_sym);
+                }
+
+                it = it->parent;
+            }
+
+            auto name = fmt::format(
+                "anonymous{}@{}", expr.loc.span,
+                fmt::join(
+                    syms | std::views::reverse |
+                        std::views::transform([](auto s) { return s->name; }),
+                    "."));
+            s.er.report_debug(expr.loc, "creating new symbol: {}", name);
+            // TODO: actually create the symbol
+        }
+
+        std::vector<ty::TypeStructField> field_names;
+        for (auto const& field : expr.fields) {
+            if (!field.name_is_discard())
+                field_names.push_back({.name = field.name, .type = {}});
+        }
+
+        expr.ty_struct = s.ts.type_struct(field_names, sym);
+
+        if (sym) {
+            // NOTE: overriding the current symbol to be this struct. This
+            // allows self-referential structs, however it needs to tested a lot
+            // so that it will not cause any problems depending on how the AST
+            // is setup.
+            sym->value = {.type = ty::make_type(),
+                          .as = {.type = expr.ty_struct}};
+
+            // NOTE: marking the symbol as fully defined!
+            sym->make_fully_defined();
+        }
+    }
+
+    auto st_scope = scope.make_child(expr.loc);
+
+    size_t field_idx = 0;
+    for (auto& field : expr.fields) {
+        sema_expr(s, st_scope, field.type_expr, ty::make_type());
+
+        auto type = eval_expr_to_type(s, st_scope, field.type_expr);
+        sema_expr(s, st_scope, field.init, type);
+
+        if (field.init) {
+            auto result = coerce_type(
+                s, field.init->type, type,
+                {.loc = field.loc,
+                 .source_loc = field.init->loc,
+                 .target_loc =
+                     field.type_expr ? field.type_expr->loc : field.loc});
+            if (result.source_requires_fixup) {
+                fixup_types_in_expr(s, field.init, result.type);
+            }
+
+            // FIXME: handle when an implicit conversion happens, as
+            // that requires an additonal AST node.
+
+            if (s.opts.verbose_coercions) {
+                s.er.report_debug(field.loc,
+                                  "{} -> {} result={} (requires_a_cast={}, "
+                                  "source_requires_fixup={})",
+                                  field.init->type, type, result.type,
+                                  result.requires_a_cast ? "yes" : "no",
+                                  result.source_requires_fixup ? "yes" : "no");
+            }
+
+            auto value = eval_expr(s, scope, field.init);
+            // FIXME: handle coercing value to field.type
+            field.init_value = value;
+        }
+
+        if (field.name_is_discard()) {
+            s.er.report_error(field.name_loc,
+                              "can not name a field of struct as _ (discard)");
+        }
+
+        field.type = type;
+        expr.ty_struct.as.st->fields[field_idx++].type = field.type;
+    }
+}
+
 void sema_expr(State& s, Scope& scope, ast::Expr* expr,
                ty::Type expected_type) {
     if (!expr) return;
@@ -1216,6 +1330,7 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
         case ast::ExprKind::MultiPtr:
         case ast::ExprKind::Slice: {
             auto& ptr = expr->as_ptr();
+            ptr.type = ty::make_type();
 
             sema_expr(s, scope, ptr.inner, ty::make_type());
             if (ptr.inner && !ptr.inner->type.is_type()) {
@@ -1223,12 +1338,11 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
                                   "can not use value of type {} as type",
                                   ptr.inner->type);
             }
-
-            ptr.type = ty::make_type();
         } break;
 
         case ast::ExprKind::Array: {
             auto& arr = expr->as_array();
+            arr.type = ty::make_type();
 
             // need a way of signaling that we want any integer...
             sema_expr(s, scope, arr.count, ty::make_comptime_int());
@@ -1246,9 +1360,11 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
                                   "can not use value of type {} as type",
                                   arr.inner->type);
             }
-
-            arr.type = ty::make_type();
         } break;
+
+        case ast::ExprKind::Struct:
+            sema_expr_struct(s, scope, expr->as_struct(), expected_type);
+            break;
 
         case ast::ExprKind::Id: {
             auto& id = expr->as_id();
@@ -1260,6 +1376,16 @@ void sema_expr(State& s, Scope& scope, ast::Expr* expr,
             else if (auto sym = scope.lookup(id.value)) {
                 id.sym = sym;
                 id.type = sym->value.type;
+
+                if (!id.sym->is_fully_defined()) {
+                    s.er.report_error(
+                        id.loc, "symbol {} has not been fully defined yet",
+                        id.sym->name);
+                    if (sym->name_loc.fileid.is_valid()) {
+                        s.er.report_note(sym->name_loc, "{} declaration here",
+                                         id.sym->name);
+                    }
+                }
             } else {
                 s.er.report_error(expr->loc, "undefined identifier {:?}",
                                   id.value);
@@ -1700,9 +1826,11 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     ASSERT(decl.attached_type == "", decl.name,
            "attached types have not been implemented yet");
 
-    decl.sym = parent_scope.define(decl.name, decl.name_loc, {}, false, true);
+    decl.sym =
+        parent_scope.define(decl.name, decl.name_loc, {}, false, true, false);
 
     auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_sym = decl.sym;
     scope.current_decl = &decl;
 
     sema_attributes(s, scope, decl.sym, decl.attributes);
@@ -1719,10 +1847,12 @@ void sema_func_decl_header(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
 
     auto type = create_func_type(s, decl);
     decl.sym->value = {.type = type, .as = {.func_decl = &decl}};
+    decl.sym->make_fully_defined();
 }
 
 void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     auto scope = parent_scope.make_child(decl.name_loc);
+    // FIXME: not setting symbol here, might be a problem? Probably a problem...
     scope.current_decl = &decl;
 
     ASSERT(decl.attributes.size() == 0, decl.name,
@@ -1737,7 +1867,7 @@ void sema_var_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     if (!decl.name_is_discard()) {
         decl.sym = parent_scope.define(decl.name, decl.name_loc,
                                        {.type = expected_type, .as = {}}, false,
-                                       false);
+                                       false, true);
     }
 }
 
@@ -1749,6 +1879,7 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     }
 
     auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_sym = decl.sym;
     scope.current_decl = &decl;
 
     sema_attributes(s, scope, decl.sym, decl.attributes);
@@ -1774,6 +1905,8 @@ void sema_def_decl_header(State& s, Scope& parent_scope, ast::VarDecl& decl) {
     if (!decl.name_is_discard()) {
         decl.sym->value = value;
     }
+
+    decl.sym->make_fully_defined();
 
     if (decl.sym && decl.sym->is_distinct()) {
         auto type = decl.sym->value.type;
@@ -1962,7 +2095,9 @@ void sema_stmt_if(State& s, Scope& scope, ast::IfStmt& stmt) {
 }
 
 void sema_stmt_var(State& s, Scope& scope, ast::VarStmt& stmt) {
-    auto expected_type = sema_some_var(s, scope,
+    auto var_scope = scope.make_child(stmt.loc);
+
+    auto expected_type = sema_some_var(s, var_scope,
                                        {.type_expr = stmt.type_expr,
                                         .init = stmt.init,
                                         .loc = stmt.loc,
@@ -1980,7 +2115,10 @@ void sema_stmt_def(State& s, Scope& scope, ast::VarStmt& stmt) {
         stmt.sym = scope.define(stmt.name, stmt.name_loc, {}, false, true);
     }
 
-    /* auto expected_type = */ sema_some_var(s, scope,
+    auto def_scope = scope.make_child(stmt.loc);
+    def_scope.current_sym = stmt.sym;
+
+    /* auto expected_type = */ sema_some_var(s, def_scope,
                                              {.type_expr = stmt.type_expr,
                                               .init = stmt.init,
                                               .loc = stmt.loc,
@@ -1989,13 +2127,15 @@ void sema_stmt_def(State& s, Scope& scope, ast::VarStmt& stmt) {
         s.er.report_error(stmt.loc, "constants must have an initializer");
     }
 
-    auto value = eval_expr(s, scope, stmt.init);
+    auto value = eval_expr(s, def_scope, stmt.init);
     // FIXME: handle coercing value to expected_type
     ASSERT(stmt.type_expr == nullptr, stmt);
 
     if (!stmt.name_is_discard()) {
         stmt.sym->value = value;
     }
+
+    stmt.sym->make_fully_defined();
 
     // FIXME: currently there is no way to make a local def distinct. Keeping
     // the code here as a reminder. Do we want to add attributes to locals? Or
@@ -2015,6 +2155,8 @@ void sema_stmt_def(State& s, Scope& scope, ast::VarStmt& stmt) {
 }
 
 void sema_stmt_multi_var(State& s, Scope& scope, ast::MultiVarStmt& stmt) {
+    // FIXME: add closest_important_name to here (needs something special
+    // because of multiple names)
     auto expected_type = sema_some_multi_var(s, scope,
                                              {.names = stmt.names,
                                               .type_exprs = stmt.types,
@@ -2125,6 +2267,7 @@ void sema_stmt(State& s, Scope& scope, ast::Stmt* stmt) {
 
 void sema_func_decl(State& s, Scope& parent_scope, ast::FuncDecl& decl) {
     auto scope = parent_scope.make_child(decl.name_loc);
+    scope.current_sym = decl.sym;
     scope.current_decl = &decl;
 
     for (auto& p : decl.params) scope.define(p.sym);
@@ -2191,25 +2334,25 @@ void define_builtins(State& s, Scope& builtin_scope) {
         return Value{.type = ty::make_type(), .as = {.type = t}};
     };
 
-    builtin_scope.define("s8", {}, mkty(s8_type), false, true);
-    builtin_scope.define("u8", {}, mkty(u8_type), false, true);
-    builtin_scope.define("s16", {}, mkty(s16_type), false, true);
-    builtin_scope.define("u16", {}, mkty(u16_type), false, true);
-    builtin_scope.define("s32", {}, mkty(s32_type), false, true);
-    builtin_scope.define("u32", {}, mkty(u32_type), false, true);
-    builtin_scope.define("s64", {}, mkty(s64_type), false, true);
-    builtin_scope.define("u64", {}, mkty(u64_type), false, true);
+    builtin_scope.define("s8", {}, mkty(s8_type), false, true, true);
+    builtin_scope.define("u8", {}, mkty(u8_type), false, true, true);
+    builtin_scope.define("s16", {}, mkty(s16_type), false, true, true);
+    builtin_scope.define("u16", {}, mkty(u16_type), false, true, true);
+    builtin_scope.define("s32", {}, mkty(s32_type), false, true, true);
+    builtin_scope.define("u32", {}, mkty(u32_type), false, true, true);
+    builtin_scope.define("s64", {}, mkty(s64_type), false, true, true);
+    builtin_scope.define("u64", {}, mkty(u64_type), false, true, true);
 
     builtin_scope.define(
         "true", {},
         {.type = ty::make_bool(),
          .as = {.boolean = {.value = true, .has_value = true}}},
-        false, true);
+        false, true, true);
     builtin_scope.define(
         "false", {},
         {.type = ty::make_bool(),
          .as = {.boolean = {.value = false, .has_value = true}}},
-        false, true);
+        false, true, true);
 
     s.typeof_symbol = builtin_scope.define(
         "typeof", {},
@@ -2218,7 +2361,7 @@ void define_builtins(State& s, Scope& builtin_scope) {
         {.type = ts.type_func(std::array{ty::Type{}}, {}),
          // FIXME: do we put anything here? Some marker that it is a builtin?
          .as = {.func_decl = nullptr}},
-        false, true);
+        false, true, true);
 }
 
 void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
@@ -2230,6 +2373,7 @@ void perform_sema(ErrorReporter& er, ast::FlatModule const& module,
     auto builtin_scope = Scope{.loc = {},
                                .symbols = {},
                                .current_decl = nullptr,
+                               .current_sym = nullptr,
                                .symbol_store = &symbol_store};
 
     define_builtins(s, builtin_scope);

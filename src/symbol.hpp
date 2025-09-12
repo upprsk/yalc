@@ -30,6 +30,10 @@ struct Value {
             bool has_value;
         } boolean;
     } as;
+
+    [[nodiscard]] constexpr auto is_valid() const -> bool {
+        return type.is_valid();
+    }
 };
 
 struct SymbolFlags {
@@ -39,6 +43,7 @@ struct SymbolFlags {
         Local = 1 << 1,
         Extern = 1 << 2,
         Distinct = 1 << 3,
+        FullyDefined = 1 << 4,
     };
 
     Flag value = None;
@@ -57,6 +62,10 @@ struct SymbolFlags {
 
     [[nodiscard]] constexpr auto is_distinct() const -> bool {
         return value & Distinct;
+    }
+
+    [[nodiscard]] constexpr auto is_fully_defined() const -> bool {
+        return value & FullyDefined;
     }
 
     [[nodiscard]] constexpr auto without_extern() const -> SymbolFlags {
@@ -106,8 +115,14 @@ struct Symbol {
         return flags.is_distinct();
     }
 
+    [[nodiscard]] constexpr auto is_fully_defined() const -> bool {
+        return flags.is_fully_defined();
+    }
+
     constexpr void remove_extern() { flags = flags.without_extern(); }
     constexpr void remove_distinct() { flags = flags.without_distinct(); }
+
+    constexpr void make_fully_defined() { flags |= SymbolFlags::FullyDefined; }
 };
 
 class SymbolStore {
@@ -120,7 +135,8 @@ public:
     SymbolStore() = default;
 
     auto new_sym(std::string_view name, Location name_loc, Value value,
-                 bool is_local, bool is_const) -> Symbol*;
+                 bool is_local, bool is_const, bool is_fully_defined = false)
+        -> Symbol*;
 
     // ========================================================================
 
